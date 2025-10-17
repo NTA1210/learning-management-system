@@ -1,0 +1,174 @@
+import { APP_ORIGIN } from "../constants/env";
+import {
+  CONFLICT,
+  INTERNAL_SERVER_ERROR,
+  NOT_FOUND,
+  UNAUTHORIZED,
+} from "../constants/http";
+import VerificationCodeType from "../constants/verificationCode";
+import SessionModel from "../models/session.model";
+import UserModel from "../models/user.model";
+import VerificationCodeModel from "../models/verificationCode.model";
+import appAssert from "../utils/appAssert";
+import { ONE_DAY_MS, onYearFromNow, thirtyDaysFromNow } from "../utils/date";
+import { getVerifyEmailTemplate } from "../utils/emailTemplates";
+import {
+  RefreshTokenPayload,
+  refreshTokenSignOptions,
+  signToKen,
+  verifyToken,
+} from "../utils/jwt";
+import { sendMail } from "../utils/sendMail";
+
+export type CreateAccountParams = {
+  email: string;
+  password: string;
+  userAgent?: string;
+};
+
+export const createAccount = async (data: CreateAccountParams) => {
+  //verify existing user does not exist
+  const existingUser = await UserModel.exists({ email: data.email });
+  // if (existingUser) throw new Error("User already exists");
+  appAssert(!existingUser, CONFLICT, "Email already in use");
+  //create user
+  const user = await UserModel.create({
+    email: data.email,
+    password: data.password,
+  });
+  //create verification code
+  const verificationCode = await VerificationCodeModel.create({
+    userId: user._id,
+    type: VerificationCodeType.VERIFY_EMAIL,
+    email: data.email,
+    expiresAt: onYearFromNow(),
+  });
+  //send verification email
+
+  const url = `${APP_ORIGIN}/auth/verify-email/${verificationCode._id}`;
+  await sendMail({
+    to: "anhkn7@gmail.com",
+    ...getVerifyEmailTemplate(url),
+  });
+
+  //create session
+
+  const session = await SessionModel.create({
+    userId: user._id,
+    userAgent: data.userAgent,
+  });
+  //sign access token & refresh token
+
+  const refreshToken = signToKen(
+    { sessionId: session._id },
+    refreshTokenSignOptions
+  );
+
+  const accessToken = signToKen({ userId: user._id, sessionId: session._id });
+  //return user & tokens
+
+  return {
+    user: user.omitPassword(),
+    accessToken,
+    refreshToken,
+  };
+};
+
+export type LoginParams = {
+  email: string;
+  password: string;
+  userAgent?: string;
+};
+
+export const loginUser = async ({
+  email,
+  password,
+  userAgent,
+}: LoginParams) => {
+  //get the user by email
+  const user = await UserModel.findOne({ email });
+  appAssert(user, UNAUTHORIZED, "Invalid email or password");
+  //validate the password from request
+  const isValidatePassword = await user.comparePassword(password);
+  appAssert(isValidatePassword, UNAUTHORIZED, "Invalid email or password");
+  //create session
+  const session = await SessionModel.create({
+    userId: user._id,
+    userAgent,
+  });
+  //sign access token & refresh token
+  const refreshToken = signToKen(
+    { sessionId: session._id },
+    refreshTokenSignOptions
+  );
+
+  const accessToken = signToKen({ userId: user._id, sessionId: session._id });
+  return {
+    user: user.omitPassword(),
+    accessToken,
+    refreshToken,
+  };
+
+  //return user & tokens
+};
+
+export const refreshUserAccessToken = async (refreshToken: string) => {
+  const { payload } = verifyToken<RefreshTokenPayload>(refreshToken, {
+    secret: refreshTokenSignOptions.secret,
+  });
+
+  appAssert(payload, UNAUTHORIZED, "Invalid refresh token");
+
+  const session = await SessionModel.findById(payload.sessionId);
+  const now = Date.now();
+  appAssert(
+    session && session.expiresAt.getTime() > now,
+    UNAUTHORIZED,
+    "Session expired"
+  );
+
+  //Refresh the token if it expires in less than 1 day
+  const sessionNeedRefresh = session.expiresAt.getTime() - now <= ONE_DAY_MS;
+
+  if (sessionNeedRefresh) {
+    session.expiresAt = thirtyDaysFromNow();
+    await session.save();
+  }
+
+  const newRefreshToken = sessionNeedRefresh
+    ? signToKen({ sessionId: session._id }, refreshTokenSignOptions)
+    : undefined;
+
+  const accessToken = signToKen({
+    userId: session.userId,
+    sessionId: session._id,
+  });
+
+  return { accessToken, refreshToken: newRefreshToken };
+};
+
+export const verifyEmail = async (code: string) => {
+  //get the verification code from db
+  const validCode = await VerificationCodeModel.findOne({
+    _id: code,
+    type: VerificationCodeType.VERIFY_EMAIL,
+    expiresAt: { $gt: new Date() },
+  });
+  appAssert(validCode, NOT_FOUND, "Invalid or expired verification code");
+  //get user by id
+  //update user verified true
+  const updatedUser = await UserModel.findByIdAndUpdate(
+    validCode.userId,
+    {
+      verified: true,
+    },
+    { new: true }
+  );
+  appAssert(updatedUser, INTERNAL_SERVER_ERROR, "Failed to verify email");
+  //delete verification code record
+  await validCode.deleteOne();
+  //return user
+  return {
+    user: updatedUser.omitPassword(),
+  };
+};
