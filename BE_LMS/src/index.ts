@@ -6,6 +6,8 @@ import cookieParser from "cookie-parser";
 import errorHandler from "./middleware/errorHandler";
 import { OK } from "./constants/http";
 import authRoutes from "./routes/auth.route";
+import authenticate from "./middleware/authenticate";
+import userRoutes from "./routes/user.route";
 
 const app = express();
 
@@ -23,6 +25,8 @@ app.get("/", (req, res) => {
   res.status(OK).send("Hello World!");
 });
 
+//protected routes
+app.use("/user", authenticate, userRoutes);
 app.use("/auth", authRoutes);
 
 app.use(errorHandler);
