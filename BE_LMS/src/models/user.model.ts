@@ -6,7 +6,8 @@ const enum Role {
   ADMIN = "admin",
 }
 
-export interface UserDocument extends mongoose.Document {
+export interface UserDocument
+  extends mongoose.Document<mongoose.Types.ObjectId> {
   email: string;
   password: string;
   role: Role;
