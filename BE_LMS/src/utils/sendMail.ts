@@ -12,14 +12,14 @@ type Params = {
 export type SendMailResult = { error?: string };
 
 const getFromMail = () => {
-  return NODE_ENV === "development" ? "anhkn7@gmail.com" : EMAIL_SENDER;
+  return NODE_ENV === "development" ? "onboarding@resend.dev" : EMAIL_SENDER;
 };
 
 const getToEmail = (to: string) => {
   return NODE_ENV === "development" ? "delivered@resend.dev" : EMAIL_SENDER;
 };
 export const sendMail = async ({ to, subject, text, html }: Params) => {
-  await resend.emails.send({
+  return await resend.emails.send({
     from: getFromMail(),
     to: getToEmail(to),
     subject,
