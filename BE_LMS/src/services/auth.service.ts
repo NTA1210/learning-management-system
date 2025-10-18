@@ -11,6 +11,7 @@ import SessionModel from "../models/session.model";
 import UserModel from "../models/user.model";
 import VerificationCodeModel from "../models/verificationCode.model";
 import appAssert from "../utils/appAssert";
+import { hashValue } from "../utils/bcrypt";
 import {
   fiveMinutesAgo,
   ONE_DAY_MS,
@@ -223,4 +224,38 @@ export const sendPasswordResetEmail = async (email: string) => {
   );
   //return success message
   return { url, emailId: data.id };
+};
+
+type ResetPasswordParams = {
+  verificationCode: string;
+  password: string;
+};
+export const resetPassword = async ({
+  verificationCode,
+  password,
+}: ResetPasswordParams) => {
+  //get the verification code from db
+  const validCode = await VerificationCodeModel.findOne({
+    _id: verificationCode,
+    type: VerificationCodeType.FORGOT_PASSWORD,
+    expiresAt: { $gt: new Date() },
+  });
+  appAssert(validCode, NOT_FOUND, "Invalid or expired verification code");
+
+  //get user by id
+  //update user password
+  const updatedUser = await UserModel.findByIdAndUpdate(validCode.userId, {
+    password: await hashValue(password),
+  });
+  appAssert(updatedUser, INTERNAL_SERVER_ERROR, "Failed to reset password");
+
+  //delete verification code record
+  await validCode.deleteOne();
+
+  //delete all sessions of the user
+  await SessionModel.deleteMany({ userId: updatedUser._id });
+
+  return {
+    user: updatedUser.omitPassword(),
+  };
 };
