@@ -2,19 +2,9 @@ import { Request, RequestHandler } from "express";
 import appAssert from "../utils/appAssert";
 import AppErrorCode from "../constants/appErrorCode";
 import { UNAUTHORIZED } from "../constants/http";
-import mongoose from "mongoose";
 import { verifyToken } from "../utils/jwt";
 
-interface AuthenticationRequest extends Request {
-  userId: mongoose.Types.ObjectId;
-  sessionId: mongoose.Types.ObjectId;
-}
-
-const authenticate: RequestHandler = (
-  req: AuthenticationRequest,
-  res,
-  next
-) => {
+const authenticate: RequestHandler = (req, res, next) => {
   const accessToken = req.cookies.accessToken as string | undefined;
   appAssert(
     accessToken,
