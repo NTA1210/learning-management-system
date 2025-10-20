@@ -116,28 +116,28 @@ async function init() {
 
     // Enroll students
     const enrollments = await Enrollment.create([
-      { student: users[2]._id, course: courses[0]._id, status: "active" },
-      { student: users[3]._id, course: courses[0]._id, status: "active" },
-      { student: users[2]._id, course: courses[1]._id, status: "active" },
+      { studentId: users[2]._id, courseId: courses[0]._id, status: "active" },
+      { studentId: users[3]._id, courseId: courses[0]._id, status: "active" },
+      { studentId: users[2]._id, courseId: courses[1]._id, status: "active" },
     ]);
 
     // Lessons
     const lessons = await Lesson.create([
       {
         title: "JS Basics",
-        course: courses[0]._id,
+        courseId: courses[0]._id,
         order: 1,
         durationMinutes: 30,
       },
       {
         title: "JS Functions",
-        course: courses[0]._id,
+        courseId: courses[0]._id,
         order: 2,
         durationMinutes: 45,
       },
       {
         title: "UI Design Principles",
-        course: courses[1]._id,
+        courseId: courses[1]._id,
         order: 1,
         durationMinutes: 60,
       },
