@@ -32,6 +32,7 @@ import {
 import { sendMail } from "../utils/sendMail";
 
 export type CreateAccountParams = {
+  username: string;
   email: string;
   password: string;
   userAgent?: string;
@@ -42,8 +43,12 @@ export const createAccount = async (data: CreateAccountParams) => {
   const existingUser = await UserModel.exists({ email: data.email });
   // if (existingUser) throw new Error("User already exists");
   appAssert(!existingUser, CONFLICT, "Email already in use");
+  //check user name
+  const usernameExists = await UserModel.exists({ username: data.username });
+  appAssert(!usernameExists, CONFLICT, "Username already in use");
   //create user
   const user = await UserModel.create({
+    username: data.username,
     email: data.email,
     password: data.password,
   });
