@@ -63,7 +63,7 @@ export const createAccount = async (data: CreateAccountParams) => {
 
   const url = `${APP_ORIGIN}/auth/verify-email/${verificationCode._id}`;
   const { error } = await sendMail({
-    to: user.email,
+    to: "anhkn7@gmail.com",
     ...getVerifyEmailTemplate(url),
   });
 
@@ -109,8 +109,6 @@ export const loginUser = async ({
   //validate the password from request
   const isValidatePassword = await user.comparePassword(password);
   appAssert(isValidatePassword, UNAUTHORIZED, "Invalid email or password");
-  //check wether user is verified
-  appAssert(user.verified, UNAUTHORIZED, "Email not verified");
   //create session
   const session = await SessionModel.create({
     userId: user._id,

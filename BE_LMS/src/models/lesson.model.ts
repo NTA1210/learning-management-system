@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 export interface ILesson extends mongoose.Document {
   title: string;
-  courseId: mongoose.Types.ObjectId;
+  course: mongoose.Types.ObjectId;
   content?: string;
   order?: number;
   durationMinutes?: number;
@@ -14,7 +14,7 @@ export interface ILesson extends mongoose.Document {
 const LessonSchema = new mongoose.Schema<ILesson>(
   {
     title: { type: String, required: true },
-    courseId: {
+    course: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Course",
       required: true,
