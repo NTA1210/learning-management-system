@@ -8,14 +8,14 @@ export const customResponse = (
 ) => {
   res.success = function <T>(
     status: number,
-    data: T,
+    data?: T,
     message?: string,
     args?: object
   ) {
     const response: IApiResponse<T> = {
       success: true,
       message: message || "Success",
-      data,
+      data: data ?? null,
       meta: {
         timestamp: new Date().toISOString(),
         ...args,
@@ -29,7 +29,8 @@ export const customResponse = (
     status: number,
     message?: string,
     code?: string,
-    details?: any
+    details?: any,
+    args?: object
   ) {
     const response: IApiResponse<null> = {
       success: false,
@@ -41,6 +42,7 @@ export const customResponse = (
       },
       meta: {
         timestamp: new Date().toISOString(),
+        ...args,
       },
     };
 
