@@ -9,6 +9,7 @@ import authRoutes from "./routes/auth.route";
 import authenticate from "./middleware/authenticate";
 import userRoutes from "./routes/user.route";
 import sessionRoutes from "./routes/session.route";
+import { customResponse } from "./middleware/customResponse";
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use(
   })
 );
 app.use(cookieParser());
+app.use(customResponse);
 
 app.get("/", (req, res) => {
   res.status(OK).send("Hello World!");

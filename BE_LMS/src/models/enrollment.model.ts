@@ -1,8 +1,8 @@
 import mongoose from "mongoose";
 
 export interface IEnrollment extends mongoose.Document {
-  student: mongoose.Types.ObjectId;
-  course: mongoose.Types.ObjectId;
+  studentId: mongoose.Types.ObjectId;
+  courseId: mongoose.Types.ObjectId;
   enrolledAt: Date;
   status: "active" | "completed" | "dropped";
   role?: "student" | "auditor";
@@ -16,13 +16,13 @@ export interface IEnrollment extends mongoose.Document {
 
 const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
   {
-    student: {
+    studentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
       index: true,
     },
-    course: {
+    courseId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Course",
       required: true,
