@@ -32,6 +32,7 @@ import {
 import { sendMail } from "../utils/sendMail";
 
 export type CreateAccountParams = {
+  username: string;
   email: string;
   password: string;
   userAgent?: string;
@@ -42,8 +43,12 @@ export const createAccount = async (data: CreateAccountParams) => {
   const existingUser = await UserModel.exists({ email: data.email });
   // if (existingUser) throw new Error("User already exists");
   appAssert(!existingUser, CONFLICT, "Email already in use");
+  //check user name
+  const usernameExists = await UserModel.exists({ username: data.username });
+  appAssert(!usernameExists, CONFLICT, "Username already in use");
   //create user
   const user = await UserModel.create({
+    username: data.username,
     email: data.email,
     password: data.password,
   });
@@ -58,7 +63,7 @@ export const createAccount = async (data: CreateAccountParams) => {
 
   const url = `${APP_ORIGIN}/auth/verify-email/${verificationCode._id}`;
   const { error } = await sendMail({
-    to: "anhkn7@gmail.com",
+    to: user.email,
     ...getVerifyEmailTemplate(url),
   });
 
@@ -104,6 +109,8 @@ export const loginUser = async ({
   //validate the password from request
   const isValidatePassword = await user.comparePassword(password);
   appAssert(isValidatePassword, UNAUTHORIZED, "Invalid email or password");
+  //check wether user is verified
+  appAssert(user.verified, UNAUTHORIZED, "Email not verified");
   //create session
   const session = await SessionModel.create({
     userId: user._id,

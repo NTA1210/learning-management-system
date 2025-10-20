@@ -3,6 +3,7 @@ import { BAD_REQUEST, INTERNAL_SERVER_ERROR } from "../constants/http";
 import z, { ZodError } from "zod";
 import AppError from "../utils/AppError";
 import { clearAuthCookies, REFRESH_PATH } from "../utils/cookies";
+import mongoose from "mongoose";
 
 function handleZodError(res: Response, error: ZodError) {
   const errors = error.issues.map((err) => ({
@@ -23,6 +24,13 @@ function handleAppError(res: Response, error: AppError) {
   });
 }
 
+function handleCastError(res: Response, error: mongoose.Error.CastError) {
+  return res.status(BAD_REQUEST).json({
+    message: `Invalid ${error.path}: ${error.value}`,
+    errorCode: "INVALID",
+  });
+}
+
 const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
   console.log(`PATH: ${req.path}`, error);
 
@@ -36,6 +44,10 @@ const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
 
   if (error instanceof AppError) {
     return handleAppError(res, error);
+  }
+
+  if (error instanceof mongoose.Error.CastError) {
+    return handleCastError(res, error);
   }
 
   return res.status(INTERNAL_SERVER_ERROR).send("Internal server error");
