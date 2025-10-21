@@ -10,6 +10,7 @@ export interface IApiResponse<T> {
   error?: IApiError | null;
   meta?: {
     timestamp: string;
+    timezone: string;
     [key: string]: any;
   };
 }

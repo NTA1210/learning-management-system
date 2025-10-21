@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { IApiResponse } from "../types/ApiResponse";
+import { nowLocal, nowTZone } from "../utils/time";
 
 export const customResponse = (
   req: Request,
@@ -17,7 +18,8 @@ export const customResponse = (
       message: message || "Success",
       data: data ?? null,
       meta: {
-        timestamp: new Date().toISOString(),
+        timestamp: nowLocal(),
+        timezone: nowTZone(),
         ...args,
       },
     };
@@ -41,7 +43,8 @@ export const customResponse = (
         details,
       },
       meta: {
-        timestamp: new Date().toISOString(),
+        timestamp: nowLocal(),
+        timezone: nowTZone(),
         ...args,
       },
     };
