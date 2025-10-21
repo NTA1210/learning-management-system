@@ -52,11 +52,11 @@ export const loginHandler = catchErrors(async (req, res) => {
     userAgent: req.headers["user-agent"],
   });
 
-  const { refreshToken, accessToken } = await loginUser(request);
+  const { user, refreshToken, accessToken } = await loginUser(request);
 
   return setAuthCookies({ res, accessToken, refreshToken }).success(
     OK,
-    null,
+    user,
     "Login successfully"
   );
 });

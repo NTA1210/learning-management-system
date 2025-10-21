@@ -22,6 +22,10 @@ export interface UserDocument
   updatedAt: Date;
   comparePassword(val: string): Promise<boolean>;
   omitPassword(): Omit<UserDocument, "password">;
+  response(): Pick<
+    UserDocument,
+    "username" | "role" | "fullname" | "avatar_url" | "bio"
+  >;
 }
 
 const userSchema = new mongoose.Schema<UserDocument>(
@@ -64,6 +68,16 @@ userSchema.methods.omitPassword = function () {
   const user = this.toObject();
   delete user.password;
   return user;
+};
+
+userSchema.methods.response = function () {
+  return {
+    username: this.username,
+    role: this.role,
+    fullname: this.fullname || "",
+    avatar_url: this.avatar_url || "",
+    bio: this.bio || "",
+  };
 };
 
 const UserModel = mongoose.model<UserDocument>("User", userSchema);
