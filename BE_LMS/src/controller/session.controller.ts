@@ -22,7 +22,15 @@ export const getSessionHandler = catchErrors(async (req, res) => {
     }
   );
 
-  return res.status(OK).json(
+  // return res.status(OK).json(
+  //   sessions.map((session) => ({
+  //     ...session.toObject(),
+  //     ...(session.id === req.sessionId && { isCurrent: true }),
+  //   }))
+  // );
+
+  return res.success(
+    OK,
     sessions.map((session) => ({
       ...session.toObject(),
       ...(session.id === req.sessionId && { isCurrent: true }),
@@ -38,5 +46,5 @@ export const deleteSessionHandler = catchErrors(async (req, res) => {
   });
   appAssert(deletedSession, NOT_FOUND, "Session not found");
 
-  return res.status(OK).json({ message: "Session deleted successfully" });
+  return res.success(OK, null, "Session deleted successfully");
 });
