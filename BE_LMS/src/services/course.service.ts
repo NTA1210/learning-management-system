@@ -1,11 +1,16 @@
 import CourseModel from "../models/course.model";
-import { ListCoursesQuery } from "../validators/course.schemas";
+import CategoryModel from "../models/category.model";
+import UserModel from "../models/user.model";
+import appAssert from "../utils/appAssert";
+import { NOT_FOUND } from "../constants/http";
 
 export type ListCoursesParams = {
   page: number;
   limit: number;
   search?: string;
   category?: string;
+  teacherId?: string;
+  code?: string;
   isPublished?: boolean;
   sortBy?: string;
   sortOrder?: string;
@@ -16,6 +21,8 @@ export const listCourses = async ({
   limit,
   search,
   category,
+  teacherId,
+  code,
   isPublished,
   sortBy = "createdAt",
   sortOrder = "desc",
@@ -31,6 +38,16 @@ export const listCourses = async ({
   // Filter by category
   if (category) {
     filter.category = category;
+  }
+
+  // Filter by teacher ID
+  if (teacherId) {
+    filter.teachers = teacherId;
+  }
+
+  // Filter by course code (exact match, case-insensitive)
+  if (code) {
+    filter.code = { $regex: `^${code}$`, $options: "i" };
   }
 
   // Search by title or description (text search)
@@ -76,5 +93,17 @@ export const listCourses = async ({
       hasPrevPage,
     },
   };
+};
+
+// Get course by ID
+export const getCourseById = async (courseId: string) => {
+  const course = await CourseModel.findById(courseId)
+    .populate("category", "name slug description")
+    .populate("teachers", "username email fullname avatar_url bio")
+    .lean();
+
+  appAssert(course, NOT_FOUND, "Course not found");
+
+  return course;
 };
 
