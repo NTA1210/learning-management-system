@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { IApiResponse } from "./src/types/ApiResponse";
+import { IApiResponse } from "./src/types/apiResponse.type";
 
 declare global {
   namespace Express {

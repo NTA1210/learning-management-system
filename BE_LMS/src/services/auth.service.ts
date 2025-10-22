@@ -124,7 +124,7 @@ export const loginUser = async ({
 
   const accessToken = signToKen({ userId: user._id, sessionId: session._id });
   return {
-    user: user.omitPassword(),
+    user: user.response(),
     accessToken,
     refreshToken,
   };

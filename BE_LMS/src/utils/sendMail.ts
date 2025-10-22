@@ -1,4 +1,3 @@
-import { get } from "node:http";
 import resend from "../config/resend";
 import { EMAIL_SENDER, NODE_ENV } from "../constants/env";
 
@@ -16,7 +15,7 @@ const getFromMail = () => {
 };
 
 const getToEmail = (to: string) => {
-  return NODE_ENV === "development" ? "delivered@resend.dev" : EMAIL_SENDER;
+  return NODE_ENV === "development" ? "delivered@resend.dev" : to;
 };
 export const sendMail = async ({ to, subject, text, html }: Params) => {
   return await resend.emails.send({

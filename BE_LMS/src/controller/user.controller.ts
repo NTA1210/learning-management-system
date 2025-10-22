@@ -4,7 +4,7 @@ import appAssert from "../utils/appAssert";
 import { catchErrors } from "../utils/asyncHandler";
 
 export const getUserHandler = catchErrors(async (req, res) => {
-  const user = await UserModel.findById(req?.userId);
+  const user = await UserModel.findById((req as any)?.userId);
   appAssert(user, NOT_FOUND, "User not found");
 
   return res.status(OK).json(user.omitPassword());

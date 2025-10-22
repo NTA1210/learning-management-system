@@ -1,11 +1,5 @@
 import mongoose from "mongoose";
-
-export interface IForum extends mongoose.Document {
-  courseId: mongoose.Types.ObjectId;
-  title: string;
-  description?: string;
-  createdBy?: mongoose.Types.ObjectId;
-}
+import { IForum } from "../types";
 
 const ForumSchema = new mongoose.Schema<IForum>(
   {
