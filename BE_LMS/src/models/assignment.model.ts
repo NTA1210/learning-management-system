@@ -7,7 +7,6 @@ const AssignmentSchema = new mongoose.Schema<IAssignment>(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Course",
       required: true,
-      index: true,
     },
     title: { type: String, required: true },
     description: { type: String },
