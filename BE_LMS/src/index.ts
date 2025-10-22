@@ -31,6 +31,8 @@ import authenticate from "./middleware/authenticate";
 import userRoutes from "./routes/user.route";
 import sessionRoutes from "./routes/session.route";
 import courseRoutes from "./routes/course.route";
+import assignmentRoutes from "./routes/assignment.route";
+import submissionRoutes from "./routes/submission.route";
 
 import { customResponse } from "./middleware/customResponse";
 
@@ -57,6 +59,8 @@ app.use("/auth", authRoutes);
 
 //public routes
 app.use("/courses", courseRoutes);
+app.use("/assignments", assignmentRoutes);
+app.use("/submissions", submissionRoutes);
 
 //protected routes
 app.use("/user", authenticate, userRoutes);
