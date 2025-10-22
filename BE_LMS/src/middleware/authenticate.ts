@@ -1,4 +1,4 @@
-import { Request, RequestHandler } from "express";
+import { RequestHandler } from "express";
 import appAssert from "../utils/appAssert";
 import AppErrorCode from "../constants/appErrorCode";
 import { UNAUTHORIZED } from "../constants/http";

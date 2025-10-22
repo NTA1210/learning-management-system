@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { IAnnouncement } from "../types";
+import { IAnnouncement } from "@/types";
 
 const AnnouncementSchema = new mongoose.Schema<IAnnouncement>(
   {
