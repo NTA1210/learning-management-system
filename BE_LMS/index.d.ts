@@ -1,10 +1,12 @@
 import mongoose from "mongoose";
 import { IApiResponse } from "./src/types/apiResponse.type";
+import { Role } from "@/types";
 
 declare global {
   namespace Express {
     interface Request {
       userId: mongoose.Types.ObjectId;
+      role: Role;
       sessionId: mongoose.Types.ObjectId;
     }
 

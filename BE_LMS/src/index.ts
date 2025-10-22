@@ -16,6 +16,8 @@ import enrollmentRoutes from "./routes/enrollment.route";
 import courseRoutes from "./routes/course.route";
 import assignmentRoutes from "./routes/assignment.route";
 import submissionRoutes from "./routes/submission.route";
+import authorize from "./middleware/authorize";
+import { Role } from "./types";
 
 const app = express();
 
@@ -44,7 +46,7 @@ app.use("/submissions", submissionRoutes);
 
 //protected routes
 app.use("/user", authenticate, userRoutes);
-app.use("/sessions", authenticate, sessionRoutes);
+app.use("/sessions", authenticate, authorize(Role.ADMIN), sessionRoutes);
 app.use("/enrollments", authenticate, enrollmentRoutes);
 
 app.use(errorHandler);

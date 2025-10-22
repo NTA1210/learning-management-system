@@ -34,5 +34,5 @@ const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
   { timestamps: false }
 );
 
-EnrollmentSchema.index({ student: 1, course: 1 }, { unique: true });
+EnrollmentSchema.index({ studentId: 1, courseId: 1 }, { unique: true });
 export default mongoose.model<IEnrollment>("Enrollment", EnrollmentSchema);
