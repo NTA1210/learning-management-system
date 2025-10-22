@@ -155,7 +155,7 @@ export const updateCourse = async (
   data: UpdateCourseInput,
   userId: string
 ) => {
-  // Check if course exists
+  // Find course
   const course = await CourseModel.findById(courseId);
   appAssert(course, NOT_FOUND, "Course not found");
 
@@ -166,7 +166,7 @@ export const updateCourse = async (
   const isTeacherOfCourse = course.teachers.some(
     (teacherId) => teacherId.toString() === userId
   );
-  const isAdmin = user.role === "ADMIN";
+  const isAdmin = user.role.toUpperCase() === "ADMIN";
 
   appAssert(
     isTeacherOfCourse || isAdmin,
@@ -193,7 +193,8 @@ export const updateCourse = async (
     );
 
     const allAreTeachers = teachers.every(
-      (teacher) => teacher.role === "teacher" || teacher.role === "ADMIN"
+      (teacher) =>
+        teacher.role === "teacher" || teacher.role.toUpperCase() === "ADMIN"
     );
     appAssert(
       allAreTeachers,
@@ -214,5 +215,4 @@ export const updateCourse = async (
 
   return updatedCourse;
 };
-
 
