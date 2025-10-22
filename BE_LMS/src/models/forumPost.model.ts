@@ -1,14 +1,5 @@
 import mongoose from "mongoose";
-
-export interface IForumPost extends mongoose.Document {
-  forumId: mongoose.Types.ObjectId;
-  authorId: mongoose.Types.ObjectId;
-  title?: string;
-  content: string;
-  createdAt?: Date;
-  updatedAt?: Date;
-  pinned?: boolean;
-}
+import { IForumPost } from "../types";
 
 const ForumPostSchema = new mongoose.Schema<IForumPost>(
   {

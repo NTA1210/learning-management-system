@@ -1,10 +1,5 @@
 import mongoose from "mongoose";
-
-export interface ICategory extends mongoose.Document {
-  name: string;
-  slug?: string;
-  description?: string;
-}
+import { ICategory } from "../types";
 
 const CategorySchema = new mongoose.Schema<ICategory>(
   {
