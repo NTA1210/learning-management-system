@@ -1,34 +1,8 @@
 import mongoose from "mongoose";
 import { compareValue, hashValue } from "../utils/bcrypt";
+import { Role, IUser } from "../types";
 
-const enum Role {
-  STUDENT = "student",
-  TEACHER = "teacher",
-  ADMIN = "ADMIN",
-}
-
-export interface UserDocument
-  extends mongoose.Document<mongoose.Types.ObjectId> {
-  username?: string;
-  email: string;
-  password: string;
-  role: Role;
-  fullname?: string;
-  phone_number?: string;
-  avatar_url?: string;
-  bio?: string;
-  verified: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  comparePassword(val: string): Promise<boolean>;
-  omitPassword(): Omit<UserDocument, "password">;
-  response(): Pick<
-    UserDocument,
-    "username" | "role" | "fullname" | "avatar_url" | "bio"
-  >;
-}
-
-const userSchema = new mongoose.Schema<UserDocument>(
+const userSchema = new mongoose.Schema<IUser>(
   {
     username: { type: String, unique: true, required: true, index: true },
     email: { type: String, required: true, unique: true, index: true },
@@ -80,5 +54,5 @@ userSchema.methods.response = function () {
   };
 };
 
-const UserModel = mongoose.model<UserDocument>("User", userSchema);
+const UserModel = mongoose.model<IUser>("User", userSchema);
 export default UserModel;

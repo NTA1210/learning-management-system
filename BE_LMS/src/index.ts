@@ -6,34 +6,13 @@ import cookieParser from "cookie-parser";
 import errorHandler from "./middleware/errorHandler";
 import { OK } from "./constants/http";
 
-// Import all models to register schemas
-import "./models/user.model";
-import "./models/session.model";
-import "./models/verificationCode.model";
-import "./models/course.model";
-import "./models/category.model";
-import "./models/enrollment.model";
-import "./models/lesson.model";
-import "./models/lessonMaterial.model";
-import "./models/assignment.model";
-import "./models/submission.model";
-import "./models/quiz.model";
-import "./models/quizAttempt.model";
-import "./models/forum.model";
-import "./models/forumPost.model";
-import "./models/forumReply.model";
-import "./models/announcement.model";
-import "./models/attendance.model";
-import "./models/notification.model";
+import { customResponse } from "./middleware/customResponse";
 
 import authRoutes from "./routes/auth.route";
 import authenticate from "./middleware/authenticate";
 import userRoutes from "./routes/user.route";
 import sessionRoutes from "./routes/session.route";
 import courseRoutes from "./routes/course.route";
-
-import { customResponse } from "./middleware/customResponse";
-
 
 const app = express();
 

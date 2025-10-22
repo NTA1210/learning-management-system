@@ -1,15 +1,5 @@
 import mongoose from "mongoose";
-
-export interface ILessonMaterial extends mongoose.Document {
-  lessonId: mongoose.Types.ObjectId;
-  title?: string;
-  type: "pdf" | "video" | "ppt" | "link" | "other";
-  fileUrl?: string;
-  fileName?: string;
-  sizeBytes?: number;
-  uploadedBy?: mongoose.Types.ObjectId;
-  createdAt?: Date;
-}
+import { ILessonMaterial } from "../types";
 
 const LessonMaterialSchema = new mongoose.Schema<ILessonMaterial>(
   {
