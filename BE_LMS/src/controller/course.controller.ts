@@ -1,12 +1,14 @@
 import { catchErrors } from "../utils/asyncHandler";
-import { OK } from "../constants/http";
+import { OK, CREATED } from "../constants/http";
 import {
   listCoursesSchema,
   courseIdSchema,
+  createCourseSchema,
 } from "../validators/course.schemas";
 import {
   listCourses,
   getCourseById,
+  createCourse,
 } from "../services/course.service";
 
 export const listCoursesHandler = catchErrors(async (req, res) => {
@@ -26,9 +28,7 @@ export const listCoursesHandler = catchErrors(async (req, res) => {
     sortOrder: query.sortOrder,
   });
 
-  return res.status(OK).json({
-    message: "Courses retrieved successfully",
-    data: result.courses,
+  return res.success(OK, result.courses, "Courses retrieved successfully", {
     pagination: result.pagination,
   });
 });
@@ -40,9 +40,16 @@ export const getCourseByIdHandler = catchErrors(async (req, res) => {
   // Call service
   const course = await getCourseById(courseId);
 
-  return res.status(OK).json({
-    message: "Course retrieved successfully",
-    data: course,
-  });
+  return res.success(OK, course, "Course retrieved successfully");
+});
+
+export const createCourseHandler = catchErrors(async (req, res) => {
+  // Validate request body
+  const data = createCourseSchema.parse(req.body);
+
+  // Call service
+  const course = await createCourse(data);
+
+  return res.success(CREATED, course, "Course created successfully");
 });
 

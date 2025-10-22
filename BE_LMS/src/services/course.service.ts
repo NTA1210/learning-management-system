@@ -2,7 +2,8 @@ import CourseModel from "../models/course.model";
 import CategoryModel from "../models/category.model";
 import UserModel from "../models/user.model";
 import appAssert from "../utils/appAssert";
-import { NOT_FOUND } from "../constants/http";
+import { NOT_FOUND, BAD_REQUEST } from "../constants/http";
+import { CreateCourseInput } from "../validators/course.schemas";
 
 export type ListCoursesParams = {
   page: number;
@@ -106,4 +107,46 @@ export const getCourseById = async (courseId: string) => {
 
   return course;
 };
+
+// Create new course
+export const createCourse = async (data: CreateCourseInput) => {
+  // Validate category exists if provided
+  if (data.category) {
+    const categoryExists = await CategoryModel.findById(data.category);
+    appAssert(categoryExists, BAD_REQUEST, "Category not found");
+  }
+
+  // Validate all teachers exist
+  const teachers = await UserModel.find({
+    _id: { $in: data.teachers },
+  });
+
+  appAssert(
+    teachers.length === data.teachers.length,
+    BAD_REQUEST,
+    "One or more teachers not found"
+  );
+
+  // Check if all users have teacher or admin role
+  const allAreTeachers = teachers.every(
+    (teacher) => teacher.role === "teacher" || teacher.role === "ADMIN"
+  );
+  appAssert(
+    allAreTeachers,
+    BAD_REQUEST,
+    "All assigned users must have teacher or admin role"
+  );
+
+  // Create course
+  const course = await CourseModel.create(data);
+
+  // Populate and return
+  const populatedCourse = await CourseModel.findById(course._id)
+    .populate("category", "name slug description")
+    .populate("teachers", "username email fullname avatar_url")
+    .lean();
+
+  return populatedCourse;
+};
+
 
