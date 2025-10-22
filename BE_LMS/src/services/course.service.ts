@@ -166,8 +166,22 @@ export const updateCourse = async (
   const isTeacherOfCourse = course.teachers.some(
     (teacherId) => teacherId.toString() === userId
   );
-  const isAdmin = user.role.toUpperCase() === "ADMIN";
+  
+  // Trim and uppercase to handle any whitespace or case issues
+  const normalizedRole = user.role.trim().toUpperCase();
+  const isAdmin = normalizedRole === "ADMIN";
 
+  // DEBUG: Log permission check
+  console.log("🔍 DEBUG - Update Permission Check:");
+  console.log("  User ID:", userId);
+  console.log("  User Role (raw):", JSON.stringify(user.role));
+  console.log("  User Role (trimmed):", user.role.trim());
+  console.log("  Normalized Role:", normalizedRole);
+  console.log("  Is Teacher of Course:", isTeacherOfCourse);
+  console.log("  Is Admin:", isAdmin);
+  console.log("  Comparison:", `"${normalizedRole}" === "ADMIN"`, normalizedRole === "ADMIN");
+  console.log("  Course Teachers:", course.teachers.map(t => t.toString()));
+  
   appAssert(
     isTeacherOfCourse || isAdmin,
     FORBIDDEN,
