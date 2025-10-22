@@ -12,6 +12,7 @@ import authRoutes from "./routes/auth.route";
 import authenticate from "./middleware/authenticate";
 import userRoutes from "./routes/user.route";
 import sessionRoutes from "./routes/session.route";
+import enrollmentRoutes from "./routes/enrollment.route";
 import courseRoutes from "./routes/course.route";
 
 const app = express();
@@ -40,6 +41,7 @@ app.use("/courses", courseRoutes);
 //protected routes
 app.use("/user", authenticate, userRoutes);
 app.use("/sessions", authenticate, sessionRoutes);
+app.use("/enrollments", authenticate, enrollmentRoutes);
 
 app.use(errorHandler);
 
