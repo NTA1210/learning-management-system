@@ -127,9 +127,12 @@ export const createCourse = async (data: CreateCourseInput) => {
     "One or more teachers not found"
   );
 
-  // Check if all users have teacher or admin role
+  // Check if all users have teacher or admin role (with trim for data consistency)
   const allAreTeachers = teachers.every(
-    (teacher) => teacher.role === "teacher" || teacher.role === "ADMIN"
+    (teacher) => {
+      const role = teacher.role.trim().toUpperCase();
+      return role === "TEACHER" || role === "ADMIN";
+    }
   );
   appAssert(
     allAreTeachers,
@@ -171,17 +174,6 @@ export const updateCourse = async (
   const normalizedRole = user.role.trim().toUpperCase();
   const isAdmin = normalizedRole === "ADMIN";
 
-  // DEBUG: Log permission check
-  console.log("🔍 DEBUG - Update Permission Check:");
-  console.log("  User ID:", userId);
-  console.log("  User Role (raw):", JSON.stringify(user.role));
-  console.log("  User Role (trimmed):", user.role.trim());
-  console.log("  Normalized Role:", normalizedRole);
-  console.log("  Is Teacher of Course:", isTeacherOfCourse);
-  console.log("  Is Admin:", isAdmin);
-  console.log("  Comparison:", `"${normalizedRole}" === "ADMIN"`, normalizedRole === "ADMIN");
-  console.log("  Course Teachers:", course.teachers.map(t => t.toString()));
-  
   appAssert(
     isTeacherOfCourse || isAdmin,
     FORBIDDEN,
@@ -207,8 +199,10 @@ export const updateCourse = async (
     );
 
     const allAreTeachers = teachers.every(
-      (teacher) =>
-        teacher.role === "teacher" || teacher.role.toUpperCase() === "ADMIN"
+      (teacher) => {
+        const role = teacher.role.trim().toUpperCase();
+        return role === "TEACHER" || role === "ADMIN";
+      }
     );
     appAssert(
       allAreTeachers,
@@ -228,5 +222,33 @@ export const updateCourse = async (
     .lean();
 
   return updatedCourse;
+};
+
+// Delete course
+export const deleteCourse = async (courseId: string, userId: string) => {
+  // Find course
+  const course = await CourseModel.findById(courseId);
+  appAssert(course, NOT_FOUND, "Course not found");
+
+  // Check if user is a teacher of this course or admin
+  const user = await UserModel.findById(userId);
+  appAssert(user, NOT_FOUND, "User not found");
+
+  const isTeacherOfCourse = course.teachers.some(
+    (teacherId) => teacherId.toString() === userId
+  );
+  const normalizedRole = user.role.trim().toUpperCase();
+  const isAdmin = normalizedRole === "ADMIN";
+
+  appAssert(
+    isTeacherOfCourse || isAdmin,
+    FORBIDDEN,
+    "You don't have permission to delete this course"
+  );
+
+  // Hard delete course
+  await CourseModel.findByIdAndDelete(courseId);
+
+  return { message: "Course deleted successfully" };
 };
 

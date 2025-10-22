@@ -11,6 +11,7 @@ import {
   getCourseById,
   createCourse,
   updateCourse,
+  deleteCourse,
 } from "../services/course.service";
 
 export const listCoursesHandler = catchErrors(async (req, res) => {
@@ -69,5 +70,15 @@ export const updateCourseHandler = catchErrors(async (req, res) => {
   const course = await updateCourse(courseId, data, userId);
 
   return res.success(OK, course, "Course updated successfully");
+});
+
+// DELETE /courses/:id - Delete course
+export const deleteCourseHandler = catchErrors(async (req, res) => {
+  const courseId = courseIdSchema.parse(req.params.id);
+  const userId = (req as any).userId; // Extract userId from authenticate middleware
+
+  const result = await deleteCourse(courseId, userId);
+
+  return res.success(OK, null, result.message);
 });
 
