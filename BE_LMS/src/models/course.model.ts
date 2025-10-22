@@ -1,17 +1,5 @@
 import mongoose from "mongoose";
-
-export interface ICourse extends mongoose.Document {
-  title: string;
-  code?: string;
-  description?: string;
-  category?: mongoose.Types.ObjectId;
-  teachers: mongoose.Types.ObjectId[]; // can be multiple teachers
-  isPublished: boolean;
-  capacity?: number;
-  createdAt?: Date;
-  updatedAt?: Date;
-  meta?: Record<string, any>;
-}
+import { ICourse } from "../types";
 
 const CourseSchema = new mongoose.Schema<ICourse>(
   {
