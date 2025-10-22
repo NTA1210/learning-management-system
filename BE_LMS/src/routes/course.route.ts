@@ -3,6 +3,7 @@ import {
   listCoursesHandler,
   getCourseByIdHandler,
   createCourseHandler,
+  updateCourseHandler,
 } from "../controller/course.controller";
 import authenticate from "../middleware/authenticate";
 
@@ -20,6 +21,9 @@ courseRoutes.get("/:id", getCourseByIdHandler);
 // Protected routes (require authentication)
 // POST /courses - Create new course (Teacher/Admin only)
 courseRoutes.post("/", authenticate, createCourseHandler);
+
+// PUT /courses/:id - Update course (Teacher of course or Admin only)
+courseRoutes.put("/:id", authenticate, updateCourseHandler);
 
 export default courseRoutes;
 

@@ -2,8 +2,8 @@ import CourseModel from "../models/course.model";
 import CategoryModel from "../models/category.model";
 import UserModel from "../models/user.model";
 import appAssert from "../utils/appAssert";
-import { NOT_FOUND, BAD_REQUEST } from "../constants/http";
-import { CreateCourseInput } from "../validators/course.schemas";
+import { NOT_FOUND, BAD_REQUEST, FORBIDDEN } from "../constants/http";
+import { CreateCourseInput, UpdateCourseInput } from "../validators/course.schemas";
 
 export type ListCoursesParams = {
   page: number;
@@ -147,6 +147,72 @@ export const createCourse = async (data: CreateCourseInput) => {
     .lean();
 
   return populatedCourse;
+};
+
+// Update course
+export const updateCourse = async (
+  courseId: string,
+  data: UpdateCourseInput,
+  userId: string
+) => {
+  // Check if course exists
+  const course = await CourseModel.findById(courseId);
+  appAssert(course, NOT_FOUND, "Course not found");
+
+  // Check if user is a teacher of this course or admin
+  const user = await UserModel.findById(userId);
+  appAssert(user, NOT_FOUND, "User not found");
+
+  const isTeacherOfCourse = course.teachers.some(
+    (teacherId) => teacherId.toString() === userId
+  );
+  const isAdmin = user.role === "ADMIN";
+
+  appAssert(
+    isTeacherOfCourse || isAdmin,
+    FORBIDDEN,
+    "You don't have permission to update this course"
+  );
+
+  // Validate category if provided
+  if (data.category) {
+    const categoryExists = await CategoryModel.findById(data.category);
+    appAssert(categoryExists, BAD_REQUEST, "Category not found");
+  }
+
+  // Validate teachers if provided
+  if (data.teachers) {
+    const teachers = await UserModel.find({
+      _id: { $in: data.teachers },
+    });
+
+    appAssert(
+      teachers.length === data.teachers.length,
+      BAD_REQUEST,
+      "One or more teachers not found"
+    );
+
+    const allAreTeachers = teachers.every(
+      (teacher) => teacher.role === "teacher" || teacher.role === "ADMIN"
+    );
+    appAssert(
+      allAreTeachers,
+      BAD_REQUEST,
+      "All assigned users must have teacher or admin role"
+    );
+  }
+
+  // Update course
+  const updatedCourse = await CourseModel.findByIdAndUpdate(
+    courseId,
+    { $set: data },
+    { new: true }
+  )
+    .populate("category", "name slug description")
+    .populate("teachers", "username email fullname avatar_url")
+    .lean();
+
+  return updatedCourse;
 };
 
 

@@ -4,11 +4,13 @@ import {
   listCoursesSchema,
   courseIdSchema,
   createCourseSchema,
+  updateCourseSchema,
 } from "../validators/course.schemas";
 import {
   listCourses,
   getCourseById,
   createCourse,
+  updateCourse,
 } from "../services/course.service";
 
 export const listCoursesHandler = catchErrors(async (req, res) => {
@@ -51,5 +53,21 @@ export const createCourseHandler = catchErrors(async (req, res) => {
   const course = await createCourse(data);
 
   return res.success(CREATED, course, "Course created successfully");
+});
+
+export const updateCourseHandler = catchErrors(async (req, res) => {
+  // Validate course ID
+  const courseId = courseIdSchema.parse(req.params.id);
+
+  // Validate request body
+  const data = updateCourseSchema.parse(req.body);
+
+  // Get userId from request (set by authenticate middleware)
+  const userId = (req as any).userId;
+
+  // Call service
+  const course = await updateCourse(courseId, data, userId);
+
+  return res.success(OK, course, "Course updated successfully");
 });
 
