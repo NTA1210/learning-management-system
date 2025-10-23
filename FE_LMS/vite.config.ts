@@ -8,5 +8,6 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true, // (Tùy chọn) Cho phép truy cập từ LAN/IP ngoài
+    allowedHosts: ['localhost', '127.0.0.1', '0.0.0.0', 'livecode.toandz.id.vn'],
   },
 });

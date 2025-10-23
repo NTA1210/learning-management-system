@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { HelloPage, NotFoundPage } from "../pages";
+import { LandingPage, NotFoundPage } from "../pages";
 
 function AppRoutes() {
   return (
@@ -8,7 +8,7 @@ function AppRoutes() {
         {/* /*layout */}
         {/* <Route element={<></>}> */}
         <Route path="/">
-          <Route index element={<HelloPage />} />
+          <Route index element={<LandingPage />} />
         </Route>
 
         {/* 404 page */}

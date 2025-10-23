@@ -1,2 +1,2 @@
-export { default as HelloPage } from "./Hello";
+export { default as LandingPage } from "./LandingPage";
 export { default as NotFoundPage } from "./NotFound";
