@@ -1,12 +1,10 @@
 //Define types here
 export interface User {
-    id: string;
-    email: string;
     username: string;
     role: string;
-    isEmailVerified: boolean;
-    createdAt: string;
-    updatedAt: string;
+    fullname: string;
+    avatar_url: string;
+    bio: string;
   }
   
   export interface LoginRequest {
@@ -22,7 +20,12 @@ export interface User {
   }
   
   export interface AuthResponse {
+    success: boolean;
     message: string;
-    user?: User;
+    data: User;
+    meta?: {
+      timestamp: string;
+      timezone: string;
+    };
   }
   

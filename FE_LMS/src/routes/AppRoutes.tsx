@@ -8,6 +8,7 @@ import {DashboardPage ,
   LoginPage,
   RegisterPage,
 } from "../pages";
+import ProtectedRoute from "../components/ProtectedRoute";
 
 function AppRoutes() {
   return (
@@ -21,8 +22,16 @@ function AppRoutes() {
         <Route path="/email-verify" element={<EmailVerifyPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="admin/dashboard" element={<DashboardPage />} />
+        <Route path="/dashboard" element={
+          <ProtectedRoute requiredRole="admin">
+            <DashboardPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/dashboard" element={
+          <ProtectedRoute requiredRole="admin">
+            <DashboardPage />
+          </ProtectedRoute>
+        } />
 
         {/* Not found */}
         <Route path="*" element={<NotFoundPage />} />

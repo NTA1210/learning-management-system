@@ -1,11 +1,11 @@
 //do business like API call, auth service, ...
 import http from "../utils/http";
 
-import { type LoginRequest, type RegisterRequest, type AuthResponse } from "../types/auth";
+import { type LoginRequest, type RegisterRequest, type AuthResponse, type User } from "../types/auth";
 export * from './mock';
 export const authService = {
-  login: async (data: LoginRequest): Promise<AuthResponse> => {
-    const response = await http.post<AuthResponse>("/auth/login", data);
+  login: async (data: LoginRequest): Promise<User> => {
+    const response = await http.post<User>("/auth/login", data);
     return response.data;
   },
 
@@ -16,6 +16,9 @@ export const authService = {
 
   logout: async (): Promise<AuthResponse> => {
     const response = await http.get<AuthResponse>("/auth/logout");
+    // Clear local storage
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('userData');
     return response.data;
   },
 
@@ -39,6 +42,12 @@ export const authService = {
 
   verifyEmail: async (code: string): Promise<AuthResponse> => {
     const response = await http.get<AuthResponse>(`/auth/email/verify/${code}`);
+    return response.data;
+  },
+
+  // Get current user info (requires authentication)
+  getCurrentUser: async (): Promise<User> => {
+    const response = await http.get<User>("/user");
     return response.data;
   },
 };

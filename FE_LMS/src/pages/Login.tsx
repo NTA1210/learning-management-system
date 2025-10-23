@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { authService } from "../services";
-import { LoginRequest } from "../types/auth";
+import { type LoginRequest } from "../types/auth";
 
 const LoginPage: React.FC = () => {
   const [formData, setFormData] = useState<LoginRequest>({
@@ -26,10 +26,31 @@ const LoginPage: React.FC = () => {
     setError("");
 
     try {
-      await authService.login(formData);
-      // Redirect to dashboard or home page after successful login
-      window.location.href = "/";
+      const response = await authService.login(formData);
+      console.log("Login successful:", response);
+      
+      // Store authentication state
+      localStorage.setItem('isAuthenticated', 'true');
+      localStorage.setItem('userData', JSON.stringify(response));
+      
+      // Redirect based on user role
+      const userRole = response.role;
+      switch (userRole) {
+        case 'admin':
+          window.location.href = "/dashboard";
+          break;
+        case 'teacher':
+          window.location.href = "/teacher-dashboard"; // You can create this later
+          break;
+        case 'student':
+          window.location.href = "/student-dashboard"; // You can create this later
+          break;
+        default:
+          window.location.href = "/";
+      }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
+      console.error("Login error:", err);
       setError(err.message || "Login failed");
     } finally {
       setLoading(false);
@@ -76,15 +97,16 @@ const LoginPage: React.FC = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                       </svg>
                     </div>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      className="auth-input w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter your email"
-                      required
-                    />
+                     <input
+                       type="email"
+                       name="email"
+                       value={formData.email}
+                       onChange={handleInputChange}
+                       className="auth-input w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                       placeholder="Enter your email"
+                       autoComplete="email"
+                       required
+                     />
                     <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
                       <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
                         <svg className="h-4 w-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
@@ -103,15 +125,16 @@ const LoginPage: React.FC = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
                     </div>
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      name="password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      className="auth-input w-full pl-12 pr-12 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter your password"
-                      required
-                    />
+                     <input
+                       type={showPassword ? "text" : "password"}
+                       name="password"
+                       value={formData.password}
+                       onChange={handleInputChange}
+                       className="auth-input w-full pl-12 pr-12 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                       placeholder="Enter your password"
+                       autoComplete="current-password"
+                       required
+                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
@@ -268,7 +291,7 @@ const LoginPage: React.FC = () => {
                   <div className="flex-shrink-0">
                     <div className="w-16 h-16 bg-orange-500/20 rounded-2xl flex items-center justify-center">
                       <svg className="w-8 h-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1721 9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 117 21 9z" />
                       </svg>
                     </div>
                   </div>
