@@ -1,20 +1,10 @@
 import mongoose from "mongoose";
-
-export interface ILesson extends mongoose.Document {
-  title: string;
-  course: mongoose.Types.ObjectId;
-  content?: string;
-  order?: number;
-  durationMinutes?: number;
-  publishedAt?: Date;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
+import { ILesson } from "../types";
 
 const LessonSchema = new mongoose.Schema<ILesson>(
   {
     title: { type: String, required: true },
-    course: {
+    courseId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Course",
       required: true,

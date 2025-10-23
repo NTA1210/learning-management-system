@@ -1,12 +1,5 @@
 import mongoose from "mongoose";
-
-export interface IAnnouncement extends mongoose.Document {
-  title: string;
-  content: string;
-  courseId?: mongoose.Types.ObjectId; // if null, system-wide
-  authorId?: mongoose.Types.ObjectId;
-  publishedAt?: Date;
-}
+import { IAnnouncement } from "@/types";
 
 const AnnouncementSchema = new mongoose.Schema<IAnnouncement>(
   {

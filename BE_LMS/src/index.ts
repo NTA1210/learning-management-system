@@ -5,10 +5,19 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import errorHandler from "./middleware/errorHandler";
 import { OK } from "./constants/http";
+
+import { customResponse } from "./middleware/customResponse";
+
 import authRoutes from "./routes/auth.route";
 import authenticate from "./middleware/authenticate";
 import userRoutes from "./routes/user.route";
 import sessionRoutes from "./routes/session.route";
+import enrollmentRoutes from "./routes/enrollment.route";
+import courseRoutes from "./routes/course.route";
+import assignmentRoutes from "./routes/assignment.route";
+import submissionRoutes from "./routes/submission.route";
+import authorize from "./middleware/authorize";
+import { Role } from "./types";
 
 const app = express();
 
@@ -21,6 +30,7 @@ app.use(
   })
 );
 app.use(cookieParser());
+app.use(customResponse);
 
 app.get("/", (req, res) => {
   res.status(OK).send("Hello World!");
@@ -29,9 +39,15 @@ app.get("/", (req, res) => {
 //auth routes
 app.use("/auth", authRoutes);
 
+//public routes
+app.use("/courses", courseRoutes);
+app.use("/assignments", assignmentRoutes);
+app.use("/submissions", submissionRoutes);
+
 //protected routes
 app.use("/user", authenticate, userRoutes);
-app.use("/sessions", authenticate, sessionRoutes);
+app.use("/sessions", authenticate, authorize(Role.ADMIN), sessionRoutes);
+app.use("/enrollments", authenticate, enrollmentRoutes);
 
 app.use(errorHandler);
 

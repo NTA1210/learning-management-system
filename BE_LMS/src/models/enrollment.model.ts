@@ -1,28 +1,15 @@
 import mongoose from "mongoose";
-
-export interface IEnrollment extends mongoose.Document {
-  student: mongoose.Types.ObjectId;
-  course: mongoose.Types.ObjectId;
-  enrolledAt: Date;
-  status: "active" | "completed" | "dropped";
-  role?: "student" | "auditor";
-  finalGrade?: number;
-  grades?: {
-    assignmentId?: mongoose.Types.ObjectId;
-    grade: number;
-    note?: string;
-  }[];
-}
+import { IEnrollment } from "../types";
 
 const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
   {
-    student: {
+    studentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
       index: true,
     },
-    course: {
+    courseId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Course",
       required: true,
@@ -47,5 +34,5 @@ const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
   { timestamps: false }
 );
 
-EnrollmentSchema.index({ student: 1, course: 1 }, { unique: true });
+EnrollmentSchema.index({ studentId: 1, courseId: 1 }, { unique: true });
 export default mongoose.model<IEnrollment>("Enrollment", EnrollmentSchema);

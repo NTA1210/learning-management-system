@@ -63,7 +63,7 @@ export const createAccount = async (data: CreateAccountParams) => {
 
   const url = `${APP_ORIGIN}/auth/verify-email/${verificationCode._id}`;
   const { error } = await sendMail({
-    to: "anhkn7@gmail.com",
+    to: user.email,
     ...getVerifyEmailTemplate(url),
   });
 
@@ -109,6 +109,8 @@ export const loginUser = async ({
   //validate the password from request
   const isValidatePassword = await user.comparePassword(password);
   appAssert(isValidatePassword, UNAUTHORIZED, "Invalid email or password");
+  //check wether user is verified
+  appAssert(user.verified, UNAUTHORIZED, "Email not verified");
   //create session
   const session = await SessionModel.create({
     userId: user._id,
@@ -120,9 +122,13 @@ export const loginUser = async ({
     refreshTokenSignOptions
   );
 
-  const accessToken = signToKen({ userId: user._id, sessionId: session._id });
+  const accessToken = signToKen({
+    userId: user._id,
+    role: user.role,
+    sessionId: session._id,
+  });
   return {
-    user: user.omitPassword(),
+    user: user.response(),
     accessToken,
     refreshToken,
   };
@@ -145,6 +151,10 @@ export const refreshUserAccessToken = async (refreshToken: string) => {
     "Session expired"
   );
 
+  //Get user
+  const user = await UserModel.findById(session.userId);
+  appAssert(user, INTERNAL_SERVER_ERROR, "User not found");
+
   //Refresh the token if it expires in less than 1 day
   const sessionNeedRefresh = session.expiresAt.getTime() - now <= ONE_DAY_MS;
 
@@ -159,6 +169,7 @@ export const refreshUserAccessToken = async (refreshToken: string) => {
 
   const accessToken = signToKen({
     userId: session.userId,
+    role: user.role,
     sessionId: session._id,
   });
 

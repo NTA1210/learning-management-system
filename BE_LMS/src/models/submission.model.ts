@@ -1,17 +1,5 @@
 import mongoose from "mongoose";
-
-export interface ISubmission extends mongoose.Document {
-  assignmentId: mongoose.Types.ObjectId;
-  studentId: mongoose.Types.ObjectId;
-  fileUrl?: string;
-  fileName?: string;
-  submittedAt: Date;
-  grade?: number;
-  feedback?: string;
-  gradedBy?: mongoose.Types.ObjectId;
-  gradedAt?: Date;
-  isLate?: boolean;
-}
+import { ISubmission } from "../types";
 
 const SubmissionSchema = new mongoose.Schema<ISubmission>(
   {
@@ -35,9 +23,33 @@ const SubmissionSchema = new mongoose.Schema<ISubmission>(
     gradedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     gradedAt: { type: Date },
     isLate: { type: Boolean, default: false },
+
+    //status
+    status: {
+      type: String,
+      enum: ["not_submitted", "submitted", "graded", "overdue"],
+      default: "submitted",
+    },
   },
-  { timestamps: false }
+  { timestamps: true } //auto thêm createdAt, updatedAt
 );
 
+//một sv chỉ có 1 submission / assignment
 SubmissionSchema.index({ assignmentId: 1, studentId: 1 }, { unique: true });
+
+//middleware ktra nộp trễ
+SubmissionSchema.pre("save", async function (next) {
+  const Assignment = mongoose.model("Assignment");
+  const assignment = await Assignment.findById(this.assignmentId);
+
+  if (assignment?.dueDate && this.submittedAt > assignment.dueDate) {
+    this.isLate = true;
+    this.status = "overdue";
+  } else {
+    this.isLate = false;
+  }
+
+  next();
+});
+
 export default mongoose.model<ISubmission>("Submission", SubmissionSchema);

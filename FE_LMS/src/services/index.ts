@@ -1,5 +1,6 @@
+//do business like API call, auth service, ...
 import http from "../utils/http";
-import { LoginRequest, RegisterRequest, AuthResponse } from "../types/auth";
+import { type LoginRequest, type RegisterRequest, type AuthResponse } from "../types/auth";
 
 export const authService = {
   login: async (data: LoginRequest): Promise<AuthResponse> => {
