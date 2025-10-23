@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import {
+import {DashboardPage ,
   LandingPage,
   NotFoundPage,
   EmailVerifyPage,
@@ -21,7 +21,9 @@ function AppRoutes() {
         <Route path="/email-verify" element={<EmailVerifyPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        
+        <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="admin/dashboard" element={<DashboardPage />} />
+
         {/* Not found */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
