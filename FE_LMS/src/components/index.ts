@@ -2,3 +2,7 @@ export { default as ThemeToggle } from './ThemeToggle';
 export { AuthLayout } from './AuthLayout';
 export { AuthInput } from './AuthInput';
 export { AuthButton } from './AuthButton';
+export { default as StudentsByBatchChart } from './StudentsByBatchChart.tsx';
+export { default as StudentsByCampusChart } from './StudentsByCampusChart.tsx';
+export { default as StudentsPerClassChart } from './StudentsPerClassChart.tsx';
+export { default as StudentsByMajorChart } from './StudentsByMajorChart.tsx';

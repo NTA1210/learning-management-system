@@ -1,7 +1,8 @@
 //do business like API call, auth service, ...
 import http from "../utils/http";
-import { type LoginRequest, type RegisterRequest, type AuthResponse } from "../types/auth";
 
+import { type LoginRequest, type RegisterRequest, type AuthResponse } from "../types/auth";
+export * from './mock';
 export const authService = {
   login: async (data: LoginRequest): Promise<AuthResponse> => {
     const response = await http.post<AuthResponse>("/auth/login", data);
