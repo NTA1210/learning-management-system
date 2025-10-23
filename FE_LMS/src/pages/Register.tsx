@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { authService } from "../services";
-import { RegisterRequest } from "../types/auth";
+import { type RegisterRequest } from "../types/auth";
 
 const RegisterPage: React.FC = () => {
   const [formData, setFormData] = useState<RegisterRequest>({
@@ -11,9 +11,10 @@ const RegisterPage: React.FC = () => {
     confirmPassword: "",
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -39,12 +40,16 @@ const RegisterPage: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess(false);
 
     try {
-      await authService.register(formData);
-      // Redirect to login page or dashboard after successful registration
-      window.location.href = "/login";
+      const response = await authService.register(formData);
+      console.log("Registration successful:", response);
+      setSuccess(true);
+      // Don't redirect immediately - show success message about email verification
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
+      console.error("Registration error:", err);
       setError(err.message || "Registration failed");
     } finally {
       setLoading(false);
@@ -223,6 +228,28 @@ const RegisterPage: React.FC = () => {
                         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                       </svg>
                       {error}
+                    </div>
+                  </div>
+                )}
+
+                {/* Success Message */}
+                {success && (
+                  <div className="text-green-600 text-sm bg-green-50 p-4 rounded-xl border border-green-200 animate-pulse">
+                    <div className="flex items-center">
+                      <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <div>
+                        <div className="font-semibold">Registration Successful!</div>
+                        <div className="text-sm mt-1">
+                          Please check your email ({formData.email}) and click the verification link to activate your account.
+                        </div>
+                        <div className="text-sm mt-2">
+                          <Link to="/login" className="text-blue-600 hover:text-blue-800 underline">
+                            Go to Login Page
+                          </Link>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
