@@ -22,13 +22,6 @@ export const getSessionHandler = catchErrors(async (req, res) => {
     }
   );
 
-  // return res.status(OK).json(
-  //   sessions.map((session) => ({
-  //     ...session.toObject(),
-  //     ...(session.id === req.sessionId && { isCurrent: true }),
-  //   }))
-  // );
-
   return res.success(
     OK,
     sessions.map((session) => ({
