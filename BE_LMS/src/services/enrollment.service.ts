@@ -183,3 +183,68 @@ export const createEnrollment = async (data: {
 
   return enrollment;
 };
+
+// PUT - Update enrollment (Admin/Teacher)
+export const updateEnrollment = async (
+  enrollmentId: string,
+  data: {
+    status?: "active" | "completed" | "dropped";
+    role?: "student" | "auditor";
+    finalGrade?: number;
+  }
+) => {
+  // 1. Check enrollment exists
+  const enrollment = await EnrollmentModel.findById(enrollmentId);
+  appAssert(enrollment, NOT_FOUND, "Enrollment not found");
+
+  // 2. Update fields
+  const updateData: any = {};
+  if (data.status !== undefined) updateData.status = data.status;
+  if (data.role !== undefined) updateData.role = data.role;
+  if (data.finalGrade !== undefined) updateData.finalGrade = data.finalGrade;
+
+  // 3. Update enrollment
+  const updatedEnrollment = await EnrollmentModel.findByIdAndUpdate(
+    enrollmentId,
+    updateData,
+    { new: true } // Return updated document
+  )
+    .populate("studentId", "username email fullname avatar_url")
+    .populate("courseId", "title code description");
+
+  return updatedEnrollment;
+};
+
+// PUT - Student update own enrollment (chỉ có thể drop)
+export const updateSelfEnrollment = async (
+  enrollmentId: string,
+  studentId: string,
+  data: {
+    status?: "dropped";
+  }
+) => {
+  // 1. Check enrollment exists và thuộc về student này
+  const enrollment = await EnrollmentModel.findOne({
+    _id: enrollmentId,
+    studentId,
+  });
+  appAssert(enrollment, NOT_FOUND, "Enrollment not found or access denied");
+
+  // 2. Không cho phép drop nếu đã completed
+  appAssert(
+    enrollment.status !== "completed",
+    BAD_REQUEST,
+    "Cannot drop a completed course"
+  );
+
+  // 3. Update status
+  const updatedEnrollment = await EnrollmentModel.findByIdAndUpdate(
+    enrollmentId,
+    { status: data.status },
+    { new: true }
+  )
+    .populate("studentId", "username email fullname avatar_url")
+    .populate("courseId", "title code description");
+
+  return updatedEnrollment;
+};

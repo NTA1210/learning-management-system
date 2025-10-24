@@ -7,6 +7,8 @@ import {
   getAllEnrollmentsHandler,
   createEnrollmentHandler,
   enrollSelfHandler,
+  updateEnrollmentHandler,
+  updateSelfEnrollmentHandler,
 } from "../controller/enrollment.controller";
 import authorize from "../middleware/authorize";
 import { Role } from "../types";
@@ -54,6 +56,20 @@ enrollmentRoutes.post(
   "/enroll",
   authorize(Role.STUDENT),
   enrollSelfHandler
+);
+
+// PUT /enrollments/my-enrollments/:id - Student update own enrollment
+enrollmentRoutes.put(
+  "/my-enrollments/:id",
+  authorize(Role.STUDENT),
+  updateSelfEnrollmentHandler
+);
+
+// PUT /enrollments/:id - Admin/Teacher update enrollment
+enrollmentRoutes.put(
+  "/:id",
+  authorize(Role.ADMIN, Role.TEACHER),
+  updateEnrollmentHandler
 );
 
 export default enrollmentRoutes;
