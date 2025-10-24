@@ -14,6 +14,7 @@ import userRoutes from "./routes/user.route";
 import sessionRoutes from "./routes/session.route";
 import enrollmentRoutes from "./routes/enrollment.route";
 import courseRoutes from "./routes/course.route";
+import categoryRoutes from "./routes/category.route";
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use("/auth", authRoutes);
 
 //public routes
 app.use("/courses", courseRoutes);
+app.use("/categories", categoryRoutes);
 
 //protected routes
 app.use("/user", authenticate, userRoutes);
