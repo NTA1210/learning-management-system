@@ -10,16 +10,8 @@ import {
 } from "../controller/enrollment.controller";
 import authorize from "../middleware/authorize";
 import { Role } from "../types";
-import { Request, Response, NextFunction } from "express";
 
 const enrollmentRoutes = Router();
-
-enrollmentRoutes.use((req: Request, res: Response, next: NextFunction) => {
-  if (req.role && (req.role as string) === "admin") {
-    req.role = "ADMIN" as any;
-  }
-  next();
-});
 
 // prefix: /enrollments
 
