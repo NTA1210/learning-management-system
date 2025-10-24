@@ -1,7 +1,9 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
+import { authService } from "../services";
 
 const ResetPasswordPage: React.FC = () => {
+  const { code } = useParams<{ code: string }>();
   const [formData, setFormData] = useState({
     password: "",
     confirmPassword: "",
@@ -37,9 +39,14 @@ const ResetPasswordPage: React.FC = () => {
     setLoading(true);
     setError("");
 
+    if (!code) {
+      setError("Invalid reset link. Please request a new password reset.");
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await authService.resetPassword(code, formData.password);
       setIsSuccess(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Password reset failed");
@@ -50,7 +57,7 @@ const ResetPasswordPage: React.FC = () => {
 
   const handleBackToLogin = () => {
     // Navigate back to login
-    console.log("Navigate to login...");
+    window.location.href = "/login";
   };
 
   if (isSuccess) {

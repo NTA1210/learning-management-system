@@ -23,7 +23,7 @@ function AppRoutes() {
         <Route path="/email-verify" element={<EmailVerifyPage />} />
         <Route path="/auth/verify-email/:code" element={<EmailVerificationPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/reset-password/:code" element={<ResetPasswordPage />} />
         <Route path="/dashboard" element={
           <ProtectedRoute requiredRole="admin">
             <DashboardPage />

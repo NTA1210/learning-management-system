@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { authService } from "../services";
 
 const ForgotPasswordPage: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -17,8 +18,7 @@ const ForgotPasswordPage: React.FC = () => {
     setError("");
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await authService.sendPasswordReset(email);
       setIsSubmitted(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to send reset link");
@@ -29,7 +29,7 @@ const ForgotPasswordPage: React.FC = () => {
 
   const handleBackToLogin = () => {
     // Navigate back to login
-    console.log("Navigate to login...");
+    window.location.href = "/login";
   };
 
   if (isSubmitted) {
