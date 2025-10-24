@@ -39,7 +39,7 @@ export const submitAssignment = async (
     // status: isLate ? "overdue" : "submitted",
   });
 
-  return await submission.populate("assignmentID","title dueDate");
+  return await submission.populate("assignmentId","title dueDate");
 };
 
  //sửa bt resubmit
@@ -66,10 +66,10 @@ export const resubmitAssignment = async (
   submission.fileName = fileName;
   submission.submittedAt = resubmittedAt;
   //submission.isLate = isLate;
-  //submission.status = isLate ? "overdue" : "submitted";
+  //submission.status = isLate ? "over due" : "submitted";
 
   await submission.save();
-  return await submission.populate("assignmentID","title dueDate");
+  return await submission.populate("assignmentId","title dueDate");
 };
 
  //xem status bài nộp
