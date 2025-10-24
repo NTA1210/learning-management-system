@@ -6,22 +6,23 @@ import StudentsPerClassChart from "../components/StudentsPerClassChart.tsx";
 import StudentsByMajorChart from "../components/StudentsByMajorChart.tsx";
 
 export default function Dashboard() {
-  const { darkMode } = useTheme();
+  const { darkMode, toggleDarkMode } = useTheme();
 
   return (
     <div 
       className="flex h-screen overflow-hidden relative"
       style={{
-        backgroundColor: darkMode ? '#0f172a' : '#f8fafc',
+        backgroundColor: darkMode ? '#1a202c' : '#f8fafc',
         color: darkMode ? '#ffffff' : '#1e293b'
       }}
     >
       {/* Navigation */}
       <nav 
-        className="text-white shadow-lg py-3 px-6 fixed top-0 left-0 right-0 z-[95] backdrop-blur-md"
+        className="shadow-lg py-3 px-6 fixed top-0 left-0 right-0 z-[95] backdrop-blur-md transition-colors duration-300"
         style={{ 
-          backgroundColor: darkMode ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-          borderBottom: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)'
+          backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+          borderBottom: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+          color: darkMode ? '#ffffff' : '#1e293b'
         }}
       >
         <div className="container mx-auto flex justify-between items-center">
@@ -406,7 +407,7 @@ export default function Dashboard() {
               <div 
                 className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                 style={{
-                  backgroundColor: darkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                  backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
                   border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                   backdropFilter: 'blur(10px)'
                 }}
@@ -446,7 +447,7 @@ export default function Dashboard() {
               <div 
                 className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                 style={{
-                  backgroundColor: darkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                  backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
                   border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                   backdropFilter: 'blur(10px)'
                 }}
@@ -486,7 +487,7 @@ export default function Dashboard() {
               <div 
                 className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                 style={{
-                  backgroundColor: darkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                  backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
                   border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                   backdropFilter: 'blur(10px)'
                 }}
@@ -517,7 +518,7 @@ export default function Dashboard() {
               <div 
                 className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                 style={{
-                  backgroundColor: darkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                  backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
                   border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                   backdropFilter: 'blur(10px)'
                 }}
@@ -561,7 +562,7 @@ export default function Dashboard() {
               <div 
                 className="rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
                 style={{
-                  backgroundColor: darkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                  backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
                   border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                   backdropFilter: 'blur(10px)'
                 }}
@@ -595,7 +596,7 @@ export default function Dashboard() {
               <div 
                 className="rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
                 style={{
-                  backgroundColor: darkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                  backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
                   border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                   backdropFilter: 'blur(10px)'
                 }}
@@ -705,7 +706,7 @@ export default function Dashboard() {
             <div 
               className="rounded-lg shadow mb-8"
               style={{
-                backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+                backgroundColor: darkMode ? '#2d3748' : '#ffffff',
                 borderColor: darkMode ? '#374151' : '#e5e7eb'
               }}
             >
@@ -873,16 +874,26 @@ export default function Dashboard() {
 
       {/* Dark Mode Toggle */}
       <button 
-        className="fixed bottom-4 right-20 z-50 w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300 shadow-lg text-white"
-        style={{ backgroundColor: darkMode ? '#4f46e5' : '#4f46e5' }}
-        onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#4338ca' : '#4338ca'}
-        onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#4f46e5' : '#4f46e5'}
-        aria-label="Switch to dark mode"
-        title="Switch to dark mode"
+        onClick={toggleDarkMode}
+        className={`fixed bottom-4 right-4 z-[100] w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300 shadow-lg hover:scale-110 ${
+          darkMode 
+            ? 'bg-yellow-400 text-gray-900 hover:bg-yellow-300' 
+            : 'bg-indigo-600 text-white hover:bg-indigo-700'
+        }`}
+        aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+        title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
-        </svg>
+        {darkMode ? (
+          // Sun icon (light mode)
+          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+        ) : (
+          // Moon icon (dark mode)
+          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+          </svg>
+        )}
       </button>
     </div>
   );

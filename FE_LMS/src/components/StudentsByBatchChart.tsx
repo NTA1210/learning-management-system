@@ -21,8 +21,8 @@ export default function StudentsByBatchChart() {
           />
           <Tooltip 
             contentStyle={{
-              backgroundColor: darkMode ? '#1f2937' : '#ffffff',
-              border: darkMode ? '1px solid #374151' : '1px solid #e5e7eb',
+              backgroundColor: darkMode ? '#2d3748' : '#ffffff',
+              border: darkMode ? '1px solid #4a5568' : '1px solid #e5e7eb',
               borderRadius: '8px',
               color: darkMode ? '#ffffff' : '#374151'
             }}
