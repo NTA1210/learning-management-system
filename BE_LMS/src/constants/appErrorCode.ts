@@ -3,6 +3,7 @@ const enum AppErrorCode {
   CastError = "CAST_ERROR",
   ValidationError = "VALIDATION_ERROR",
   InvalidDateTime = "INVALID_DATE_TIME",
+  InvalidFileType = "INVALID_FILE_TYPE",
 }
 
 export default AppErrorCode;
