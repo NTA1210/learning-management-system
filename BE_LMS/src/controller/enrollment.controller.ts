@@ -1,16 +1,19 @@
-import { OK } from "../constants/http";
+import { OK, CREATED } from "../constants/http";
 import { catchErrors } from "../utils/asyncHandler";
 import {
   getEnrollmentsQuerySchema,
   enrollmentIdSchema,
   studentIdSchema,
   courseIdSchema,
+  createEnrollmentSchema,
+  enrollSelfSchema,
 } from "../validators/enrollment.schemas";
 import {
   getEnrollmentById,
   getStudentEnrollments,
   getCourseEnrollments,
   getAllEnrollments,
+  createEnrollment,
 } from "../services/enrollment.service";
 
 // GET /enrollments/:id - Get enrollment by ID
@@ -63,4 +66,25 @@ export const getAllEnrollmentsHandler = catchErrors(async (req, res) => {
 
   const result = await getAllEnrollments(filters); // No userId passed
   return res.success(OK, result);
+});
+
+// POST /enrollments - Admin tạo enrollment cho student
+export const createEnrollmentHandler = catchErrors(async (req, res) => {
+  const data = createEnrollmentSchema.parse(req.body); // Validate body
+
+  const enrollment = await createEnrollment(data);
+  return res.success(CREATED, enrollment, "Enrollment created successfully");
+});
+
+// POST /enrollments/enroll - Student tự enroll vào course
+export const enrollSelfHandler = catchErrors(async (req, res) => {
+  const { courseId, role } = enrollSelfSchema.parse(req.body); // Validate body
+  const studentId = req.userId!.toString(); // Lấy từ authenticate middleware
+
+  const enrollment = await createEnrollment({
+    studentId,
+    courseId,
+    role,
+  });
+  return res.success(CREATED, enrollment, "Enrolled successfully");
 });

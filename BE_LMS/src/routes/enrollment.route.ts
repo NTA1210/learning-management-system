@@ -5,11 +5,21 @@ import {
   getStudentEnrollmentsHandler,
   getCourseEnrollmentsHandler,
   getAllEnrollmentsHandler,
+  createEnrollmentHandler,
+  enrollSelfHandler,
 } from "../controller/enrollment.controller";
 import authorize from "../middleware/authorize";
 import { Role } from "../types";
+import { Request, Response, NextFunction } from "express";
 
 const enrollmentRoutes = Router();
+
+enrollmentRoutes.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.role && (req.role as string) === "admin") {
+    req.role = "ADMIN" as any;
+  }
+  next();
+});
 
 // prefix: /enrollments
 
@@ -38,6 +48,20 @@ enrollmentRoutes.get(
   "/:id",
   authorize(Role.ADMIN, Role.TEACHER),
   getEnrollmentHandler
+);
+
+// POST /enrollments - Admin tạo enrollment cho student
+enrollmentRoutes.post(
+  "/",
+  authorize(Role.ADMIN),
+  createEnrollmentHandler
+);
+
+// POST /enrollments/enroll - Student tự enroll vào course
+enrollmentRoutes.post(
+  "/enroll",
+  authorize(Role.STUDENT),
+  enrollSelfHandler
 );
 
 export default enrollmentRoutes;

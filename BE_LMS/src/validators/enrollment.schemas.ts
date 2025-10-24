@@ -27,3 +27,16 @@ export const courseIdSchema = z.object({
   courseId: objectIdSchema,
 });
 
+// POST - Admin tạo enrollment cho student
+export const createEnrollmentSchema = z.object({
+  studentId: objectIdSchema,
+  courseId: objectIdSchema,
+  status: z.enum(["active", "completed", "dropped"]).optional(),
+  role: z.enum(["student", "auditor"]).optional(),
+});
+
+// POST - Student tự enroll vào course
+export const enrollSelfSchema = z.object({
+  courseId: objectIdSchema,
+  role: z.enum(["student", "auditor"]).optional(),
+});
