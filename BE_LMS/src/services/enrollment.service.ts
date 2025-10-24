@@ -147,12 +147,38 @@ export const createEnrollment = async (data: {
   appAssert(course, NOT_FOUND, "Course not found");
   appAssert(course.isPublished, BAD_REQUEST, "Course is not published");
 
-  // 3. Check duplicate enrollment
+  // 3. Check existing enrollment
   const existingEnrollment = await EnrollmentModel.findOne({
     studentId,
     courseId,
   });
-  appAssert(!existingEnrollment, CONFLICT, "Already enrolled in this course");
+
+  // Nếu đã có enrollment
+  if (existingEnrollment) {
+    // Nếu status = "dropped" → CHO PHÉP re-enroll (update lại thành active)
+    if (existingEnrollment.status === "dropped") {
+      existingEnrollment.status = status;
+      existingEnrollment.role = role;
+      existingEnrollment.enrolledAt = new Date(); // Reset enrollment date
+      existingEnrollment.finalGrade = undefined; // Reset grade
+      existingEnrollment.grades = []; // Reset grades
+      await existingEnrollment.save();
+
+      await existingEnrollment.populate([
+        { path: "studentId", select: "username email fullname avatar_url" },
+        { path: "courseId", select: "title code description" },
+      ]);
+
+      return existingEnrollment;
+    }
+
+    // Nếu status = "active" hoặc "completed" → KHÔNG CHO PHÉP
+    appAssert(
+      false,
+      CONFLICT,
+      `Already enrolled in this course with status: ${existingEnrollment.status}`
+    );
+  }
 
   // 4. Check course capacity
   if (course.capacity) {
