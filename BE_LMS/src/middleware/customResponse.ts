@@ -2,11 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { IApiResponse } from "../types/apiResponse.type";
 import { nowLocal, nowTZone } from "../utils/time";
 
-export const customResponse = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
+const customResponse = (req: Request, res: Response, next: NextFunction) => {
   res.success = function <T>(
     status: number,
     data?: T,
@@ -54,3 +50,5 @@ export const customResponse = (
 
   next();
 };
+
+export default customResponse;

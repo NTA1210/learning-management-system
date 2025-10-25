@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 export default interface ICourse extends mongoose.Document {
   title: string;
   code?: string;
+  logo?: string;
   description?: string;
   category?: mongoose.Types.ObjectId;
   teachers: mongoose.Types.ObjectId[]; // can be multiple teachers

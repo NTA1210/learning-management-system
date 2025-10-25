@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { IApiResponse } from "./src/types/apiResponse.type";
+import { IApiResponse } from "@/types/apiResponse.type";
 import { Role } from "@/types";
 
 declare global {
@@ -26,4 +26,5 @@ declare global {
     }
   }
 }
+
 export {};

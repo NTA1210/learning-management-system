@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { authService } from "../services";
+import { useTheme } from "../hooks/useTheme";
 
 const ForgotPasswordPage: React.FC = () => {
+  const { darkMode } = useTheme();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -18,7 +19,8 @@ const ForgotPasswordPage: React.FC = () => {
     setError("");
 
     try {
-      await authService.sendPasswordReset(email);
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 2000));
       setIsSubmitted(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to send reset link");
@@ -29,27 +31,55 @@ const ForgotPasswordPage: React.FC = () => {
 
   const handleBackToLogin = () => {
     // Navigate back to login
-    window.location.href = "/login";
+    console.log("Navigate to login...");
   };
 
   if (isSubmitted) {
     return (
-      <div className="auth-container flex items-center justify-center p-4">
-        <div className="auth-card max-w-4xl w-full overflow-hidden">
+      <div 
+        className="auth-container flex items-center justify-center p-4 transition-colors duration-300"
+        style={{
+          backgroundColor: darkMode ? '#111827' : undefined,
+          color: darkMode ? '#ffffff' : undefined,
+        }}
+      >
+        <div 
+          className="auth-card max-w-4xl w-full overflow-hidden transition-colors duration-300"
+          style={{
+            backgroundColor: darkMode ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+            borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(255, 255, 255, 0.2)',
+          }}
+        >
           <div className="flex min-h-[560px]">
             {/* Left Side - Success Message */}
             <div className="flex-1 p-8 flex items-center">
               <div className="max-w-md mx-auto w-full">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
-                  <Link to="/login" className="text-gray-600 hover:text-gray-800 transition-colors duration-200 p-2 rounded-full hover:bg-gray-100">
+                  <button 
+                    className="transition-colors duration-200 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                  >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
-                  </Link>
-                  <div className="text-sm text-gray-600">
+                  </button>
+                  <div 
+                    className="text-sm"
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                  >
                     Already member?{" "}
-                    <Link to="/login" className="text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200">
+                    <Link 
+                      to="/login" 
+                      className="font-medium transition-colors duration-200"
+                      style={{
+                        color: darkMode ? '#60a5fa' : '#2563eb',
+                      }}
+                    >
                       Sign in
                     </Link>
                   </div>
@@ -57,10 +87,21 @@ const ForgotPasswordPage: React.FC = () => {
 
                 {/* Title */}
                 <div className="mb-6">
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent mb-2">
+                  <h1 
+                    className="text-3xl font-bold mb-2"
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                  >
                     Check Your Email
                   </h1>
-                  <p className="text-gray-600">We've sent a password reset link to your email address</p>
+                  <p 
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                  >
+                    We've sent a password reset link to your email address
+                  </p>
                 </div>
 
                 {/* Success Content */}
@@ -71,8 +112,20 @@ const ForgotPasswordPage: React.FC = () => {
                     </svg>
                   </div>
                   
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">Email Sent!</h3>
-                  <p className="text-gray-600 mb-6">
+                  <h3 
+                    className="text-xl font-semibold mb-2"
+                    style={{
+                      color: darkMode ? '#ffffff' : '#1f2937',
+                    }}
+                  >
+                    Email Sent!
+                  </h3>
+                  <p 
+                    className="mb-6"
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                  >
                     We've sent a password reset link to <strong>{email}</strong>
                   </p>
                   
@@ -90,14 +143,33 @@ const ForgotPasswordPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setIsSubmitted(false)}
-                      className="w-full py-3 px-4 text-gray-600 hover:text-gray-800 font-medium transition-colors"
+                      className="w-full py-3 px-4 font-medium transition-colors"
+                      style={{
+                        color: darkMode ? '#d1d5db' : '#6b7280',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = darkMode ? '#ffffff' : '#374151';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = darkMode ? '#d1d5db' : '#6b7280';
+                      }}
                     >
                       Try different email
                     </button>
                   </div>
 
-                  <div className="mt-8 p-4 bg-blue-50 rounded-xl">
-                    <p className="text-blue-800 text-sm">
+                  <div 
+                    className="mt-8 p-4 rounded-xl"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(59, 130, 246, 0.1)' : '#dbeafe',
+                    }}
+                  >
+                    <p 
+                      className="text-sm"
+                      style={{
+                        color: darkMode ? '#93c5fd' : '#1e40af',
+                      }}
+                    >
                       <strong>Didn't receive the email?</strong> Check your spam folder or try again in a few minutes.
                     </p>
                   </div>
@@ -105,7 +177,18 @@ const ForgotPasswordPage: React.FC = () => {
 
                 {/* Language Selector */}
                 <div className="flex items-center justify-start mt-6">
-                  <div className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors duration-200 cursor-pointer">
+                  <div 
+                    className="flex items-center space-x-2 transition-colors duration-200 cursor-pointer"
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = darkMode ? '#ffffff' : '#374151';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = darkMode ? '#d1d5db' : '#6b7280';
+                    }}
+                  >
                     <span className="text-2xl">🇬🇧</span>
                     <span className="text-sm font-medium">ENG</span>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -204,22 +287,50 @@ const ForgotPasswordPage: React.FC = () => {
   }
 
   return (
-    <div className="auth-container flex items-center justify-center p-4">
-      <div className="auth-card max-w-4xl w-full overflow-hidden">
+    <div 
+      className="auth-container flex items-center justify-center p-4 transition-colors duration-300"
+      style={{
+        backgroundColor: darkMode ? '#111827' : undefined,
+        color: darkMode ? '#ffffff' : undefined,
+      }}
+    >
+      <div 
+        className="auth-card max-w-4xl w-full overflow-hidden transition-colors duration-300"
+        style={{
+          backgroundColor: darkMode ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+          borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(255, 255, 255, 0.2)',
+        }}
+      >
         <div className="flex min-h-[560px]">
           {/* Left Side - Forgot Password Form */}
           <div className="flex-1 p-8 flex items-center">
             <div className="max-w-md mx-auto w-full">
               {/* Header */}
               <div className="flex items-center justify-between mb-8">
-                <button className="text-gray-600 hover:text-gray-800 transition-colors duration-200 p-2 rounded-full hover:bg-gray-100">
+                <button 
+                  className="transition-colors duration-200 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                  style={{
+                    color: darkMode ? '#d1d5db' : '#6b7280',
+                  }}
+                >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                <div className="text-sm text-gray-600">
+                <div 
+                  className="text-sm"
+                  style={{
+                    color: darkMode ? '#d1d5db' : '#6b7280',
+                  }}
+                >
                   Already member?{" "}
-                  <Link to="/login" className="text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200">
+                  <Link 
+                    to="/login" 
+                    className="font-medium transition-colors duration-200"
+                    style={{
+                      color: darkMode ? '#60a5fa' : '#2563eb',
+                    }}
+                  >
                     Sign in
                   </Link>
                 </div>
@@ -227,10 +338,21 @@ const ForgotPasswordPage: React.FC = () => {
 
               {/* Title */}
               <div className="mb-6">
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent mb-2">
+                <h1 
+                  className="text-3xl font-bold mb-2"
+                  style={{
+                    color: darkMode ? '#d1d5db' : '#6b7280',
+                  }}
+                >
                   Forgot Password
                 </h1>
-                <p className="text-gray-600">Enter your email address and we'll send you a reset link</p>
+                <p 
+                  style={{
+                    color: darkMode ? '#d1d5db' : '#6b7280',
+                  }}
+                >
+                  Enter your email address and we'll send you a reset link
+                </p>
               </div>
 
               {/* Form */}
@@ -247,7 +369,12 @@ const ForgotPasswordPage: React.FC = () => {
                       type="email"
                       value={email}
                       onChange={handleInputChange}
-                      className="auth-input w-full pl-12 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="auth-input w-full pl-12 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-300"
+                      style={{
+                        backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                        borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : 'rgba(209, 213, 219, 0.3)',
+                        color: darkMode ? '#ffffff' : '#000000',
+                      }}
                       placeholder="Enter your email address"
                       required
                     />
@@ -300,7 +427,16 @@ const ForgotPasswordPage: React.FC = () => {
                     to="/login"
                     type="button"
                     onClick={handleBackToLogin}
-                    className="text-gray-600 hover:text-gray-800 font-medium text-sm transition-colors"
+                    className="font-medium text-sm transition-colors"
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = darkMode ? '#ffffff' : '#374151';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = darkMode ? '#d1d5db' : '#6b7280';
+                    }}
                   >
                     ← Back to Login
                   </Link>
@@ -308,7 +444,18 @@ const ForgotPasswordPage: React.FC = () => {
 
                 {/* Language Selector */}
                 <div className="flex items-center justify-start mt-6">
-                  <div className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors duration-200 cursor-pointer">
+                  <div 
+                    className="flex items-center space-x-2 transition-colors duration-200 cursor-pointer"
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = darkMode ? '#ffffff' : '#374151';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = darkMode ? '#d1d5db' : '#6b7280';
+                    }}
+                  >
                     <span className="text-2xl">🇬🇧</span>
                     <span className="text-sm font-medium">ENG</span>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

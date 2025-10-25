@@ -85,7 +85,10 @@ export const convertTime = (
  * @returns string
  * @throws
  */
-export const formatDate = (date: string | number): string => {
+export const formatDate = (
+  date: string | number,
+  format = DEFAULT_FORMAT
+): string => {
   const parsed = dayjs(date);
   appAssert(
     parsed.isValid(),
@@ -93,7 +96,7 @@ export const formatDate = (date: string | number): string => {
     "Invalid time",
     AppErrorCode.InvalidDateTime
   );
-  return parsed.format(DEFAULT_FORMAT);
+  return parsed.format(format);
 };
 
 /**

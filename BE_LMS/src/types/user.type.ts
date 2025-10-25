@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 export const enum Role {
   STUDENT = "student",
   TEACHER = "teacher",
-  ADMIN = "ADMIN",
+  ADMIN = "admin",
 }
 
 export default interface IUser

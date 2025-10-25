@@ -16,19 +16,19 @@ export default function StudentsByCampusChart() {
             cx="50%"
             cy="50%"
             labelLine={false}
-            label={({ campus, percent }) => `${campus} ${(percent * 100).toFixed(0)}%`}
+            label={({ campus, percent }: any) => `${campus} ${(percent * 100).toFixed(0)}%`}
             outerRadius={80}
             fill="#8884d8"
             dataKey="students"
           >
-            {studentsByCampusData.map((entry, index) => (
+            {studentsByCampusData.map((_, index) => (
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>
           <Tooltip 
             contentStyle={{
-              backgroundColor: darkMode ? '#1f2937' : '#ffffff',
-              border: darkMode ? '1px solid #374151' : '1px solid #e5e7eb',
+              backgroundColor: darkMode ? '#2d3748' : '#ffffff',
+              border: darkMode ? '1px solid #4a5568' : '1px solid #e5e7eb',
               borderRadius: '8px',
               color: darkMode ? '#ffffff' : '#374151'
             }}

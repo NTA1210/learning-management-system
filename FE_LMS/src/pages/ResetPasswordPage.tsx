@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { authService } from "../services";
+import { useTheme } from "../hooks/useTheme";
 
 const ResetPasswordPage: React.FC = () => {
+  const { darkMode } = useTheme();
   const { code } = useParams<{ code: string }>();
   const [formData, setFormData] = useState({
     password: "",
@@ -62,22 +64,50 @@ const ResetPasswordPage: React.FC = () => {
 
   if (isSuccess) {
     return (
-      <div className="auth-container flex items-center justify-center p-4">
-        <div className="auth-card max-w-4xl w-full overflow-hidden">
+      <div 
+        className="auth-container flex items-center justify-center p-4 transition-colors duration-300"
+        style={{
+          backgroundColor: darkMode ? '#111827' : undefined,
+          color: darkMode ? '#ffffff' : undefined,
+        }}
+      >
+        <div 
+          className="auth-card max-w-4xl w-full overflow-hidden transition-colors duration-300"
+          style={{
+            backgroundColor: darkMode ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+            borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(255, 255, 255, 0.2)',
+          }}
+        >
           <div className="flex min-h-[560px]">
             {/* Left Side - Success Message */}
             <div className="flex-1 p-8 flex items-center">
               <div className="max-w-md mx-auto w-full">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
-                  <button className="text-gray-600 hover:text-gray-800 transition-colors duration-200 p-2 rounded-full hover:bg-gray-100">
+                  <button 
+                    className="transition-colors duration-200 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                  >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                   </button>
-                  <div className="text-sm text-gray-600">
+                  <div 
+                    className="text-sm"
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                  >
                     Already member?{" "}
-                    <Link to="/login" className="text-blue-600 hover:text-blue-800 font-medium transition-colors duration-200">
+                    <Link 
+                      to="/login" 
+                      className="font-medium transition-colors duration-200"
+                      style={{
+                        color: darkMode ? '#60a5fa' : '#2563eb',
+                      }}
+                    >
                       Sign in
                     </Link>
                   </div>
@@ -85,10 +115,21 @@ const ResetPasswordPage: React.FC = () => {
 
                 {/* Title */}
                 <div className="mb-6">
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent mb-2">
+                  <h1 
+                    className="text-3xl font-bold mb-2"
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                  >
                     Password Reset Successfully!
                   </h1>
-                  <p className="text-gray-600">Your password has been updated. You can now sign in with your new password.</p>
+                  <p 
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                  >
+                    Your password has been updated. You can now sign in with your new password.
+                  </p>
                 </div>
 
                 {/* Success Content */}
@@ -99,8 +140,20 @@ const ResetPasswordPage: React.FC = () => {
                     </svg>
                   </div>
                   
-                  <h3 className="text-xl font-semibold text-gray-800 mb-2">All Set!</h3>
-                  <p className="text-gray-600 mb-6">
+                  <h3 
+                    className="text-xl font-semibold mb-2"
+                    style={{
+                      color: darkMode ? '#ffffff' : '#1f2937',
+                    }}
+                  >
+                    All Set!
+                  </h3>
+                  <p 
+                    className="mb-6"
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                  >
                     Your password has been successfully updated. You can now sign in with your new password.
                   </p>
                   
@@ -117,7 +170,18 @@ const ResetPasswordPage: React.FC = () => {
 
                 {/* Language Selector */}
                 <div className="flex items-center justify-start mt-6">
-                  <div className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors duration-200 cursor-pointer">
+                  <div 
+                    className="flex items-center space-x-2 transition-colors duration-200 cursor-pointer"
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = darkMode ? '#ffffff' : '#374151';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = darkMode ? '#d1d5db' : '#6b7280';
+                    }}
+                  >
                     <span className="text-2xl">🇬🇧</span>
                     <span className="text-sm font-medium">ENG</span>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -216,8 +280,20 @@ const ResetPasswordPage: React.FC = () => {
   }
 
   return (
-    <div className="auth-container flex items-center justify-center p-4">
-      <div className="auth-card max-w-4xl w-full overflow-hidden">
+    <div 
+      className="auth-container flex items-center justify-center p-4 transition-colors duration-300"
+      style={{
+        backgroundColor: darkMode ? '#111827' : undefined,
+        color: darkMode ? '#ffffff' : undefined,
+      }}
+    >
+      <div 
+        className="auth-card max-w-4xl w-full overflow-hidden transition-colors duration-300"
+        style={{
+          backgroundColor: darkMode ? 'rgba(31, 41, 55, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+          borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(255, 255, 255, 0.2)',
+        }}
+      >
         <div className="flex min-h-[560px]">
           {/* Left Side - Reset Password Form */}
           <div className="flex-1 p-8 flex items-center">
@@ -239,10 +315,21 @@ const ResetPasswordPage: React.FC = () => {
 
               {/* Title */}
               <div className="mb-6">
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent mb-2">
+                <h1 
+                  className="text-3xl font-bold mb-2"
+                  style={{
+                    color: darkMode ? '#d1d5db' : '#6b7280',
+                  }}
+                >
                   Reset Password
                 </h1>
-                <p className="text-gray-600">Enter your new password below</p>
+                <p 
+                  style={{
+                    color: darkMode ? '#d1d5db' : '#6b7280',
+                  }}
+                >
+                  Enter your new password below
+                </p>
               </div>
 
               {/* Form */}
@@ -260,7 +347,12 @@ const ResetPasswordPage: React.FC = () => {
                       name="password"
                       value={formData.password}
                       onChange={handleInputChange}
-                      className="auth-input w-full pl-12 pr-12 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="auth-input w-full pl-12 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-300"
+                      style={{
+                        backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                        borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : 'rgba(209, 213, 219, 0.3)',
+                        color: darkMode ? '#ffffff' : '#000000',
+                      }}
                       placeholder="Enter new password"
                       required
                     />
@@ -286,19 +378,34 @@ const ResetPasswordPage: React.FC = () => {
                   <div className="mt-3 space-y-2">
                     <div className="flex items-center text-sm">
                       <div className={`w-3 h-3 rounded-full mr-3 transition-all duration-300 ${passwordValidation.hasMinLength ? 'bg-green-500 scale-110' : 'bg-gray-300'}`}></div>
-                      <span className={`transition-colors duration-300 ${passwordValidation.hasMinLength ? 'text-green-600 font-medium' : 'text-gray-500'}`}>
+                      <span 
+                        className={`transition-colors duration-300 ${passwordValidation.hasMinLength ? 'font-medium' : ''}`}
+                        style={{
+                          color: passwordValidation.hasMinLength ? (darkMode ? '#10b981' : '#059669') : (darkMode ? '#6b7280' : '#9ca3af'),
+                        }}
+                      >
                         Least 8 characters
                       </span>
                     </div>
                     <div className="flex items-center text-sm">
                       <div className={`w-3 h-3 rounded-full mr-3 transition-all duration-300 ${passwordValidation.hasNumberOrSymbol ? 'bg-green-500 scale-110' : 'bg-gray-300'}`}></div>
-                      <span className={`transition-colors duration-300 ${passwordValidation.hasNumberOrSymbol ? 'text-green-600 font-medium' : 'text-gray-500'}`}>
+                      <span 
+                        className={`transition-colors duration-300 ${passwordValidation.hasNumberOrSymbol ? 'font-medium' : ''}`}
+                        style={{
+                          color: passwordValidation.hasNumberOrSymbol ? (darkMode ? '#10b981' : '#059669') : (darkMode ? '#6b7280' : '#9ca3af'),
+                        }}
+                      >
                         Least one number (0-9) or a symbol
                       </span>
                     </div>
                     <div className="flex items-center text-sm">
                       <div className={`w-3 h-3 rounded-full mr-3 transition-all duration-300 ${passwordValidation.hasUpperAndLower ? 'bg-green-500 scale-110' : 'bg-gray-300'}`}></div>
-                      <span className={`transition-colors duration-300 ${passwordValidation.hasUpperAndLower ? 'text-green-600 font-medium' : 'text-gray-500'}`}>
+                      <span 
+                        className={`transition-colors duration-300 ${passwordValidation.hasUpperAndLower ? 'font-medium' : ''}`}
+                        style={{
+                          color: passwordValidation.hasUpperAndLower ? (darkMode ? '#10b981' : '#059669') : (darkMode ? '#6b7280' : '#9ca3af'),
+                        }}
+                      >
                         Lowercase (a-z) and uppercase (A-Z)
                       </span>
                     </div>
@@ -318,7 +425,12 @@ const ResetPasswordPage: React.FC = () => {
                       name="confirmPassword"
                       value={formData.confirmPassword}
                       onChange={handleInputChange}
-                      className="auth-input w-full pl-12 pr-12 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="auth-input w-full pl-12 pr-12 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-300"
+                      style={{
+                        backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                        borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : 'rgba(209, 213, 219, 0.3)',
+                        color: darkMode ? '#ffffff' : '#000000',
+                      }}
                       placeholder="Confirm new password"
                       required
                     />
@@ -380,7 +492,16 @@ const ResetPasswordPage: React.FC = () => {
                     to="/login"
                     type="button"
                     onClick={handleBackToLogin}
-                    className="text-gray-600 hover:text-gray-800 font-medium text-sm transition-colors"
+                    className="font-medium text-sm transition-colors"
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = darkMode ? '#ffffff' : '#374151';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = darkMode ? '#d1d5db' : '#6b7280';
+                    }}
                   >
                     ← Back to Login
                   </Link>
@@ -388,7 +509,18 @@ const ResetPasswordPage: React.FC = () => {
 
                 {/* Language Selector */}
                 <div className="flex items-center justify-start mt-6">
-                  <div className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors duration-200 cursor-pointer">
+                  <div 
+                    className="flex items-center space-x-2 transition-colors duration-200 cursor-pointer"
+                    style={{
+                      color: darkMode ? '#d1d5db' : '#6b7280',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = darkMode ? '#ffffff' : '#374151';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = darkMode ? '#d1d5db' : '#6b7280';
+                    }}
+                  >
                     <span className="text-2xl">🇬🇧</span>
                     <span className="text-sm font-medium">ENG</span>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -33,8 +33,7 @@
       "@/*": ["*"]
     } /* Specify a set of entries that re-map imports to additional lookup locations. */,
     // "rootDirs": [],                                   /* Allow multiple folders to be treated as one when resolving modules. */
-    // "typeRoots": [
-    //   "./index.d.ts"]
+    "typeRoots": ["./node_modules/@types", "global.d.ts"],
     /* Specify multiple folders that act like './node_modules/@types'. */
 
     // "types": [],                                      /* Specify type package names to be included without being referenced in a source file. */
@@ -111,6 +110,6 @@
     // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
     "skipLibCheck": true /* Skip type checking all .d.ts files. */
   },
-  "include": ["src", "index.d.ts"],
+  "include": ["src", "global.d.ts"],
   "exclude": ["node_modules", "dist"]
 }
