@@ -7,6 +7,8 @@ import {
   courseIdSchema,
   createEnrollmentSchema,
   enrollSelfSchema,
+  updateEnrollmentSchema,
+  updateSelfEnrollmentSchema,
 } from "../validators/enrollment.schemas";
 import {
   getEnrollmentById,
@@ -14,6 +16,8 @@ import {
   getCourseEnrollments,
   getAllEnrollments,
   createEnrollment,
+  updateEnrollment,
+  updateSelfEnrollment,
 } from "../services/enrollment.service";
 
 // GET /enrollments/:id - Get enrollment by ID
@@ -87,4 +91,23 @@ export const enrollSelfHandler = catchErrors(async (req, res) => {
     role,
   });
   return res.success(CREATED, enrollment, "Enrolled successfully");
+});
+
+// PUT /enrollments/:id - Admin/Teacher update enrollment
+export const updateEnrollmentHandler = catchErrors(async (req, res) => {
+  const { id } = enrollmentIdSchema.parse(req.params); // Validate ID
+  const data = updateEnrollmentSchema.parse(req.body); // Validate body
+
+  const enrollment = await updateEnrollment(id, data);
+  return res.success(OK, enrollment, "Enrollment updated successfully");
+});
+
+// PUT /enrollments/my-enrollments/:id - Student update own enrollment
+export const updateSelfEnrollmentHandler = catchErrors(async (req, res) => {
+  const { id } = enrollmentIdSchema.parse(req.params); // Validate ID
+  const data = updateSelfEnrollmentSchema.parse(req.body); // Validate body
+  const studentId = req.userId!.toString(); // Lấy từ authenticate middleware
+
+  const enrollment = await updateSelfEnrollment(id, studentId, data);
+  return res.success(OK, enrollment, "Enrollment updated successfully");
 });

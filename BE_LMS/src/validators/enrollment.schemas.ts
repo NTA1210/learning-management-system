@@ -40,3 +40,15 @@ export const enrollSelfSchema = z.object({
   courseId: objectIdSchema,
   role: z.enum(["student", "auditor"]).optional(),
 });
+
+// PUT - Update enrollment (Admin/Teacher)
+export const updateEnrollmentSchema = z.object({
+  status: z.enum(["active", "completed", "dropped"]).optional(),
+  role: z.enum(["student", "auditor"]).optional(),
+  finalGrade: z.number().min(0).max(100).optional(),
+});
+
+// PUT - Student update own enrollment (chỉ có thể drop)
+export const updateSelfEnrollmentSchema = z.object({
+  status: z.enum(["dropped"]).optional(),
+});
