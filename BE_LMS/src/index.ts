@@ -30,6 +30,7 @@ import {
   sessionRoutes,
   submissionRoutes,
   userRoutes,
+  categoryRoutes
 } from "./routes";
 
 const app = express();
@@ -65,6 +66,7 @@ app.use("/auth", authRoutes);
 
 //public routes
 app.use("/courses", courseRoutes);
+app.use("/categories", categoryRoutes);
 app.use("/assignments", assignmentRoutes);
 app.use("/submissions", submissionRoutes);
 
