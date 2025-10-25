@@ -1,4 +1,4 @@
-import { Request, RequestHandler } from "express";
+import { RequestHandler } from "express";
 import appAssert from "../utils/appAssert";
 import AppErrorCode from "../constants/appErrorCode";
 import { UNAUTHORIZED } from "../constants/http";
@@ -22,6 +22,7 @@ const authenticate: RequestHandler = (req, res, next) => {
   );
 
   req.userId = payload.userId;
+  req.role = payload.role;
   req.sessionId = payload.sessionId;
   next();
 };

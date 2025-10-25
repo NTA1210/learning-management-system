@@ -4,7 +4,7 @@
   "description": "BE_LMS - MERN + TS Backend",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only -r tsconfig-paths/register src/index.ts",
+    "dev": "ts-node-dev --respawn --transpile-only  -r tsconfig-paths/register src/index.ts",
     "build": "tsc && cp package.json dist/",
     "start": "node -r tsconfig-paths/register dist/index.js"
   },
@@ -23,8 +23,12 @@
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
+    "minio": "^8.0.6",
     "mongoose": "^8.2.0",
+    "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
     "resend": "^6.2.0",
+    "uuid": "^13.0.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {
@@ -33,6 +37,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.23",
     "@types/jsonwebtoken": "^9.0.6",
+    "@types/multer": "^2.0.0",
     "@types/node": "^20.19.22",
     "ts-node-dev": "^2.0.0",
     "tsconfig-paths": "^4.2.0",

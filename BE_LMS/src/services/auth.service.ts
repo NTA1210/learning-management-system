@@ -71,24 +71,24 @@ export const createAccount = async (data: CreateAccountParams) => {
 
   //create session
 
-  const session = await SessionModel.create({
-    userId: user._id,
-    userAgent: data.userAgent,
-  });
+  // const session = await SessionModel.create({
+  //   userId: user._id,
+  //   userAgent: data.userAgent,
+  // });
   //sign access token & refresh token
 
-  const refreshToken = signToKen(
-    { sessionId: session._id },
-    refreshTokenSignOptions
-  );
+  // const refreshToken = signToKen(
+  //   { sessionId: session._id },
+  //   refreshTokenSignOptions
+  // );
 
-  const accessToken = signToKen({ userId: user._id, sessionId: session._id });
+  // const accessToken = signToKen({ userId: user._id, sessionId: session._id });
   //return user & tokens
 
   return {
     user: user.omitPassword(),
-    accessToken,
-    refreshToken,
+    // accessToken,
+    // refreshToken,
   };
 };
 
@@ -122,7 +122,11 @@ export const loginUser = async ({
     refreshTokenSignOptions
   );
 
-  const accessToken = signToKen({ userId: user._id, sessionId: session._id });
+  const accessToken = signToKen({
+    userId: user._id,
+    role: user.role,
+    sessionId: session._id,
+  });
   return {
     user: user.response(),
     accessToken,
@@ -147,6 +151,10 @@ export const refreshUserAccessToken = async (refreshToken: string) => {
     "Session expired"
   );
 
+  //Get user
+  const user = await UserModel.findById(session.userId);
+  appAssert(user, INTERNAL_SERVER_ERROR, "User not found");
+
   //Refresh the token if it expires in less than 1 day
   const sessionNeedRefresh = session.expiresAt.getTime() - now <= ONE_DAY_MS;
 
@@ -161,6 +169,7 @@ export const refreshUserAccessToken = async (refreshToken: string) => {
 
   const accessToken = signToKen({
     userId: session.userId,
+    role: user.role,
     sessionId: session._id,
   });
 

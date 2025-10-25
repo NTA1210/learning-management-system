@@ -16,7 +16,7 @@ export const httpClient = axios.create({
 // ===============================
 // 2️⃣ Định nghĩa kiểu dữ liệu API
 // ===============================
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   status?: number | null;
   message?: string;
@@ -44,7 +44,7 @@ httpClient.interceptors.response.use(
 // ===============================
 // 4️⃣ Hàm gửi request tổng quát
 // ===============================
-const _send = async <T = any>(
+const _send = async <T = unknown>(
   method: Method,
   pathname: string,
   data?: unknown,
@@ -86,25 +86,25 @@ const _send = async <T = any>(
 // ===============================
 // 5️⃣ Hàm tiện ích cho từng method
 // ===============================
-const get = <T = any>(pathname: string, config?: AxiosRequestConfig) =>
+const get = <T = unknown>(pathname: string, config?: AxiosRequestConfig) =>
   _send<T>("GET", pathname, undefined, config);
 
-const post = <T = any>(
+const post = <T = unknown>(
   pathname: string,
   data?: unknown,
   config?: AxiosRequestConfig
 ) => _send<T>("POST", pathname, data, config);
 
-const put = <T = any>(
+const put = <T = unknown>(
   pathname: string,
   data?: unknown,
   config?: AxiosRequestConfig
 ) => _send<T>("PUT", pathname, data, config);
 
-const del = <T = any>(pathname: string, config?: AxiosRequestConfig) =>
+const del = <T = unknown>(pathname: string, config?: AxiosRequestConfig) =>
   _send<T>("DELETE", pathname, undefined, config);
 
-const patch = <T = any>(
+const patch = <T = unknown>(
   pathname: string,
   data?: unknown,
   config?: AxiosRequestConfig

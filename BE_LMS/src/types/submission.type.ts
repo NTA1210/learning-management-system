@@ -11,4 +11,5 @@ export default interface ISubmission extends mongoose.Document {
   gradedBy?: mongoose.Types.ObjectId;
   gradedAt?: Date;
   isLate?: boolean;
+  status: "not_submitted" | "submitted" | "graded" | "overdue";
 }

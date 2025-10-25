@@ -1,20 +1,37 @@
 import express from "express";
-import connectToDatabase from "./config/db";
-import { APP_ORIGIN, NODE_ENV, PORT } from "./constants/env";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import errorHandler from "./middleware/errorHandler";
+import { Role } from "./types";
+import { uploadFile } from "./utils/uploadFile";
+
+//constants
 import { OK } from "./constants/http";
+import { APP_ORIGIN, NODE_ENV, PORT } from "./constants/env";
 
-import { customResponse } from "./middleware/customResponse";
+//config
+import upload from "./config/multer";
+import { ensureBucket } from "./config/minio";
+import connectToDatabase from "./config/db";
 
-import authRoutes from "./routes/auth.route";
-import authenticate from "./middleware/authenticate";
-import userRoutes from "./routes/user.route";
-import sessionRoutes from "./routes/session.route";
-import enrollmentRoutes from "./routes/enrollment.route";
-import courseRoutes from "./routes/course.route";
-import categoryRoutes from "./routes/category.route";
+//middleware
+import {
+  authenticate,
+  customResponse,
+  authorize,
+  errorHandler,
+} from "./middleware";
+
+//routes
+import {
+  assignmentRoutes,
+  authRoutes,
+  courseRoutes,
+  enrollmentRoutes,
+  sessionRoutes,
+  submissionRoutes,
+  userRoutes,
+  categoryRoutes
+} from "./routes";
 
 const app = express();
 
@@ -29,9 +46,20 @@ app.use(
 app.use(cookieParser());
 app.use(customResponse);
 
+//example API
 app.get("/", (req, res) => {
   res.status(OK).send("Hello World!");
 });
+
+app.post("/uploadExample", upload.single("file"), async (req, res) => {
+  const file = req.file;
+  if (!file) {
+    return res.status(400).json({ error: "No file uploaded" });
+  }
+  const result = await uploadFile(file);
+  res.status(200).json(result);
+});
+//-----------------------------------------------
 
 //auth routes
 app.use("/auth", authRoutes);
@@ -39,15 +67,29 @@ app.use("/auth", authRoutes);
 //public routes
 app.use("/courses", courseRoutes);
 app.use("/categories", categoryRoutes);
+app.use("/assignments", assignmentRoutes);
+app.use("/submissions", submissionRoutes);
 
 //protected routes
 app.use("/user", authenticate, userRoutes);
-app.use("/sessions", authenticate, sessionRoutes);
+app.use("/sessions", authenticate, authorize(Role.ADMIN), sessionRoutes);
 app.use("/enrollments", authenticate, enrollmentRoutes);
 
 app.use(errorHandler);
 
-app.listen(PORT, async () => {
-  console.log(`Server started on port ${PORT} in ${NODE_ENV} environment`);
-  await connectToDatabase();
-});
+/**
+ * Check if the bucket exists and set policy
+ * then start the server
+ */
+function startServer() {
+  ensureBucket()
+    .then(() => console.log("✅ MinIO initialized"))
+    .catch((err) => console.error("⚠️ MinIO not ready:", err));
+
+  app.listen(PORT, async () => {
+    console.log(`Server started on port ${PORT} in ${NODE_ENV} environment`);
+    await connectToDatabase();
+  });
+}
+
+startServer();

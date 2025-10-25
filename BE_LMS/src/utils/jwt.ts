@@ -1,6 +1,6 @@
 import jwt, { SignOptions, VerifyOptions } from "jsonwebtoken";
-import { SessionDocument } from "../models/session.model";
-import { UserDocument } from "../models/user.model";
+import { Role, ISession as SessionDocument } from "@/types";
+import { IUser as UserDocument } from "@/types";
 import { JWT_REFRESH_SECRET, JWT_SECRET } from "../constants/env";
 
 export type RefreshTokenPayload = {
@@ -8,6 +8,7 @@ export type RefreshTokenPayload = {
 };
 export type AccessTokenPayload = {
   userId: UserDocument["_id"];
+  role: Role;
   sessionId: SessionDocument["_id"];
 };
 

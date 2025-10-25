@@ -27,3 +27,28 @@ export const courseIdSchema = z.object({
   courseId: objectIdSchema,
 });
 
+// POST - Admin tạo enrollment cho student
+export const createEnrollmentSchema = z.object({
+  studentId: objectIdSchema,
+  courseId: objectIdSchema,
+  status: z.enum(["active", "completed", "dropped"]).optional(),
+  role: z.enum(["student", "auditor"]).optional(),
+});
+
+// POST - Student tự enroll vào course
+export const enrollSelfSchema = z.object({
+  courseId: objectIdSchema,
+  role: z.enum(["student", "auditor"]).optional(),
+});
+
+// PUT - Update enrollment (Admin/Teacher)
+export const updateEnrollmentSchema = z.object({
+  status: z.enum(["active", "completed", "dropped"]).optional(),
+  role: z.enum(["student", "auditor"]).optional(),
+  finalGrade: z.number().min(0).max(100).optional(),
+});
+
+// PUT - Student update own enrollment (chỉ có thể drop)
+export const updateSelfEnrollmentSchema = z.object({
+  status: z.enum(["dropped"]).optional(),
+});

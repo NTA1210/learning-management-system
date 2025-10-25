@@ -1,12 +1,17 @@
 import { catchErrors } from "../utils/asyncHandler";
-import { OK } from "../constants/http";
+import { OK, CREATED } from "../constants/http";
 import {
   listCoursesSchema,
   courseIdSchema,
+  createCourseSchema,
+  updateCourseSchema,
 } from "../validators/course.schemas";
 import {
   listCourses,
   getCourseById,
+  createCourse,
+  updateCourse,
+  deleteCourse,
 } from "../services/course.service";
 
 export const listCoursesHandler = catchErrors(async (req, res) => {
@@ -26,9 +31,7 @@ export const listCoursesHandler = catchErrors(async (req, res) => {
     sortOrder: query.sortOrder,
   });
 
-  return res.status(OK).json({
-    message: "Courses retrieved successfully",
-    data: result.courses,
+  return res.success(OK, result.courses, "Courses retrieved successfully", {
     pagination: result.pagination,
   });
 });
@@ -40,9 +43,42 @@ export const getCourseByIdHandler = catchErrors(async (req, res) => {
   // Call service
   const course = await getCourseById(courseId);
 
-  return res.status(OK).json({
-    message: "Course retrieved successfully",
-    data: course,
-  });
+  return res.success(OK, course, "Course retrieved successfully");
+});
+
+export const createCourseHandler = catchErrors(async (req, res) => {
+  // Validate request body
+  const data = createCourseSchema.parse(req.body);
+
+  // Call service
+  const course = await createCourse(data);
+
+  return res.success(CREATED, course, "Course created successfully");
+});
+
+export const updateCourseHandler = catchErrors(async (req, res) => {
+  // Validate course ID
+  const courseId = courseIdSchema.parse(req.params.id);
+
+  // Validate request body
+  const data = updateCourseSchema.parse(req.body);
+
+  // Get userId from request (set by authenticate middleware)
+  const userId = (req as any).userId;
+
+  // Call service
+  const course = await updateCourse(courseId, data, userId);
+
+  return res.success(OK, course, "Course updated successfully");
+});
+
+// DELETE /courses/:id - Delete course
+export const deleteCourseHandler = catchErrors(async (req, res) => {
+  const courseId = courseIdSchema.parse(req.params.id);
+  const userId = (req as any).userId; // Extract userId from authenticate middleware
+
+  const result = await deleteCourse(courseId, userId);
+
+  return res.success(OK, null, result.message);
 });
 
