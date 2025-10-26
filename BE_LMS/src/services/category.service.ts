@@ -1,6 +1,7 @@
 import CategoryModel from "../models/category.model";
+import CourseModel from "../models/course.model";
 import appAssert from "../utils/appAssert";
-import {NOT_FOUND} from "../constants/http";
+import {NOT_FOUND, CONFLICT} from "../constants/http";
 
 export type ListCategoryParams = {
     page: number;
@@ -96,3 +97,109 @@ export const getCategoryBySlug = async (slug: string) => {
 
     return category;
 }
+
+export const createCategory = async (data: {
+    name: string;
+    slug: string;
+    description?: string;
+}) => {
+    // Check if category with same name already exists
+    const existingByName = await CategoryModel.findOne({ name: data.name });
+    appAssert(!existingByName, CONFLICT, "Category with this name already exists");
+
+    // Check if category with same slug already exists
+    const existingBySlug = await CategoryModel.findOne({ slug: data.slug });
+    appAssert(!existingBySlug, CONFLICT, "Category with this slug already exists");
+
+    return await CategoryModel.create(data);
+};
+
+export const updateCategoryById = async (
+    categoryId: string,
+    data: {
+        name?: string;
+        slug?: string;
+        description?: string;
+    }
+) => {
+    const category = await CategoryModel.findById(categoryId);
+    appAssert(category, NOT_FOUND, "Category not found");
+
+    // If updating name, check for conflicts
+    if (data.name && data.name !== category.name) {
+        const existingByName = await CategoryModel.findOne({ name: data.name });
+        appAssert(!existingByName, CONFLICT, "Category with this name already exists");
+    }
+
+    // If updating slug, check for conflicts
+    if (data.slug && data.slug !== category.slug) {
+        const existingBySlug = await CategoryModel.findOne({ slug: data.slug });
+        appAssert(!existingBySlug, CONFLICT, "Category with this slug already exists");
+    }
+
+    Object.assign(category, data);
+    await category.save();
+
+    return category;
+};
+
+export const updateCategoryBySlug = async (
+    slug: string,
+    data: {
+        name?: string;
+        slug?: string;
+        description?: string;
+    }
+) => {
+    const category = await CategoryModel.findOne({ slug });
+    appAssert(category, NOT_FOUND, "Category not found");
+
+    // If updating name, check for conflicts
+    if (data.name && data.name !== category.name) {
+        const existingByName = await CategoryModel.findOne({ name: data.name });
+        appAssert(!existingByName, CONFLICT, "Category with this name already exists");
+    }
+
+    // If updating slug, check for conflicts
+    if (data.slug && data.slug !== category.slug) {
+        const existingBySlug = await CategoryModel.findOne({ slug: data.slug });
+        appAssert(!existingBySlug, CONFLICT, "Category with this slug already exists");
+    }
+
+    Object.assign(category, data);
+    await category.save();
+
+    return category;
+};
+
+export const deleteCategoryById = async (categoryId: string) => {
+    const category = await CategoryModel.findById(categoryId);
+    appAssert(category, NOT_FOUND, "Category not found");
+
+    // Check if any courses are using this category
+    const coursesUsingCategory = await CourseModel.countDocuments({ category: categoryId });
+    appAssert(
+        coursesUsingCategory === 0,
+        CONFLICT,
+        `Cannot delete category. ${coursesUsingCategory} course(s) are using this category`
+    );
+
+    await CategoryModel.findByIdAndDelete(categoryId);
+    return category;
+};
+
+export const deleteCategoryBySlug = async (slug: string) => {
+    const category = await CategoryModel.findOne({ slug });
+    appAssert(category, NOT_FOUND, "Category not found");
+
+    // Check if any courses are using this category
+    const coursesUsingCategory = await CourseModel.countDocuments({ category: category._id });
+    appAssert(
+        coursesUsingCategory === 0,
+        CONFLICT,
+        `Cannot delete category. ${coursesUsingCategory} course(s) are using this category`
+    );
+
+    await CategoryModel.findOneAndDelete({ slug });
+    return category;
+};
