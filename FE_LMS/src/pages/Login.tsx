@@ -50,12 +50,29 @@ const LoginPage: React.FC = () => {
           window.location.href = "/";
       }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      console.error("Login error:", err);
-      setError(err.message || "Login failed");
-    } finally {
-      setLoading(false);
+   } catch (err: any) {
+  console.error("Login error:", err);
+
+  let finalError: string | any[] = "Đăng nhập thất bại";
+
+  // Nếu backend trả JSON dạng chuỗi → parse thành mảng
+  if (err.message && typeof err.message === "string") {
+    try {
+      const parsed = JSON.parse(err.message);
+      if (Array.isArray(parsed)) {
+        finalError = parsed;
+      } else {
+        finalError = err.message;
+      }
+    } catch {
+      finalError = err.message;
     }
+  }
+
+  setError(finalError); // ← Dùng mảng hoặc chuỗi
+} finally {
+  setLoading(false);
+}
   };
 
   return (
@@ -80,7 +97,7 @@ const LoginPage: React.FC = () => {
               {/* Header */}
               <div className="flex items-center justify-between mb-8">
                 <button 
-                  className="transition-colors duration-200 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                  className="invisible transition-colors duration-200 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
                   style={{
                     color: darkMode ? '#d1d5db' : '#6b7280',
                   }}
@@ -215,15 +232,35 @@ const LoginPage: React.FC = () => {
 
                 {/* Error Message */}
                 {error && (
-                  <div className="text-red-600 text-sm bg-red-50 p-4 rounded-xl border border-red-200 animate-pulse">
-                    <div className="flex items-center">
-                      <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      {error}
-                    </div>
-                  </div>
-                )}
+  <div className="text-red-600 text-sm bg-red-50 p-4 rounded-xl border border-red-200 animate-pulse">
+    <div className="flex items-center">
+      <svg className="w-5 h-5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+        <path
+          fillRule="evenodd"
+          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+          clipRule="evenodd"
+        />
+      </svg>
+      <span>
+        {Array.isArray(error) ? (
+          // Xử lý nhiều lỗi (từ Zod)
+          <ul className="list-none  list-inside space-y-1">
+            {error.map((err, index) => (
+              <li key={index}>
+                {err.path?.[0] === "password" && err.code === "too_small"
+                  ? "Mật khẩu phải có ít nhất 8 ký tự"
+                  : err.message}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          // Trường hợp lỗi đơn
+          error
+        )}
+      </span>
+    </div>
+  </div>
+)}
                 <div className="flex justify-end">
                   <div 
                     className="text-sm"
@@ -298,27 +335,8 @@ const LoginPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Language Selector */}
-                <div className="flex items-center justify-start mt-10">
-                  <div 
-                    className="flex items-center space-x-3 transition-colors duration-200 cursor-pointer"
-                    style={{
-                      color: darkMode ? '#d1d5db' : '#6b7280',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = darkMode ? '#ffffff' : '#374151';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = darkMode ? '#d1d5db' : '#6b7280';
-                    }}
-                  >
-                    <span className="text-3xl">🇬🇧</span>
-                    <span className="text-lg font-medium">ENG</span>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </div>
+               
+                
               </form>
             </div>
           </div>
