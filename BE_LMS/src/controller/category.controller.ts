@@ -1,10 +1,22 @@
 import {catchErrors} from "../utils/asyncHandler";
-import {OK} from "../constants/http";
+import {OK, CREATED} from "../constants/http";
 import {
     listCategoriesSchema,
-    categoryIdSchema, categorySlugSchema,
+    categoryIdSchema,
+    categorySlugSchema,
+    createCategorySchema,
+    updateCategorySchema,
 } from "../validators/category.schemas";
-import {getCategoryById, getCategoryBySlug, listCategories} from "../../src/services/category.service";
+import {
+    getCategoryById,
+    getCategoryBySlug,
+    listCategories,
+    createCategory,
+    updateCategoryById,
+    updateCategoryBySlug,
+    deleteCategoryById,
+    deleteCategoryBySlug,
+} from "../../src/services/category.service";
 
 export const listCategoriesHandler = catchErrors(async (req, res) => {
     // Validate query parameters
@@ -53,3 +65,64 @@ export const getCategoryBySlugHandler = catchErrors(async (req, res) => {
     });
 });
 
+export const createCategoryHandler = catchErrors(async (req, res) => {
+    const data = createCategorySchema.parse(req.body);
+
+    // Call service
+    const category = await createCategory(data);
+
+    return res.status(CREATED).json({
+        message: "Category created successfully",
+        data: category,
+    });
+});
+
+export const updateCategoryByIdHandler = catchErrors(async (req, res) => {
+    const categoryId = categoryIdSchema.parse(req.params.id);
+    const data = updateCategorySchema.parse(req.body);
+
+    // Call service
+    const category = await updateCategoryById(categoryId, data);
+
+    return res.status(OK).json({
+        message: "Category updated successfully",
+        data: category,
+    });
+});
+
+export const updateCategoryBySlugHandler = catchErrors(async (req, res) => {
+    const slug = categorySlugSchema.parse(req.params.slug);
+    const data = updateCategorySchema.parse(req.body);
+
+    // Call service
+    const category = await updateCategoryBySlug(slug, data);
+
+    return res.status(OK).json({
+        message: "Category updated successfully",
+        data: category,
+    });
+});
+
+export const deleteCategoryByIdHandler = catchErrors(async (req, res) => {
+    const categoryId = categoryIdSchema.parse(req.params.id);
+
+    // Call service
+    const category = await deleteCategoryById(categoryId);
+
+    return res.status(OK).json({
+        message: "Category deleted successfully",
+        data: category,
+    });
+});
+
+export const deleteCategoryBySlugHandler = catchErrors(async (req, res) => {
+    const slug = categorySlugSchema.parse(req.params.slug);
+
+    // Call service
+    const category = await deleteCategoryBySlug(slug);
+
+    return res.status(OK).json({
+        message: "Category deleted successfully",
+        data: category,
+    });
+});

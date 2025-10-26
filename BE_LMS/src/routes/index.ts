@@ -8,4 +8,3 @@ export { default as categoryRoutes } from "./category.route";
 export { default as lessonRoutes } from "./lesson.route";
 export { default as lessonMaterialRoutes } from "./lessonMaterial.route";
 export { default as userRoutes } from "./user.route";
-export { default as categoryRoutes} from "./category.route";
