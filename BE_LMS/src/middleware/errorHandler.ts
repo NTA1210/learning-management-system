@@ -29,7 +29,7 @@ function handleCastError(res: Response, error: mongoose.Error.CastError) {
 }
 
 const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
-  console.log(`PATH: ${req.path} - ERROR: `, error.message);
+  console.log(`PATH: ${req.path} - ERROR: `, error);
 
   if (req.path === REFRESH_PATH) {
     clearAuthCookies(res);
