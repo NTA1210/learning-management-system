@@ -1,5 +1,5 @@
 import React, { type ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -7,6 +7,8 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole }) => {
+  const location = useLocation();
+  
   // For now, we'll use a simple localStorage check
   // Later you can integrate with the AuthContext
   const isAuthenticated = () => {
@@ -28,7 +30,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
   };
 
   if (!isAuthenticated()) {
-    return <Navigate to="/login" replace />;
+    // Capture the current path and redirect to login with redirect parameter
+    const currentPath = location.pathname + location.search;
+    return <Navigate to={`/login?redirect=${encodeURIComponent(currentPath)}`} replace />;
   }
 
   if (requiredRole && getUserRole() !== requiredRole) {

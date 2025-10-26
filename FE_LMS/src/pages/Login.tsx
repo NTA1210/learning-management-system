@@ -1,17 +1,20 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { authService } from "../services";
 import { type LoginRequest } from "../types/auth";
 import { useTheme } from "../hooks/useTheme";
+
+type ErrorType = string | { path?: string[]; code?: string; message?: string };
 const LoginPage: React.FC = () => {
   const { darkMode } = useTheme();
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState<LoginRequest>({
     email: "",
     password: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ErrorType | ErrorType[]>("");
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -34,20 +37,28 @@ const LoginPage: React.FC = () => {
       localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('userData', JSON.stringify(response));
       
-      // Redirect based on user role
-      const userRole = response.role;
-      switch (userRole) {
-        case 'admin':
-          window.location.href = "/dashboard";
-          break;
-        case 'teacher':
-          window.location.href = "/teacher-dashboard"; // You can create this later
-          break;
-        case 'student':
-          window.location.href = "/student-dashboard"; // You can create this later
-          break;
-        default:
-          window.location.href = "/";
+      // Check if there's a redirect parameter
+      const redirectPath = searchParams.get('redirect');
+      
+      if (redirectPath) {
+        // Redirect to the original path the user was trying to access
+        window.location.href = redirectPath;
+      } else {
+        // Default redirect based on user role
+        const userRole = response.role;
+        switch (userRole) {
+          case 'admin':
+            window.location.href = "/dashboard";
+            break;
+          case 'teacher':
+            window.location.href = "/teacher-dashboard"; // You can create this later
+            break;
+          case 'student':
+            window.location.href = "/student-dashboard"; // You can create this later
+            break;
+          default:
+            window.location.href = "/";
+        }
       }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
    } catch (err: any) {
@@ -247,15 +258,17 @@ const LoginPage: React.FC = () => {
           <ul className="list-none  list-inside space-y-1">
             {error.map((err, index) => (
               <li key={index}>
-                {err.path?.[0] === "password" && err.code === "too_small"
-                  ? "Mật khẩu phải có ít nhất 8 ký tự"
-                  : err.message}
+                {typeof err === 'object' && err !== null && 'path' in err && 'code' in err && 'message' in err
+                  ? (err.path?.[0] === "password" && err.code === "too_small"
+                      ? "Mật khẩu phải có ít nhất 8 ký tự"
+                      : err.message)
+                  : String(err)}
               </li>
             ))}
           </ul>
         ) : (
           // Trường hợp lỗi đơn
-          error
+          String(error)
         )}
       </span>
     </div>
