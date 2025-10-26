@@ -50,12 +50,28 @@ const RegisterPage: React.FC = () => {
       setSuccess(true);
       // Don't redirect immediately - show success message about email verification
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      console.error("Registration error:", err);
-      setError(err.message || "Registration failed");
-    } finally {
-      setLoading(false);
+  } catch (err: any) {
+    console.error("Registration error:", err);
+  
+    let finalError: string | any[] = "Đăng ký thất bại";
+  
+    if (err.message && typeof err.message === "string") {
+      try {
+        const parsed = JSON.parse(err.message);
+        if (Array.isArray(parsed)) {
+          finalError = parsed;
+        } else {
+          finalError = err.message;
+        }
+      } catch {
+        finalError = err.message;
+      }
     }
+  
+    setError(finalError);
+  } finally {
+    setLoading(false);
+  }
   };
 
   return (
@@ -84,6 +100,7 @@ const RegisterPage: React.FC = () => {
                   style={{
                     color: darkMode ? '#d1d5db' : '#6b7280',
                   }}
+                  onClick={() => window.location.href = '/login'}
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -297,16 +314,35 @@ const RegisterPage: React.FC = () => {
                 </div>
 
                 {/* Error Message */}
-                {error && (
-                  <div className="text-red-600 text-sm bg-red-50 p-4 rounded-xl border border-red-200 animate-pulse">
-                    <div className="flex items-center">
-                      <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      {error}
-                    </div>
-                  </div>
-                )}
+                {/* Error Message */}
+{error && (
+  <div className="text-red-600 text-sm bg-red-50 p-4 rounded-xl border border-red-200 animate-pulse">
+    <div className="flex items-center">
+      <svg className="w-5 h-5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+        <path
+          fillRule="evenodd"
+          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+          clipRule="evenodd"
+        />
+      </svg>
+      <span>
+        {Array.isArray(error) ? (
+          <ul className="list-none list-inside space-y-1">
+            {error.map((err, index) => (
+              <li key={index}>
+                {err.path?.[0] === "username" && err.code === "too_small"
+                  ? "Tên người dùng phải có ít nhất 3 ký tự"
+                  : err.message}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          error
+        )}
+      </span>
+    </div>
+  </div>
+)}
 
                 {/* Success Message */}
                 {success && (
@@ -392,27 +428,7 @@ const RegisterPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Language Selector */}
-                <div className="flex items-center justify-start mt-6">
-                  <div 
-                    className="flex items-center space-x-2 transition-colors duration-200 cursor-pointer"
-                    style={{
-                      color: darkMode ? '#d1d5db' : '#6b7280',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = darkMode ? '#ffffff' : '#374151';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = darkMode ? '#d1d5db' : '#6b7280';
-                    }}
-                  >
-                    <span className="text-2xl">🇬🇧</span>
-                    <span className="text-sm font-medium">ENG</span>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </div>
+               
               </form>
             </div>
           </div>
