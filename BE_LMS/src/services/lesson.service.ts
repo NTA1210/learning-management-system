@@ -76,8 +76,8 @@ export const updateLessonService = async (id: string, data: Partial<CreateLesson
   const canUpdate = userRole === Role.ADMIN || isInstructor;
   appAssert(canUpdate, FORBIDDEN, "Not authorized to update this lesson");
 
-  const parsed = CreateLessonSchema.partial().parse(data);
-  const updatedLesson = await LessonModel.findByIdAndUpdate(id, parsed, { new: true })
+ 
+  const updatedLesson = await LessonModel.findByIdAndUpdate(id, data, { new: true })
     .populate('courseId', 'title description')
     .lean();
   
@@ -86,38 +86,37 @@ export const updateLessonService = async (id: string, data: Partial<CreateLesson
 
 export const getLessons = async (query: any, userId?: string, userRole?: Role) => {
   // Validate query parameters using schema
-  const validatedQuery = LessonQuerySchema.parse(query);
  
   const filter: any = {};
   
   // Basic filters
-  if (validatedQuery.title) {
-    filter.title = { $regex: validatedQuery.title, $options: 'i' }; 
+  if (query.title) {
+    filter.title = { $regex: query.title, $options: 'i' }; 
   }
   
-  if (validatedQuery.content) {
-    filter.content = { $regex: validatedQuery.content, $options: 'i' };
+  if (query.content) {
+    filter.content = { $regex: query.content, $options: 'i' };
   }
   
-  if (validatedQuery.order !== undefined) {
-    filter.order = validatedQuery.order;
+  if (query.order !== undefined) {
+    filter.order = query.order;
   }
   
-  if (validatedQuery.durationMinutes !== undefined) {
-    filter.durationMinutes = validatedQuery.durationMinutes;
+  if (query.durationMinutes !== undefined) {
+    filter.durationMinutes = query.durationMinutes;
   }
   
-  if (validatedQuery.publishedAt) {
-    filter.publishedAt = validatedQuery.publishedAt;
+  if (query.publishedAt) {
+    filter.publishedAt = query.publishedAt;
   }
   
-  if (validatedQuery.courseId) {
-    filter.courseId = validatedQuery.courseId;
+  if (query.courseId) {
+    filter.courseId = query.courseId;
   }
 
   // Full-text search
-  if (validatedQuery.search) {
-    filter.$text = { $search: validatedQuery.search };
+  if (query.search) {
+    filter.$text = { $search: query.search };
   }
 
   // Access control based on user role and publishedAt field
@@ -151,14 +150,14 @@ export const getLessons = async (query: any, userId?: string, userRole?: Role) =
   // Admin can see everything (no additional filter)
 
   // Pagination
-  const page = validatedQuery.page;
-  const limit = validatedQuery.limit;
+  const page = query.page;
+  const limit = query.limit;
   const skip = (page - 1) * limit;
 
   const [lessons, total] = await Promise.all([
     LessonModel.find(filter)
       .populate('courseId', 'title description isPublished teachers') 
-      .sort(validatedQuery.search ? { score: { $meta: 'textScore' } } : { order: 1, createdAt: -1 })
+      .sort(query.search ? { score: { $meta: 'textScore' } } : { order: 1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),

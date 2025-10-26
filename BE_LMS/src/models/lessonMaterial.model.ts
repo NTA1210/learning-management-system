@@ -23,6 +23,7 @@ const LessonMaterialSchema = new mongoose.Schema<ILessonMaterial>(
   { timestamps: { createdAt: "uploadedAt", updatedAt: false } }
 );
 
+
 export default mongoose.model<ILessonMaterial>(
   "LessonMaterial",
   LessonMaterialSchema
