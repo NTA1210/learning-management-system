@@ -7,3 +7,4 @@ export { default as ResetPasswordPage } from "./ResetPasswordPage";
 export { default as LoginPage } from "./Login";
 export { default as RegisterPage } from "./Register";
 export { default as DashboardPage } from "./Dashboard";
+export { default as StudentDashboardPage } from "./StudentDashboard";
