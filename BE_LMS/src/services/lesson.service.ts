@@ -14,41 +14,109 @@ import {
 import { CreateLessonSchema, LessonQuerySchema } from "@/validators/lesson.schemas";
 import { Role } from "../types";
 
+export type CreateLessonParams = {
+  title: string;
+  courseId: string;
+  content?: string;
+  order?: number;
+  durationMinutes?: number;
+  publishedAt?: Date;
+};
+
+export const createLessonService = async (data: CreateLessonParams, userId: string, userRole?: Role) => {
+  // Check if lesson with same title exists in the same course
+  const existingLesson = await LessonModel.exists({ title: data.title, courseId: data.courseId });
+  appAssert(!existingLesson, CONFLICT, "Lesson already exists");
+
+  // Verify the course exists
+  const course = await CourseModel.findById(data.courseId);
+  appAssert(course, NOT_FOUND, "Course not found");
+  
+  // ADMIN can create lessons in any course
+  // TEACHER can only create lessons in courses they teach
+  if (userRole !== Role.ADMIN) {
+    const isInstructor = course.teachers.includes(new mongoose.Types.ObjectId(userId));
+    appAssert(isInstructor, FORBIDDEN, "Only course instructors or admins can create lessons");
+  }
+
+  const newLesson = await LessonModel.create(data);
+  
+  return await LessonModel.findById(newLesson._id)
+    .populate('courseId', 'title description')
+    .lean();
+};
+
+export const deleteLessonService = async (id: string, userId: string, userRole: Role) => {
+  const lesson = await LessonModel.findById(id);
+  appAssert(lesson, NOT_FOUND, "Lesson not found");
+
+  // Get course to check instructor
+  const course = await CourseModel.findById(lesson.courseId);
+  appAssert(course, NOT_FOUND, "Course not found");
+
+  // Only admin or course instructor can delete
+  const isInstructor = course.teachers.includes(new mongoose.Types.ObjectId(userId));
+  const canDelete = userRole === Role.ADMIN || isInstructor;
+  appAssert(canDelete, FORBIDDEN, "Not authorized to delete this lesson");
+
+  const deletedLesson = await LessonModel.findByIdAndDelete(id);
+  return deletedLesson;
+};
+
+export const updateLessonService = async (id: string, data: Partial<CreateLessonParams>, userId: string, userRole: Role) => {
+  const lesson = await LessonModel.findById(id);
+  appAssert(lesson, NOT_FOUND, "Lesson not found");
+
+  // Get course to check instructor
+  const course = await CourseModel.findById(lesson.courseId);
+  appAssert(course, NOT_FOUND, "Course not found");
+
+  // Only admin or course instructor can update
+  const isInstructor = course.teachers.includes(new mongoose.Types.ObjectId(userId));
+  const canUpdate = userRole === Role.ADMIN || isInstructor;
+  appAssert(canUpdate, FORBIDDEN, "Not authorized to update this lesson");
+
+ 
+  const updatedLesson = await LessonModel.findByIdAndUpdate(id, data, { new: true })
+    .populate('courseId', 'title description')
+    .lean();
+  
+  return updatedLesson;
+};
 
 export const getLessons = async (query: any, userId?: string, userRole?: Role) => {
   // Validate query parameters using schema
-  const validatedQuery = LessonQuerySchema.parse(query);
  
   const filter: any = {};
   
   // Basic filters
-  if (validatedQuery.title) {
-    filter.title = { $regex: validatedQuery.title, $options: 'i' }; 
+  if (query.title) {
+    filter.title = { $regex: query.title, $options: 'i' }; 
   }
   
-  if (validatedQuery.content) {
-    filter.content = { $regex: validatedQuery.content, $options: 'i' };
+  if (query.content) {
+    filter.content = { $regex: query.content, $options: 'i' };
   }
   
-  if (validatedQuery.order !== undefined) {
-    filter.order = validatedQuery.order;
+  if (query.order !== undefined) {
+    filter.order = query.order;
   }
   
-  if (validatedQuery.durationMinutes !== undefined) {
-    filter.durationMinutes = validatedQuery.durationMinutes;
+  if (query.durationMinutes !== undefined) {
+    filter.durationMinutes = query.durationMinutes;
   }
   
-  if (validatedQuery.publishedAt) {
-    filter.publishedAt = validatedQuery.publishedAt;
+  if (query.publishedAt) {
+    filter.publishedAt = query.publishedAt;
   }
   
-  if (validatedQuery.courseId) {
-    filter.courseId = validatedQuery.courseId;
+  if (query.courseId) {
+    filter.courseId = query.courseId;
   }
 
   // Full-text search
-  if (validatedQuery.search) {
-    filter.$text = { $search: validatedQuery.search };
+  if (query.search) {
+    filter.$text = { $search: query.search };
   }
 
   // Access control based on user role and publishedAt field
@@ -82,14 +150,14 @@ export const getLessons = async (query: any, userId?: string, userRole?: Role) =
   // Admin can see everything (no additional filter)
 
   // Pagination
-  const page = validatedQuery.page;
-  const limit = validatedQuery.limit;
+  const page = query.page;
+  const limit = query.limit;
   const skip = (page - 1) * limit;
 
   const [lessons, total] = await Promise.all([
     LessonModel.find(filter)
       .populate('courseId', 'title description isPublished teachers') 
-      .sort(validatedQuery.search ? { score: { $meta: 'textScore' } } : { order: 1, createdAt: -1 })
+      .sort(query.search ? { score: { $meta: 'textScore' } } : { order: 1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean(),
