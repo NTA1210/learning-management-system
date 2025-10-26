@@ -54,35 +54,39 @@ async function init() {
     console.log("Old data cleared");
 
     // Create Users
-    const password = await bcrypt.hash("123456", 10);
+    const password = "123456"; // Model sẽ tự động hash trong pre-save hook
     const users = await User.create([
       {
         username: "admin1",
         email: "admin1@example.com",
         password,
         role: "admin",
-        fullName: "Admin One",
+        fullname: "Admin One",
+        verified: true, 
       },
       {
         username: "teacher1",
         email: "teacher1@example.com",
         password,
         role: "teacher",
-        fullName: "Teacher One",
+        fullname: "Teacher One", 
+        verified: true, 
       },
       {
         username: "student1",
         email: "student1@example.com",
         password,
         role: "student",
-        fullName: "Student One",
+        fullname: "Student One", 
+        verified: true, 
       },
       {
         username: "student2",
         email: "student2@example.com",
         password,
         role: "student",
-        fullName: "Student Two",
+        fullname: "Student Two", 
+        verified: true, 
       },
     ]);
 
@@ -126,20 +130,26 @@ async function init() {
       {
         title: "JS Basics",
         courseId: courses[0]._id,
+        content: "Learn the basics of JavaScript programming language",
         order: 1,
         durationMinutes: 30,
+        publishedAt: new Date(),
       },
       {
         title: "JS Functions",
         courseId: courses[0]._id,
+        content: "Understanding JavaScript functions and their usage",
         order: 2,
         durationMinutes: 45,
+        publishedAt: new Date(),
       },
       {
         title: "UI Design Principles",
         courseId: courses[1]._id,
+        content: "Fundamental principles of UI/UX design",
         order: 1,
         durationMinutes: 60,
+        publishedAt: new Date(), 
       },
     ]);
 
