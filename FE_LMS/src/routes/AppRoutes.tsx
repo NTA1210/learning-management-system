@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import {DashboardPage ,
+  StudentDashboardPage,
   LandingPage,
   NotFoundPage,
   EmailVerifyPage,
@@ -32,6 +33,11 @@ function AppRoutes() {
         <Route path="/admin/dashboard" element={
           <ProtectedRoute requiredRole="admin">
             <DashboardPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/student-dashboard" element={
+          <ProtectedRoute requiredRole="student">
+            <StudentDashboardPage />
           </ProtectedRoute>
         } />
 
