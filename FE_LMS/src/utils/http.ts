@@ -11,6 +11,7 @@ import axios, {
 export const httpClient = axios.create({
   baseURL: import.meta.env.VITE_BASE_API,
   timeout: 10000,
+  withCredentials: true, // Enable cookies for authentication
 });
 
 // ===============================
@@ -28,6 +29,10 @@ export interface ApiResponse<T = unknown> {
 // ===============================
 httpClient.interceptors.request.use(
   (config) => {
+    // Debug: Check if cookies will be sent
+    console.log("Request to:", config.url);
+    console.log("With credentials:", config.withCredentials);
+    
     // Ví dụ: thêm token nếu cần
     // const token = localStorage.getItem("token");
     // if (token) config.headers.Authorization = `Bearer ${token}`;
@@ -55,6 +60,7 @@ const _send = async <T = unknown>(
       method,
       url: pathname,
       data,
+      withCredentials: true, // Ensure credentials are always sent
       ...config,
     });
 

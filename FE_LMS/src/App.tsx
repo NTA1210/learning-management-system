@@ -1,13 +1,16 @@
 import { AppRoutes } from "./routes";
 import { ThemeProvider } from "./context/ThemeContextProvider";
+import { AuthProvider } from "./context/AuthContext";
 import { ThemeToggle } from "./components";
 
 function App() {
   return (
-    <ThemeProvider>
-      <AppRoutes />
-      <ThemeToggle />
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <AppRoutes />
+        <ThemeToggle />
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
 

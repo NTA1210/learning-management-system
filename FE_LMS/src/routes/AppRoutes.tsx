@@ -9,6 +9,7 @@ import {DashboardPage ,
   ResetPasswordPage,
   LoginPage,
   RegisterPage,
+  CourseManagementPage,
 } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import ProtectedRoute from "../components/ProtectedRoute";
@@ -29,6 +30,16 @@ function AppRoutes() {
         <Route path="/dashboard" element={
           <ProtectedRoute requiredRole="admin">
             <DashboardPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/courses" element={
+          <ProtectedRoute requiredRole="admin">
+            <CourseManagementPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/courses" element={
+          <ProtectedRoute>
+            <CourseManagementPage />
           </ProtectedRoute>
         } />
         <Route path="/admin/dashboard" element={
