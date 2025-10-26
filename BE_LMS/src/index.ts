@@ -31,7 +31,8 @@ import {
   submissionRoutes,
   userRoutes,
   categoryRoutes,
-  lessonRoutes
+  lessonRoutes,
+  lessonMaterialRoutes
 } from "./routes";
 
 const app = express();
@@ -70,7 +71,8 @@ app.use("/courses", courseRoutes);
 app.use("/categories", categoryRoutes);
 app.use("/assignments", assignmentRoutes);
 app.use("/submissions", submissionRoutes);
-app.use("/lesson",lessonRoutes)
+app.use("/lesson",lessonRoutes);
+app.use("/lesson-material", lessonMaterialRoutes)
 //protected routes
 app.use("/user", authenticate, userRoutes);
 app.use("/sessions", authenticate, authorize(Role.ADMIN), sessionRoutes);
