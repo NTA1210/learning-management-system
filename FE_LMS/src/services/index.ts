@@ -3,6 +3,7 @@ import http from "../utils/http";
 
 import { type LoginRequest, type RegisterRequest, type AuthResponse, type User } from "../types/auth";
 export * from './mock';
+export * from './courseService';
 export const authService = {
   login: async (data: LoginRequest): Promise<User> => {
     const response = await http.post<User>("/auth/login", data);

@@ -19,7 +19,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const response = await authService.getCurrentUser();
         setUser(response);
       } catch {
-        setUser(null);
+        // Fallback to localStorage if API fails
+        const userData = localStorage.getItem('userData');
+        if (userData) {
+          try {
+            const parsedUser = JSON.parse(userData);
+            setUser(parsedUser);
+          } catch {
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
       } finally {
         setLoading(false);
       }
