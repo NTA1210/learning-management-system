@@ -28,31 +28,36 @@ export const listAssignmentsHandler = catchErrors(async (req, res) => {
     sortOrder: query.sortOrder,
   });
 
-  return res.status(OK).json({
-    message: "Assignments retrieved successfully",
-    data: result.assignments,
-    pagination: result.pagination,
-  });
+  // return res.status(OK).json({
+  //   message: "Assignments retrieved successfully",
+  //   data: result.assignments,
+  //   pagination: result.pagination,
+  // });
+  return res.success(OK, result.assignments, "Assignments retrieved successfully", {
+  pagination: result.pagination,
+});
 });
 
 export const getAssignmentByIdHandler = catchErrors(async (req, res) => {
   const assignmentId = assignmentIdSchema.parse(req.params.id);
   const assignment = await getAssignmentById(assignmentId);
 
-  return res.status(OK).json({
-    message: "Assignment retrieved successfully",
-    data: assignment,
-  });
+  // return res.status(OK).json({
+  //   message: "Assignment retrieved successfully",
+  //   data: assignment,
+  // });
+  return res.success(OK, assignment, "Assignment retrieved successfully");
 });
 
 export const createAssignmentHandler = catchErrors(async (req, res) => {
   const data = createAssignmentSchema.parse(req.body);
   const assignment = await createAssignment(data);
 
-  return res.status(CREATED).json({
-    message: "Assignment created successfully",
-    data: assignment,
-  });
+  // return res.status(CREATED).json({
+  //   message: "Assignment created successfully",
+  //   data: assignment,
+  // });
+  return res.success(OK, assignment, "Assignment created successfully");
 });
 
 export const updateAssignmentHandler = catchErrors(async (req, res) => {
@@ -60,17 +65,19 @@ export const updateAssignmentHandler = catchErrors(async (req, res) => {
   const data = updateAssignmentSchema.parse(req.body);
   const assignment = await updateAssignment(assignmentId, data);
 
-  return res.status(OK).json({
-    message: "Assignment updated successfully",
-    data: assignment,
-  });
+  // return res.status(OK).json({
+  //   message: "Assignment updated successfully",
+  //   data: assignment,
+  // });
+  return res.success(OK, assignment, "Assignment updated successfully");
 });
 
 export const deleteAssignmentHandler = catchErrors(async (req, res) => {
   const assignmentId = assignmentIdSchema.parse(req.params.id);
   await deleteAssignment(assignmentId);
 
-  return res.status(OK).json({
-    message: "Assignment deleted successfully",
-  });
+  // return res.status(OK).json({
+  //   message: "Assignment deleted successfully",
+  // });
+  return res.success(OK, null, "Assignment deleted successfully");
 });

@@ -6,18 +6,20 @@ import {
   updateAssignmentHandler,
   deleteAssignmentHandler,
 } from "../controller/assignment.controller";
+import { authenticate, authorize } from "@/middleware";
+import { Role } from "@/types";
 
 const assignmentRoutes = Router();
 
 // prefix: /assignments
 
 // Public routes
-assignmentRoutes.get("/", listAssignmentsHandler);
-assignmentRoutes.get("/:id", getAssignmentByIdHandler);
+assignmentRoutes.get("/", authenticate, listAssignmentsHandler);
+assignmentRoutes.get("/:id", authenticate, getAssignmentByIdHandler);
 
 // Protected routes (cần authentication)
-assignmentRoutes.post("/", createAssignmentHandler);
-assignmentRoutes.put("/:id", updateAssignmentHandler);
-assignmentRoutes.delete("/:id", deleteAssignmentHandler);
+assignmentRoutes.post("/", authenticate, authorize(Role.ADMIN,Role.TEACHER), createAssignmentHandler);
+assignmentRoutes.put("/:id", authenticate, authorize(Role.ADMIN,Role.TEACHER), updateAssignmentHandler);
+assignmentRoutes.delete("/:id", authenticate, authorize(Role.ADMIN,Role.TEACHER), deleteAssignmentHandler);
 
 export default assignmentRoutes;
