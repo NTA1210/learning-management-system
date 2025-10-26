@@ -4,4 +4,6 @@ export { default as courseRoutes } from "./course.route";
 export { default as enrollmentRoutes } from "./enrollment.route";
 export { default as sessionRoutes } from "./session.route";
 export { default as submissionRoutes } from "./submission.route";
+export { default as categoryRoutes } from "./category.route";
+export { default as lessonRoutes } from "./lesson.route";
 export { default as userRoutes } from "./user.route";
