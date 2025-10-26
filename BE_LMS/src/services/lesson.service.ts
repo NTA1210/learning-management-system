@@ -14,6 +14,75 @@ import {
 import { CreateLessonSchema, LessonQuerySchema } from "@/validators/lesson.schemas";
 import { Role } from "../types";
 
+export type CreateLessonParams = {
+  title: string;
+  courseId: string;
+  content?: string;
+  order?: number;
+  durationMinutes?: number;
+  publishedAt?: Date;
+};
+
+export const createLessonService = async (data: CreateLessonParams, userId: string, userRole?: Role) => {
+  // Check if lesson with same title exists in the same course
+  const existingLesson = await LessonModel.exists({ title: data.title, courseId: data.courseId });
+  appAssert(!existingLesson, CONFLICT, "Lesson already exists");
+
+  // Verify the course exists
+  const course = await CourseModel.findById(data.courseId);
+  appAssert(course, NOT_FOUND, "Course not found");
+  
+  // ADMIN can create lessons in any course
+  // TEACHER can only create lessons in courses they teach
+  if (userRole !== Role.ADMIN) {
+    const isInstructor = course.teachers.includes(new mongoose.Types.ObjectId(userId));
+    appAssert(isInstructor, FORBIDDEN, "Only course instructors or admins can create lessons");
+  }
+
+  const newLesson = await LessonModel.create(data);
+  
+  return await LessonModel.findById(newLesson._id)
+    .populate('courseId', 'title description')
+    .lean();
+};
+
+export const deleteLessonService = async (id: string, userId: string, userRole: Role) => {
+  const lesson = await LessonModel.findById(id);
+  appAssert(lesson, NOT_FOUND, "Lesson not found");
+
+  // Get course to check instructor
+  const course = await CourseModel.findById(lesson.courseId);
+  appAssert(course, NOT_FOUND, "Course not found");
+
+  // Only admin or course instructor can delete
+  const isInstructor = course.teachers.includes(new mongoose.Types.ObjectId(userId));
+  const canDelete = userRole === Role.ADMIN || isInstructor;
+  appAssert(canDelete, FORBIDDEN, "Not authorized to delete this lesson");
+
+  const deletedLesson = await LessonModel.findByIdAndDelete(id);
+  return deletedLesson;
+};
+
+export const updateLessonService = async (id: string, data: Partial<CreateLessonParams>, userId: string, userRole: Role) => {
+  const lesson = await LessonModel.findById(id);
+  appAssert(lesson, NOT_FOUND, "Lesson not found");
+
+  // Get course to check instructor
+  const course = await CourseModel.findById(lesson.courseId);
+  appAssert(course, NOT_FOUND, "Course not found");
+
+  // Only admin or course instructor can update
+  const isInstructor = course.teachers.includes(new mongoose.Types.ObjectId(userId));
+  const canUpdate = userRole === Role.ADMIN || isInstructor;
+  appAssert(canUpdate, FORBIDDEN, "Not authorized to update this lesson");
+
+  const parsed = CreateLessonSchema.partial().parse(data);
+  const updatedLesson = await LessonModel.findByIdAndUpdate(id, parsed, { new: true })
+    .populate('courseId', 'title description')
+    .lean();
+  
+  return updatedLesson;
+};
 
 export const getLessons = async (query: any, userId?: string, userRole?: Role) => {
   // Validate query parameters using schema

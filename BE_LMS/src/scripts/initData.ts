@@ -54,35 +54,39 @@ async function init() {
     console.log("Old data cleared");
 
     // Create Users
-    const password = await bcrypt.hash("123456", 10);
+    const password = "123456"; // Model sẽ tự động hash trong pre-save hook
     const users = await User.create([
       {
         username: "admin1",
         email: "admin1@example.com",
         password,
         role: "admin",
-        fullName: "Admin One",
+        fullname: "Admin One",
+        verified: true, 
       },
       {
         username: "teacher1",
         email: "teacher1@example.com",
         password,
         role: "teacher",
-        fullName: "Teacher One",
+        fullname: "Teacher One", 
+        verified: true, 
       },
       {
         username: "student1",
         email: "student1@example.com",
         password,
         role: "student",
-        fullName: "Student One",
+        fullname: "Student One", 
+        verified: true, 
       },
       {
         username: "student2",
         email: "student2@example.com",
         password,
         role: "student",
-        fullName: "Student Two",
+        fullname: "Student Two", 
+        verified: true, 
       },
     ]);
 
