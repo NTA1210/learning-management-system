@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import {DashboardPage ,
   StudentDashboardPage,
+  TeacherDashboardPage,
   LandingPage,
   NotFoundPage,
   EmailVerifyPage,
@@ -38,6 +39,11 @@ function AppRoutes() {
         <Route path="/student-dashboard" element={
           <ProtectedRoute requiredRole="student">
             <StudentDashboardPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/teacher-dashboard" element={
+          <ProtectedRoute requiredRole="teacher">
+            <TeacherDashboardPage />
           </ProtectedRoute>
         } />
 
