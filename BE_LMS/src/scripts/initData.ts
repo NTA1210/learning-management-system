@@ -126,20 +126,26 @@ async function init() {
       {
         title: "JS Basics",
         courseId: courses[0]._id,
+        content: "Learn the basics of JavaScript programming language",
         order: 1,
         durationMinutes: 30,
+        publishedAt: new Date(),
       },
       {
         title: "JS Functions",
         courseId: courses[0]._id,
+        content: "Understanding JavaScript functions and their usage",
         order: 2,
         durationMinutes: 45,
+        publishedAt: new Date(),
       },
       {
         title: "UI Design Principles",
         courseId: courses[1]._id,
+        content: "Fundamental principles of UI/UX design",
         order: 1,
         durationMinutes: 60,
+        publishedAt: new Date(), 
       },
     ]);
 
