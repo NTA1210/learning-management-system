@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { compareValue, hashValue } from "../utils/bcrypt";
-import { Role, IUser } from "../types";
+import { Role, IUser, UserStatus } from "../types";
 
 const userSchema = new mongoose.Schema<IUser>(
   {
@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema<IUser>(
     avatar_url: { type: String },
     bio: { type: String },
     verified: { type: Boolean, required: true, default: false },
+    status: { type: String, required: true, default: UserStatus.ACTIVE },
   },
   {
     timestamps: true,
@@ -24,7 +25,7 @@ const userSchema = new mongoose.Schema<IUser>(
 userSchema.pre("save", async function (next) {
   // ✅ Kiểm tra xem field "password" có bị thay đổi không
   // Nếu KHÔNG thay đổi (ví dụ chỉ update email, name,...) thì bỏ qua việc hash lại
-  if (!this.isModified("password")) next();
+  if (!this.isModified("password")) return next();
 
   // ✅ Nếu password đã thay đổi hoặc là lần đầu tạo user,
   // thì hash lại password trước khi lưu vào database
@@ -44,14 +45,31 @@ userSchema.methods.omitPassword = function () {
   return user;
 };
 
-userSchema.methods.response = function () {
-  return {
-    username: this.username,
+userSchema.methods.response = function (viewerRole: Role = Role.STUDENT) {
+  const baseData = {
+    fullname: this.fullname,
+    avatar_url: this.avatar_url,
+    bio: this.bio,
     role: this.role,
-    fullname: this.fullname || "",
-    avatar_url: this.avatar_url || "",
-    bio: this.bio || "",
   };
+
+  if (viewerRole === Role.TEACHER) {
+    return {
+      ...baseData,
+      email: this.email,
+      phone_number: this.phone_number,
+    };
+  }
+
+  if (viewerRole === Role.ADMIN) {
+    return {
+      ...this.toObject(),
+      password: undefined,
+    };
+  }
+
+  // public
+  return baseData;
 };
 
 const UserModel = mongoose.model<IUser>("User", userSchema);

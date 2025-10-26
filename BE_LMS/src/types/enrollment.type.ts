@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 export default interface IEnrollment extends mongoose.Document {
-  studentId: mongoose.Types.ObjectId;
+  userId: mongoose.Types.ObjectId;
   courseId: mongoose.Types.ObjectId;
   enrolledAt: Date;
   status: "active" | "completed" | "dropped";
