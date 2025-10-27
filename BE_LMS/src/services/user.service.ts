@@ -26,7 +26,12 @@ export const getAllUsers = async (
   if (username) query.username = { $regex: username, $options: "i" };
 
   const [users, enrolledList] = await Promise.all([
-    UserModel.find({ ...query, verified: true })
+    UserModel.find({
+      ...query,
+      verified: true,
+      status: UserStatus.ACTIVE,
+      role: { $ne: Role.ADMIN },
+    })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)

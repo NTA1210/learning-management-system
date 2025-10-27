@@ -1,10 +1,13 @@
 import { Router } from "express";
-import { getUserHandler, getUsersHandler } from "../controller/user.controller";
+import {
+  getUserHandler,
+  getUserForCourseHandler,
+} from "../controller/user.controller";
 
 const userRoutes = Router();
 
-//prefix : /user
-userRoutes.get("/:courseId", getUsersHandler);
+//prefix : /users
 userRoutes.get("/me", getUserHandler);
+userRoutes.get("/:courseId", getUserForCourseHandler);
 
 export default userRoutes;

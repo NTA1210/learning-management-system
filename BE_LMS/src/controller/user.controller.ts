@@ -6,14 +6,8 @@ import { catchErrors } from "../utils/asyncHandler";
 import { courseIdSchema } from "@/validators";
 import { getAllUsers } from "@/services/user.service";
 
-export const getUserHandler = catchErrors(async (req, res) => {
-  const user = await UserModel.findById(req?.userId);
-  appAssert(user, NOT_FOUND, "User not found");
-
-  return res.status(OK).json(user.omitPassword());
-});
-
-export const getUsersHandler = catchErrors(async (req, res) => {
+// GET /users/:courseId - Get all users for a specific course
+export const getUserForCourseHandler = catchErrors(async (req, res) => {
   const request = listAllUsersSchema.parse(req.query);
   const courseId = courseIdSchema.parse(req.params.courseId);
 
@@ -22,4 +16,11 @@ export const getUsersHandler = catchErrors(async (req, res) => {
   return res.success(OK, data.users, "Users retrieved successfully", {
     pagination: data.pagination,
   });
+});
+
+export const getUserHandler = catchErrors(async (req, res) => {
+  const user = await UserModel.findById(req?.userId);
+  appAssert(user, NOT_FOUND, "User not found");
+
+  return res.status(OK).json(user.omitPassword());
 });
