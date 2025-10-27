@@ -15,7 +15,7 @@ export interface Course {
   title: string;
   code: string;
   description: string;
-  category: Category;
+  category?: Category;
   teachers: Teacher[];
   isPublished: boolean;
   capacity: number;

@@ -6,3 +6,5 @@ export { default as StudentsByBatchChart } from './StudentsByBatchChart.tsx';
 export { default as StudentsByCampusChart } from './StudentsByCampusChart.tsx';
 export { default as StudentsPerClassChart } from './StudentsPerClassChart.tsx';
 export { default as StudentsByMajorChart } from './StudentsByMajorChart.tsx';
+export { default as Navbar } from './Navbar.tsx';
+export { default as Sidebar } from './Sidebar.tsx';

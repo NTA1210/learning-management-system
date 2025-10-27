@@ -48,7 +48,7 @@ export const authService = {
 
   // Get current user info (requires authentication)
   getCurrentUser: async (): Promise<User> => {
-    const response = await http.get<User>("/user");
+    const response = await http.get<User>("/users/me");
     return response.data;
   },
 };
