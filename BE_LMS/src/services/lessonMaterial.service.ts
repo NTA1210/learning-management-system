@@ -14,7 +14,14 @@ import {
 import { Role } from "../types";
 import { uploadFile } from "../utils/uploadFile";
 
-
+export type CreateLessonMaterialParams = {
+  lessonId: string;
+  title: string;
+  type: "pdf" | "video" | "ppt" | "link" | "other";
+   fileUrl?: string;
+   fileName?: string;
+   sizeBytes?: number;
+};
 // Get all lesson materials with filtering and access control
 export const getLessonMaterials = async (query: any, userId?: string, userRole?: Role) => {
  
@@ -310,4 +317,177 @@ export const getLessonMaterialById = async (id: string, userId?: string, userRol
     hasAccess: true,
     accessReason
   };
+};
+
+// Create lesson material
+export const createLessonMaterial = async (data: CreateLessonMaterialParams, userId: string, userRole: Role) => {
+  // Validate lesson exists
+  const lesson = await LessonModel.findById(data.lessonId).populate('courseId', 'teachers');
+  appAssert(lesson, NOT_FOUND, "Lesson not found");
+
+  // Check if user has permission to add materials to this lesson
+  if (userRole === Role.STUDENT) {
+    appAssert(false, FORBIDDEN, "Students cannot create lesson materials");
+  } else if (userRole === Role.TEACHER) {
+    // Check if teacher is instructor of the course
+    const isInstructor = (lesson.courseId as any).teachers.includes(new mongoose.Types.ObjectId(userId));
+    appAssert(isInstructor, FORBIDDEN, "Only course instructors can add materials");
+  }
+
+  // Check if material with same title exists in the same lesson
+  const existingMaterial = await LessonMaterialModel.exists({ 
+    title: data.title, 
+    lessonId: data.lessonId 
+  });
+  appAssert(!existingMaterial, CONFLICT, "Material with this title already exists in this lesson");
+
+  const newMaterial = await LessonMaterialModel.create({
+    ...data,
+    lessonId: new mongoose.Types.ObjectId(data.lessonId),
+    uploadedBy: new mongoose.Types.ObjectId(userId)
+  });
+  
+  return await LessonMaterialModel.findById(newMaterial._id)
+    .populate('lessonId', 'title courseId')
+    .populate('uploadedBy', 'firstName lastName email')
+    .lean();
+};
+
+// Update lesson material
+export const updateLessonMaterial = async (id: string, data: Partial<CreateLessonMaterialParams>, userId: string, userRole: Role) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    appAssert(false, NOT_FOUND, "Invalid material ID format");
+  }
+
+  const material = await LessonMaterialModel.findById(id);
+  appAssert(material, NOT_FOUND, "Material not found");
+
+  // Check if user has permission to update this material
+  if (userRole === Role.STUDENT) {
+    appAssert(false, FORBIDDEN, "Students cannot update lesson materials");
+  } else if (userRole === Role.TEACHER) {
+    // Check if teacher uploaded this material or is instructor of the lesson's course
+    const isUploader = material.uploadedBy && material.uploadedBy.toString() === userId;
+    const lesson = await LessonModel.findById(material.lessonId).populate('courseId', 'teachers');
+    const isInstructor = lesson && (lesson.courseId as any).teachers.includes(new mongoose.Types.ObjectId(userId));
+    
+    appAssert(isUploader || isInstructor, FORBIDDEN, "Not authorized to update this material");
+  }
+
+  // If updating title, check for conflicts
+  if (data.title && data.title !== material.title) {
+    const existingMaterial = await LessonMaterialModel.exists({ 
+      title: data.title, 
+      lessonId: material.lessonId,
+      _id: { $ne: id }
+    });
+    appAssert(!existingMaterial, CONFLICT, "Material with this title already exists in this lesson");
+  }
+
+  const parsed = CreateLessonMaterialSchema.partial().parse(data);
+  const updatedMaterial = await LessonMaterialModel.findByIdAndUpdate(
+    id, 
+    parsed, 
+    { new: true }
+  )
+    .populate('lessonId', 'title courseId')
+    .populate('uploadedBy', 'firstName lastName email')
+    .lean();
+
+  return updatedMaterial;
+};
+
+export const deleteLessonMaterial = async (id: string, userId: string, userRole: Role) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    appAssert(false, NOT_FOUND, "Invalid material ID format");
+  }
+
+  const material = await LessonMaterialModel.findById(id);
+  appAssert(material, NOT_FOUND, "Material not found");
+
+  // Check if user has permission to delete this material
+  if (userRole === Role.STUDENT) {
+    appAssert(false, FORBIDDEN, "Students cannot delete lesson materials");
+  } else if (userRole === Role.TEACHER) {
+    // Check if teacher uploaded this material or is instructor of the lesson's course
+    const isUploader = material.uploadedBy && material.uploadedBy.toString() === userId;
+    const lesson = await LessonModel.findById(material.lessonId).populate('courseId', 'teachers');
+    const isInstructor = lesson && (lesson.courseId as any).teachers.includes(new mongoose.Types.ObjectId(userId));
+    
+    appAssert(isUploader || isInstructor, FORBIDDEN, "Not authorized to delete this material");
+  }
+
+  const deletedMaterial = await LessonMaterialModel.findByIdAndDelete(id);
+  return deletedMaterial;
+};
+
+// Upload lesson material with file
+export const uploadLessonMaterial = async (data: any, file: Express.Multer.File, userId: string, userRole: Role) => {
+  // Validate form data
+  const validatedData = UploadMaterialSchema.parse(data);
+  
+  // Validate lesson exists
+  const lesson = await LessonModel.findById(validatedData.lessonId).populate('courseId', 'teachers');
+  appAssert(lesson, NOT_FOUND, "Lesson not found");
+
+  // Check if user has permission to add materials to this lesson
+  if (userRole === Role.STUDENT) {
+    appAssert(false, FORBIDDEN, "Students cannot upload lesson materials");
+  } else if (userRole === Role.TEACHER) {
+    // Check if teacher is instructor of the course
+    const isInstructor = (lesson.courseId as any).teachers.includes(new mongoose.Types.ObjectId(userId));
+    appAssert(isInstructor, FORBIDDEN, "Only course instructors can upload materials");
+  }
+
+  // Check if material with same title exists in the same lesson
+  const existingMaterial = await LessonMaterialModel.exists({ 
+    title: validatedData.title, 
+    lessonId: validatedData.lessonId 
+  });
+  appAssert(!existingMaterial, CONFLICT, "Material with this title already exists in this lesson");
+
+  // Determine file type based on MIME type (matching multer config)
+  const getFileType = (mimetype: string): "pdf" | "video" | "ppt" | "link" | "other" => {
+    if (mimetype.includes('pdf')) return 'pdf';
+    if (mimetype.includes('video')) return 'video';
+    if (mimetype.includes('powerpoint') || mimetype.includes('presentation')) return 'ppt';
+    if (mimetype.includes('image')) return 'other'; // Map image to other since not in original enum
+    if (mimetype.includes('audio')) return 'other'; // Map audio to other since not in original enum
+    if (mimetype.includes('text') || mimetype.includes('document') || mimetype.includes('excel') || mimetype.includes('zip') || mimetype.includes('rar')) return 'other';
+    return 'other';
+  };
+
+  // Upload file
+  const uploadResult = await uploadFile(file);
+
+  // Create material with file information
+  const newMaterial = await LessonMaterialModel.create({
+    lessonId: new mongoose.Types.ObjectId(validatedData.lessonId),
+    title: validatedData.title,
+    type: validatedData.type || getFileType(file.mimetype),
+    fileUrl: uploadResult.url,
+    fileName: uploadResult.fileName,
+    sizeBytes: file.size,
+    uploadedBy: new mongoose.Types.ObjectId(userId)
+  });
+  
+  return await LessonMaterialModel.findById(newMaterial._id)
+    .populate('lessonId', 'title courseId')
+    .populate('uploadedBy', 'firstName lastName email')
+    .lean();
+};
+
+// Get material for download (no download count tracking in original model)
+export const getMaterialForDownload = async (id: string) => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    appAssert(false, NOT_FOUND, "Invalid material ID format");
+  }
+
+  const material = await LessonMaterialModel.findById(id)
+    .populate('lessonId', 'title courseId')
+    .populate('uploadedBy', 'firstName lastName email')
+    .lean();
+  
+  appAssert(material, NOT_FOUND, "Material not found");
+  return material;
 };
