@@ -9,7 +9,7 @@ const objectIdSchema = z.string().regex(/^[0-9a-fA-F]{24}$/, {
 export const getEnrollmentsQuerySchema = z.object({
   status: z.enum(["active", "completed", "dropped"]).optional(),
   courseId: z.string().optional(),
-  studentId: z.string().optional(),
+  userId: z.string().optional(),
   page: z.string().optional().transform((val) => (val ? parseInt(val) : 1)),
   limit: z.string().optional().transform((val) => (val ? parseInt(val) : 10)),
 });
@@ -29,7 +29,7 @@ export const courseIdSchema = z.object({
 
 // POST - Admin tạo enrollment cho student
 export const createEnrollmentSchema = z.object({
-  studentId: objectIdSchema,
+  userId: objectIdSchema,
   courseId: objectIdSchema,
   status: z.enum(["active", "completed", "dropped"]).optional(),
   role: z.enum(["student", "auditor"]).optional(),
