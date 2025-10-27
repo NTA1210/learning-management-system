@@ -69,26 +69,8 @@ export const createAccount = async (data: CreateAccountParams) => {
 
   appAssert(!error, INTERNAL_SERVER_ERROR, "Failed to send verification email");
 
-  //create session
-
-  // const session = await SessionModel.create({
-  //   userId: user._id,
-  //   userAgent: data.userAgent,
-  // });
-  //sign access token & refresh token
-
-  // const refreshToken = signToKen(
-  //   { sessionId: session._id },
-  //   refreshTokenSignOptions
-  // );
-
-  // const accessToken = signToKen({ userId: user._id, sessionId: session._id });
-  //return user & tokens
-
   return {
     user: user.omitPassword(),
-    // accessToken,
-    // refreshToken,
   };
 };
 
@@ -239,7 +221,7 @@ export const sendPasswordResetEmail = async (email: string) => {
     `${error?.name} - ${error?.message}`
   );
   //return success message
-  return { url, emailId: data.id };
+  return { url, emailId: data?.id };
 };
 
 type ResetPasswordParams = {
