@@ -21,7 +21,11 @@ export const getAllUsers = async (
   const skip = (page - 1) * limit;
 
   const query: any = {};
-  if (role) query.role = role;
+  if (role) {
+    query.role = role;
+  } else {
+    query.role = { $ne: Role.ADMIN };
+  }
   if (email) query.email = { $regex: email, $options: "i" };
   if (username) query.username = { $regex: username, $options: "i" };
 
@@ -30,7 +34,6 @@ export const getAllUsers = async (
       ...query,
       verified: true,
       status: UserStatus.ACTIVE,
-      role: { $ne: Role.ADMIN },
     })
       .sort({ createdAt: -1 })
       .skip(skip)
