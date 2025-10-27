@@ -68,7 +68,7 @@ export const createApp = () => {
   app.use("/submissions", submissionRoutes);
 
   //protected routes
-  app.use("/user", authenticate, userRoutes);
+  app.use("/users", authenticate, userRoutes);
   app.use("/sessions", authenticate, authorize(Role.ADMIN), sessionRoutes);
   app.use("/enrollments", authenticate, enrollmentRoutes);
 
