@@ -11,7 +11,7 @@ void UserModel;
 // GET - Get enrollment by ID
 export const getEnrollmentById = async (enrollmentId: string) => {
   const enrollment = await EnrollmentModel.findById(enrollmentId)
-    .populate("studentId", "username email fullname avatar_url")
+    .populate("userId", "username email fullname avatar_url")
     .populate("courseId", "title code description");
 
   appAssert(enrollment, NOT_FOUND, "Enrollment not found");
@@ -20,15 +20,15 @@ export const getEnrollmentById = async (enrollmentId: string) => {
 
 // GET - Get all enrollments for a student
 export const getStudentEnrollments = async (filters: {
-  studentId: string;
+  userId: string;
   status?: string;
   page?: number;
   limit?: number;
 }) => {
-  const { studentId, status, page = 1, limit = 10 } = filters;
+  const { userId, status, page = 1, limit = 10 } = filters;
   const skip = (page - 1) * limit;
 
-  const query: any = { studentId };
+  const query: any = { userId };
   if (status) {
     query.status = status;
   }
@@ -74,7 +74,7 @@ export const getCourseEnrollments = async (filters: {
 
   const [enrollments, total] = await Promise.all([
     EnrollmentModel.find(query)
-      .populate("studentId", "username email fullname avatar_url")
+      .populate("userId", "username email fullname avatar_url")
       .sort({ enrolledAt: -1 })
       .skip(skip)
       .limit(limit),
@@ -96,21 +96,21 @@ export const getCourseEnrollments = async (filters: {
 export const getAllEnrollments = async (filters: {
   status?: string;
   courseId?: string;
-  studentId?: string;
+  userId?: string;
   page?: number;
   limit?: number;
 }) => {
-  const { status, courseId, studentId, page = 1, limit = 10 } = filters;
+  const { status, courseId, userId, page = 1, limit = 10 } = filters;
   const skip = (page - 1) * limit;
 
   const query: any = {};
   if (status) query.status = status;
   if (courseId) query.courseId = courseId;
-  if (studentId) query.studentId = studentId;
+  if (userId) query.userId = userId;
 
   const [enrollments, total] = await Promise.all([
     EnrollmentModel.find(query)
-      .populate("studentId", "username email fullname avatar_url")
+      .populate("userId", "username email fullname avatar_url")
       .populate("courseId", "title code description")
       .sort({ enrolledAt: -1 })
       .skip(skip)
@@ -131,15 +131,15 @@ export const getAllEnrollments = async (filters: {
 
 // POST - Create enrollment (dùng chung cho admin và student)
 export const createEnrollment = async (data: {
-  studentId: string;
+  userId: string;
   courseId: string;
   status?: "active" | "completed" | "dropped";
   role?: "student" | "auditor";
 }) => {
-  const { studentId, courseId, status = "active", role = "student" } = data;
+  const { userId, courseId, status = "active", role = "student" } = data;
 
   // 1. Check student exists
-  const student = await UserModel.findById(studentId);
+  const student = await UserModel.findById(userId);
   appAssert(student, NOT_FOUND, "Student not found");
 
   // 2. Check course exists and is published
@@ -149,7 +149,7 @@ export const createEnrollment = async (data: {
 
   // 3. Check existing enrollment
   const existingEnrollment = await EnrollmentModel.findOne({
-    studentId,
+    userId,
     courseId,
   });
 
@@ -165,7 +165,7 @@ export const createEnrollment = async (data: {
       await existingEnrollment.save();
 
       await existingEnrollment.populate([
-        { path: "studentId", select: "username email fullname avatar_url" },
+        { path: "userId", select: "username email fullname avatar_url" },
         { path: "courseId", select: "title code description" },
       ]);
 
@@ -176,7 +176,7 @@ export const createEnrollment = async (data: {
     appAssert(
       false,
       CONFLICT,
-      `Already enrolled in this course with status: ${existingEnrollment.status}`
+      "Already enrolled in this course"
     );
   }
 
@@ -195,7 +195,7 @@ export const createEnrollment = async (data: {
 
   // 5. Create enrollment
   const enrollment = await EnrollmentModel.create({
-    studentId,
+    userId,
     courseId,
     status,
     role,
@@ -203,7 +203,7 @@ export const createEnrollment = async (data: {
 
   // Populate để trả về đầy đủ thông tin
   await enrollment.populate([
-    { path: "studentId", select: "username email fullname avatar_url" },
+    { path: "userId", select: "username email fullname avatar_url" },
     { path: "courseId", select: "title code description" },
   ]);
 
@@ -235,7 +235,7 @@ export const updateEnrollment = async (
     updateData,
     { new: true } // Return updated document
   )
-    .populate("studentId", "username email fullname avatar_url")
+    .populate("userId", "username email fullname avatar_url")
     .populate("courseId", "title code description");
 
   return updatedEnrollment;
@@ -244,7 +244,7 @@ export const updateEnrollment = async (
 // PUT - Student update own enrollment (chỉ có thể drop)
 export const updateSelfEnrollment = async (
   enrollmentId: string,
-  studentId: string,
+  userId: string,
   data: {
     status?: "dropped";
   }
@@ -252,7 +252,7 @@ export const updateSelfEnrollment = async (
   // 1. Check enrollment exists và thuộc về student này
   const enrollment = await EnrollmentModel.findOne({
     _id: enrollmentId,
-    studentId,
+    userId,
   });
   appAssert(enrollment, NOT_FOUND, "Enrollment not found or access denied");
 
@@ -269,7 +269,7 @@ export const updateSelfEnrollment = async (
     { status: data.status },
     { new: true }
   )
-    .populate("studentId", "username email fullname avatar_url")
+    .populate("userId", "username email fullname avatar_url")
     .populate("courseId", "title code description");
 
   return updatedEnrollment;
