@@ -21,11 +21,17 @@ export const getAllUsers = async (
   const skip = (page - 1) * limit;
 
   const query: any = {};
-  if (role) {
-    query.role = role;
+
+  if (viewerRole === Role.ADMIN) {
+    if (role) query.role = role; // admin có thể lọc role cụ thể
   } else {
-    query.role = { $ne: Role.ADMIN };
+    if (role && role !== Role.ADMIN) {
+      query.role = role;
+    } else {
+      query.role = { $ne: Role.ADMIN };
+    }
   }
+
   if (email) query.email = { $regex: email, $options: "i" };
   if (username) query.username = { $regex: username, $options: "i" };
 
