@@ -137,7 +137,7 @@ const ForgotPasswordPage: React.FC = () => {
             borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(255, 255, 255, 0.2)',
           }}
         >
-          <div className="flex min-h-[560px]">
+          <div className="flex flex-col md:flex-row min-h-[560px]">
             {/* Left Side - Success Message */}
             <div className="flex-1 p-8 flex items-center">
               <div className="max-w-md mx-auto w-full">
@@ -270,7 +270,7 @@ const ForgotPasswordPage: React.FC = () => {
             </div>
 
             {/* Right Side - Illustrative Content */}
-            <div className="gradient-bg flex-1 p-12 relative overflow-hidden flex items-center">
+            <div className="gradient-bg hidden md:flex md:flex-1 p-12 relative overflow-hidden items-center">
               <div className="absolute inset-0">
                 <div className="floating-element absolute top-20 left-10 w-24 h-24 bg-white/10 rounded-full"></div>
                 <div className="floating-element absolute top-40 right-16 w-20 h-20 bg-white/5 rounded-full"></div>
@@ -360,7 +360,7 @@ const ForgotPasswordPage: React.FC = () => {
           borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(255, 255, 255, 0.2)',
         }}
       >
-        <div className="flex min-h-[560px]">
+        <div className="flex flex-col md:flex-row min-h-[560px]">
           {/* Left Side - Forgot Password Form */}
           <div className="flex-1 p-8 flex items-center">
             <div className="max-w-md mx-auto w-full">
@@ -548,33 +548,12 @@ const ForgotPasswordPage: React.FC = () => {
                   </Link>
                 </div>
 
-                {/* Language Selector */}
-                <div className="flex items-center justify-start mt-6">
-                  <div 
-                    className="flex items-center space-x-2 transition-colors duration-200 cursor-pointer"
-                    style={{
-                      color: darkMode ? '#d1d5db' : '#6b7280',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = darkMode ? '#ffffff' : '#374151';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = darkMode ? '#d1d5db' : '#6b7280';
-                    }}
-                  >
-                    <span className="text-2xl">ENG</span>
-                    <span className="text-sm font-medium">ENG</span>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </div>
               </form>
             </div>
           </div>
 
           {/* Right Side - Illustrative Content */}
-          <div className="gradient-bg flex-1 p-12 relative overflow-hidden flex items-center">
+          <div className="gradient-bg hidden md:flex md:flex-1 p-12 relative overflow-hidden items-center">
             <div className="absolute inset-0">
               <div className="floating-element absolute top-20 left-10 w-24 h-24 bg-white/10 rounded-full"></div>
               <div className="floating-element absolute top-40 right-16 w-20 h-20 bg-white/5 rounded-full"></div>
