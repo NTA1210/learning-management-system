@@ -60,23 +60,23 @@ const LoginPage: React.FC = () => {
             window.location.href = "/";
         }
       }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-   } catch (err: any) {
+   } catch (err: unknown) {
   console.error("Login error:", err);
 
-  let finalError: string | any[] = "Đăng nhập thất bại";
+  let finalError: ErrorType | ErrorType[] = "Đăng nhập thất bại";
 
   // Nếu backend trả JSON dạng chuỗi → parse thành mảng
-  if (err.message && typeof err.message === "string") {
+  const maybeMessage = (err as { message?: unknown })?.message;
+  if (typeof maybeMessage === "string") {
     try {
-      const parsed = JSON.parse(err.message);
+      const parsed = JSON.parse(maybeMessage);
       if (Array.isArray(parsed)) {
-        finalError = parsed;
+        finalError = parsed as ErrorType[];
       } else {
-        finalError = err.message;
+        finalError = maybeMessage;
       }
     } catch {
-      finalError = err.message;
+      finalError = maybeMessage;
     }
   }
 
@@ -101,7 +101,7 @@ const LoginPage: React.FC = () => {
           borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(255, 255, 255, 0.2)',
         }}
       >
-        <div className="flex min-h-[560px]">
+        <div className="flex flex-col md:flex-row min-h-[560px]">
           {/* Left Side - Login Form */}
           <div className="flex-1 p-8 flex items-center">
             <div className="max-w-md mx-auto w-full">
@@ -180,13 +180,7 @@ const LoginPage: React.FC = () => {
                        autoComplete="email"
                        required
                      />
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                      <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
-                        <svg className="h-4 w-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    </div>
+                    
                   </div>
                 </div>
 
@@ -355,7 +349,7 @@ const LoginPage: React.FC = () => {
           </div>
 
           {/* Right Side - Illustrative Content */}
-          <div className="gradient-bg flex-1 p-8 relative overflow-hidden flex items-center">
+          <div className="gradient-bg hidden md:flex md:flex-1 p-8 relative overflow-hidden items-center">
             {/* Animated Background Elements */}
             <div className="absolute inset-0">
               <div className="floating-element absolute top-20 left-10 w-24 h-24 bg-white/10 rounded-full"></div>

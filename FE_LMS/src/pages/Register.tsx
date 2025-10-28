@@ -4,6 +4,8 @@ import { authService } from "../services";
 import { type RegisterRequest } from "../types/auth";
 import { useTheme } from "../hooks/useTheme";
 
+type ErrorType = string | { path?: string[]; code?: string; message?: string };
+
 const RegisterPage: React.FC = () => {
   const { darkMode } = useTheme();
   const [formData, setFormData] = useState<RegisterRequest>({
@@ -15,7 +17,7 @@ const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ErrorType | ErrorType[]>("");
   const [success, setSuccess] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,22 +51,22 @@ const RegisterPage: React.FC = () => {
       console.log("Registration successful:", response);
       setSuccess(true);
       // Don't redirect immediately - show success message about email verification
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Registration error:", err);
   
-    let finalError: string | any[] = "Đăng ký thất bại";
+    let finalError: ErrorType | ErrorType[] = "Đăng ký thất bại";
   
-    if (err.message && typeof err.message === "string") {
+    const maybeMessage = (err as { message?: unknown })?.message;
+    if (typeof maybeMessage === "string") {
       try {
-        const parsed = JSON.parse(err.message);
+        const parsed = JSON.parse(maybeMessage);
         if (Array.isArray(parsed)) {
-          finalError = parsed;
+          finalError = parsed as ErrorType[];
         } else {
-          finalError = err.message;
+          finalError = maybeMessage;
         }
       } catch {
-        finalError = err.message;
+        finalError = maybeMessage;
       }
     }
   
@@ -89,7 +91,7 @@ const RegisterPage: React.FC = () => {
           borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(255, 255, 255, 0.2)',
         }}
       >
-        <div className="flex min-h-[560px]">
+        <div className="flex flex-col md:flex-row min-h-[560px]">
           {/* Left Side - Register Form */}
           <div className="flex-1 p-8 flex items-center">
             <div className="max-w-md mx-auto w-full">
@@ -168,13 +170,6 @@ const RegisterPage: React.FC = () => {
                       placeholder="Enter your username"
                       required
                     />
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                      <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
-                        <svg className="h-4 w-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
@@ -200,13 +195,6 @@ const RegisterPage: React.FC = () => {
                       placeholder="Enter your email"
                       required
                     />
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                      <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
-                        <svg className="h-4 w-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
@@ -330,14 +318,16 @@ const RegisterPage: React.FC = () => {
           <ul className="list-none list-inside space-y-1">
             {error.map((err, index) => (
               <li key={index}>
-                {err.path?.[0] === "username" && err.code === "too_small"
-                  ? "Tên người dùng phải có ít nhất 3 ký tự"
-                  : err.message}
+                {typeof err === 'object' && err !== null && 'path' in err && 'code' in err && 'message' in err
+                  ? (err.path?.[0] === "username" && err.code === "too_small"
+                      ? "Tên người dùng phải có ít nhất 3 ký tự"
+                      : err.message)
+                  : String(err)}
               </li>
             ))}
           </ul>
         ) : (
-          error
+          String(error)
         )}
       </span>
     </div>
@@ -434,7 +424,7 @@ const RegisterPage: React.FC = () => {
           </div>
 
           {/* Right Side - Illustrative Content */}
-          <div className="gradient-bg flex-1 p-12 relative overflow-hidden flex items-center">
+          <div className="gradient-bg hidden md:flex md:flex-1 p-12 relative overflow-hidden items-center">
             {/* Animated Background Elements */}
             <div className="absolute inset-0">
               <div className="floating-element absolute top-20 left-10 w-24 h-24 bg-white/10 rounded-full"></div>

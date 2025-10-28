@@ -78,7 +78,7 @@ const ResetPasswordPage: React.FC = () => {
             borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(255, 255, 255, 0.2)',
           }}
         >
-          <div className="flex min-h-[560px]">
+          <div className="flex flex-col md:flex-row min-h-[560px]">
             {/* Left Side - Success Message */}
             <div className="flex-1 p-8 flex items-center">
               <div className="max-w-md mx-auto w-full">
@@ -193,7 +193,7 @@ const ResetPasswordPage: React.FC = () => {
             </div>
 
             {/* Right Side - Illustrative Content */}
-            <div className="gradient-bg flex-1 p-12 relative overflow-hidden flex items-center">
+            <div className="gradient-bg hidden md:flex md:flex-1 p-12 relative overflow-hidden items-center">
               {/* Same illustration as reset password form */}
               <div className="absolute inset-0">
                 <div className="floating-element absolute top-20 left-10 w-24 h-24 bg-white/10 rounded-full"></div>
@@ -294,7 +294,7 @@ const ResetPasswordPage: React.FC = () => {
           borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(255, 255, 255, 0.2)',
         }}
       >
-        <div className="flex min-h-[560px]">
+        <div className="flex flex-col md:flex-row min-h-[560px]">
           {/* Left Side - Reset Password Form */}
           <div className="flex-1 p-8 flex items-center">
             <div className="max-w-md mx-auto w-full">
@@ -533,7 +533,7 @@ const ResetPasswordPage: React.FC = () => {
           </div>
 
           {/* Right Side - Illustrative Content */}
-          <div className="gradient-bg flex-1 p-12 relative overflow-hidden flex items-center">
+          <div className="gradient-bg hidden md:flex md:flex-1 p-12 relative overflow-hidden items-center">
             {/* Animated Background Elements */}
             <div className="absolute inset-0">
               <div className="floating-element absolute top-20 left-10 w-24 h-24 bg-white/10 rounded-full"></div>
