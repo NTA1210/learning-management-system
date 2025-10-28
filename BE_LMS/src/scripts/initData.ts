@@ -1,7 +1,6 @@
 // src/scripts/initData.ts
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import bcrypt from "bcrypt";
 
 // import tất cả models
 import {
@@ -62,31 +61,31 @@ async function init() {
         password,
         role: "admin",
         fullname: "Admin One",
-        verified: true, 
+        verified: true,
       },
       {
         username: "teacher1",
         email: "teacher1@example.com",
         password,
         role: "teacher",
-        fullname: "Teacher One", 
-        verified: true, 
+        fullname: "Teacher One",
+        verified: true,
       },
       {
         username: "student1",
         email: "student1@example.com",
         password,
         role: "student",
-        fullname: "Student One", 
-        verified: true, 
+        fullname: "Student One",
+        verified: true,
       },
       {
         username: "student2",
         email: "student2@example.com",
         password,
         role: "student",
-        fullname: "Student Two", 
-        verified: true, 
+        fullname: "Student Two",
+        verified: true,
       },
     ]);
 
@@ -149,7 +148,7 @@ async function init() {
         content: "Fundamental principles of UI/UX design",
         order: 1,
         durationMinutes: 60,
-        publishedAt: new Date(), 
+        publishedAt: new Date(),
       },
     ]);
 
