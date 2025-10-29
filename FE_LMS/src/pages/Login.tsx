@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { authService } from "../services";
+import { authService, saveCurrentUserFromApi } from "../services";
 import { type LoginRequest } from "../types/auth";
 import { useTheme } from "../hooks/useTheme";
 
@@ -32,6 +32,13 @@ const LoginPage: React.FC = () => {
     try {
       const response = await authService.login(formData);
       console.log("Login successful:", response);
+      // After login, fetch current user profile and save to storage
+      try {
+        const me = await saveCurrentUserFromApi();
+        console.log("[auth] current user loaded:", me);
+      } catch (e) {
+        console.warn("[auth] failed to load current user after login", e);
+      }
       
       // Store authentication state
       localStorage.setItem('isAuthenticated', 'true');
@@ -40,6 +47,9 @@ const LoginPage: React.FC = () => {
       // Check if there's a redirect parameter
       const redirectPath = searchParams.get('redirect');
       
+      // Delay to see log
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
       if (redirectPath) {
         // Redirect to the original path the user was trying to access
         window.location.href = redirectPath;
@@ -60,16 +70,16 @@ const LoginPage: React.FC = () => {
             window.location.href = "/";
         }
       }
-   } catch (err: unknown) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   } catch (err: any) {
   console.error("Login error:", err);
 
-  let finalError: ErrorType | ErrorType[] = "Đăng nhập thất bại";
+  let finalError: string | any[] = "Đăng nhập thất bại";
 
   // Nếu backend trả JSON dạng chuỗi → parse thành mảng
-  const maybeMessage = (err as { message?: unknown })?.message;
-  if (typeof maybeMessage === "string") {
+  if (err.message && typeof err.message === "string") {
     try {
-      const parsed = JSON.parse(maybeMessage);
+      const parsed = JSON.parse(err.message);
       if (Array.isArray(parsed)) {
         finalError = parsed as ErrorType[];
       } else {
@@ -405,7 +415,7 @@ const LoginPage: React.FC = () => {
                   <div className="flex-shrink-0">
                     <div className="w-16 h-16 bg-orange-500/20 rounded-2xl flex items-center justify-center">
                       <svg className="w-8 h-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 117 21 9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l7 4v6c0 5-3.5 9.5-7 10-3.5-.5-7-5-7-10V6l7-4z" />
                       </svg>
                     </div>
                   </div>

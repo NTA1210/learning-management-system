@@ -1,4 +1,7 @@
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTheme } from "../hooks/useTheme";
+import { Link } from "react-router-dom";
+import { authService } from "../services";
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -12,8 +15,8 @@ interface SidebarProps {
 
 interface MenuItem {
   href: string;
-  icon: JSX.Element;
-  label?: string;
+  icon: ReactNode;
+  label: string;
 }
 
 const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
@@ -24,7 +27,8 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
         <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
         </svg>
-      )
+      ),
+      label: "Dashboard"
     },
     {
       href: "/my-courses",
@@ -32,7 +36,8 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
         <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
         </svg>
-      )
+      ),
+      label: "My Courses"
     },
     {
       href: "/assignments",
@@ -40,7 +45,8 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
         <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
         </svg>
-      )
+      ),
+      label: "Assignments"
     },
     {
       href: "/quiz",
@@ -48,7 +54,8 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
         <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
-      )
+      ),
+      label: "Quizzes"
     },
     {
       href: "/materials",
@@ -56,7 +63,8 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
         <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
         </svg>
-      )
+      ),
+      label: "Course Materials"
     }
   ];
 
@@ -69,7 +77,8 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
           <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
           </svg>
-        )
+        ),
+        label: "Weekly Timetable"
       },
       {
         href: "/admin/users",
@@ -77,7 +86,8 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
           <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
           </svg>
-        )
+        ),
+        label: "Manage Users"
       },
       {
         href: "/admin/room-management",
@@ -85,7 +95,8 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
           <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
           </svg>
-        )
+        ),
+        label: "Room Management"
       },
       {
         href: "/admin/room-control",
@@ -93,7 +104,8 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
           <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
-        )
+        ),
+        label: "Room Controls"
       }
     ];
   }
@@ -107,7 +119,8 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
           <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
           </svg>
-        )
+        ),
+        label: "Grading"
       },
       {
         href: "/students",
@@ -115,7 +128,8 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
           <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
           </svg>
-        )
+        ),
+        label: "Students"
       }
     ];
   }
@@ -129,7 +143,8 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
           <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path>
           </svg>
-        )
+        ),
+        label: "Grades"
       },
       {
         href: "/calendar",
@@ -137,7 +152,8 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
           <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
           </svg>
-        )
+        ),
+        label: "Calendar"
       }
     ];
   }
@@ -148,78 +164,322 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
 export default function Sidebar({ isOpen = true, role = 'admin', userInfo }: SidebarProps) {
   const { darkMode } = useTheme();
   const menuItems = getMenuItems(role);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
+  const [closingSubmenu, setClosingSubmenu] = useState<string | null>(null);
+  const [animatingOut, setAnimatingOut] = useState(false);
+  const helpRef = useRef<HTMLDivElement | null>(null);
+  const settingsRef = useRef<HTMLDivElement | null>(null);
+  const [helpHeight, setHelpHeight] = useState(0);
+  const [settingsHeight, setSettingsHeight] = useState(0);
+
+  const [storedUser, setStoredUser] = useState<null | {
+    _id?: string;
+    username?: string;
+    fullname?: string;
+    email?: string;
+    role?: string;
+    avatar?: string;
+  }>(null);
+
+  useEffect(() => {
+    if (animatingOut) {
+      const timer = setTimeout(() => {
+        setAnimatingOut(false);
+        setClosingSubmenu(null);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [animatingOut]);
+
+  useEffect(() => {
+    const updateHeights = () => {
+      if (helpRef.current) setHelpHeight(helpRef.current.scrollHeight);
+      if (settingsRef.current) setSettingsHeight(settingsRef.current.scrollHeight);
+    };
+    updateHeights();
+    window.addEventListener('resize', updateHeights);
+    return () => window.removeEventListener('resize', updateHeights);
+  }, [isExpanded, openSubmenu]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('lms:user');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setStoredUser(parsed);
+      }
+    } catch { }
+  }, []);
+
+  const handleMouseEnter = () => {
+    setIsExpanded(true);
+  };
+
+  const handleMouseLeave = () => {
+    //close submenu after mouse leave
+    if (openSubmenu !== null) {
+      setAnimatingOut(true);
+      setClosingSubmenu(openSubmenu);
+      setOpenSubmenu(null);
+    }
+    setIsExpanded(false);
+  };
+
+  const toggleSubmenu = (menuName: string) => {
+    if (openSubmenu === menuName) {
+      setAnimatingOut(true);
+      setClosingSubmenu(openSubmenu);
+      setOpenSubmenu(null);
+    } else {
+      setOpenSubmenu(menuName);
+      setAnimatingOut(false);
+    }
+  };
 
   if (!isOpen) return null;
 
   const defaultUserInfo = {
     name: role,
     email: `${role}@fpt.edu.vn`,
-    avatar: "https://media.tenor.com/AN83u7YyqwUAAAAM/maxwell-the-cat.gif"
+    avatar: "https://admin.toandz.id.vn/placeholder/img/14.jpg"
   };
 
-  const user = userInfo || defaultUserInfo;
+  const user = userInfo || {
+    name: storedUser?.fullname || storedUser?.username || defaultUserInfo.name,
+    email: storedUser?.email || defaultUserInfo.email,
+    avatar: storedUser?.avatar || defaultUserInfo.avatar,
+  };
   const roleColors = {
     admin: 'rgba(168, 85, 247, 0.7)',
     teacher: 'rgba(59, 130, 246, 0.7)',
     student: 'rgba(34, 197, 94, 0.7)'
   };
+  const effectiveRole = (storedUser?.role as 'admin' | 'teacher' | 'student') || role;
 
   return (
     <div className="hidden sm:block">
-      <div 
-        className="fixed left-4 top-1/2 -translate-y-1/2 z-[9002] flex flex-col rounded-xl shadow-xl transition-all duration-300 overflow-hidden sm:flex w-14"
+      {/* Hover sensor to expand when cursor reaches screen's left edge */}
+      <div
+        className="fixed left-0 top-0 h-screen w-4 z-[9001]"
+        onMouseEnter={handleMouseEnter}
+        aria-hidden
+      />
+      <div
+        className={`fixed left-4 top-1/2 -translate-y-1/2 z-[9002] flex flex-col rounded-xl shadow-xl transition-all duration-300 overflow-hidden sm:flex ${isExpanded ? 'w-64' : 'w-14'}`}
         style={{
           backgroundColor: darkMode ? 'rgba(31, 41, 55, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-          backdropFilter: 'blur(5px)'
+          backdropFilter: 'blur(5px)',
+          transitionProperty: 'width, background-color, backdrop-filter'
         }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
-        <div className="flex-1 overflow-y-auto py-4 px-1.5 w-14 transition-all duration-300 hide-scrollbar">
+        <div className={`flex-1 overflow-y-auto py-4 px-1.5 ${isExpanded ? 'w-64' : 'w-14'} transition-all duration-300 hide-scrollbar`}>
           <style>
             {`.hide-scrollbar::-webkit-scrollbar {
               display: none;
             }`}
           </style>
-          <div className="flex flex-col items-center p-2 mb-4 border-b border-gray-200/50 transition-opacity duration-300 opacity-0 h-0 overflow-hidden m-0 p-0">
-            <div className="relative mb-2">
-              <img 
-                className="h-16 w-16 rounded-full object-cover" 
-                src={user.avatar} 
-                alt="Profile"
-              />
-              <div 
-                className="absolute right-0 top-4/5 transform translate-x-1/2 -translate-y-1/2 px-2 py-0 text-xs font-semibold rounded-md backdrop-blur-sm"
-                style={{
-                  backgroundColor: roleColors[role],
-                  backdropFilter: 'blur(16px)'
-                }}
-              >
-                {role}
+          {/* Profile info - visible when expanded */}
+          {isExpanded && (
+            <div className="border-b border-gray-200/50">
+              <div className="flex items-center p-3 gap-3">
+                {/* Avatar */}
+                <div className="relative">
+                  <img
+                    className="h-16 w-16 rounded-xl object-cover"
+                    src={user.avatar}
+                    alt="Profile"
+                  />
+                </div>
+
+                {/* Thông tin */}
+                <div className="flex flex-col justify-center overflow-hidden">
+                  <h2
+                    className="text-sm font-semibold truncate max-w-[140px]"
+                    style={{ color: darkMode ? '#ffffff' : '#1f2937' }}
+                  >
+                    {user.name}
+                  </h2>
+                  <p
+                    className="text-xs truncate max-w-[140px]"
+                    style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                  >
+                    {user.email}
+                  </p>
+
+                  <div
+                    className="mt-1 w-fit px-2 py-0.5 text-xs font-semibold rounded-md backdrop-blur-sm"
+                    style={{
+                      backgroundColor: roleColors[effectiveRole],
+                      backdropFilter: 'blur(16px)',
+                      color: '#fff'
+                    }}
+                  >
+                    {storedUser?.role || role}
+                  </div>
+                </div>
               </div>
             </div>
-            <h2 className="text-sm font-semibold truncate max-w-full" style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>{user.name}</h2>
-            <p className="text-xs truncate max-w-full" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>{user.email}</p>
-          </div>
+          )}
+
           <nav className="space-y-2">
             {menuItems.map((item, index) => {
-              const isActive = item.href === `/${role}-dashboard`;
               return (
-                <a 
+                <Link
                   key={index}
-                  className="flex items-center px-3 py-2 text-sm rounded-md w-full"
+                  className="flex items-center px-3 py-2 text-sm rounded-md w-full hover:bg-gray-600/20"
                   style={{
-                    backgroundColor: isActive ? (darkMode ? 'rgba(99, 102, 241, 0.3)' : 'rgba(99, 102, 241, 0.3)') : 'transparent',
-                    color: isActive ? (darkMode ? '#a5b4fc' : '#4338ca') : (darkMode ? '#9ca3af' : '#374151')
+                    color: darkMode ? '#9ca3af' : '#374151'
                   }}
-                  href={item.href}
+                  to={item.href}
                 >
                   <div style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
                     {item.icon}
                   </div>
-                </a>
+                  {isExpanded && (
+                    <span className="ml-2 whitespace-nowrap">{item.label}</span>
+                  )}
+                </Link>
               );
             })}
+
+            {/* Help submenu */}
+            <div className="relative">
+              <button
+                onClick={() => toggleSubmenu('help')}
+                className="flex items-center w-full px-3 py-2 text-sm rounded-md hover:bg-gray-600/20 justify-between"
+                style={{ color: darkMode ? '#9ca3af' : '#374151' }}
+              >
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  {isExpanded && (
+                    <span className="ml-2 whitespace-nowrap">Help</span>
+                  )}
+                </div>
+                {isExpanded && (
+                  <svg className={`ml-auto h-4 w-4 transition-transform ${openSubmenu === 'help' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                )}
+              </button>
+              {isExpanded && (
+                <div
+                  ref={helpRef}
+                  className="pl-7 mt-1 space-y-1 overflow-hidden"
+                  style={{
+                    maxHeight: (openSubmenu === 'help' || (closingSubmenu === 'help' && animatingOut)) ? helpHeight : 0,
+                    transition: 'max-height 300ms ease'
+                  }}
+                >
+                  <Link to="/help/faq" className="flex items-center w-full px-3 py-2 text-sm hover:bg-gray-100/20 rounded-md" style={{ color: darkMode ? '#9ca3af' : '#374151' }}>
+                    <svg className="w-4 h-4 mr-2 min-w-[1rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="whitespace-nowrap">FAQ/Usage</span>
+                  </Link>
+                  <Link to="/help/feedback" className="flex items-center w-full px-3 py-2 text-sm hover:bg-gray-100/20 rounded-md" style={{ color: darkMode ? '#9ca3af' : '#374151' }}>
+                    <svg className="w-4 h-4 mr-2 min-w-[1rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                    </svg>
+                    <span className="whitespace-nowrap">Feedback</span>
+                  </Link>
+                  <Link to="/help/about" className="flex items-center w-full px-3 py-2 text-sm hover:bg-gray-100/20 rounded-md" style={{ color: darkMode ? '#9ca3af' : '#374151' }}>
+                    <svg className="w-4 h-4 mr-2 min-w-[1rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="whitespace-nowrap">About Us</span>
+                  </Link>
+                </div>
+              )}
+            </div>
+
+            {/* Settings submenu */}
+            <div className="relative">
+              <button
+                onClick={() => toggleSubmenu('settings')}
+                className="flex items-center w-full px-3 py-2 text-sm rounded-md hover:bg-gray-600/20 justify-between"
+                style={{ color: darkMode ? '#9ca3af' : '#374151' }}
+              >
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  {isExpanded && (
+                    <span className="ml-2 whitespace-nowrap">Settings</span>
+                  )}
+                </div>
+                {isExpanded && (
+                  <svg className={`ml-auto h-4 w-4 transition-transform ${openSubmenu === 'settings' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                )}
+              </button>
+              {isExpanded && (
+                <div
+                  ref={settingsRef}
+                  className="pl-7 mt-1 space-y-1 overflow-hidden"
+                  style={{
+                    maxHeight: (openSubmenu === 'settings' || (closingSubmenu === 'settings' && animatingOut)) ? settingsHeight : 0,
+                    transition: 'max-height 300ms ease'
+                  }}
+                >
+                  <Link to="/profile" className="flex items-center w-full px-3 py-2 text-sm hover:bg-gray-100/20 rounded-md" style={{ color: darkMode ? '#9ca3af' : '#374151' }}>
+                    <svg className="w-4 h-4 mr-2 min-w-[1rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <span className="whitespace-nowrap">Profile</span>
+                  </Link>
+                  <Link to="/account" className="flex items-center w-full px-3 py-2 text-sm hover:bg-gray-100/20 rounded-md" style={{ color: darkMode ? '#9ca3af' : '#374151' }}>
+                    <svg className="w-4 h-4 mr-2 min-w-[1rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span className="whitespace-nowrap">Account</span>
+                  </Link>
+                  <Link to="/theme" className="flex items-center w-full px-3 py-2 text-sm hover:bg-gray-100/20 rounded-md" style={{ color: darkMode ? '#9ca3af' : '#374151' }}>
+                    <svg className="w-4 h-4 mr-2 min-w-[1rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                    </svg>
+                    <span className="whitespace-nowrap">App Theme</span>
+                  </Link>
+                </div>
+              )}
+            </div>
           </nav>
         </div>
+        {/* Logout button - visible when expanded */}
+        {isExpanded && (
+          <div className="p-3 border-t border-gray-200/50">
+            <button
+              onClick={async () => {
+                try {
+                  await authService.logout();
+                } catch { }
+                window.location.href = '/login';
+              }}
+              className="flex items-center w-full mt-5 px-3 py-2 text-sm text-red-600 hover:bg-red-50/70 rounded-md"
+            >
+              <svg
+                className="w-5 h-5 text-red-500 min-w-[1.25rem]"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
+              <span className="ml-2 whitespace-nowrap">Logout</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
