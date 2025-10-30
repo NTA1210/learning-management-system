@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { ISubmission } from "../types";
+import { SubmissionStatus } from "@/types/submission.type";
 
 const SubmissionSchema = new mongoose.Schema<ISubmission>(
   {
@@ -15,8 +16,19 @@ const SubmissionSchema = new mongoose.Schema<ISubmission>(
       required: true,
       index: true,
     },
-    fileUrl: { type: String },
-    fileName: { type: String },
+    originalName: { type: String, required: true },
+    key: { type: String, required: true },
+    mimeType: { type: String },
+    size: {
+      type: Number,
+      default: 0,
+      validate: {
+        validator: function (v) {
+          return v <= 20 * 1024 * 1024;
+        },
+        message: "File size must be <= 20MB",
+      },
+    },
     submittedAt: { type: Date, default: Date.now },
     grade: { type: Number },
     feedback: { type: String },
@@ -27,8 +39,14 @@ const SubmissionSchema = new mongoose.Schema<ISubmission>(
     //status
     status: {
       type: String,
-      enum: ["not_submitted", "submitted", "graded", "overdue"],
-      default: "submitted",
+      enum: [
+        SubmissionStatus.NOT_SUBMITTED,
+        SubmissionStatus.SUBMITTED,
+        SubmissionStatus.RESUBMITTED,
+        SubmissionStatus.GRADED,
+        SubmissionStatus.OVERDUE,
+      ],
+      default: SubmissionStatus.NOT_SUBMITTED,
     },
   },
   { timestamps: true } //auto thêm createdAt, updatedAt
@@ -36,20 +54,40 @@ const SubmissionSchema = new mongoose.Schema<ISubmission>(
 
 //một sv chỉ có 1 submission / assignment
 SubmissionSchema.index({ assignmentId: 1, studentId: 1 }, { unique: true });
+SubmissionSchema.index({ assignmentId: 1, status: 1 });
+SubmissionSchema.index({ studentId: 1, status: 1 });
+SubmissionSchema.index({ gradedBy: 1, gradedAt: -1 });
+SubmissionSchema.index({ assignmentId: 1, submittedAt: -1 });
 
-//middleware ktra nộp trễ
+//middleware ktra nộp trễ - (xem lại để có thể tinh chỉnh lại nếu như resubmit)
 SubmissionSchema.pre("save", async function (next) {
   const Assignment = mongoose.model("Assignment");
   const assignment = await Assignment.findById(this.assignmentId);
 
   if (assignment?.dueDate && this.submittedAt > assignment.dueDate) {
     this.isLate = true;
-    this.status = "overdue";
+    this.status = SubmissionStatus.OVERDUE;
   } else {
     this.isLate = false;
   }
 
   next();
 });
+//
+SubmissionSchema.pre("save", function (next) {
+  if (
+    (this.isModified("grade") || this.isModified("feedback")) &&
+    this.grade !== undefined
+  ) {
+    this.gradedAt = new Date();
+    this.status = SubmissionStatus.GRADED;
+  }
+  next();
+});
 
-export default mongoose.model<ISubmission>("Submission", SubmissionSchema);
+const SubmissionModel = mongoose.model<ISubmission>(
+  "Submission",
+  SubmissionSchema
+);
+
+export default SubmissionModel;

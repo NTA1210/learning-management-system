@@ -17,8 +17,19 @@ const ForumPostSchema = new mongoose.Schema<IForumPost>(
     title: { type: String },
     content: { type: String, required: true },
     pinned: { type: Boolean, default: false },
+    replyCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
 
-export default mongoose.model<IForumPost>("ForumPost", ForumPostSchema);
+//Indexes
+ForumPostSchema.index({ forumId: 1, pinned: -1, createdAt: -1 });
+ForumPostSchema.index({ authorId: 1, createdAt: -1 });
+
+const ForumPostModel = mongoose.model<IForumPost>(
+  "ForumPost",
+  ForumPostSchema,
+  "forumPosts"
+);
+
+export default ForumPostModel;

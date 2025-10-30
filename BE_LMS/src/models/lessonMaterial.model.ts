@@ -10,21 +10,34 @@ const LessonMaterialSchema = new mongoose.Schema<ILessonMaterial>(
       index: true,
     },
     title: { type: String },
-    type: {
-      type: String,
-      enum: ["pdf", "video", "ppt", "link", "other"],
-      default: "other",
+    note: { type: String },
+    originalName: { type: String },
+    mimeType: { type: String },
+    key: { type: String }, // courses/courseId/lessonId/fileName
+    size: {
+      type: Number,
+      default: 0,
+      validate: {
+        validator: function (v) {
+          return v <= 20 * 1024 * 1024;
+        },
+        message: "File size must be <= 20MB",
+      },
     },
-    fileUrl: { type: String },
-    fileName: { type: String },
-    sizeBytes: { type: Number },
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
-  { timestamps: { createdAt: "uploadedAt", updatedAt: false } }
+  { timestamps: true }
 );
 
+//Indexes
+LessonMaterialSchema.index({ lessonId: 1, type: 1 });
+LessonMaterialSchema.index({ uploadedBy: 1, uploadedAt: -1 });
+LessonMaterialSchema.index({ key: 1 }, { unique: true });
 
-export default mongoose.model<ILessonMaterial>(
+const LessonMaterialModel = mongoose.model<ILessonMaterial>(
   "LessonMaterial",
-  LessonMaterialSchema
+  LessonMaterialSchema,
+  "lessonMaterials"
 );
+
+export default LessonMaterialModel;

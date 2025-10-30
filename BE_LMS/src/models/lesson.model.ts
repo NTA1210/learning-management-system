@@ -9,25 +9,34 @@ const LessonSchema = new mongoose.Schema<ILesson>(
       ref: "Course",
       required: true,
     },
-    content: { type: String },
+    content: { type: String, maxLength: 100000 },
     order: { type: Number, default: 0 },
-    durationMinutes: { type: Number },
-    publishedAt: { type: Date },
+    durationSeconds: { type: Number },
+    isPublished: { type: Boolean, default: false },
+    publishedAt: { type: Date, default: null },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }
 );
 
 // Indexes for better performance
-LessonSchema.index({ courseId: 1, order: 1 });
-LessonSchema.index({ title: 1 });
+LessonSchema.index({ courseId: 1, order: 1 }, { unique: true });
+LessonSchema.index({ title: "text", content: "text" });
+LessonSchema.index({ courseId: 1, title: 1 });
+LessonSchema.index({ courseId: 1, isPublished: 1, createdAt: -1 });
 LessonSchema.index({ publishedAt: 1 });
 
-// Text search index for better search performance
-LessonSchema.index({ 
-  title: "text", 
-  content: "text" 
+// Hooks
+LessonSchema.pre("save", async function (next) {
+  if (!this.order) {
+    const count = await mongoose
+      .model("Lesson")
+      .countDocuments({ courseId: this.courseId });
+    this.order = count + 1;
+  }
+  next();
 });
 
-const LessonModel = mongoose.model<ILesson>("Lesson", LessonSchema);
+const LessonModel = mongoose.model<ILesson>("Lesson", LessonSchema, "lessons");
 
 export default LessonModel;
