@@ -11,9 +11,17 @@ const ForumSchema = new mongoose.Schema<IForum>(
     },
     title: { type: String, required: true },
     description: { type: String },
+    isActive: { type: Boolean, default: true },
+    isArchived: { type: Boolean, default: false },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }
 );
 
-export default mongoose.model<IForum>("Forum", ForumSchema);
+//Indexes
+ForumSchema.index({ courseId: 1, createdAt: -1 });
+ForumSchema.index({ title: "text", description: "text" });
+
+const ForumModel = mongoose.model<IForum>("Forum", ForumSchema, "forums");
+
+export default ForumModel;

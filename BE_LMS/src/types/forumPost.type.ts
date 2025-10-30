@@ -5,7 +5,8 @@ export default interface IForumPost extends mongoose.Document {
   authorId: mongoose.Types.ObjectId;
   title?: string;
   content: string;
+  pinned?: boolean;
+  replyCount?: number;
   createdAt?: Date;
   updatedAt?: Date;
-  pinned?: boolean;
 }

@@ -1,21 +1,6 @@
 import mongoose from "mongoose";
-import { IQuizQuestion, IQuiz } from "../types";
-
-const QuizQuestionSchema = new mongoose.Schema<IQuizQuestion>(
-  {
-    text: { type: String, required: true },
-    type: {
-      type: String,
-      enum: ["mcq", "multi", "truefalse", "essay", "fillblank"],
-      default: "mcq",
-    },
-    options: [String],
-    correct: { type: mongoose.Schema.Types.Mixed },
-    points: { type: Number, default: 1 },
-    explanation: { type: String },
-  },
-  { _id: true }
-);
+import { IQuiz } from "../types";
+import QuizQuestionModel from "./quizQuestion.model";
 
 const QuizSchema = new mongoose.Schema<IQuiz>(
   {
@@ -29,11 +14,41 @@ const QuizSchema = new mongoose.Schema<IQuiz>(
     description: { type: String },
     timeLimitMinutes: { type: Number },
     shuffleQuestions: { type: Boolean, default: false },
-    questions: [QuizQuestionSchema],
+    questionIds: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "QuizQuestion" },
+    ],
+    snapshotQuestions: {
+      type: [mongoose.Schema.Types.Mixed],
+      default: [],
+    },
     isPublished: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
+//Indexes
+QuizSchema.index({ courseId: 1, isPublished: 1, createdAt: -1 });
+
+//methods create snapshot questions
+QuizSchema.methods.createSnapshot = async function () {
+  const questions = await QuizQuestionModel.find({
+    _id: { $in: this.questionIds },
+  });
+
+  this.snapshotQuestions = questions.map((q) => ({
+    id: q._id,
+    text: q.text,
+    type: q.type,
+    options: q.options,
+    correctOptions: q.correctOptions,
+    points: q.points,
+    explanation: q.explanation,
+  }));
+
+  await this.save();
+};
+
 QuizSchema.index({ courseId: 1, title: 1 });
-export default mongoose.model<IQuiz>("Quiz", QuizSchema);
+const QuizModel = mongoose.model<IQuiz>("Quiz", QuizSchema, "quizzes");
+
+export default QuizModel;

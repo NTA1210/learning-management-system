@@ -1,9 +1,14 @@
 import mongoose from "mongoose";
 import { IEnrollment } from "../types";
+import {
+  EnrollmentMethod,
+  EnrollmentRole,
+  EnrollmentStatus,
+} from "@/types/enrollment.type";
 
 const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
   {
-    userId: {
+    studentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
@@ -15,24 +20,59 @@ const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
       required: true,
       index: true,
     },
-    enrolledAt: { type: Date, default: Date.now },
     status: {
       type: String,
-      enum: ["active", "completed", "dropped"],
-      default: "active",
+      enum: [
+        EnrollmentStatus.PENDING,
+        EnrollmentStatus.APPROVED,
+        EnrollmentStatus.REJECTED,
+        EnrollmentStatus.CANCELLED,
+        EnrollmentStatus.DROPPED,
+        EnrollmentStatus.COMPLETED,
+      ],
+      default: EnrollmentStatus.PENDING,
     },
-    role: { type: String, enum: ["student", "auditor"], default: "student" },
+    method: {
+      type: String,
+      enum: [
+        EnrollmentMethod.SELF,
+        EnrollmentMethod.INVITED,
+        EnrollmentMethod.PASSWORD,
+        EnrollmentMethod.OTHER,
+      ],
+      default: EnrollmentMethod.SELF,
+    },
+    role: {
+      type: String,
+      enum: [EnrollmentRole.STUDENT, EnrollmentRole.AUDITOR],
+      default: EnrollmentRole.STUDENT,
+    },
+    respondedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    respondedAt: { type: Date },
+    note: { type: String },
+    progress: {
+      totalLessons: { type: Number, default: 0 },
+      completedLessons: { type: Number, default: 0 },
+    },
     finalGrade: { type: Number },
-    grades: [
-      {
-        assignmentId: { type: mongoose.Schema.Types.ObjectId },
-        grade: { type: Number },
-        note: { type: String },
-      },
-    ],
+    completedAt: { type: Date },
+    droppedAt: { type: Date },
   },
-  { timestamps: false }
+  { timestamps: true }
 );
 
+//indexes
 EnrollmentSchema.index({ userId: 1, courseId: 1 }, { unique: true });
-export default mongoose.model<IEnrollment>("Enrollment", EnrollmentSchema);
+EnrollmentSchema.index({ userId: 1, courseId: 1, status: 1 });
+EnrollmentSchema.index({ userId: 1, status: 1 });
+
+const EnrollmentModel = mongoose.model<IEnrollment>(
+  "Enrollment",
+  EnrollmentSchema,
+  "enrollments"
+);
+
+export default EnrollmentModel;

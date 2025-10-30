@@ -11,12 +11,21 @@ const AssignmentSchema = new mongoose.Schema<IAssignment>(
     title: { type: String, required: true },
     description: { type: String },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    maxScore: { type: Number, default: 100 },
+    maxScore: { type: Number, default: 10 },
     dueDate: { type: Date },
     allowLate: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
-AssignmentSchema.index({ courseId: 1 });
-export default mongoose.model<IAssignment>("Assignment", AssignmentSchema);
+//Indexes
+AssignmentSchema.index({ courseId: 1, dueDate: 1 });
+AssignmentSchema.index({ courseId: 1, createdAt: -1 });
+
+const AssignmentModel = mongoose.model<IAssignment>(
+  "Assignment",
+  AssignmentSchema,
+  "assignments"
+);
+
+export default AssignmentModel;

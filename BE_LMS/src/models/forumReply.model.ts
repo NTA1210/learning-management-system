@@ -15,9 +15,20 @@ const ForumReplySchema = new mongoose.Schema<IForumReply>(
       required: true,
     },
     content: { type: String, required: true },
-    parentReply: { type: mongoose.Schema.Types.ObjectId, ref: "ForumReply" },
+    parentReplyId: { type: mongoose.Schema.Types.ObjectId, ref: "ForumReply" },
   },
-  { timestamps: { createdAt: true, updatedAt: false } }
+  { timestamps: true }
 );
 
-export default mongoose.model<IForumReply>("ForumReply", ForumReplySchema);
+//Indexes
+ForumReplySchema.index({ postId: 1, createdAt: 1 });
+ForumReplySchema.index({ parentReplyId: 1, createdAt: 1 });
+ForumReplySchema.index({ authorId: 1, createdAt: -1 });
+
+const ForumReplyModel = mongoose.model<IForumReply>(
+  "ForumReply",
+  ForumReplySchema,
+  "forumReplies"
+);
+
+export default ForumReplyModel;

@@ -12,7 +12,15 @@ const AnnouncementSchema = new mongoose.Schema<IAnnouncement>(
   { timestamps: true }
 );
 
-export default mongoose.model<IAnnouncement>(
+//Indexes
+AnnouncementSchema.index({ courseId: 1, publishedAt: -1 });
+AnnouncementSchema.index({ publishedAt: -1 });
+AnnouncementSchema.index({ title: "text", content: "text" });
+
+const AnnouncementModel = mongoose.model<IAnnouncement>(
   "Announcement",
-  AnnouncementSchema
+  AnnouncementSchema,
+  "announcements"
 );
+
+export default AnnouncementModel;

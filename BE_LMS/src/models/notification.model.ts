@@ -26,7 +26,9 @@ NotificationSchema.methods.markRead = function () {
 };
 
 NotificationSchema.index({ recipientUser: 1, createdAt: -1 });
-export default mongoose.model<INotification>(
+const NotificationModel = mongoose.model<INotification>(
   "Notification",
   NotificationSchema
 );
+
+export default NotificationModel;

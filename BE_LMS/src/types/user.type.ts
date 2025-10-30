@@ -21,8 +21,9 @@ export default interface IUser
   phone_number?: string;
   avatar_url?: string;
   bio?: string;
-  verified: boolean;
+  isVerified: boolean;
   status?: UserStatus;
+  specialistIds: mongoose.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
   comparePassword(val: string): Promise<boolean>;
