@@ -14,6 +14,9 @@ import {
   deleteCourse,
 } from "../services/course.service";
 
+/**
+ * GET /courses - List all courses with filters
+ */
 export const listCoursesHandler = catchErrors(async (req, res) => {
   // Validate query parameters
   const query = listCoursesSchema.parse(req.query);
@@ -23,10 +26,11 @@ export const listCoursesHandler = catchErrors(async (req, res) => {
     page: query.page,
     limit: query.limit,
     search: query.search,
-    category: query.category,
+    specialistId: query.specialistId,
     teacherId: query.teacherId,
     code: query.code,
     isPublished: query.isPublished,
+    status: query.status,
     sortBy: query.sortBy,
     sortOrder: query.sortOrder,
   });
@@ -36,6 +40,9 @@ export const listCoursesHandler = catchErrors(async (req, res) => {
   });
 });
 
+/**
+ * GET /courses/:id - Get course by ID
+ */
 export const getCourseByIdHandler = catchErrors(async (req, res) => {
   // Validate course ID
   const courseId = courseIdSchema.parse(req.params.id);
@@ -46,16 +53,25 @@ export const getCourseByIdHandler = catchErrors(async (req, res) => {
   return res.success(OK, course, "Course retrieved successfully");
 });
 
+/**
+ * POST /courses - Create new course
+ */
 export const createCourseHandler = catchErrors(async (req, res) => {
   // Validate request body
   const data = createCourseSchema.parse(req.body);
 
+  // Get userId from request (set by authenticate middleware)
+  const userId = (req as any).userId;
+
   // Call service
-  const course = await createCourse(data);
+  const course = await createCourse(data, userId);
 
   return res.success(CREATED, course, "Course created successfully");
 });
 
+/**
+ * PUT /courses/:id - Update course
+ */
 export const updateCourseHandler = catchErrors(async (req, res) => {
   // Validate course ID
   const courseId = courseIdSchema.parse(req.params.id);
@@ -72,13 +88,18 @@ export const updateCourseHandler = catchErrors(async (req, res) => {
   return res.success(OK, course, "Course updated successfully");
 });
 
-// DELETE /courses/:id - Delete course
+/**
+ * DELETE /courses/:id - Delete course
+ */
 export const deleteCourseHandler = catchErrors(async (req, res) => {
+  // Validate course ID
   const courseId = courseIdSchema.parse(req.params.id);
-  const userId = (req as any).userId; // Extract userId from authenticate middleware
 
+  // Get userId from request (set by authenticate middleware)
+  const userId = (req as any).userId;
+
+  // Call service
   const result = await deleteCourse(courseId, userId);
 
   return res.success(OK, null, result.message);
 });
-
