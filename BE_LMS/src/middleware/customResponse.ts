@@ -5,18 +5,24 @@ import { nowLocal, nowTZone } from "../utils/time";
 const customResponse = (req: Request, res: Response, next: NextFunction) => {
   res.success = function <T>(
     status: number,
-    data?: T,
-    message?: string,
-    args?: object
+    {
+      data,
+      message,
+      ...args
+    }: {
+      data?: T;
+      message?: string;
+      [key: string]: any;
+    }
   ) {
     const response: IApiResponse<T> = {
       success: true,
       message: message || "Success",
       data: data ?? null,
+      ...args,
       meta: {
         timestamp: nowLocal(),
         timezone: nowTZone(),
-        ...args,
       },
     };
 
@@ -25,10 +31,17 @@ const customResponse = (req: Request, res: Response, next: NextFunction) => {
 
   res.error = function (
     status: number,
-    message?: string,
-    code?: string,
-    details?: any,
-    args?: object
+    {
+      message,
+      code,
+      details,
+      ...args
+    }: {
+      message?: string;
+      code?: string;
+      details?: any;
+      [key: string]: any;
+    }
   ) {
     const response: IApiResponse<null> = {
       success: false,
@@ -38,10 +51,10 @@ const customResponse = (req: Request, res: Response, next: NextFunction) => {
         code,
         details,
       },
+      ...args,
       meta: {
         timestamp: nowLocal(),
         timezone: nowTZone(),
-        ...args,
       },
     };
 
