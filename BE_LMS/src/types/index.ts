@@ -2,7 +2,6 @@ export * from "./apiResponse.type";
 export { default as IAnnouncement } from "./announcement.type";
 export { default as IAssignment } from "./assignment.type";
 export { default as IAttendance } from "./attendance.type";
-export { default as ICategory } from "./category.type";
 export { default as ICourse } from "./course.type";
 export { default as IEnrollment } from "./enrollment.type";
 export { default as IForum } from "./forum.type";
