@@ -11,6 +11,7 @@ export default interface IQuizQuestion extends mongoose.Document {
   courseId: mongoose.Types.ObjectId;
   specialistId: mongoose.Types.ObjectId;
   text: string;
+  image?: string;
   type: QuizQuestionType;
   options?: string[]; // for MCQ
   correctOptions?: any; // for auto-graded (index or array)
