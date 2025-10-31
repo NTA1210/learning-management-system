@@ -1,4 +1,6 @@
 import { useTheme } from "../hooks/useTheme";
+import { useAuth } from "../hooks/useAuth";
+import { Link } from "react-router-dom";
 
 interface NavbarProps {
   onToggleSidebar?: () => void;
@@ -6,6 +8,7 @@ interface NavbarProps {
 
 export default function Navbar({ onToggleSidebar }: NavbarProps) {
   const { darkMode } = useTheme();
+  const { user } = useAuth();
 
   return (
     <nav 
@@ -85,13 +88,15 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
               </span>
             </div>
           </div>
-          <a className="flex items-center space-x-2" href="/profile">
-            <img 
-              src="https://media.tenor.com/AN83u7YyqwUAAAAM/maxwell-the-cat.gif" 
-              alt="admin" 
-              className="h-8 w-8 rounded-full object-cover border-2 border-white"
-            />
-          </a>
+          {user && (
+            <Link to="/profile" className="flex items-center space-x-2">
+              <img 
+                src={(user as { profileImageUrl?: string; avatar_url?: string }).profileImageUrl || (user as { profileImageUrl?: string; avatar_url?: string }).avatar_url || "https://media.tenor.com/AN83u7YyqwUAAAAM/maxwell-the-cat.gif"}
+                alt={(user as { fullName?: string; fullname?: string }).fullName || (user as { fullName?: string; fullname?: string }).fullname || "profile"}
+                className="h-8 w-8 rounded-full object-cover border-2 border-white"
+              />
+            </Link>
+          )}
         </div>
       </div>
     </nav>

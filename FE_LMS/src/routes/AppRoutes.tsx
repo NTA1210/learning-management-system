@@ -13,6 +13,7 @@ import {DashboardPage ,
 } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import ProtectedRoute from "../components/ProtectedRoute";
+import Profile from "../pages/profile";
 
 function AppRoutes() {
   return (
@@ -55,6 +56,13 @@ function AppRoutes() {
         <Route path="/teacher-dashboard" element={
           <ProtectedRoute requiredRole="teacher">
             <TeacherDashboardPage />
+          </ProtectedRoute>
+        } />
+
+        {/* Profile */}
+        <Route path="/profile" element={
+          <ProtectedRoute>
+            <Profile />
           </ProtectedRoute>
         } />
 

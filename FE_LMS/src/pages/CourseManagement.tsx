@@ -33,6 +33,31 @@ const CourseManagement: React.FC = () => {
     isPublished: false,
     capacity: 0,
   });
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [detailCourse, setDetailCourse] = useState<Course | null>(null);
+  // Animation state for modal
+  const [modalAnim, setModalAnim] = useState<'enter'|'leave'|'none'>('none');
+  const [contentPaddingLeft, setContentPaddingLeft] = useState(window.innerWidth >= 640 ? 93 : 0);
+
+  function openDetail(course: Course) {
+    setDetailCourse(course);
+    setShowDetailModal(true);
+    setModalAnim('enter');
+  }
+  function closeModal() {
+    setModalAnim('leave');
+  }
+
+  useEffect(() => {
+    if (modalAnim === 'leave') {
+      const timeout = setTimeout(() => {
+        setShowDetailModal(false);
+        setDetailCourse(null);
+        setModalAnim('none');
+      }, 350); // match CSS duration
+      return () => clearTimeout(timeout);
+    }
+  }, [modalAnim]);
 
   // Role-based permissions
   const isAdmin = user?.role === 'admin';
@@ -259,6 +284,14 @@ const CourseManagement: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    function handleResize() {
+      setContentPaddingLeft(window.innerWidth >= 640 ? 93 : 0);
+    }
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   return (
     <>
       <style>
@@ -313,6 +346,23 @@ const CourseManagement: React.FC = () => {
               opacity: 1;
             }
           }
+
+          @keyframes fadeInUpModal {
+            0% { opacity: 0; transform: translateY(32px) scale(0.96); }
+            80% { opacity: 1; }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+          }
+          @keyframes fadeOutDownModal {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            20% { opacity: 1; }
+            100% { opacity: 0; transform: translateY(32px) scale(0.96); }
+          }
+          .modal-fade-enter {
+            animation: fadeInUpModal 0.39s cubic-bezier(.22,1,.36,1.02);
+          }
+          .modal-fade-leave {
+            animation: fadeOutDownModal 0.33s cubic-bezier(.36,1,.22,1.02);
+          }
         `}
       </style>
       <div
@@ -329,7 +379,7 @@ const CourseManagement: React.FC = () => {
       <Sidebar role={(user?.role as 'admin' | 'teacher' | 'student') || 'student'} />
 
       {/* Main Content */}
-      <div className="flex flex-col flex-1 w-0 overflow-hidden">
+      <div className="flex flex-col flex-1 w-0 overflow-hidden" style={{ paddingLeft: contentPaddingLeft }}>
         <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 mt-16">
           <div className="max-w-7xl mx-auto">
             {/* Header */}
@@ -596,6 +646,7 @@ const CourseManagement: React.FC = () => {
                           e.currentTarget.style.backgroundColor = darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff';
                           e.currentTarget.style.transform = 'scale(1)';
                         }}
+                        onClick={() => openDetail(course)}
                       >
                         {isStudent ? 'View Course' : 'View Details'}
                       </button>
@@ -1277,6 +1328,110 @@ const CourseManagement: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* --- Course Detail Modal --- */}
+      {showDetailModal && detailCourse && (
+        <div 
+          className="fixed inset-0 flex items-center justify-center z-[40] p-4 transition-all duration-300"
+          onClick={e => {
+            if (e.target === e.currentTarget) {
+              closeModal();
+            }
+          }}
+          style={{
+            backgroundColor: darkMode ? 'rgba(15,23,42,0.5)' : 'rgba(0,0,0,0.3)',
+            backdropFilter: 'blur(5px)',
+          }}
+        >
+          <div
+            className={`relative w-full max-w-xl rounded-2xl shadow-2xl px-8 py-6 sm:px-10 sm:py-8 border ${modalAnim === 'enter' ? 'modal-fade-enter' : ''} ${modalAnim === 'leave' ? 'modal-fade-leave' : ''}`}
+            onClick={e => e.stopPropagation()}
+            style={{
+              backgroundColor: darkMode ? '#181F2A' : '#fff',
+              color: darkMode ? '#E5E7EB' : '#1e293b',
+              border: darkMode ? '1px solid #272B36' : '1px solid #e5e7eb',
+            }}
+          >
+            <button
+              onClick={closeModal}
+              className="absolute top-4 right-6 text-3xl font-bold focus:outline-none transition-colors"
+              aria-label="Close"
+              title="Close"
+              style={{ zIndex: 41, color: darkMode ? '#a3a3a3' : '#666', background: 'none', border: 'none' }}
+            >
+              ×
+            </button>
+            <div className="mb-2 flex items-center gap-2 flex-wrap">
+              <span className="text-2xl sm:text-3xl font-bold mr-2 flex-shrink-0">{detailCourse.title}</span>
+              <span style={{backgroundColor: darkMode ? '#3730a3':'#eef2ff', color: darkMode ? '#e0e7ff':'#4f46e5', borderRadius: '1rem', fontWeight:'bold', padding:'0.25rem 0.75rem', fontSize: '1rem'}}>{detailCourse.code}</span>
+              {detailCourse.isPublished ? (
+                <span style={{backgroundColor: darkMode ? '#065f46':'#d1fae5', color: darkMode ? '#6ee7b7':'#059669', fontWeight:'bold', borderRadius:'9999px', fontSize:'0.8rem', padding:'0.18rem 0.75rem'}}>Published</span>
+              ) : (
+                <span style={{backgroundColor: darkMode ? '#393a3e':'#e5e7eb', color: darkMode ? '#a3a3a3':'#636363', fontWeight:'bold', borderRadius:'9999px', fontSize:'0.8rem', padding:'0.18rem 0.75rem'}}>Draft</span>
+              )}
+            </div>
+            <hr style={{ borderColor: darkMode ? '#2d3748':'#e5e7eb', margin:'.9rem 0'}}/>
+            <div className="sm:grid sm:grid-cols-2 gap-x-6 gap-y-4 mb-4">
+              <div className="mb-2">
+                <div style={{fontSize:'0.75rem', color: darkMode ? '#a3a3a3':'#94a3b8', marginBottom:'0.2rem'}}>Category</div>
+                <div className="flex items-center gap-2">
+                  <span style={{backgroundColor: darkMode ? '#3730a3':'#dbeafe', color: darkMode ? '#e0e7ff':'#4f46e5', borderRadius: '.6rem', fontSize:'.85rem', fontWeight:'bold', padding:'0.15rem 0.7rem'}}>{detailCourse.category?.name || 'N/A'}</span>
+                </div>
+                {detailCourse.category?.description && (
+                  <div style={{fontSize:'0.75rem', color: darkMode ? '#9ca3af':'#475569', marginTop:'0.3rem', fontStyle:'italic'}}>{detailCourse.category.description}</div>
+                )}
+              </div>
+              <div>
+                <div style={{fontSize:'0.75rem', color: darkMode ? '#a3a3a3':'#94a3b8', marginBottom:'0.2rem'}}>Capacity</div>
+                <div><span style={{fontWeight:'bold'}}>{detailCourse.capacity}</span> student{detailCourse.capacity !== 1 ? 's' : ''}</div>
+              </div>
+              <div>
+                <div style={{fontSize:'0.75rem', color: darkMode ? '#a3a3a3':'#94a3b8', marginBottom:'0.2rem'}}>Created At</div>
+                <div>{detailCourse.createdAt ? new Date(detailCourse.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : ''}</div>
+              </div>
+              <div>
+                <div style={{fontSize:'0.75rem', color: darkMode ? '#a3a3a3':'#94a3b8', marginBottom:'0.2rem'}}>Last Updated</div>
+                <div>{detailCourse.updatedAt ? new Date(detailCourse.updatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : ''}</div>
+              </div>
+            </div>
+            <hr style={{ borderColor: darkMode ? '#2d3748':'#e5e7eb', margin:'0.7rem 0'}}/>
+            <div style={{marginBottom:'1.25rem', marginTop:'1.2rem'}}>
+              <div style={{fontWeight:'bold'}}>Description</div>
+              <div style={{borderRadius:'0.7rem', background:darkMode?'#232946':'#f1f5f9', color:darkMode?'#e5e7eb':'#374151', padding: '0.6rem 1rem', fontSize:'0.96em', minHeight:40}}>{detailCourse.description || <span style={{fontStyle:'italic', color: darkMode?'#71717a':'#64748b'}}>No description.</span>}</div>
+            </div>
+            <div style={{marginBottom:'0.8rem', marginTop:'1.1rem'}}>
+              <div style={{fontWeight:600, marginBottom:'.6rem'}}>Teachers</div>
+              <div style={{display:'flex', flexWrap:'wrap', gap: '1rem'}}>
+                {detailCourse.teachers.length > 0 ? detailCourse.teachers.map(t => (
+                  <div
+                    key={t._id}
+                    style={{
+                      display:'flex', alignItems:'center',
+                      borderRadius: '1.2rem',
+                      backgroundColor: darkMode ? '#5b21b6':'#f3e8ff',
+                      color: darkMode ? '#f3e8ff':'#5b21b6',
+                      border: darkMode ? '1.5px solid #a78bfa':'1.5px solid #c4b5fd',
+                      minWidth: 200, maxWidth:'100%', padding: '0.55rem 1.1rem', boxShadow:darkMode?'0 3px 7px #181F2A':'0 1px 5px #ede9fe', fontSize:'0.93em', gap:12
+                    }}
+                  >
+                    <img
+                      src={"https://admin.toandz.id.vn/placeholder/img/14.jpg"}
+                      alt="avatar"
+                      width={48}
+                      height={48}
+                      style={{ borderRadius: '50%', aspectRatio: '1 / 1', objectFit: 'cover', marginRight: 8, border: darkMode ? '2px solid #a78bfa' : '2px solid #c4b5fd', background: darkMode ? '#232946':'#fff' }}
+                    />
+                    <div style={{display:'flex', flexDirection:'column', minWidth:0}}>
+                      <span style={{fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{t.username}</span>
+                      {t.fullname && <span style={{fontSize:'11px', color:darkMode?'#f3e8ff':'#5b21b6', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{t.fullname}</span>}
+                      <span style={{fontSize:'11px', color:darkMode?'#ddd6fe':'#7c3aed', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{t.email}</span>
+                    </div>
+                  </div>
+                )) : <span style={{fontStyle:'italic', color:darkMode?'#a3a3a3':'#64748b'}}>No teachers assigned</span>}
+              </div>
+            </div>
           </div>
         </div>
       )}

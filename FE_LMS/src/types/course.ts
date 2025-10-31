@@ -2,12 +2,14 @@ export interface Teacher {
   _id: string;
   username: string;
   email: string;
+  fullname?: string;
 }
 
 export interface Category {
   _id: string;
   name: string;
   slug: string;
+  description?: string;
 }
 
 export interface Course {

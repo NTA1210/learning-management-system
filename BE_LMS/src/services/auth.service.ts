@@ -88,11 +88,12 @@ export const loginUser = async ({
   //get the user by email
   const user = await UserModel.findOne({ email });
   appAssert(user, UNAUTHORIZED, "Invalid email or password");
+  //check wether user is verified
+  appAssert(user.verified, UNAUTHORIZED, "Email not verified");
   //validate the password from request
   const isValidatePassword = await user.comparePassword(password);
   appAssert(isValidatePassword, UNAUTHORIZED, "Invalid email or password");
-  //check wether user is verified
-  appAssert(user.verified, UNAUTHORIZED, "Email not verified");
+
   //create session
   const session = await SessionModel.create({
     userId: user._id,

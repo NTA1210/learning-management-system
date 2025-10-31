@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { authService } from "../services";
+import { authService, saveCurrentUserFromApi } from "../services";
 import { type LoginRequest } from "../types/auth";
 import { useTheme } from "../hooks/useTheme";
 
@@ -32,6 +32,13 @@ const LoginPage: React.FC = () => {
     try {
       const response = await authService.login(formData);
       console.log("Login successful:", response);
+      // After login, fetch current user profile and save to storage
+      try {
+        const me = await saveCurrentUserFromApi();
+        console.log("[auth] current user loaded:", me);
+      } catch (e) {
+        console.warn("[auth] failed to load current user after login", e);
+      }
       
       // Store authentication state
       localStorage.setItem('isAuthenticated', 'true');
@@ -40,6 +47,9 @@ const LoginPage: React.FC = () => {
       // Check if there's a redirect parameter
       const redirectPath = searchParams.get('redirect');
       
+      // Delay to see log
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
       if (redirectPath) {
         // Redirect to the original path the user was trying to access
         window.location.href = redirectPath;
@@ -71,12 +81,12 @@ const LoginPage: React.FC = () => {
     try {
       const parsed = JSON.parse(err.message);
       if (Array.isArray(parsed)) {
-        finalError = parsed;
+        finalError = parsed as ErrorType[];
       } else {
-        finalError = err.message;
+        finalError = maybeMessage;
       }
     } catch {
-      finalError = err.message;
+      finalError = maybeMessage;
     }
   }
 
@@ -101,7 +111,7 @@ const LoginPage: React.FC = () => {
           borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(255, 255, 255, 0.2)',
         }}
       >
-        <div className="flex min-h-[560px]">
+        <div className="flex flex-col md:flex-row min-h-[560px]">
           {/* Left Side - Login Form */}
           <div className="flex-1 p-8 flex items-center">
             <div className="max-w-md mx-auto w-full">
@@ -180,13 +190,7 @@ const LoginPage: React.FC = () => {
                        autoComplete="email"
                        required
                      />
-                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                      <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
-                        <svg className="h-4 w-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    </div>
+                    
                   </div>
                 </div>
 
@@ -355,7 +359,7 @@ const LoginPage: React.FC = () => {
           </div>
 
           {/* Right Side - Illustrative Content */}
-          <div className="gradient-bg flex-1 p-8 relative overflow-hidden flex items-center">
+          <div className="gradient-bg hidden md:flex md:flex-1 p-8 relative overflow-hidden items-center">
             {/* Animated Background Elements */}
             <div className="absolute inset-0">
               <div className="floating-element absolute top-20 left-10 w-24 h-24 bg-white/10 rounded-full"></div>
@@ -411,7 +415,7 @@ const LoginPage: React.FC = () => {
                   <div className="flex-shrink-0">
                     <div className="w-16 h-16 bg-orange-500/20 rounded-2xl flex items-center justify-center">
                       <svg className="w-8 h-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 117 21 9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l7 4v6c0 5-3.5 9.5-7 10-3.5-.5-7-5-7-10V6l7-4z" />
                       </svg>
                     </div>
                   </div>

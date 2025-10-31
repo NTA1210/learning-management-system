@@ -15,6 +15,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Check if user is authenticated on app load
   useEffect(() => {
     const checkAuth = async () => {
+      // Avoid unnecessary call on public routes; rely on localStorage fallback
+      const publicPaths = [
+        '/',
+        '/login',
+        '/register',
+        '/verify',
+        '/verify-email',
+        '/forgot-password',
+        '/reset-password',
+        '/landing',
+      ];
+      const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
+      const isPublic = publicPaths.some((p) => currentPath === p || currentPath.startsWith(p + '/'));
+      if (isPublic) {
+        const userData = localStorage.getItem('userData');
+        if (userData) {
+          try {
+            const parsedUser = JSON.parse(userData);
+            setUser(parsedUser);
+          } catch {
+            setUser(null);
+          }
+        }
+        setLoading(false);
+        return;
+      }
       try {
         const response = await authService.getCurrentUser();
         setUser(response);
