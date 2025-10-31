@@ -3,6 +3,7 @@ import { minioClient } from "../config/minio";
 import { v4 } from "uuid";
 import { prefixLessonMaterial } from "./filePrefix";
 import mime from "mime-types";
+import { nowLocal } from "./time";
 /**
  * Upload 1 file, trả về public URL
  * @param file
@@ -67,8 +68,16 @@ export const getPublicUrl = (key: string) =>
  * @param expiresIn
  * @returns
  */
-export const getSignedUrl = (key: string, expiresIn = 3600) =>
-  minioClient.presignedGetObject(BUCKET_NAME, key, expiresIn);
+export const getSignedUrl = (
+  key: string,
+  expiresIn = 24 * 60 * 60,
+  filename: string
+) =>
+  minioClient.presignedGetObject(BUCKET_NAME, key, expiresIn, {
+    "response-content-disposition": `attachment; filename="${encodeURIComponent(
+      `${nowLocal()}_${v4()}_${filename ? filename : ""}`
+    )}"`,
+  });
 
 /**
  * Xóa file

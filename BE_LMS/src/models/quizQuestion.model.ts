@@ -9,19 +9,13 @@ export const QuizQuestionSchema = new mongoose.Schema<IQuizQuestion>(
       required: true,
       index: true,
     },
-    specialistId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Specialist",
-      required: true,
-      index: true,
-    },
     text: { type: String, required: true },
     image: { type: String },
     type: {
       type: String,
       enum: [
         QuizQuestionType.MCQ,
-        QuizQuestionType.MULTI,
+        QuizQuestionType.MULTIPLE_CHOICE,
         QuizQuestionType.TRUE_FALSE,
         QuizQuestionType.FILL_BLANK,
       ],
@@ -36,7 +30,7 @@ export const QuizQuestionSchema = new mongoose.Schema<IQuizQuestion>(
 );
 
 //Indexes
-QuizQuestionSchema.index({ courseId: 1, specialistId: 1, text: 1 });
+QuizQuestionSchema.index({ courseId: 1, text: 1 });
 QuizQuestionSchema.index({ text: "text" });
 
 const QuizQuestionModel = mongoose.model<IQuizQuestion>(
