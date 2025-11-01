@@ -30,8 +30,24 @@ export const listCoursesSchema = z.object({
   status: z
     .enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED])
     .optional(), // Filter by status
+  // ✅ SOFT DELETE: Admin can view deleted courses
+  includeDeleted: z
+    .string()
+    .optional()
+    .transform((val) => {
+      if (val === "true") return true;
+      if (val === "false") return false;
+      return undefined;
+    }), // Admin only - show deleted courses
+  onlyDeleted: z
+    .string()
+    .optional()
+    .transform((val) => {
+      if (val === "true") return true;
+      return false;
+    }), // Admin only - show only deleted courses
   sortBy: z
-    .enum(["createdAt", "title", "updatedAt", "startDate", "endDate"])
+    .enum(["createdAt", "title", "updatedAt", "startDate", "endDate", "deletedAt"])
     .optional(),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
 });

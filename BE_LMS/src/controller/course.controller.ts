@@ -12,10 +12,13 @@ import {
   createCourse,
   updateCourse,
   deleteCourse,
+  restoreCourse,
+  permanentDeleteCourse,
 } from "../services/course.service";
 
 /**
  * GET /courses - List all courses with filters
+ * Supports soft delete: ?includeDeleted=true or ?onlyDeleted=true (admin only)
  */
 export const listCoursesHandler = catchErrors(async (req, res) => {
   // Validate query parameters
@@ -31,6 +34,8 @@ export const listCoursesHandler = catchErrors(async (req, res) => {
     code: query.code,
     isPublished: query.isPublished,
     status: query.status,
+    includeDeleted: query.includeDeleted,
+    onlyDeleted: query.onlyDeleted,
     sortBy: query.sortBy,
     sortOrder: query.sortOrder,
   });
@@ -89,7 +94,7 @@ export const updateCourseHandler = catchErrors(async (req, res) => {
 });
 
 /**
- * DELETE /courses/:id - Delete course
+ * DELETE /courses/:id - Soft delete course
  */
 export const deleteCourseHandler = catchErrors(async (req, res) => {
   // Validate course ID
@@ -102,4 +107,40 @@ export const deleteCourseHandler = catchErrors(async (req, res) => {
   const result = await deleteCourse(courseId, userId);
 
   return res.success(OK, null, result.message);
+});
+
+/**
+ * POST /courses/:id/restore - Restore deleted course (Admin only)
+ */
+export const restoreCourseHandler = catchErrors(async (req, res) => {
+  // Validate course ID
+  const courseId = courseIdSchema.parse(req.params.id);
+
+  // Get userId from request (set by authenticate middleware)
+  const userId = (req as any).userId;
+
+  // Call service
+  const result = await restoreCourse(courseId, userId);
+
+  return res.success(OK, result.course, result.message);
+});
+
+/**
+ * DELETE /courses/:id/permanent - Permanently delete course from database (Admin only)
+ * ⚠️ WARNING: This action CANNOT be undone!
+ */
+export const permanentDeleteCourseHandler = catchErrors(async (req, res) => {
+  // Validate course ID
+  const courseId = courseIdSchema.parse(req.params.id);
+
+  // Get userId from request (set by authenticate middleware)
+  const userId = (req as any).userId;
+
+  // Call service
+  const result = await permanentDeleteCourse(courseId, userId);
+
+  return res.success(OK, null, result.message, {
+    warning: result.warning,
+    deletedCourseId: result.deletedCourseId,
+  });
 });

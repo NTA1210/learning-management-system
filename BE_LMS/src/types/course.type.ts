@@ -23,6 +23,10 @@ export default interface ICourse extends mongoose.Document {
   enrollRequiresApproval?: boolean;
   enrollPasswordHash?: string;
   createdBy?: mongoose.Types.ObjectId;
+  // Soft delete fields
+  isDeleted: boolean;
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
   createdAt?: Date;
   updatedAt?: Date;
 }

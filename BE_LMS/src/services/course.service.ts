@@ -20,12 +20,21 @@ export type ListCoursesParams = {
   code?: string;
   isPublished?: boolean;
   status?: CourseStatus;
+  includeDeleted?: boolean; // Admin only - include deleted courses in results
+  onlyDeleted?: boolean; // Admin only - show only deleted courses
   sortBy?: string;
   sortOrder?: string;
 };
 
 /**
  * Lấy danh sách khóa học với filter, search, sort và pagination
+ * 
+ * YÊU CẦU NGHIỆP VỤ - SOFT DELETE:
+ * 1. Mặc định chỉ show courses chưa bị xóa (isDeleted: false)
+ * 2. Admin có thể xem courses đã xóa với query param:
+ *    - ?includeDeleted=true → Show cả active và deleted courses
+ *    - ?onlyDeleted=true → Chỉ show deleted courses (recycle bin)
+ * 3. Regular users luôn chỉ thấy active courses
  */
 export const listCourses = async ({
   page,
@@ -36,11 +45,25 @@ export const listCourses = async ({
   code,
   isPublished,
   status,
+  includeDeleted,
+  onlyDeleted,
   sortBy = "createdAt",
   sortOrder = "desc",
 }: ListCoursesParams) => {
   // Build filter query
   const filter: any = {};
+
+  // ✅ SOFT DELETE: Control deleted course visibility
+  if (onlyDeleted) {
+    // Admin viewing recycle bin
+    filter.isDeleted = true;
+  } else if (includeDeleted) {
+    // Admin viewing all courses (no filter on isDeleted)
+    // Do nothing - show both deleted and non-deleted
+  } else {
+    // Default: Only show non-deleted courses
+    filter.isDeleted = false;
+  }
 
   // Filter by published status
   if (isPublished !== undefined) {
@@ -117,7 +140,11 @@ export const listCourses = async ({
  * Lấy thông tin chi tiết một khóa học theo ID
  */
 export const getCourseById = async (courseId: string) => {
-  const course = await CourseModel.findById(courseId)
+  // ✅ SOFT DELETE: Only get non-deleted course
+  const course = await CourseModel.findOne({
+    _id: courseId,
+    isDeleted: false,
+  })
     .populate("teacherIds", "username email fullname avatar_url bio")
     .populate("specialistIds", "name slug description majorId")
     .populate("createdBy", "username email fullname")
@@ -275,8 +302,11 @@ export const updateCourse = async (
   data: UpdateCourseInput,
   userId: string
 ) => {
-  // Find course
-  const course = await CourseModel.findById(courseId);
+  // ✅ SOFT DELETE: Find non-deleted course only
+  const course = await CourseModel.findOne({
+    _id: courseId,
+    isDeleted: false,
+  });
   appAssert(course, NOT_FOUND, "Course not found");
 
   // Check if user is a teacher of this course or admin
@@ -421,12 +451,22 @@ export const updateCourse = async (
 };
 
 /**
- * Xóa khóa học
+ * Xóa mềm khóa học (Soft Delete)
+ * 
+ * YÊU CẦU NGHIỆP VỤ:
+ * 1. Course không bị xóa thật khỏi database
+ * 2. Chỉ đánh dấu isDeleted = true, lưu thời gian và người xóa
+ * 3. Course đã xóa không hiển thị trong list/get operations
+ * 4. Admin có thể khôi phục course đã xóa (future feature)
+ * 5. Chỉ teacher của course hoặc admin mới có quyền xóa
  */
 export const deleteCourse = async (courseId: string, userId: string) => {
-  // Find course
-  const course = await CourseModel.findById(courseId);
-  appAssert(course, NOT_FOUND, "Course not found");
+  // ✅ SOFT DELETE: Find non-deleted course only
+  const course = await CourseModel.findOne({
+    _id: courseId,
+    isDeleted: false,
+  });
+  appAssert(course, NOT_FOUND, "Course not found or already deleted");
 
   // Check if user is a teacher of this course or admin
   const user = await UserModel.findById(userId);
@@ -444,16 +484,135 @@ export const deleteCourse = async (courseId: string, userId: string) => {
     "You don't have permission to delete this course"
   );
 
-  // TODO: Optional - Check if course has enrollments
-  // const enrollments = await EnrollmentModel.countDocuments({ courseId });
+  // ✅ SOFT DELETE: Mark as deleted instead of removing from database
+  await CourseModel.findByIdAndUpdate(
+    courseId,
+    {
+      $set: {
+        isDeleted: true,
+        deletedAt: new Date(),
+        deletedBy: userId,
+      },
+    },
+    { new: true }
+  );
+
+  return { 
+    message: "Course deleted successfully",
+    deletedAt: new Date(),
+    deletedBy: userId,
+  };
+};
+
+/**
+ * Khôi phục khóa học đã xóa (Restore Deleted Course)
+ * 
+ * YÊU CẦU NGHIỆP VỤ:
+ * 1. Chỉ admin mới có quyền khôi phục course
+ * 2. Course phải đang ở trạng thái deleted (isDeleted = true)
+ * 3. Sau khi restore, course trở lại trạng thái active
+ * 4. Clear deletedAt và deletedBy fields
+ */
+export const restoreCourse = async (courseId: string, userId: string) => {
+  // ✅ Find deleted course only
+  const course = await CourseModel.findOne({
+    _id: courseId,
+    isDeleted: true,
+  });
+  appAssert(course, NOT_FOUND, "Deleted course not found");
+
+  // Check if user is admin
+  const user = await UserModel.findById(userId);
+  appAssert(user, NOT_FOUND, "User not found");
+
+  const normalizedRole = user.role.trim().toUpperCase();
+  const isAdmin = normalizedRole === "ADMIN";
+
+  appAssert(
+    isAdmin,
+    FORBIDDEN,
+    "Only administrators can restore deleted courses"
+  );
+
+  // ✅ RESTORE: Mark as not deleted
+  const restoredCourse = await CourseModel.findByIdAndUpdate(
+    courseId,
+    {
+      $set: {
+        isDeleted: false,
+        deletedAt: null,
+        deletedBy: null,
+      },
+    },
+    { new: true }
+  )
+    .populate("teacherIds", "username email fullname avatar_url")
+    .populate("specialistIds", "name slug description majorId")
+    .populate("createdBy", "username email fullname")
+    .lean();
+
+  return {
+    message: "Course restored successfully",
+    course: restoredCourse,
+  };
+};
+
+/**
+ * Xóa vĩnh viễn khóa học khỏi database (Hard Delete / Permanent Delete)
+ * 
+ * YÊU CẦU NGHIỆP VỤ:
+ * 1. CHỈ Admin mới có quyền xóa vĩnh viễn
+ * 2. CHỈ xóa được courses đã ở trạng thái deleted (isDeleted=true)
+ * 3. Course bị xóa THẬT khỏi database, KHÔNG thể khôi phục
+ * 4. Thường dùng để dọn dẹp "Recycle Bin"
+ * 5. CẢNH BÁO: Action này không thể hoàn tác (irreversible)
+ * 
+ * LƯU Ý: Nên check enrollments, lessons, quizzes... trước khi xóa vĩnh viễn
+ */
+export const permanentDeleteCourse = async (
+  courseId: string,
+  userId: string
+) => {
+  // ✅ Find deleted course only (must be soft-deleted first)
+  const course = await CourseModel.findOne({
+    _id: courseId,
+    isDeleted: true, // IMPORTANT: Chỉ xóa được courses đã soft delete
+  });
+  appAssert(
+    course,
+    NOT_FOUND,
+    "Course not found in recycle bin. Only deleted courses can be permanently deleted."
+  );
+
+  // ✅ Check if user is admin
+  const user = await UserModel.findById(userId);
+  appAssert(user, NOT_FOUND, "User not found");
+
+  const normalizedRole = user.role.trim().toUpperCase();
+  const isAdmin = normalizedRole === "ADMIN";
+
+  appAssert(
+    isAdmin,
+    FORBIDDEN,
+    "Only administrators can permanently delete courses"
+  );
+
+  // ⚠️ OPTIONAL: Check if course has related data
+  // Uncomment if you want to prevent deletion of courses with enrollments
+  // const EnrollmentModel = require("../models/enrollment.model").default;
+  // const enrollmentCount = await EnrollmentModel.countDocuments({ courseId });
   // appAssert(
-  //   enrollments === 0,
+  //   enrollmentCount === 0,
   //   BAD_REQUEST,
-  //   "Cannot delete course with active enrollments"
+  //   `Cannot permanently delete course with ${enrollmentCount} enrollment(s). Please remove enrollments first.`
   // );
 
-  // Hard delete course
+  // ✅ HARD DELETE: Remove from database permanently
   await CourseModel.findByIdAndDelete(courseId);
 
-  return { message: "Course deleted successfully" };
+  return {
+    message: "Course permanently deleted successfully",
+    warning: "This action cannot be undone",
+    deletedCourseId: courseId,
+  };
 };
