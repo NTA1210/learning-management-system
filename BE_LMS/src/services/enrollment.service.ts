@@ -4,6 +4,7 @@ import CourseModel from "../models/course.model";
 import UserModel from "../models/user.model";
 import appAssert from "../utils/appAssert";
 import { compareValue } from "../utils/bcrypt";
+import { CourseStatus } from "../types/course.type";
 
 // Ensure models are registered
 void CourseModel;
@@ -233,10 +234,15 @@ export const createEnrollment = async (data: {
   const student = await UserModel.findById(studentId);
   appAssert(student, NOT_FOUND, "Student not found");
 
-  // 2. Check course exists and is published
+  // 2. Check course exists and status
   const course = await CourseModel.findById(courseId);
   appAssert(course, NOT_FOUND, "Course not found");
-  appAssert(course.isPublished, BAD_REQUEST, "Course is not published");
+  // Only allow enrollment for ongoing courses (not draft/deleted)
+  appAssert(
+    course.status === CourseStatus.ONGOING,
+    BAD_REQUEST,
+    "Course is not available for enrollment. Only ongoing courses can be enrolled."
+  );
 
   // 2.1. Check password if course is password-protected
   if (course.enrollPasswordHash && method === "self") {
