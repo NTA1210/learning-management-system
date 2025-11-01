@@ -54,7 +54,7 @@ export const courseService = {
     
     // Handle response format - response.data is always an array
     const courses = Array.isArray(response.data) ? response.data : [];
-    const pagination = { total: courses.length, page: 1, limit: 10, totalPages: 1 };
+    const pagination = response.meta?.pagination;
     
     return { courses, pagination };
   },

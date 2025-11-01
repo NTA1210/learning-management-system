@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
-import { courseService } from "../services";
+import { courseService, enrollmentService } from "../services";
 import type { Course } from "../types/course";
 import type { CourseFilters } from "../services/courseService";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
+import { Search, Trash } from "lucide-react";
+
 
 const CourseManagement: React.FC = () => {
   const { darkMode } = useTheme();
@@ -35,14 +37,32 @@ const CourseManagement: React.FC = () => {
   });
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailCourse, setDetailCourse] = useState<Course | null>(null);
+  const [enrollments, setEnrollments] = useState<{
+    _id: string;
+    userId: { _id: string; username: string; email: string; fullname?: string };
+    courseId: string;
+    status: string;
+    role: string;
+    enrolledAt: string;
+  }[]>([]);
+  const [enrollPage, setEnrollPage] = useState(1);
+  const [enrollLimit, setEnrollLimit] = useState(10);
+  const [enrollTotal, setEnrollTotal] = useState(0);
+  const [enrollLoading, setEnrollLoading] = useState(false);
   // Animation state for modal
   const [modalAnim, setModalAnim] = useState<'enter'|'leave'|'none'>('none');
   const [contentPaddingLeft, setContentPaddingLeft] = useState(window.innerWidth >= 640 ? 93 : 0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageLimit, setPageLimit] = useState(25);
+  const [totalCourses, setTotalCourses] = useState(0);
+  const [sortOption, setSortOption] = useState<'name_asc' | 'name_desc' | 'date_asc' | 'date_desc'>('date_desc');
 
   function openDetail(course: Course) {
     setDetailCourse(course);
     setShowDetailModal(true);
     setModalAnim('enter');
+    // fetch enrollments for this course
+    fetchEnrollments(course._id, 1, enrollLimit);
   }
   function closeModal() {
     setModalAnim('leave');
@@ -119,17 +139,36 @@ const CourseManagement: React.FC = () => {
     return null;
   };
 
+  const changePageLimit = (limit: number) => {
+    setPageLimit(limit);
+    setCurrentPage(1);
+  };
+  const goToPage = (page: number) => {
+    setCurrentPage(page);
+  };
+
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      const filters: CourseFilters = {};
-      if (searchTerm) filters.search = searchTerm;
-      if (_selectedTeacher) filters.teacherId = _selectedTeacher;
-      
+      // Map unified sort option to backend query
+      const isName = sortOption === 'name_asc' || sortOption === 'name_desc';
+      const order = (sortOption.endsWith('asc') ? 'asc' : 'desc') as 'asc' | 'desc';
+
+      const filters: CourseFilters = {
+        ...(searchTerm && { search: searchTerm }),
+        // ...(selectedTeacher && { teacherId: selectedTeacher }), // not used
+        page: currentPage,
+        limit: pageLimit,
+        ...(isName ? { sortBy: 'title' } : {}),
+        ...(order ? { sortOrder: order } : {}),
+      };
       const result = await courseService.getAllCourses(filters);
       setCourses(result.courses);
       setError("");
-
+      if (result.pagination && typeof result.pagination === 'object') {
+        if ('total' in result.pagination)
+          setTotalCourses(result.pagination.total as number);
+      }
       // Extract unique categories and teachers from courses
       const categories = new Map<string, { _id: string; name: string }>();
       const teachers = new Map<string, { _id: string; username: string; email: string }>();
@@ -151,6 +190,25 @@ const CourseManagement: React.FC = () => {
       setError(err instanceof Error ? err.message : "Failed to fetch courses");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchEnrollments = async (courseId: string, page = enrollPage, limit = enrollLimit) => {
+    try {
+      setEnrollLoading(true);
+      const { enrollments: items, pagination } = await enrollmentService.getByCourse(courseId, { page, limit });
+      setEnrollments(items || []);
+      if (pagination) {
+        setEnrollTotal(pagination.total || 0);
+        setEnrollPage(pagination.page || 1);
+        setEnrollLimit(pagination.limit || limit);
+      }
+    } catch (e) {
+      console.error(e);
+      setEnrollments([]);
+      setEnrollTotal(0);
+    } finally {
+      setEnrollLoading(false);
     }
   };
 
@@ -292,6 +350,12 @@ const CourseManagement: React.FC = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Fetch courses on param change
+  useEffect(() => {
+    fetchCourses();
+    // eslint-disable-next-line
+  }, [currentPage, pageLimit, sortOption]);
+
   return (
     <>
       <style>
@@ -379,7 +443,7 @@ const CourseManagement: React.FC = () => {
       <Sidebar role={(user?.role as 'admin' | 'teacher' | 'student') || 'student'} />
 
       {/* Main Content */}
-      <div className="flex flex-col flex-1 w-0 overflow-hidden" style={{ paddingLeft: contentPaddingLeft }}>
+      <div className="flex flex-col flex-1 w-0 overflow-hidden" style={{ paddingLeft: contentPaddingLeft, backgroundColor: darkMode ? '#1f2937' : '#f0f0f0' }}>
         <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 mt-16">
           <div className="max-w-7xl mx-auto">
             {/* Header */}
@@ -432,14 +496,118 @@ const CourseManagement: React.FC = () => {
                 />
               </div>
               <button
-                onClick={handleSearch}
-                className="px-6 py-2 rounded-lg text-white transition-all duration-200"
-                style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
-                onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#5b21b6' : '#4338ca'}
-                onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#4c1d95' : '#4f46e5'}
-              >
-                Search
-              </button>
+  onClick={handleSearch}
+  className="p-2 rounded-lg text-white transition-all duration-200 flex items-center justify-center"
+  style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
+  onMouseEnter={(e) =>
+    ((e.target as HTMLElement).style.backgroundColor = darkMode ? '#5b21b6' : '#4338ca')
+  }
+  onMouseLeave={(e) =>
+    ((e.target as HTMLElement).style.backgroundColor = darkMode ? '#4c1d95' : '#4f46e5')
+  }
+>
+  <Search size={20} />
+</button>
+              {/* Sort options: a-z, z-a, old->new, new->old */}
+              <div className="relative">
+                <select
+                  value={sortOption}
+                  onChange={e => setSortOption(e.target.value as 'name_asc'|'name_desc'|'date_asc'|'date_desc')}
+                  className="appearance-none rounded-lg px-4 py-2 pr-10 border focus:outline-none focus:ring-2 transition-colors duration-200 shadow-sm"
+                  style={{
+                    width: 120,
+                    fontWeight: 600,
+                    background: darkMode ? '#152632' : '#ffffff',
+                    color: darkMode ? '#ffffff' : '#111827',
+                    borderColor: darkMode ? '#334155' : '#e5e7eb',
+                    boxShadow: darkMode ? '0 1px 2px rgba(0,0,0,0.25)' : '0 1px 2px rgba(0,0,0,0.06)'
+                  }}
+                >
+                  <option value="name_asc">A-Z</option>
+                  <option value="name_desc">Z-A</option>
+                  <option value="date_asc">Oldest</option>
+                  <option value="date_desc">Newest</option>
+                </select>
+                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                    aria-hidden="true"
+                  >
+                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.062l-4.24 4.24a.75.75 0 01-1.06 0L5.25 8.29a.75.75 0 01-.02-1.08z" clipRule="evenodd" />
+                  </svg>
+                </span>
+              </div>
+              
+
+
+                          {/* Pagination Controls */}
+                          <div className="flex items-center gap-3 mr-3 flex-wrap">
+  <div className="relative">
+    <select
+      value={pageLimit}
+      onChange={e => changePageLimit(Number(e.target.value))}
+      className="appearance-none rounded-lg px-4 py-2 pr-10 border focus:outline-none focus:ring-2 transition-colors duration-200 shadow-sm"
+      style={{
+        width: 135,
+        fontWeight: 600,
+        background: darkMode ? '#152632' : '#ffffff',
+        color: darkMode ? '#ffffff' : '#111827',
+        borderColor: darkMode ? '#334155' : '#e5e7eb',
+        boxShadow: darkMode ? '0 1px 2px rgba(0,0,0,0.25)' : '0 1px 2px rgba(0,0,0,0.06)'
+      }}
+    >
+      {[5, 25, 50, 75, 100].map(l => (
+        <option key={l} value={l}>{l} / page</option>
+      ))}
+    </select>
+    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+        aria-hidden="true"
+      >
+        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.062l-4.24 4.24a.75.75 0 01-1.06 0L5.25 8.29a.75.75 0 01-.02-1.08z" clipRule="evenodd" />
+      </svg>
+    </span>
+  </div>
+  <span style={{
+    minWidth: 100,
+    fontVariantNumeric: 'tabular-nums',
+    color: darkMode ? '#e5e7eb' : '#223344'
+  }}>
+    {`${(pageLimit * (currentPage - 1)) + 1} – ${Math.min(pageLimit * currentPage, totalCourses)} of ${totalCourses}`}
+  </span>
+  <button
+    className="px-4 py-1 rounded border mx-1 disabled:opacity-40"
+    onClick={() => goToPage(currentPage - 1)}
+    disabled={currentPage <= 1}
+    title="Previous page"
+    style={{
+      background: darkMode ? '#223344' : '#ffffff',
+      color: darkMode ? '#fff' : '#223344',
+      borderColor: darkMode ? '#334155' : '#e5e7eb'
+    }}
+  >&#x2039;</button>
+  <button
+    className="px-4 py-1 rounded border mx-1 disabled:opacity-40"
+    onClick={() => goToPage(currentPage + 1)}
+    disabled={(pageLimit * currentPage) >= totalCourses}
+    title="Next page"
+    style={{
+      background: darkMode ? '#223344' : '#ffffff',
+      color: darkMode ? '#fff' : '#223344',
+      borderColor: darkMode ? '#334155' : '#e5e7eb'
+    }}
+  >&#x203A;</button>
+</div>
+
               {canCreate && (
                 <button
                   onClick={() => {
@@ -495,28 +663,30 @@ const CourseManagement: React.FC = () => {
 
             {/* Courses Grid */}
             {!loading && !error && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
                 {courses.map((course, index) => (
                   <div
                     key={course._id}
-                    className="rounded-xl p-6 transition-all duration-300 hover:shadow-xl hover:scale-105"
+                    className="rounded-xl p-6 transition-all duration-300 hover:scale-[1.02] neu-surface"
                     style={{
-                      backgroundColor: darkMode ? 'rgba(31, 41, 55, 0.8)' : '#ffffff',
-                      border: darkMode ? '1px solid rgba(75, 85, 99, 0.3)' : '1px solid #e5e7eb',
+                      // Use neumorphic surface background for light mode; keep subtle tone in dark
+                      backgroundColor: darkMode ? 'rgba(31, 41, 55, 0.8)' : '#f0f0f0',
+                      border: 'none',
                       animationDelay: `${index * 100}ms`,
                       animation: 'fadeInUp 0.6s ease-out forwards',
                       opacity: 0,
                       transform: 'translateY(20px)',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
-                      e.currentTarget.style.borderColor = darkMode ? 'rgba(99, 102, 241, 0.5)' : '#6366f1';
-                      e.currentTarget.style.boxShadow = darkMode ? '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)' : '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)';
+                      e.currentTarget.style.transform = 'translateY(-6px) scale(1.03)';
+                      // amplify the dual-shadow slightly on hover
+                      e.currentTarget.style.boxShadow = darkMode
+                        ? '28px 28px 48px rgba(0,0,0,0.6), -28px -28px 48px rgba(255,255,255,0.06)'
+                        : '34px 34px 54px rgba(0,0,0,0.28), -34px -34px 54px rgba(255,255,255,0.72)';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                      e.currentTarget.style.borderColor = darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb';
-                      e.currentTarget.style.boxShadow = 'none';
+                      e.currentTarget.style.boxShadow = '';
                     }}
                   >
                     {/* Course Header */}
@@ -672,23 +842,24 @@ const CourseManagement: React.FC = () => {
                       )}
                       {canTeacherDeleteCourse(course) && (
                         <button
-                          className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md"
-                          style={{
-                            backgroundColor: darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2',
-                            color: darkMode ? '#fca5a5' : '#dc2626'
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = darkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca';
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2';
-                            e.currentTarget.style.transform = 'scale(1)';
-                          }}
-                          onClick={() => handleDelete(course._id)}
-                        >
-                          Delete
-                        </button>
+                        className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md flex items-center gap-2"
+                        style={{
+                          backgroundColor: darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2',
+                          color: darkMode ? '#fca5a5' : '#dc2626'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = darkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca';
+                          e.currentTarget.style.transform = 'scale(1.05)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2';
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }}
+                        onClick={() => handleDelete(course._id)}
+                      >
+                        <Trash size={16} />
+                        
+                      </button>
                       )}
                       {isStudent && (
                         <button
@@ -1334,7 +1505,7 @@ const CourseManagement: React.FC = () => {
       {/* --- Course Detail Modal --- */}
       {showDetailModal && detailCourse && (
         <div 
-          className="fixed inset-0 flex items-center justify-center z-[40] p-4 transition-all duration-300"
+          className="fixed inset-0 flex items-center justify-center z-[9999] p-4 transition-all duration-300"
           onClick={e => {
             if (e.target === e.currentTarget) {
               closeModal();
@@ -1346,12 +1517,14 @@ const CourseManagement: React.FC = () => {
           }}
         >
           <div
-            className={`relative w-full max-w-xl rounded-2xl shadow-2xl px-8 py-6 sm:px-10 sm:py-8 border ${modalAnim === 'enter' ? 'modal-fade-enter' : ''} ${modalAnim === 'leave' ? 'modal-fade-leave' : ''}`}
+            className={`relative w-full max-w-5xl rounded-2xl shadow-2xl px-8 py-6 sm:px-10 sm:py-8 border ${modalAnim === 'enter' ? 'modal-fade-enter' : ''} ${modalAnim === 'leave' ? 'modal-fade-leave' : ''}`}
             onClick={e => e.stopPropagation()}
             style={{
               backgroundColor: darkMode ? '#181F2A' : '#fff',
               color: darkMode ? '#E5E7EB' : '#1e293b',
               border: darkMode ? '1px solid #272B36' : '1px solid #e5e7eb',
+              maxHeight: 'calc(100vh - 16px)',
+              overflowY: 'auto'
             }}
           >
             <button
@@ -1373,63 +1546,159 @@ const CourseManagement: React.FC = () => {
               )}
             </div>
             <hr style={{ borderColor: darkMode ? '#2d3748':'#e5e7eb', margin:'.9rem 0'}}/>
-            <div className="sm:grid sm:grid-cols-2 gap-x-6 gap-y-4 mb-4">
-              <div className="mb-2">
-                <div style={{fontSize:'0.75rem', color: darkMode ? '#a3a3a3':'#94a3b8', marginBottom:'0.2rem'}}>Category</div>
-                <div className="flex items-center gap-2">
-                  <span style={{backgroundColor: darkMode ? '#3730a3':'#dbeafe', color: darkMode ? '#e0e7ff':'#4f46e5', borderRadius: '.6rem', fontSize:'.85rem', fontWeight:'bold', padding:'0.15rem 0.7rem'}}>{detailCourse.category?.name || 'N/A'}</span>
-                </div>
-                {detailCourse.category?.description && (
-                  <div style={{fontSize:'0.75rem', color: darkMode ? '#9ca3af':'#475569', marginTop:'0.3rem', fontStyle:'italic'}}>{detailCourse.category.description}</div>
-                )}
-              </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Left: course details */}
               <div>
-                <div style={{fontSize:'0.75rem', color: darkMode ? '#a3a3a3':'#94a3b8', marginBottom:'0.2rem'}}>Capacity</div>
-                <div><span style={{fontWeight:'bold'}}>{detailCourse.capacity}</span> student{detailCourse.capacity !== 1 ? 's' : ''}</div>
-              </div>
-              <div>
-                <div style={{fontSize:'0.75rem', color: darkMode ? '#a3a3a3':'#94a3b8', marginBottom:'0.2rem'}}>Created At</div>
-                <div>{detailCourse.createdAt ? new Date(detailCourse.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : ''}</div>
-              </div>
-              <div>
-                <div style={{fontSize:'0.75rem', color: darkMode ? '#a3a3a3':'#94a3b8', marginBottom:'0.2rem'}}>Last Updated</div>
-                <div>{detailCourse.updatedAt ? new Date(detailCourse.updatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : ''}</div>
-              </div>
-            </div>
-            <hr style={{ borderColor: darkMode ? '#2d3748':'#e5e7eb', margin:'0.7rem 0'}}/>
-            <div style={{marginBottom:'1.25rem', marginTop:'1.2rem'}}>
-              <div style={{fontWeight:'bold'}}>Description</div>
-              <div style={{borderRadius:'0.7rem', background:darkMode?'#232946':'#f1f5f9', color:darkMode?'#e5e7eb':'#374151', padding: '0.6rem 1rem', fontSize:'0.96em', minHeight:40}}>{detailCourse.description || <span style={{fontStyle:'italic', color: darkMode?'#71717a':'#64748b'}}>No description.</span>}</div>
-            </div>
-            <div style={{marginBottom:'0.8rem', marginTop:'1.1rem'}}>
-              <div style={{fontWeight:600, marginBottom:'.6rem'}}>Teachers</div>
-              <div style={{display:'flex', flexWrap:'wrap', gap: '1rem'}}>
-                {detailCourse.teachers.length > 0 ? detailCourse.teachers.map(t => (
-                  <div
-                    key={t._id}
-                    style={{
-                      display:'flex', alignItems:'center',
-                      borderRadius: '1.2rem',
-                      backgroundColor: darkMode ? '#5b21b6':'#f3e8ff',
-                      color: darkMode ? '#f3e8ff':'#5b21b6',
-                      border: darkMode ? '1.5px solid #a78bfa':'1.5px solid #c4b5fd',
-                      minWidth: 200, maxWidth:'100%', padding: '0.55rem 1.1rem', boxShadow:darkMode?'0 3px 7px #181F2A':'0 1px 5px #ede9fe', fontSize:'0.93em', gap:12
-                    }}
-                  >
-                    <img
-                      src={"https://admin.toandz.id.vn/placeholder/img/14.jpg"}
-                      alt="avatar"
-                      width={48}
-                      height={48}
-                      style={{ borderRadius: '50%', aspectRatio: '1 / 1', objectFit: 'cover', marginRight: 8, border: darkMode ? '2px solid #a78bfa' : '2px solid #c4b5fd', background: darkMode ? '#232946':'#fff' }}
-                    />
-                    <div style={{display:'flex', flexDirection:'column', minWidth:0}}>
-                      <span style={{fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{t.username}</span>
-                      {t.fullname && <span style={{fontSize:'11px', color:darkMode?'#f3e8ff':'#5b21b6', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{t.fullname}</span>}
-                      <span style={{fontSize:'11px', color:darkMode?'#ddd6fe':'#7c3aed', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{t.email}</span>
+                <div className="sm:grid sm:grid-cols-2 gap-x-6 gap-y-4 mb-4">
+                  <div className="mb-2">
+                    <div style={{fontSize:'0.75rem', color: darkMode ? '#a3a3a3':'#94a3b8', marginBottom:'0.2rem'}}>Category</div>
+                    <div className="flex items-center gap-2">
+                      <span style={{backgroundColor: darkMode ? '#3730a3':'#dbeafe', color: darkMode ? '#e0e7ff':'#4f46e5', borderRadius: '.6rem', fontSize:'.85rem', fontWeight:'bold', padding:'0.15rem 0.7rem'}}>{detailCourse.category?.name || 'N/A'}</span>
                     </div>
+                    {detailCourse.category?.description && (
+                      <div style={{fontSize:'0.75rem', color: darkMode ? '#9ca3af':'#475569', marginTop:'0.3rem', fontStyle:'italic'}}>{detailCourse.category.description}</div>
+                    )}
                   </div>
-                )) : <span style={{fontStyle:'italic', color:darkMode?'#a3a3a3':'#64748b'}}>No teachers assigned</span>}
+                  <div>
+                    <div style={{fontSize:'0.75rem', color: darkMode ? '#a3a3a3':'#94a3b8', marginBottom:'0.2rem'}}>Capacity</div>
+                    <div><span style={{fontWeight:'bold'}}>{detailCourse.capacity}</span> student{detailCourse.capacity !== 1 ? 's' : ''}</div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:'0.75rem', color: darkMode ? '#a3a3a3':'#94a3b8', marginBottom:'0.2rem'}}>Created At</div>
+                    <div>{detailCourse.createdAt ? new Date(detailCourse.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : ''}</div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:'0.75rem', color: darkMode ? '#a3a3a3':'#94a3b8', marginBottom:'0.2rem'}}>Last Updated</div>
+                    <div>{detailCourse.updatedAt ? new Date(detailCourse.updatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : ''}</div>
+                  </div>
+                </div>
+                <hr style={{ borderColor: darkMode ? '#2d3748':'#e5e7eb', margin:'0.7rem 0'}}/>
+                <div style={{marginBottom:'1.25rem', marginTop:'1.2rem'}}>
+                  <div style={{fontWeight:'bold'}}>Description</div>
+                  <div style={{borderRadius:'0.7rem', background:darkMode?'#232946':'#f1f5f9', color:darkMode?'#e5e7eb':'#374151', padding: '0.6rem 1rem', fontSize:'0.96em', minHeight:40}}>{detailCourse.description || <span style={{fontStyle:'italic', color: darkMode?'#71717a':'#64748b'}}>No description.</span>}</div>
+                </div>
+                <div style={{marginBottom:'0.8rem', marginTop:'1.1rem'}}>
+                  <div style={{fontWeight:600, marginBottom:'.6rem'}}>Teachers</div>
+                  <div style={{display:'flex', flexWrap:'wrap', gap: '1rem'}}>
+                    {detailCourse.teachers.length > 0 ? detailCourse.teachers.map(t => (
+                      <div
+                        key={t._id}
+                        style={{
+                          display:'flex', alignItems:'center',
+                          borderRadius: '1.2rem',
+                          backgroundColor: darkMode ? '#5b21b6':'#f3e8ff',
+                          color: darkMode ? '#f3e8ff':'#5b21b6',
+                          border: darkMode ? '1.5px solid #a78bfa':'1.5px solid #c4b5fd',
+                          minWidth: '100%', padding: '0.55rem 1.1rem', boxShadow:darkMode?'0 3px 7px #181F2A':'0 1px 5px #ede9fe', fontSize:'0.93em', gap:12
+                        }}
+                      >
+                        <img
+                          src={"https://admin.toandz.id.vn/placeholder/img/14.jpg"}
+                          alt="avatar"
+                          width={48}
+                          height={48}
+                          style={{ borderRadius: '50%', aspectRatio: '1 / 1', objectFit: 'cover', marginRight: 8, border: darkMode ? '2px solid #a78bfa' : '2px solid #c4b5fd', background: darkMode ? '#232946':'#fff' }}
+                        />
+                        <div style={{display:'flex', flexDirection:'column', minWidth:0, width:'100%'}}>
+                          <span style={{fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{t.username}</span>
+                          {t.fullname && <span style={{fontSize:'11px', color:darkMode?'#f3e8ff':'#5b21b6', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{t.fullname}</span>}
+                          <span style={{fontSize:'11px', color:darkMode?'#ddd6fe':'#7c3aed', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{t.email}</span>
+                        </div>
+                      </div>
+                    )) : <span style={{fontStyle:'italic', color:darkMode?'#a3a3a3':'#64748b'}}>No teachers assigned</span>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: enrolled students */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div style={{fontWeight:600}}>Enrolled Students</div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={enrollLimit}
+                      onChange={e => {
+                        const newLimit = Number(e.target.value);
+                        setEnrollLimit(newLimit);
+                        setEnrollPage(1);
+                        fetchEnrollments(detailCourse._id, 1, newLimit);
+                      }}
+                      className="rounded border px-2 py-1"
+                      style={{ background: darkMode ? '#1f2937' : '#fff', color: darkMode ? '#e5e7eb' : '#111827', borderColor: darkMode ? '#334155' : '#e5e7eb' }}
+                    >
+                      {[5,10,15,20].map(l => <option key={l} value={l}>{l}/page</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div style={{ maxHeight: 360, overflowY: 'auto' }}>
+                  {enrollLoading ? (
+                    <div className="p-2">Loading...</div>
+                  ) : enrollments.length === 0 ? (
+                    <div className="p-2" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>No students enrolled.</div>
+                  ) : (
+                    <div style={{display:'flex', flexWrap:'wrap', gap: '1rem'}}>
+                      {enrollments.map(item => (
+                        <div
+                          key={item._id}
+                          style={{
+                            display:'flex', alignItems:'center',
+                            borderRadius: '1.2rem',
+                            backgroundColor: darkMode ? '#0f766e':'#ecfeff',
+                            color: darkMode ? '#99f6e4':'#0f766e',
+                            border: darkMode ? '1.5px solid #2dd4bf':'1.5px solid #99f6e4',
+                            minWidth: '100%', padding: '0.55rem 1.1rem', boxShadow:darkMode?'0 3px 7px #181F2A':'0 1px 5px #cffafe', fontSize:'0.93em', gap:12
+                          }}
+                        >
+                          <img
+                            src={"https://admin.toandz.id.vn/placeholder/img/3.jpg"}
+                            alt="avatar"
+                            width={48}
+                            height={48}
+                            style={{ borderRadius: '50%', aspectRatio: '1 / 1', objectFit: 'cover', marginRight: 8, border: darkMode ? '2px solid #2dd4bf' : '2px solid #99f6e4', background: darkMode ? '#232946':'#fff' }}
+                          />
+                          <div style={{display:'flex', flexDirection:'column', minWidth:0, width:'100%'}}>
+                            <span style={{fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{item.userId.username}</span>
+                            {item.userId.fullname && <span style={{fontSize:'11px', color:darkMode?'#a7f3d0':'#0f766e', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{item.userId.fullname}</span>}
+                            <span style={{fontSize:'11px', color:darkMode?'#99f6e4':'#0ea5e9', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{item.userId.email}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* pagination */}
+                <div className="flex items-center justify-between mt-3">
+                  <span style={{ fontVariantNumeric: 'tabular-nums', color: darkMode ? '#e5e7eb' : '#223344' }}>
+                    {enrollTotal === 0 ? '0' : `${(enrollLimit * (enrollPage - 1)) + 1} – ${Math.min(enrollLimit * enrollPage, enrollTotal)} of ${enrollTotal}`}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="px-3 py-1 rounded border disabled:opacity-40"
+                      onClick={() => {
+                        const p = Math.max(1, enrollPage - 1);
+                        setEnrollPage(p);
+                        fetchEnrollments(detailCourse._id, p, enrollLimit);
+                      }}
+                      disabled={enrollPage <= 1}
+                      style={{ background: darkMode ? '#223344' : '#ffffff', color: darkMode ? '#fff' : '#223344', borderColor: darkMode ? '#334155' : '#e5e7eb' }}
+                    >
+                      &#x2039;
+                    </button>
+                    <button
+                      className="px-3 py-1 rounded border disabled:opacity-40"
+                      onClick={() => {
+                        const max = Math.ceil(enrollTotal / enrollLimit) || 1;
+                        const p = Math.min(max, enrollPage + 1);
+                        setEnrollPage(p);
+                        fetchEnrollments(detailCourse._id, p, enrollLimit);
+                      }}
+                      disabled={(enrollLimit * enrollPage) >= enrollTotal}
+                      style={{ background: darkMode ? '#223344' : '#ffffff', color: darkMode ? '#fff' : '#223344', borderColor: darkMode ? '#334155' : '#e5e7eb' }}
+                    >
+                      &#x203A;
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
