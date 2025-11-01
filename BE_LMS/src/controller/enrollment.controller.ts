@@ -30,11 +30,11 @@ export const getEnrollmentHandler = catchErrors(async (req, res) => {
 
 // GET /enrollments/my-enrollments - Get all enrollments for the authenticated student
 export const getMyEnrollmentsHandler = catchErrors(async (req, res) => {
-  const userId = req.userId!.toString(); // userId from authenticate middleware
+  const studentId = req.userId!.toString(); // userId from authenticate middleware
   const filters = getEnrollmentsQuerySchema.parse(req.query);
 
   const result = await getStudentEnrollments({
-    userId, // Pass userId for filtering
+    studentId, // Pass studentId for filtering
     ...filters,
   });
   return res.success(OK, result);
@@ -46,7 +46,7 @@ export const getStudentEnrollmentsHandler = catchErrors(async (req, res) => {
   const filters = getEnrollmentsQuerySchema.parse(req.query);
 
   const result = await getStudentEnrollments({
-    userId: studentId,
+    studentId,
     ...filters,
   });
   return res.success(OK, result);
@@ -76,19 +76,25 @@ export const getAllEnrollmentsHandler = catchErrors(async (req, res) => {
 export const createEnrollmentHandler = catchErrors(async (req, res) => {
   const data = createEnrollmentSchema.parse(req.body); // Validate body
 
-  const enrollment = await createEnrollment(data);
+  // Admin creates enrollment → default approved if no status specified
+  const enrollment = await createEnrollment({
+    ...data,
+    status: data.status || "approved",
+  });
   return res.success(CREATED, enrollment, "Enrollment created successfully");
 });
 
 // POST /enrollments/enroll - Student tự enroll vào course
 export const enrollSelfHandler = catchErrors(async (req, res) => {
-  const { courseId, role } = enrollSelfSchema.parse(req.body); // Validate body
-  const userId = req.userId!.toString(); // Lấy từ authenticate middleware
+  const { courseId, role, password } = enrollSelfSchema.parse(req.body); // Validate body
+  const studentId = req.userId!.toString(); // Lấy từ authenticate middleware
 
   const enrollment = await createEnrollment({
-    userId,
+    studentId,
     courseId,
     role,
+    method: "self", // Student tự enroll
+    password, // Pass password for password-protected courses
   });
   return res.success(CREATED, enrollment, "Enrolled successfully");
 });
@@ -106,8 +112,8 @@ export const updateEnrollmentHandler = catchErrors(async (req, res) => {
 export const updateSelfEnrollmentHandler = catchErrors(async (req, res) => {
   const { id } = enrollmentIdSchema.parse(req.params); // Validate ID
   const data = updateSelfEnrollmentSchema.parse(req.body); // Validate body
-  const userId = req.userId!.toString(); // Lấy từ authenticate middleware
+  const studentId = req.userId!.toString(); // Lấy từ authenticate middleware
 
-  const enrollment = await updateSelfEnrollment(id, userId, data);
+  const enrollment = await updateSelfEnrollment(id, studentId, data);
   return res.success(OK, enrollment, "Enrollment updated successfully");
 });

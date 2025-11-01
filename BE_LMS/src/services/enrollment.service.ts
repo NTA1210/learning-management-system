@@ -1,34 +1,61 @@
-import { NOT_FOUND, BAD_REQUEST, CONFLICT } from "../constants/http";
+import { NOT_FOUND, BAD_REQUEST, CONFLICT, UNAUTHORIZED } from "../constants/http";
 import EnrollmentModel from "../models/enrollment.model";
 import CourseModel from "../models/course.model";
 import UserModel from "../models/user.model";
 import appAssert from "../utils/appAssert";
+import { compareValue } from "../utils/bcrypt";
 
 // Ensure models are registered
 void CourseModel;
 void UserModel;
 
-// GET - Get enrollment by ID
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Lấy thông tin chi tiết của một enrollment theo ID
+ * - Hiển thị thông tin student (username, email, fullname, avatar_url)
+ * - Hiển thị thông tin course (title, code, description)
+ * - Nếu enrollmentId không tồn tại → trả lỗi NOT_FOUND
+ * 
+ * Input: enrollmentId (string)
+ * Output: Enrollment với thông tin student và course đã populate
+ */
 export const getEnrollmentById = async (enrollmentId: string) => {
   const enrollment = await EnrollmentModel.findById(enrollmentId)
-    .populate("userId", "username email fullname avatar_url")
+    .populate("studentId", "username email fullname avatar_url")
     .populate("courseId", "title code description");
 
   appAssert(enrollment, NOT_FOUND, "Enrollment not found");
   return enrollment;
 };
 
-// GET - Get all enrollments for a student
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Lấy danh sách tất cả enrollment của một student cụ thể
+ * - Có thể filter theo status (pending, approved, rejected, cancelled, dropped, completed)
+ * - Hỗ trợ phân trang (page, limit)
+ * - Sắp xếp theo thời gian tạo mới nhất (createdAt desc)
+ * - Populate thông tin course (title, code, description, category, teachers, isPublished)
+ * 
+ * Input: 
+ * - studentId (string, bắt buộc)
+ * - status (string, optional)
+ * - page (number, default: 1)
+ * - limit (number, default: 10)
+ * 
+ * Output: 
+ * - enrollments: Danh sách enrollment của student
+ * - pagination: { total, page, limit, totalPages }
+ */
 export const getStudentEnrollments = async (filters: {
-  userId: string;
+  studentId: string;
   status?: string;
   page?: number;
   limit?: number;
 }) => {
-  const { userId, status, page = 1, limit = 10 } = filters;
+  const { studentId, status, page = 1, limit = 10 } = filters;
   const skip = (page - 1) * limit;
 
-  const query: any = { userId };
+  const query: any = { studentId };
   if (status) {
     query.status = status;
   }
@@ -36,7 +63,7 @@ export const getStudentEnrollments = async (filters: {
   const [enrollments, total] = await Promise.all([
     EnrollmentModel.find(query)
       .populate("courseId", "title code description category teachers isPublished")
-      .sort({ enrolledAt: -1 })
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit),
     EnrollmentModel.countDocuments(query),
@@ -53,7 +80,25 @@ export const getStudentEnrollments = async (filters: {
   };
 };
 
-// GET - Get all enrollments for a course
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Lấy danh sách tất cả enrollment của một khóa học cụ thể
+ * - Kiểm tra course tồn tại trước → nếu không tồn tại trả lỗi NOT_FOUND
+ * - Có thể filter theo status
+ * - Hỗ trợ phân trang (page, limit)
+ * - Sắp xếp theo thời gian tạo mới nhất (createdAt desc)
+ * - Populate thông tin student (username, email, fullname, avatar_url)
+ * 
+ * Input:
+ * - courseId (string, bắt buộc)
+ * - status (string, optional)
+ * - page (number, default: 1)
+ * - limit (number, default: 10)
+ * 
+ * Output:
+ * - enrollments: Danh sách enrollment của course
+ * - pagination: { total, page, limit, totalPages }
+ */
 export const getCourseEnrollments = async (filters: {
   courseId: string;
   status?: string;
@@ -74,8 +119,8 @@ export const getCourseEnrollments = async (filters: {
 
   const [enrollments, total] = await Promise.all([
     EnrollmentModel.find(query)
-      .populate("userId", "username email fullname avatar_url")
-      .sort({ enrolledAt: -1 })
+      .populate("studentId", "username email fullname avatar_url")
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit),
     EnrollmentModel.countDocuments(query),
@@ -92,27 +137,45 @@ export const getCourseEnrollments = async (filters: {
   };
 };
 
-// GET - Get all enrollments (admin view)
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Lấy toàn bộ danh sách enrollment trong hệ thống (dành cho admin)
+ * - Hỗ trợ filter đa điều kiện: status, courseId, studentId
+ * - Hỗ trợ phân trang (page, limit)
+ * - Sắp xếp theo thời gian tạo mới nhất (createdAt desc)
+ * - Populate cả thông tin student và course
+ * 
+ * Input:
+ * - status (string, optional)
+ * - courseId (string, optional)
+ * - studentId (string, optional)
+ * - page (number, default: 1)
+ * - limit (number, default: 10)
+ * 
+ * Output:
+ * - enrollments: Danh sách tất cả enrollment theo filter
+ * - pagination: { total, page, limit, totalPages }
+ */
 export const getAllEnrollments = async (filters: {
   status?: string;
   courseId?: string;
-  userId?: string;
+  studentId?: string;
   page?: number;
   limit?: number;
 }) => {
-  const { status, courseId, userId, page = 1, limit = 10 } = filters;
+  const { status, courseId, studentId, page = 1, limit = 10 } = filters;
   const skip = (page - 1) * limit;
 
   const query: any = {};
   if (status) query.status = status;
   if (courseId) query.courseId = courseId;
-  if (userId) query.userId = userId;
+  if (studentId) query.studentId = studentId;
 
   const [enrollments, total] = await Promise.all([
     EnrollmentModel.find(query)
-      .populate("userId", "username email fullname avatar_url")
+      .populate("studentId", "username email fullname avatar_url")
       .populate("courseId", "title code description")
-      .sort({ enrolledAt: -1 })
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit),
     EnrollmentModel.countDocuments(query),
@@ -129,17 +192,45 @@ export const getAllEnrollments = async (filters: {
   };
 };
 
-// POST - Create enrollment (dùng chung cho admin và student)
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Tạo enrollment mới cho student vào một khóa học
+ * - Kiểm tra student tồn tại → nếu không tồn tại trả lỗi NOT_FOUND
+ * - Kiểm tra course tồn tại và đã published → nếu không trả lỗi NOT_FOUND hoặc BAD_REQUEST
+ * - Nếu course có password → yêu cầu nhập password đúng (với method = "self")
+ * - Xác định status mặc định dựa vào enrollRequiresApproval của course:
+ *   + Nếu enrollRequiresApproval = true → status = "pending"
+ *   + Nếu enrollRequiresApproval = false → status = "approved"
+ * - Kiểm tra enrollment đã tồn tại:
+ *   + Nếu status cũ = "dropped", "rejected", "cancelled" → CHO PHÉP re-enroll (cập nhật lại)
+ *   + Nếu status cũ = "pending", "approved", "completed" → KHÔNG CHO PHÉP (trả lỗi CONFLICT)
+ * - Kiểm tra capacity (sức chứa) của course → nếu đầy trả lỗi BAD_REQUEST
+ * - Tạo enrollment mới với các thông tin: studentId, courseId, status, role, method, note
+ * 
+ * Input:
+ * - studentId (string, bắt buộc)
+ * - courseId (string, bắt buộc)
+ * - status (string, optional - mặc định theo enrollRequiresApproval)
+ * - role (string, default: "student")
+ * - method (string, default: "self")
+ * - note (string, optional)
+ * - password (string, optional - bắt buộc nếu course có password và method = "self")
+ * 
+ * Output: Enrollment mới được tạo (hoặc cập nhật) với thông tin student và course đã populate
+ */
 export const createEnrollment = async (data: {
-  userId: string;
+  studentId: string;
   courseId: string;
-  status?: "active" | "completed" | "dropped";
+  status?: "pending" | "approved" | "rejected" | "cancelled" | "dropped" | "completed";
   role?: "student" | "auditor";
+  method?: "self" | "invited" | "password" | "other";
+  note?: string;
+  password?: string;
 }) => {
-  const { userId, courseId, status = "active", role = "student" } = data;
+  const { studentId, courseId, role = "student", method = "self", note, password } = data;
 
   // 1. Check student exists
-  const student = await UserModel.findById(userId);
+  const student = await UserModel.findById(studentId);
   appAssert(student, NOT_FOUND, "Student not found");
 
   // 2. Check course exists and is published
@@ -147,32 +238,55 @@ export const createEnrollment = async (data: {
   appAssert(course, NOT_FOUND, "Course not found");
   appAssert(course.isPublished, BAD_REQUEST, "Course is not published");
 
+  // 2.1. Check password if course is password-protected
+  if (course.enrollPasswordHash && method === "self") {
+    appAssert(password, BAD_REQUEST, "Password is required for this course");
+    const isValidPassword = await compareValue(password, course.enrollPasswordHash);
+    appAssert(isValidPassword, UNAUTHORIZED, "Invalid course password");
+  }
+
+  // 2.2. Determine default status based on enrollRequiresApproval
+  const defaultStatus = data.status || (course.enrollRequiresApproval ? "pending" : "approved");
+  const status = defaultStatus;
+
   // 3. Check existing enrollment
   const existingEnrollment = await EnrollmentModel.findOne({
-    userId,
+    studentId,
     courseId,
   });
 
   // Nếu đã có enrollment
   if (existingEnrollment) {
-    // Nếu status = "dropped" → CHO PHÉP re-enroll (update lại thành active)
-    if (existingEnrollment.status === "dropped") {
-      existingEnrollment.status = status;
-      existingEnrollment.role = role;
-      existingEnrollment.enrolledAt = new Date(); // Reset enrollment date
+    // Nếu status = "dropped", "rejected", "cancelled" → CHO PHÉP re-enroll
+    if (["dropped", "rejected", "cancelled"].includes(existingEnrollment.status)) {
+      // Verify password again for re-enrollment if needed
+      if (course.enrollPasswordHash && method === "self") {
+        appAssert(password, BAD_REQUEST, "Password is required for this course");
+        const isValidPassword = await compareValue(password, course.enrollPasswordHash);
+        appAssert(isValidPassword, UNAUTHORIZED, "Invalid course password");
+      }
+
+      existingEnrollment.status = status as any;
+      existingEnrollment.role = role as any;
+      existingEnrollment.method = method as any;
+      existingEnrollment.note = note;
       existingEnrollment.finalGrade = undefined; // Reset grade
-      existingEnrollment.grades = []; // Reset grades
+      existingEnrollment.progress = { totalLessons: 0, completedLessons: 0 }; // Reset progress
+      existingEnrollment.respondedBy = undefined;
+      existingEnrollment.respondedAt = undefined;
+      existingEnrollment.completedAt = undefined;
+      existingEnrollment.droppedAt = undefined;
       await existingEnrollment.save();
 
       await existingEnrollment.populate([
-        { path: "userId", select: "username email fullname avatar_url" },
+        { path: "studentId", select: "username email fullname avatar_url" },
         { path: "courseId", select: "title code description" },
       ]);
 
       return existingEnrollment;
     }
 
-    // Nếu status = "active" hoặc "completed" → KHÔNG CHO PHÉP
+    // Nếu status = "pending", "approved" hoặc "completed" → KHÔNG CHO PHÉP
     appAssert(
       false,
       CONFLICT,
@@ -184,7 +298,7 @@ export const createEnrollment = async (data: {
   if (course.capacity) {
     const enrolledCount = await EnrollmentModel.countDocuments({
       courseId,
-      status: "active",
+      status: "approved",
     });
     appAssert(
       enrolledCount < course.capacity,
@@ -195,28 +309,52 @@ export const createEnrollment = async (data: {
 
   // 5. Create enrollment
   const enrollment = await EnrollmentModel.create({
-    userId,
+    studentId,
     courseId,
     status,
     role,
+    method,
+    note,
   });
 
   // Populate để trả về đầy đủ thông tin
   await enrollment.populate([
-    { path: "userId", select: "username email fullname avatar_url" },
+    { path: "studentId", select: "username email fullname avatar_url" },
     { path: "courseId", select: "title code description" },
   ]);
 
   return enrollment;
 };
 
-// PUT - Update enrollment (Admin/Teacher)
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Cập nhật thông tin enrollment (dành cho Admin hoặc Teacher)
+ * - Kiểm tra enrollment tồn tại → nếu không tồn tại trả lỗi NOT_FOUND
+ * - Cho phép cập nhật: status, role, finalGrade, note, respondedBy
+ * - Tự động set timestamp khi status thay đổi:
+ *   + status = "approved" hoặc "rejected" → set respondedAt = new Date()
+ *   + status = "completed" → set completedAt = new Date()
+ *   + status = "dropped" → set droppedAt = new Date()
+ * - Nếu có respondedBy → gán vào trường respondedBy
+ * 
+ * Input:
+ * - enrollmentId (string, bắt buộc)
+ * - status (string, optional)
+ * - role (string, optional)
+ * - finalGrade (number, optional)
+ * - note (string, optional)
+ * - respondedBy (string, optional)
+ * 
+ * Output: Enrollment đã được cập nhật với thông tin student và course đã populate
+ */
 export const updateEnrollment = async (
   enrollmentId: string,
   data: {
-    status?: "active" | "completed" | "dropped";
+    status?: "pending" | "approved" | "rejected" | "cancelled" | "dropped" | "completed";
     role?: "student" | "auditor";
     finalGrade?: number;
+    note?: string;
+    respondedBy?: string;
   }
 ) => {
   // 1. Check enrollment exists
@@ -225,9 +363,27 @@ export const updateEnrollment = async (
 
   // 2. Update fields
   const updateData: any = {};
-  if (data.status !== undefined) updateData.status = data.status;
+  if (data.status !== undefined) {
+    updateData.status = data.status;
+    
+    // Tự động set timestamp khi status thay đổi
+    if (data.status === "approved" || data.status === "rejected") {
+      updateData.respondedAt = new Date();
+      if (data.respondedBy) {
+        updateData.respondedBy = data.respondedBy;
+      }
+    }
+    if (data.status === "completed") {
+      updateData.completedAt = new Date();
+    }
+    if (data.status === "dropped") {
+      updateData.droppedAt = new Date();
+    }
+  }
   if (data.role !== undefined) updateData.role = data.role;
   if (data.finalGrade !== undefined) updateData.finalGrade = data.finalGrade;
+  if (data.note !== undefined) updateData.note = data.note;
+  if (data.respondedBy !== undefined) updateData.respondedBy = data.respondedBy;
 
   // 3. Update enrollment
   const updatedEnrollment = await EnrollmentModel.findByIdAndUpdate(
@@ -235,16 +391,29 @@ export const updateEnrollment = async (
     updateData,
     { new: true } // Return updated document
   )
-    .populate("userId", "username email fullname avatar_url")
+    .populate("studentId", "username email fullname avatar_url")
     .populate("courseId", "title code description");
 
   return updatedEnrollment;
 };
 
-// PUT - Student update own enrollment (chỉ có thể drop)
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Student tự cập nhật enrollment của mình (chỉ được phép drop khóa học)
+ * - Kiểm tra enrollment tồn tại và thuộc về student này → nếu không trả lỗi NOT_FOUND
+ * - Không cho phép drop nếu course đã completed → trả lỗi BAD_REQUEST
+ * - Khi drop → set status = "dropped" và droppedAt = new Date()
+ * 
+ * Input:
+ * - enrollmentId (string, bắt buộc)
+ * - studentId (string, bắt buộc - để verify ownership)
+ * - status (string, chỉ nhận giá trị "dropped")
+ * 
+ * Output: Enrollment đã được cập nhật với thông tin student và course đã populate
+ */
 export const updateSelfEnrollment = async (
   enrollmentId: string,
-  userId: string,
+  studentId: string,
   data: {
     status?: "dropped";
   }
@@ -252,7 +421,7 @@ export const updateSelfEnrollment = async (
   // 1. Check enrollment exists và thuộc về student này
   const enrollment = await EnrollmentModel.findOne({
     _id: enrollmentId,
-    userId,
+    studentId,
   });
   appAssert(enrollment, NOT_FOUND, "Enrollment not found or access denied");
 
@@ -263,13 +432,18 @@ export const updateSelfEnrollment = async (
     "Cannot drop a completed course"
   );
 
-  // 3. Update status
+  // 3. Update status và timestamp
+  const updateData: any = { status: data.status };
+  if (data.status === "dropped") {
+    updateData.droppedAt = new Date();
+  }
+
   const updatedEnrollment = await EnrollmentModel.findByIdAndUpdate(
     enrollmentId,
-    { status: data.status },
+    updateData,
     { new: true }
   )
-    .populate("userId", "username email fullname avatar_url")
+    .populate("studentId", "username email fullname avatar_url")
     .populate("courseId", "title code description");
 
   return updatedEnrollment;

@@ -7,9 +7,9 @@ const objectIdSchema = z.string().regex(/^[0-9a-fA-F]{24}$/, {
 
 // GET - Query enrollments (cho các query params)
 export const getEnrollmentsQuerySchema = z.object({
-  status: z.enum(["active", "completed", "dropped"]).optional(),
+  status: z.enum(["pending", "approved", "rejected", "cancelled", "dropped", "completed"]).optional(),
   courseId: z.string().optional(),
-  userId: z.string().optional(),
+  studentId: z.string().optional(),
   page: z.string().optional().transform((val) => (val ? parseInt(val) : 1)),
   limit: z.string().optional().transform((val) => (val ? parseInt(val) : 10)),
 });
@@ -29,23 +29,28 @@ export const courseIdSchema = z.object({
 
 // POST - Admin tạo enrollment cho student
 export const createEnrollmentSchema = z.object({
-  userId: objectIdSchema,
+  studentId: objectIdSchema,
   courseId: objectIdSchema,
-  status: z.enum(["active", "completed", "dropped"]).optional(),
+  status: z.enum(["pending", "approved", "rejected", "cancelled", "dropped", "completed"]).optional(),
   role: z.enum(["student", "auditor"]).optional(),
+  method: z.enum(["self", "invited", "password", "other"]).optional(),
+  note: z.string().optional(),
 });
 
 // POST - Student tự enroll vào course
 export const enrollSelfSchema = z.object({
   courseId: objectIdSchema,
   role: z.enum(["student", "auditor"]).optional(),
+  password: z.string().min(1).optional(), // For password-protected courses
 });
 
 // PUT - Update enrollment (Admin/Teacher)
 export const updateEnrollmentSchema = z.object({
-  status: z.enum(["active", "completed", "dropped"]).optional(),
+  status: z.enum(["pending", "approved", "rejected", "cancelled", "dropped", "completed"]).optional(),
   role: z.enum(["student", "auditor"]).optional(),
   finalGrade: z.number().min(0).max(100).optional(),
+  note: z.string().optional(),
+  respondedBy: objectIdSchema.optional(),
 });
 
 // PUT - Student update own enrollment (chỉ có thể drop)
