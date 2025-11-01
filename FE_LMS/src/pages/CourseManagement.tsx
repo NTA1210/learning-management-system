@@ -619,18 +619,15 @@ const CourseManagement: React.FC = () => {
                       setSelectedTeachers([]);
                     }
                   }}
-                  className="px-6 py-2 rounded-lg text-white transition-all duration-300 hover:scale-105 hover:shadow-lg"
+                  className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg"
                   style={{ 
-                    backgroundColor: darkMode ? '#059669' : '#10b981',
-                    animation: 'pulse 2s infinite'
+                    backgroundColor: darkMode ? '#059669' : '#10b981'
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = darkMode ? '#047857' : '#059669';
-                    e.currentTarget.style.transform = 'scale(1.05)';
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = darkMode ? '#059669' : '#10b981';
-                    e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
                   + Create Course
