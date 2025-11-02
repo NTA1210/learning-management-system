@@ -222,7 +222,7 @@ export const getAllEnrollments = async (filters: {
 export const createEnrollment = async (data: {
   studentId: string;
   courseId: string;
-  status?: "pending" | "approved" | "rejected" | "cancelled" | "dropped" | "completed";
+  status?: "pending" | "approved";
   role?: "student" | "auditor";
   method?: "self" | "invited" | "password" | "other";
   note?: string;
@@ -253,6 +253,12 @@ export const createEnrollment = async (data: {
 
   // 2.2. Determine default status based on enrollRequiresApproval
   const defaultStatus = data.status || (course.enrollRequiresApproval ? "pending" : "approved");
+  // Validate: Only pending or approved can be set when creating enrollment
+  appAssert(
+    defaultStatus === "pending" || defaultStatus === "approved",
+    BAD_REQUEST,
+    "Enrollment status must be 'pending' or 'approved'"
+  );
   const status = defaultStatus;
 
   // 3. Check existing enrollment

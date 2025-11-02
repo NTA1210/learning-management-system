@@ -31,7 +31,7 @@ export const courseIdSchema = z.object({
 export const createEnrollmentSchema = z.object({
   studentId: objectIdSchema,
   courseId: objectIdSchema,
-  status: z.enum(["pending", "approved", "rejected", "cancelled", "dropped", "completed"]).optional(),
+  status: z.enum(["pending", "approved"]).optional(),
   role: z.enum(["student", "auditor"]).optional(),
   method: z.enum(["self", "invited", "password", "other"]).optional(),
   note: z.string().optional(),
