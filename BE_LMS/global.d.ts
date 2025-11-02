@@ -13,15 +13,17 @@ declare global {
     interface Response {
       success<T>(
         status: number,
-        data?: T | null,
-        message?: string,
-        ...args: any
+        options?: { data?: T; message?: string; [key: string]: any }
       ): Response<IApiResponse<T>>;
+
       error(
         status: number,
-        message: string,
-        code?: string,
-        details?: any
+        options?: {
+          message?: string;
+          code?: string;
+          details?: any;
+          [key: string]: any;
+        }
       ): Response<IApiResponse<null>>;
     }
   }

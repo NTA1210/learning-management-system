@@ -25,6 +25,7 @@ import {
   authRoutes,
   courseRoutes,
   enrollmentRoutes,
+  quizQuestionRoutes,
   sessionRoutes,
   submissionRoutes,
   userRoutes,
@@ -77,6 +78,7 @@ export const createApp = () => {
   app.use("/enrollments", authenticate, enrollmentRoutes);
   app.use("/majors", authenticate, authorize(Role.ADMIN), majorProtectedRoutes);
   app.use("/specialists", authenticate, authorize(Role.ADMIN), specialistProtectedRoutes);
+  app.use("/quiz-questions", authenticate, quizQuestionRoutes);
 
   app.use(errorHandler);
 
