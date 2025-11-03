@@ -447,36 +447,7 @@ export const updateCourse = async (
     .populate("createdBy", "username email fullname")
     .lean();
 
-        appAssert(
-            teachers.length === data.teachers.length,
-            BAD_REQUEST,
-            "One or more teachers not found"
-        );
-
-        const allAreTeachers = teachers.every(
-            (teacher) => {
-                const role = teacher.role.trim().toUpperCase();
-                return role === "TEACHER" || role === "ADMIN";
-            }
-        );
-        appAssert(
-            allAreTeachers,
-            BAD_REQUEST,
-            "All assigned users must have teacher or admin role"
-        );
-    }
-
-    // Update course
-    const updatedCourse = await CourseModel.findByIdAndUpdate(
-        courseId,
-        {$set: data},
-        {new: true}
-    )
-        .populate("category", "name slug description")
-        .populate("teachers", "username email fullname avatar_url")
-        .lean();
-
-    return updatedCourse;
+  return updatedCourse;
 };
 
 /**
@@ -507,13 +478,11 @@ export const deleteCourse = async (courseId: string, userId: string) => {
   const normalizedRole = user.role.trim().toUpperCase();
   const isAdmin = normalizedRole === "ADMIN";
 
-    appAssert(
-        isAdmin,
-        // TODO: Replace this with correct parameters
-        // isTeacherOfCourse || isAdmin,
-        FORBIDDEN,
-        "You don't have permission to delete this course"
-    );
+  appAssert(
+    isTeacherOfCourse || isAdmin,
+    FORBIDDEN,
+    "You don't have permission to delete this course"
+  );
 
   // ✅ SOFT DELETE: Mark as deleted instead of removing from database
   await CourseModel.findByIdAndUpdate(

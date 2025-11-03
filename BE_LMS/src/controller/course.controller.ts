@@ -40,7 +40,9 @@ export const listCoursesHandler = catchErrors(async (req, res) => {
     sortOrder: query.sortOrder,
   });
 
-  return res.success(OK, result.courses, "Courses retrieved successfully", {
+  return res.success(OK, {
+    data: result.courses,
+    message: "Courses retrieved successfully",
     pagination: result.pagination,
   });
 });
@@ -55,7 +57,10 @@ export const getCourseByIdHandler = catchErrors(async (req, res) => {
   // Call service
   const course = await getCourseById(courseId);
 
-  return res.success(OK, course, "Course retrieved successfully");
+  return res.success(OK, {
+    data: course,
+    message: "Course retrieved successfully",
+  });
 });
 
 /**
@@ -71,7 +76,10 @@ export const createCourseHandler = catchErrors(async (req, res) => {
   // Call service
   const course = await createCourse(data, userId);
 
-  return res.success(CREATED, course, "Course created successfully");
+  return res.success(CREATED, {
+    data: course,
+    message: "Course created successfully",
+  });
 });
 
 /**
@@ -90,7 +98,10 @@ export const updateCourseHandler = catchErrors(async (req, res) => {
   // Call service
   const course = await updateCourse(courseId, data, userId);
 
-  return res.success(OK, course, "Course updated successfully");
+  return res.success(OK, {
+    data: course,
+    message: "Course updated successfully",
+  });
 });
 
 /**
@@ -106,7 +117,10 @@ export const deleteCourseHandler = catchErrors(async (req, res) => {
   // Call service
   const result = await deleteCourse(courseId, userId);
 
-  return res.success(OK, null, result.message);
+  return res.success(OK, {
+    data: null,
+    message: result.message,
+  });
 });
 
 /**
@@ -122,7 +136,10 @@ export const restoreCourseHandler = catchErrors(async (req, res) => {
   // Call service
   const result = await restoreCourse(courseId, userId);
 
-  return res.success(OK, result.course, result.message);
+  return res.success(OK, {
+    data: result.course,
+    message: result.message,
+  });
 });
 
 /**
@@ -139,7 +156,9 @@ export const permanentDeleteCourseHandler = catchErrors(async (req, res) => {
   // Call service
   const result = await permanentDeleteCourse(courseId, userId);
 
-  return res.success(OK, null, result.message, {
+  return res.success(OK, {
+    data: null,
+    message: result.message,
     warning: result.warning,
     deletedCourseId: result.deletedCourseId,
   });
