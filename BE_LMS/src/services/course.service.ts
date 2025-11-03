@@ -15,9 +15,8 @@ export type ListCoursesParams = {
   page: number;
   limit: number;
   search?: string;
-  specialistId?: string;
+  subjectId?: string; // ✅ NEW: Filter by subject instead of specialist
   teacherId?: string;
-  code?: string;
   isPublished?: boolean;
   status?: CourseStatus;
   includeDeleted?: boolean; // Admin only - include deleted courses in results
@@ -40,9 +39,8 @@ export const listCourses = async ({
   page,
   limit,
   search,
-  specialistId,
+  subjectId,
   teacherId,
-  code,
   isPublished,
   status,
   includeDeleted,
@@ -70,12 +68,12 @@ export const listCourses = async ({
     `Invalid sort field. Allowed: ${allowedSortFields.join(", ")}`
   );
 
-  // ❌ FIX: Validate specialistId/teacherId if provided
-  if (specialistId) {
+  // ❌ FIX: Validate subjectId/teacherId if provided
+  if (subjectId) {
     appAssert(
-      specialistId.match(/^[0-9a-fA-F]{24}$/),
+      subjectId.match(/^[0-9a-fA-F]{24}$/),
       BAD_REQUEST,
-      "Invalid specialist ID format"
+      "Invalid subject ID format"
     );
   }
   if (teacherId) {
@@ -111,20 +109,15 @@ export const listCourses = async ({
     filter.status = status;
   }
 
-  // Filter by specialist ID
-  if (specialistId) {
-    filter.specialistIds = specialistId;
+  // ✅ NEW: Filter by subject ID
+  if (subjectId) {
+    filter.subjectId = subjectId;
   }
 
   // Filter by teacher ID
   if (teacherId) {
     filter.teacherIds = teacherId;
   }
-
-    // Filter by course code (exact match, case-insensitive)
-    if (code) {
-        filter.code = {$regex: `^${code}$`, $options: "i"};
-    }
 
     // Search by title or description (text search)
     if (search) {
@@ -145,7 +138,7 @@ export const listCourses = async ({
   const [courses, total] = await Promise.all([
     CourseModel.find(filter)
       .populate("teacherIds", "username email fullname avatar_url")
-      .populate("specialistIds", "name slug description majorId")
+      .populate("subjectId", "name code slug description credits")
       .populate("createdBy", "username email fullname")
       .sort(sort)
       .skip(skip)
@@ -189,7 +182,7 @@ export const getCourseById = async (courseId: string) => {
     isDeleted: false,
   })
     .populate("teacherIds", "username email fullname avatar_url bio")
-    .populate("specialistIds", "name slug description majorId")
+    .populate("subjectId", "name code slug description credits")
     .populate("createdBy", "username email fullname")
     .lean();
 
@@ -219,16 +212,6 @@ export const createCourse = async (
     BAD_REQUEST,
     "Teacher list contains duplicate entries"
   );
-
-  // ❌ FIX: Check duplicate specialistIds
-  if (data.specialistIds && data.specialistIds.length > 0) {
-    const uniqueSpecs = new Set(data.specialistIds.map(id => id.toString()));
-    appAssert(
-      uniqueSpecs.size === data.specialistIds.length,
-      BAD_REQUEST,
-      "Specialist list contains duplicate entries"
-    );
-  }
 
   // Validate dates
   appAssert(data.startDate, BAD_REQUEST, "Start date is required");
@@ -287,62 +270,6 @@ export const createCourse = async (
     "Cannot assign inactive or banned teachers to course"
   );
 
-  // ✅ YÊU CẦU 1: Validate teacher specialistIds phải khớp với course specialistIds
-  if (data.specialistIds && data.specialistIds.length > 0) {
-    for (const teacher of teachers) {
-      const role = teacher.role.trim().toUpperCase();
-      // Admin có thể dạy bất kỳ chuyên ngành nào
-      if (role === "ADMIN") continue;
-
-      // Teacher phải có ít nhất 1 specialist trùng với course
-      const teacherSpecIds = teacher.specialistIds.map((id) => id.toString());
-      const courseSpecIds = data.specialistIds.map((id) => id.toString());
-
-      const hasMatchingSpecialty = courseSpecIds.some((specId) =>
-        teacherSpecIds.includes(specId)
-      );
-
-      appAssert(
-        hasMatchingSpecialty,
-        BAD_REQUEST,
-        `Teacher "${teacher.username}" does not have the required specialist credentials for this course. Teacher specialists: [${teacherSpecIds.join(
-          ", "
-        )}], Course requires: [${courseSpecIds.join(", ")}]`
-      );
-    }
-  }
-
-  // Validate specialists exist and are active (if provided)
-  if (data.specialistIds && data.specialistIds.length > 0) {
-    const specialists = await SpecialistModel.find({
-      _id: { $in: data.specialistIds },
-    });
-
-    appAssert(
-      specialists.length === data.specialistIds.length,
-      BAD_REQUEST,
-      "One or more specialists not found"
-    );
-
-    const allAreActive = specialists.every((spec) => spec.isActive === true);
-
-    appAssert(
-      allAreActive,
-      BAD_REQUEST,
-      "All specialists must be active"
-    );
-  }
-
-  // Check if code is unique (if provided)
-  if (data.code) {
-    const existingCourse = await CourseModel.findOne({ code: data.code });
-    appAssert(
-      !existingCourse,
-      BAD_REQUEST,
-      "Course code already exists"
-    );
-  }
-
   // ✅ YÊU CẦU 2: Teacher tạo course cần Admin approve
   // Get creator info to determine permissions
   const creator = await UserModel.findById(userId);
@@ -379,7 +306,7 @@ export const createCourse = async (
   // Populate and return
   const populatedCourse = await CourseModel.findById(course._id)
     .populate("teacherIds", "username email fullname avatar_url")
-    .populate("specialistIds", "name slug description majorId")
+    .populate("subjectId", "name code slug description credits")
     .populate("createdBy", "username email fullname")
     .lean();
 
@@ -485,62 +412,6 @@ export const updateCourse = async (
       "All assigned users must have teacher or admin role"
     );
 
-    // ✅ YÊU CẦU 1: Validate teacher specialistIds when updating
-    const courseSpecIds =
-      data.specialistIds || course.specialistIds || [];
-
-    if (courseSpecIds.length > 0) {
-      for (const teacher of teachers) {
-        const role = teacher.role.trim().toUpperCase();
-        if (role === "ADMIN") continue;
-
-        const teacherSpecIds = teacher.specialistIds.map((id) =>
-          id.toString()
-        );
-        const specIds = courseSpecIds.map((id) => id.toString());
-
-        const hasMatchingSpecialty = specIds.some((specId) =>
-          teacherSpecIds.includes(specId)
-        );
-
-        appAssert(
-          hasMatchingSpecialty,
-          BAD_REQUEST,
-          `Teacher "${teacher.username}" does not have the required specialist credentials for this course`
-        );
-      }
-    }
-  }
-
-  // Validate specialists if provided
-  if (data.specialistIds) {
-    const specialists = await SpecialistModel.find({
-      _id: { $in: data.specialistIds },
-    });
-
-    appAssert(
-      specialists.length === data.specialistIds.length,
-      BAD_REQUEST,
-      "One or more specialists not found"
-    );
-
-    const allAreActive = specialists.every((spec) => spec.isActive === true);
-
-    appAssert(
-      allAreActive,
-      BAD_REQUEST,
-      "All specialists must be active"
-    );
-  }
-
-  // Check if code is unique (if provided and different from current)
-  if (data.code && data.code !== course.code) {
-    const existingCourse = await CourseModel.findOne({ code: data.code });
-    appAssert(
-      !existingCourse,
-      BAD_REQUEST,
-      "Course code already exists"
-    );
   }
 
   // ✅ YÊU CẦU 2: Only Admin can approve/publish courses
@@ -562,7 +433,7 @@ export const updateCourse = async (
     { new: true, runValidators: true }
   )
     .populate("teacherIds", "username email fullname avatar_url")
-    .populate("specialistIds", "name slug description majorId")
+    .populate("subjectId", "name code slug description credits")
     .populate("createdBy", "username email fullname")
     .lean();
 
@@ -664,21 +535,6 @@ export const restoreCourse = async (courseId: string, userId: string) => {
   });
   appAssert(course, NOT_FOUND, "Deleted course not found");
 
-  // ❌ FIX: Check if code is already used by another active course
-  if (course.code) {
-    const codeConflict = await CourseModel.findOne({
-      code: course.code,
-      isDeleted: false,
-      _id: { $ne: courseId },
-    });
-
-    appAssert(
-      !codeConflict,
-      BAD_REQUEST,
-      `Cannot restore: course code "${course.code}" is already in use by another course`
-    );
-  }
-
   // Check if user is admin
   const user = await UserModel.findById(userId);
   appAssert(user, NOT_FOUND, "User not found");
@@ -705,7 +561,7 @@ export const restoreCourse = async (courseId: string, userId: string) => {
     { new: true }
   )
     .populate("teacherIds", "username email fullname avatar_url")
-    .populate("specialistIds", "name slug description majorId")
+    .populate("subjectId", "name code slug description credits")
     .populate("createdBy", "username email fullname")
     .lean();
 
