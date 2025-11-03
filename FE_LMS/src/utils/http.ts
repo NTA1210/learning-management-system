@@ -54,30 +54,24 @@ const _send = async <T = unknown>(
   pathname: string,
   data?: unknown,
   config?: AxiosRequestConfig
-): Promise<{ data: T; message?: string }> => {
+): Promise<any> => {
   try {
-    const response: AxiosResponse<ApiResponse<T>> = await httpClient.request({
+    const response: AxiosResponse<any> = await httpClient.request({
       method,
       url: pathname,
       data,
       withCredentials: true, // Ensure credentials are always sent
       ...config,
     });
-
-    const { success, data: payload, message } = response.data;
-
-    // Nếu success=false → coi là lỗi logic từ backend
-    if (!success) {
-      throw new Error(message || "Request failed");
+    const responseData = response.data;
+    if (!responseData.success) {
+      throw new Error(responseData.message || "Request failed");
     }
-
-    // ✅ Trả về cả data và message
-    return { data: payload as T, message };
+    // Return fully structured response
+    return responseData;
   } catch (err) {
-    const error = err as AxiosError<ApiResponse>;
+    const error = err as AxiosError<any>;
     console.error("HTTP Error:", error);
-
-    // Trả về lỗi chuẩn
     throw {
       success: false,
       status: error.response?.status || null,
@@ -85,7 +79,7 @@ const _send = async <T = unknown>(
         error.response?.data?.message ||
         error.message ||
         "Unknown error occurred",
-    } as ApiResponse;
+    };
   }
 };
 

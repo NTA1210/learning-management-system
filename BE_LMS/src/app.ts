@@ -30,6 +30,8 @@ import {
   submissionRoutes,
   userRoutes,
 } from "./routes";
+import {majorProtectedRoutes, majorPublicRoutes} from "@/routes/major.route";
+import {specialistProtectedRoutes, specialistPublicRoutes} from "@/routes/specialist.route";
 
 export const createApp = () => {
   const app = express();
@@ -67,6 +69,8 @@ export const createApp = () => {
   app.use("/courses", courseRoutes);
   app.use("/assignments", assignmentRoutes);
   app.use("/submissions", submissionRoutes);
+  app.use("/majors", majorPublicRoutes);
+  app.use("/specialists", specialistPublicRoutes);
 
   //protected routes
   app.use("/users", authenticate, userRoutes);

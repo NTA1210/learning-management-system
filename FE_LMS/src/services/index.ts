@@ -4,6 +4,7 @@ import http, { httpClient } from "../utils/http";
 import { type LoginRequest, type RegisterRequest, type AuthResponse, type User } from "../types/auth";
 export * from './mock';
 export * from './courseService';
+export * from './enrollmentService';
 
 // storage keys
 const USER_STORAGE_KEY = 'lms:user';
