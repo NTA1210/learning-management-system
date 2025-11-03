@@ -112,54 +112,73 @@ export const getStatFile = async (key: string) => {
  * @returns
  */
 export async function deleteFilesByPrefix(prefix: string) {
-  const objectsList: string[] = [];
+  console.log(`🧹 Starting deletion in prefix "${prefix}"...`);
+  let totalDeleted = 0;
+  const failed: string[] = [];
 
   try {
-    // ✅ Bọc toàn bộ trong try/catch để tránh crash
-    await new Promise<void>((resolve, reject) => {
-      const stream = minioClient.listObjectsV2(BUCKET_NAME, prefix, true);
+    let startAfter: string | undefined = undefined;
 
-      stream.on("data", (obj) => {
-        if (obj.name) objectsList.push(obj.name);
+    while (true) {
+      const objectsList: string[] = [];
+
+      // ✅ 1. Lấy 1 batch file (tối đa ~1000)
+      await new Promise<void>((resolve, reject) => {
+        const stream = minioClient.listObjectsV2(
+          BUCKET_NAME,
+          prefix,
+          true,
+          startAfter
+        );
+
+        stream.on("data", (obj) => {
+          if (obj.name) {
+            objectsList.push(obj.name);
+            startAfter = obj.name; // lưu lại để phân trang batch kế tiếp
+          }
+        });
+
+        stream.on("end", () => resolve());
+        stream.on("error", (err) => {
+          console.error("❌ Error when listing objects:", err);
+          reject(err);
+        });
       });
 
-      stream.on("end", () => resolve());
-      stream.on("error", (err) => {
-        console.error("❌ Error when listing objects:", err);
-        reject(err);
-      });
-    });
-
-    // Không có file nào để xóa
-    if (objectsList.length === 0) {
-      console.log(`⚠️ There is no file to delete in prefix "${prefix}"`);
-      return;
-    }
-
-    // ✅ Xóa từng file thay vì xóa toàn bộ 1 lần — tránh lỗi dừng giữa chừng
-    const failed: string[] = [];
-
-    for (const fileKey of objectsList) {
-      try {
-        await minioClient.removeObject(BUCKET_NAME, fileKey);
-        console.log(`🗑️ Deleted: ${fileKey}`);
-      } catch (err) {
-        console.error(`❌ Error when deleting ${fileKey}:`, err);
-        failed.push(fileKey);
+      // ✅ 2. Nếu không còn file nào → dừng
+      if (objectsList.length === 0) {
+        console.log(`✅ No more files found in prefix "${prefix}".`);
+        break;
       }
+
+      console.log(`📦 Found ${objectsList.length} files, deleting...`);
+
+      // ✅ 3. Xóa từng file trong batch
+      for (const fileKey of objectsList) {
+        try {
+          await minioClient.removeObject(BUCKET_NAME, fileKey);
+          console.log(`🗑️ Deleted: ${fileKey}`);
+          totalDeleted++;
+        } catch (err) {
+          console.error(`❌ Error deleting ${fileKey}:`, err);
+          failed.push(fileKey);
+        }
+      }
+
+      // ✅ 4. Nếu < 1000 file thì không cần lặp tiếp
+      if (objectsList.length < 1000) break;
     }
 
+    // ✅ 5. Kết quả cuối cùng
+    console.log(
+      `✅ Finished! Deleted ${totalDeleted} file(s) from prefix "${prefix}".`
+    );
     if (failed.length > 0) {
       console.warn(
-        `⚠️ Failed to delete ${failed.length} file:\n${failed.join(",\n")}`
-      );
-    } else {
-      console.log(
-        `✅ Deleted ${objectsList.length} files in prefix "${prefix}"`
+        `⚠️ Failed to delete ${failed.length} files:\n${failed.join("\n")}`
       );
     }
   } catch (err) {
-    // ✅ Nếu toàn bộ stream bị lỗi, không để crash
     console.error(`🚨 Fatal error while deleting prefix "${prefix}":`, err);
   }
 }

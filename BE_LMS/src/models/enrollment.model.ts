@@ -23,12 +23,12 @@ const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
     status: {
       type: String,
       enum: [
-        EnrollmentStatus.PENDING,
-        EnrollmentStatus.APPROVED,
-        EnrollmentStatus.REJECTED,
-        EnrollmentStatus.CANCELLED,
-        EnrollmentStatus.DROPPED,
-        EnrollmentStatus.COMPLETED,
+        EnrollmentStatus.PENDING, //enrollment chưa được duyệt vào nhóm
+        EnrollmentStatus.APPROVED, //enrollment đa được duyệt vào nhóm
+        EnrollmentStatus.REJECTED, //enrollment bị từ chối duyệt vào nhóm
+        EnrollmentStatus.CANCELLED, // student hủy enrollment
+        EnrollmentStatus.DROPPED, // student bị đánh rớt khóa học
+        EnrollmentStatus.COMPLETED, // student hoàn thành khóa học
       ],
       default: EnrollmentStatus.PENDING,
     },
