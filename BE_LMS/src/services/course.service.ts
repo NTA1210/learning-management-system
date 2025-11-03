@@ -50,6 +50,42 @@ export const listCourses = async ({
   sortBy = "createdAt",
   sortOrder = "desc",
 }: ListCoursesParams) => {
+  // ❌ FIX: Validate pagination parameters
+  appAssert(
+    page > 0 && page <= 10000,
+    BAD_REQUEST,
+    "Page must be between 1 and 10000"
+  );
+  appAssert(
+    limit > 0 && limit <= 100,
+    BAD_REQUEST,
+    "Limit must be between 1 and 100"
+  );
+
+  // ❌ FIX: Validate sortBy field
+  const allowedSortFields = ["createdAt", "updatedAt", "title", "startDate", "endDate", "deletedAt"];
+  appAssert(
+    allowedSortFields.includes(sortBy),
+    BAD_REQUEST,
+    `Invalid sort field. Allowed: ${allowedSortFields.join(", ")}`
+  );
+
+  // ❌ FIX: Validate specialistId/teacherId if provided
+  if (specialistId) {
+    appAssert(
+      specialistId.match(/^[0-9a-fA-F]{24}$/),
+      BAD_REQUEST,
+      "Invalid specialist ID format"
+    );
+  }
+  if (teacherId) {
+    appAssert(
+      teacherId.match(/^[0-9a-fA-F]{24}$/),
+      BAD_REQUEST,
+      "Invalid teacher ID format"
+    );
+  }
+
   // Build filter query
   const filter: any = {};
 
@@ -140,6 +176,13 @@ export const listCourses = async ({
  * Lấy thông tin chi tiết một khóa học theo ID
  */
 export const getCourseById = async (courseId: string) => {
+  // ❌ FIX: Validate courseId format
+  appAssert(
+    courseId && courseId.match(/^[0-9a-fA-F]{24}$/),
+    BAD_REQUEST,
+    "Invalid course ID format"
+  );
+
   // ✅ SOFT DELETE: Only get non-deleted course
   const course = await CourseModel.findOne({
     _id: courseId,
@@ -150,9 +193,9 @@ export const getCourseById = async (courseId: string) => {
     .populate("createdBy", "username email fullname")
     .lean();
 
-    appAssert(course, NOT_FOUND, "Course not found");
+  appAssert(course, NOT_FOUND, "Course not found");
 
-    return course;
+  return course;
 };
 
 /**
@@ -162,6 +205,31 @@ export const createCourse = async (
   data: CreateCourseInput,
   userId: string
 ) => {
+  // ❌ FIX: Validate teacherIds array
+  appAssert(
+    data.teacherIds && data.teacherIds.length > 0,
+    BAD_REQUEST,
+    "At least one teacher is required"
+  );
+
+  // ❌ FIX: Check duplicate teacherIds
+  const uniqueTeachers = new Set(data.teacherIds.map(id => id.toString()));
+  appAssert(
+    uniqueTeachers.size === data.teacherIds.length,
+    BAD_REQUEST,
+    "Teacher list contains duplicate entries"
+  );
+
+  // ❌ FIX: Check duplicate specialistIds
+  if (data.specialistIds && data.specialistIds.length > 0) {
+    const uniqueSpecs = new Set(data.specialistIds.map(id => id.toString()));
+    appAssert(
+      uniqueSpecs.size === data.specialistIds.length,
+      BAD_REQUEST,
+      "Specialist list contains duplicate entries"
+    );
+  }
+
   // Validate dates
   appAssert(data.startDate, BAD_REQUEST, "Start date is required");
   appAssert(data.endDate, BAD_REQUEST, "End date is required");
@@ -174,6 +242,15 @@ export const createCourse = async (
     BAD_REQUEST,
     "End date must be after start date"
   );
+
+  // ❌ FIX: Validate capacity if provided
+  if (data.capacity !== undefined) {
+    appAssert(
+      data.capacity > 0 && data.capacity <= 10000,
+      BAD_REQUEST,
+      "Capacity must be between 1 and 10000"
+    );
+  }
 
   // Validate all teachers exist and have correct roles
   const teachers = await UserModel.find({
@@ -196,6 +273,18 @@ export const createCourse = async (
     allAreTeachers,
     BAD_REQUEST,
     "All assigned users must have teacher or admin role"
+  );
+
+  // ❌ FIX: Check if teachers are active (not banned/inactive)
+  const allTeachersActive = teachers.every((teacher) => {
+    const status = teacher.status?.trim().toUpperCase();
+    return status === "ACTIVE";
+  });
+
+  appAssert(
+    allTeachersActive,
+    BAD_REQUEST,
+    "Cannot assign inactive or banned teachers to course"
   );
 
   // ✅ YÊU CẦU 1: Validate teacher specialistIds phải khớp với course specialistIds
@@ -284,6 +373,9 @@ export const createCourse = async (
 
   const course = await CourseModel.create(courseData);
 
+  // ❌ FIX: Ensure course was created
+  appAssert(course, BAD_REQUEST, "Failed to create course");
+
   // Populate and return
   const populatedCourse = await CourseModel.findById(course._id)
     .populate("teacherIds", "username email fullname avatar_url")
@@ -291,7 +383,10 @@ export const createCourse = async (
     .populate("createdBy", "username email fullname")
     .lean();
 
-    return populatedCourse;
+  // ❌ FIX: Ensure populated course exists
+  appAssert(populatedCourse, BAD_REQUEST, "Failed to retrieve created course");
+
+  return populatedCourse;
 };
 
 /**
@@ -302,12 +397,26 @@ export const updateCourse = async (
     data: UpdateCourseInput,
     userId: string
 ) => {
+  // ❌ FIX: Validate courseId format
+  appAssert(
+    courseId && courseId.match(/^[0-9a-fA-F]{24}$/),
+    BAD_REQUEST,
+    "Invalid course ID format"
+  );
+
   // ✅ SOFT DELETE: Find non-deleted course only
   const course = await CourseModel.findOne({
     _id: courseId,
     isDeleted: false,
   });
   appAssert(course, NOT_FOUND, "Course not found");
+
+  // ❌ FIX: Cannot update completed course
+  appAssert(
+    course.status !== CourseStatus.COMPLETED,
+    BAD_REQUEST,
+    "Cannot update a completed course"
+  );
 
     // Check if user is a teacher of this course or admin
     const user = await UserModel.findById(userId);
@@ -339,7 +448,17 @@ export const updateCourse = async (
       "End date must be after start date"
     );
 
-    if (data.startDate) data.startDate = startDate as any;
+    // ❌ FIX: Cannot change startDate if course already started
+    if (data.startDate) {
+      const now = new Date();
+      appAssert(
+        course.startDate > now,
+        BAD_REQUEST,
+        "Cannot change start date of a course that has already started"
+      );
+      data.startDate = startDate as any;
+    }
+
     if (data.endDate) data.endDate = endDate as any;
   }
 
@@ -447,6 +566,9 @@ export const updateCourse = async (
     .populate("createdBy", "username email fullname")
     .lean();
 
+  // ❌ FIX: Ensure course was updated successfully
+  appAssert(updatedCourse, BAD_REQUEST, "Failed to update course");
+
   return updatedCourse;
 };
 
@@ -461,12 +583,26 @@ export const updateCourse = async (
  * 5. Chỉ teacher của course hoặc admin mới có quyền xóa
  */
 export const deleteCourse = async (courseId: string, userId: string) => {
+  // ❌ FIX: Validate courseId format
+  appAssert(
+    courseId && courseId.match(/^[0-9a-fA-F]{24}$/),
+    BAD_REQUEST,
+    "Invalid course ID format"
+  );
+
   // ✅ SOFT DELETE: Find non-deleted course only
   const course = await CourseModel.findOne({
     _id: courseId,
     isDeleted: false,
   });
   appAssert(course, NOT_FOUND, "Course not found or already deleted");
+
+  // ❌ FIX: Cannot delete ongoing course
+  appAssert(
+    course.status !== CourseStatus.ONGOING,
+    BAD_REQUEST,
+    "Cannot delete an ongoing course. Please complete or cancel it first."
+  );
 
     // Check if user is a teacher of this course or admin
     const user = await UserModel.findById(userId);
@@ -514,12 +650,34 @@ export const deleteCourse = async (courseId: string, userId: string) => {
  * 4. Clear deletedAt và deletedBy fields
  */
 export const restoreCourse = async (courseId: string, userId: string) => {
+  // ❌ FIX: Validate courseId format
+  appAssert(
+    courseId && courseId.match(/^[0-9a-fA-F]{24}$/),
+    BAD_REQUEST,
+    "Invalid course ID format"
+  );
+
   // ✅ Find deleted course only
   const course = await CourseModel.findOne({
     _id: courseId,
     isDeleted: true,
   });
   appAssert(course, NOT_FOUND, "Deleted course not found");
+
+  // ❌ FIX: Check if code is already used by another active course
+  if (course.code) {
+    const codeConflict = await CourseModel.findOne({
+      code: course.code,
+      isDeleted: false,
+      _id: { $ne: courseId },
+    });
+
+    appAssert(
+      !codeConflict,
+      BAD_REQUEST,
+      `Cannot restore: course code "${course.code}" is already in use by another course`
+    );
+  }
 
   // Check if user is admin
   const user = await UserModel.findById(userId);
