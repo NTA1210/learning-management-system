@@ -10,6 +10,7 @@ const SubjectSchema = new mongoose.Schema<ISubject>(
     specialistIds: [
       { type: mongoose.Schema.Types.ObjectId, ref: "Specialist" },
     ],
+    credits: { type: Number, required: true },
     isActive: { type: Boolean, default: true },
     prerequisites: [{ type: mongoose.Schema.Types.ObjectId, ref: "Subject" }],
   },
