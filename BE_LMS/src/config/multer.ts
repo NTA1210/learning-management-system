@@ -18,6 +18,8 @@ const ALLOWED_MIME_TYPES = [
   "image/png",
   "video/mp4",
   "audio/mpeg",
+  "application/xml",
+  "text/xml",
 ];
 
 const storage = multer.memoryStorage();

@@ -12,24 +12,29 @@ function handleZodError(res: Response, error: ZodError) {
     message: err.message,
   }));
 
-  return res.error(
-    BAD_REQUEST,
-    error.message,
-    AppErrorCode.ValidationError,
-    errors
-  );
+  return res.error(BAD_REQUEST, {
+    message: error.message,
+    code: AppErrorCode.ValidationError,
+    errors,
+  });
 }
 
 function handleAppError(res: Response, error: AppError) {
-  return res.error(error.statusCode, error.message, error.errorCode);
+  return res.error(error.statusCode, {
+    message: error.message,
+    code: error.errorCode,
+  });
 }
 
 function handleCastError(res: Response, error: mongoose.Error.CastError) {
-  return res.error(BAD_REQUEST, error.message, AppErrorCode.CastError);
+  return res.error(BAD_REQUEST, {
+    message: error.message,
+    code: AppErrorCode.ValidationError,
+  });
 }
 
 const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
-  console.log(`PATH: ${req.path} - ERROR: `, error.message);
+  console.log(`PATH: ${req.path} - ERROR: `, error);
 
   if (req.path === REFRESH_PATH) {
     clearAuthCookies(res);
@@ -47,7 +52,9 @@ const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
     return handleCastError(res, error);
   }
 
-  return res.error(INTERNAL_SERVER_ERROR, "Something went wrong");
+  return res.error(INTERNAL_SERVER_ERROR, {
+    message: "Internal server error",
+  });
 };
 
 export default errorHandler;

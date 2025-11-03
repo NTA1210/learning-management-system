@@ -3,7 +3,6 @@ import dotenv from "dotenv";
 
 import {
   UserModel,
-  CategoryModel,
   CourseModel,
   EnrollmentModel,
   LessonModel,
@@ -26,20 +25,21 @@ import {
 } from "../models";
 import { EnrollmentStatus } from "../types/enrollment.type";
 import { QuizQuestionType } from "@/types/quizQuestion.type";
+import {MONGO_URI} from "@/constants/env";
 
 dotenv.config();
 
 async function seed() {
   try {
-    await mongoose.connect("mongodb://127.0.0.1:27017/lms");
+    await mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://minhhieu69420:fVCAoajSIt8Tg8XG@cluster0.rpp2msz.mongodb.net/lms_local?retryWrites=true&w=majority&appName=Cluster0');
     console.log("MongoDB connected");
 
     // Drop whole database if exists
 
-    if (mongoose.connection.db) {
-      await mongoose.connection.db.dropDatabase();
-      console.log("Database dropped");
-    }
+    // if (mongoose.connection.db) {
+    //   await mongoose.connection.db.dropDatabase();
+    //   console.log("Database dropped");
+    // }
 
     // Users (2-3)
     const users = await UserModel.create([
@@ -49,7 +49,7 @@ async function seed() {
         password: "123456",
         role: "admin",
         fullname: "Admin One",
-        verified: true,
+        isVerified: true,
       },
       {
         username: "teacher1",
@@ -57,7 +57,7 @@ async function seed() {
         password: "123456",
         role: "teacher",
         fullname: "Teacher One",
-        verified: true,
+        isVerified: true,
       },
       {
         username: "student1",
@@ -65,7 +65,7 @@ async function seed() {
         password: "123456",
         role: "student",
         fullname: "Student One",
-        verified: true,
+        isVerified: true,
       },
       {
         username: "student2",
@@ -73,7 +73,7 @@ async function seed() {
         password: "123456",
         role: "student",
         fullname: "Student Two",
-        verified: true,
+        isVerified: true,
       },
     ]);
 

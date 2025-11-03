@@ -85,25 +85,25 @@ export const listCourses = async ({
     filter.teacherIds = teacherId;
   }
 
-  // Filter by course code (exact match, case-insensitive)
-  if (code) {
-    filter.code = { $regex: `^${code}$`, $options: "i" };
-  }
+    // Filter by course code (exact match, case-insensitive)
+    if (code) {
+        filter.code = {$regex: `^${code}$`, $options: "i"};
+    }
 
-  // Search by title or description (text search)
-  if (search) {
-    filter.$or = [
-      { title: { $regex: search, $options: "i" } },
-      { description: { $regex: search, $options: "i" } },
-    ];
-  }
+    // Search by title or description (text search)
+    if (search) {
+        filter.$or = [
+            {title: {$regex: search, $options: "i"}},
+            {description: {$regex: search, $options: "i"}},
+        ];
+    }
 
-  // Calculate pagination
-  const skip = (page - 1) * limit;
+    // Calculate pagination
+    const skip = (page - 1) * limit;
 
-  // Build sort object
-  const sort: any = {};
-  sort[sortBy] = sortOrder === "asc" ? 1 : -1;
+    // Build sort object
+    const sort: any = {};
+    sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
   // Execute query with pagination
   const [courses, total] = await Promise.all([
@@ -118,22 +118,22 @@ export const listCourses = async ({
     CourseModel.countDocuments(filter),
   ]);
 
-  // Calculate pagination metadata
-  const totalPages = Math.ceil(total / limit);
-  const hasNextPage = page < totalPages;
-  const hasPrevPage = page > 1;
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(total / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
 
-  return {
-    courses,
-    pagination: {
-      total,
-      page,
-      limit,
-      totalPages,
-      hasNextPage,
-      hasPrevPage,
-    },
-  };
+    return {
+        courses,
+        pagination: {
+            total,
+            page,
+            limit,
+            totalPages,
+            hasNextPage,
+            hasPrevPage,
+        },
+    };
 };
 
 /**
@@ -150,9 +150,9 @@ export const getCourseById = async (courseId: string) => {
     .populate("createdBy", "username email fullname")
     .lean();
 
-  appAssert(course, NOT_FOUND, "Course not found");
+    appAssert(course, NOT_FOUND, "Course not found");
 
-  return course;
+    return course;
 };
 
 /**
@@ -291,16 +291,16 @@ export const createCourse = async (
     .populate("createdBy", "username email fullname")
     .lean();
 
-  return populatedCourse;
+    return populatedCourse;
 };
 
 /**
  * Cập nhật khóa học
  */
 export const updateCourse = async (
-  courseId: string,
-  data: UpdateCourseInput,
-  userId: string
+    courseId: string,
+    data: UpdateCourseInput,
+    userId: string
 ) => {
   // ✅ SOFT DELETE: Find non-deleted course only
   const course = await CourseModel.findOne({
@@ -309,9 +309,9 @@ export const updateCourse = async (
   });
   appAssert(course, NOT_FOUND, "Course not found");
 
-  // Check if user is a teacher of this course or admin
-  const user = await UserModel.findById(userId);
-  appAssert(user, NOT_FOUND, "User not found");
+    // Check if user is a teacher of this course or admin
+    const user = await UserModel.findById(userId);
+    appAssert(user, NOT_FOUND, "User not found");
 
   const isTeacherOfCourse = course.teacherIds.some(
     (teacherId) => teacherId.toString() === userId
@@ -447,7 +447,36 @@ export const updateCourse = async (
     .populate("createdBy", "username email fullname")
     .lean();
 
-  return updatedCourse;
+        appAssert(
+            teachers.length === data.teachers.length,
+            BAD_REQUEST,
+            "One or more teachers not found"
+        );
+
+        const allAreTeachers = teachers.every(
+            (teacher) => {
+                const role = teacher.role.trim().toUpperCase();
+                return role === "TEACHER" || role === "ADMIN";
+            }
+        );
+        appAssert(
+            allAreTeachers,
+            BAD_REQUEST,
+            "All assigned users must have teacher or admin role"
+        );
+    }
+
+    // Update course
+    const updatedCourse = await CourseModel.findByIdAndUpdate(
+        courseId,
+        {$set: data},
+        {new: true}
+    )
+        .populate("category", "name slug description")
+        .populate("teachers", "username email fullname avatar_url")
+        .lean();
+
+    return updatedCourse;
 };
 
 /**
@@ -468,9 +497,9 @@ export const deleteCourse = async (courseId: string, userId: string) => {
   });
   appAssert(course, NOT_FOUND, "Course not found or already deleted");
 
-  // Check if user is a teacher of this course or admin
-  const user = await UserModel.findById(userId);
-  appAssert(user, NOT_FOUND, "User not found");
+    // Check if user is a teacher of this course or admin
+    const user = await UserModel.findById(userId);
+    appAssert(user, NOT_FOUND, "User not found");
 
   const isTeacherOfCourse = course.teacherIds.some(
     (teacherId) => teacherId.toString() === userId
@@ -478,11 +507,13 @@ export const deleteCourse = async (courseId: string, userId: string) => {
   const normalizedRole = user.role.trim().toUpperCase();
   const isAdmin = normalizedRole === "ADMIN";
 
-  appAssert(
-    isTeacherOfCourse || isAdmin,
-    FORBIDDEN,
-    "You don't have permission to delete this course"
-  );
+    appAssert(
+        isAdmin,
+        // TODO: Replace this with correct parameters
+        // isTeacherOfCourse || isAdmin,
+        FORBIDDEN,
+        "You don't have permission to delete this course"
+    );
 
   // ✅ SOFT DELETE: Mark as deleted instead of removing from database
   await CourseModel.findByIdAndUpdate(

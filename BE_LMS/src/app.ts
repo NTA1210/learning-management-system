@@ -25,10 +25,13 @@ import {
   authRoutes,
   courseRoutes,
   enrollmentRoutes,
+  quizQuestionRoutes,
   sessionRoutes,
   submissionRoutes,
   userRoutes,
 } from "./routes";
+import {majorProtectedRoutes, majorPublicRoutes} from "@/routes/major.route";
+import {specialistProtectedRoutes, specialistPublicRoutes} from "@/routes/specialist.route";
 
 export const createApp = () => {
   const app = express();
@@ -66,11 +69,16 @@ export const createApp = () => {
   app.use("/courses", courseRoutes);
   app.use("/assignments", assignmentRoutes);
   app.use("/submissions", submissionRoutes);
+  app.use("/majors", majorPublicRoutes);
+  app.use("/specialists", specialistPublicRoutes);
 
   //protected routes
   app.use("/users", authenticate, userRoutes);
   app.use("/sessions", authenticate, authorize(Role.ADMIN), sessionRoutes);
   app.use("/enrollments", authenticate, enrollmentRoutes);
+  app.use("/majors", authenticate, authorize(Role.ADMIN), majorProtectedRoutes);
+  app.use("/specialists", authenticate, authorize(Role.ADMIN), specialistProtectedRoutes);
+  app.use("/quiz-questions", authenticate, quizQuestionRoutes);
 
   app.use(errorHandler);
 
