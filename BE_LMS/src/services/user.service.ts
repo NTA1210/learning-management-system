@@ -4,7 +4,6 @@ import EnrollmentModel from "@/models/enrollment.model";
 import UserModel from "@/models/user.model";
 import { Role, UserStatus } from "@/types";
 import appAssert from "@/utils/appAssert";
-import { formatUserResponse } from "@/utils/userResponse";
 import { TGetAllUsersFilter } from "@/validators/user.schemas";
 
 export const getAllUsers = async (
@@ -49,7 +48,7 @@ export const getAllUsers = async (
   ]);
 
   const enrolledUerIds = new Set<String>(
-    enrolledList.map((enrollment) => enrollment.userId.toString())
+    enrolledList.map((enrollment) => enrollment.studentId.toString())
   );
 
   const usersWithEnrolledStatus = users.map((user) => {
@@ -85,3 +84,28 @@ export const getAllUsers = async (
     },
   };
 };
+function formatUserResponse(user: any, viewerRole: Role) {
+  const base = {
+    _id: user._id,
+    fullname: user.fullname,
+    avatar_url: user.avatar_url,
+    bio: user.bio,
+    role: user.role,
+    isEnrolled: user.isEnrolled ?? false,
+  };
+
+  if (viewerRole === Role.TEACHER) {
+    return {
+      ...base,
+      email: user.email,
+      phone_number: user.phone_number,
+    };
+  }
+
+  if (viewerRole === Role.ADMIN) {
+    const { password, __v, ...rest } = user;
+    return rest;
+  }
+
+  return base;
+}

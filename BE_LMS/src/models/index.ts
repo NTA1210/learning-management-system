@@ -1,7 +1,6 @@
 export { default as AnnouncementModel } from "./announcement.model";
 export { default as AssignmentModel } from "./assignment.model";
 export { default as AttendanceModel } from "./attendance.model";
-export { default as CategoryModel } from "./category.model";
 export { default as CourseModel } from "./course.model";
 export { default as EnrollmentModel } from "./enrollment.model";
 export { default as ForumModel } from "./forum.model";
@@ -20,3 +19,4 @@ export { default as LessonProgressModel } from "./lessonProgress.model";
 export { default as SpecialistModel } from "./specialist.model";
 export { default as MajorModel } from "./major.model";
 export { default as QuizQuestionModel } from "./quizQuestion.model";
+export { default as SubjectModel } from "./subject.model";

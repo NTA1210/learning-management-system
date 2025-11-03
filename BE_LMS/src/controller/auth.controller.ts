@@ -51,11 +51,10 @@ export const loginHandler = catchErrors(async (req, res) => {
 
   const { user, refreshToken, accessToken } = await loginUser(request);
 
-  return setAuthCookies({ res, accessToken, refreshToken }).success(
-    OK,
-    user,
-    "Login successfully"
-  );
+  return setAuthCookies({ res, accessToken, refreshToken }).success(OK, {
+    data: user,
+    message: "Login successfully",
+  });
 });
 
 export const logoutHandler = catchErrors(async (req, res) => {
@@ -66,7 +65,9 @@ export const logoutHandler = catchErrors(async (req, res) => {
     await SessionModel.findByIdAndDelete(payload.sessionId);
   }
 
-  return clearAuthCookies(res).success(OK, null, "Logout successfully");
+  return clearAuthCookies(res).success(OK, {
+    message: "Logout successfully",
+  });
 });
 
 export const refreshHandler = catchErrors(async (req, res) => {
@@ -82,7 +83,9 @@ export const refreshHandler = catchErrors(async (req, res) => {
 
   return res
     .cookie("accessToken", accessToken, getAccessTokenCookieOptions())
-    .success(OK, null, "Token refreshed successfully");
+    .success(OK, {
+      message: "Token refreshed successfully",
+    });
 });
 
 export const verifyEmailHandler = catchErrors(async (req, res) => {
@@ -91,15 +94,18 @@ export const verifyEmailHandler = catchErrors(async (req, res) => {
   //call service to verify email
   await verifyEmail(verificationCode);
 
-  return res.success(OK, null, "Email verified successfully");
+  return res.success(OK, {
+    message: "Email verified successfully",
+  });
 });
 
 export const sendPasswordResetHandler = catchErrors(async (req, res) => {
   const email = emailSchema.parse(req.body.email);
   await sendPasswordResetEmail(email);
 
-  return res.success(OK, null, "Email sent successfully", {
-    info: "Please check your email to reset your password",
+  return res.success(OK, {
+    message: "Password reset email sent successfully",
+    info: "Check your email to reset your password",
   });
 });
 
@@ -109,5 +115,7 @@ export const resetPasswordHandler = catchErrors(async (req, res) => {
 
   await resetPassword(request);
 
-  return clearAuthCookies(res).success(OK, null, "Password reset successfully");
+  return clearAuthCookies(res).success(OK, {
+    message: "Password reset successfully",
+  });
 });

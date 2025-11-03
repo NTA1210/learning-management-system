@@ -3,8 +3,9 @@ import appAssert from "../utils/appAssert";
 import AppErrorCode from "../constants/appErrorCode";
 import { UNAUTHORIZED } from "../constants/http";
 import { verifyToken } from "../utils/jwt";
+import { SessionModel } from "@/models";
 
-const authenticate: RequestHandler = (req, res, next) => {
+const authenticate: RequestHandler = async (req, res, next) => {
   const accessToken = req.cookies.accessToken as string | undefined;
   appAssert(
     accessToken,
@@ -18,6 +19,15 @@ const authenticate: RequestHandler = (req, res, next) => {
     payload,
     UNAUTHORIZED,
     error === "jwt expired" ? "Token expired" : "Invalid token",
+    AppErrorCode.InvalidAccessToken
+  );
+
+  //Check if session is valid
+  const session = await SessionModel.findById(payload.sessionId);
+  appAssert(
+    session && session.expiresAt.getTime() > Date.now(),
+    UNAUTHORIZED,
+    "Session expired or logged out",
     AppErrorCode.InvalidAccessToken
   );
 
