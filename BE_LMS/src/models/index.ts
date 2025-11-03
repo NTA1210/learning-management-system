@@ -19,3 +19,4 @@ export { default as LessonProgressModel } from "./lessonProgress.model";
 export { default as SpecialistModel } from "./specialist.model";
 export { default as MajorModel } from "./major.model";
 export { default as QuizQuestionModel } from "./quizQuestion.model";
+export { default as SubjectModel } from "./subject.model";
