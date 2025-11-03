@@ -5,6 +5,7 @@ import UserModel from "../models/user.model";
 import appAssert from "../utils/appAssert";
 import { compareValue } from "../utils/bcrypt";
 import { CourseStatus } from "../types/course.type";
+import { EnrollmentStatus } from "@/types/enrollment.type";
 
 // Ensure models are registered
 void CourseModel;
@@ -197,14 +198,15 @@ export const getAllEnrollments = async (filters: {
  * Yêu cầu nghiệp vụ:
  * - Tạo enrollment mới cho student vào một khóa học
  * - Kiểm tra student tồn tại → nếu không tồn tại trả lỗi NOT_FOUND
- * - Kiểm tra course tồn tại và đã published → nếu không trả lỗi NOT_FOUND hoặc BAD_REQUEST
+ * - Kiểm tra course tồn tại và status = ONGOING → nếu không trả lỗi NOT_FOUND hoặc BAD_REQUEST
  * - Nếu course có password → yêu cầu nhập password đúng (với method = "self")
  * - Xác định status mặc định dựa vào enrollRequiresApproval của course:
  *   + Nếu enrollRequiresApproval = true → status = "pending"
  *   + Nếu enrollRequiresApproval = false → status = "approved"
- * - Kiểm tra enrollment đã tồn tại:
- *   + Nếu status cũ = "dropped", "rejected", "cancelled" → CHO PHÉP re-enroll (cập nhật lại)
- *   + Nếu status cũ = "pending", "approved", "completed" → KHÔNG CHO PHÉP (trả lỗi CONFLICT)
+ * - Kiểm tra enrollment đã tồn tại (theo FPT LMS logic):
+ *   + Nếu status cũ = REJECTED hoặc CANCELLED → CHO PHÉP re-enroll (cập nhật lại)
+ *   + Nếu status cũ = DROPPED hoặc COMPLETED → KHÔNG CHO PHÉP (phải học khóa KHÁC)
+ *   + Nếu status cũ = PENDING hoặc APPROVED → KHÔNG CHO PHÉP (trả lỗi CONFLICT)
  * - Kiểm tra capacity (sức chứa) của course → nếu đầy trả lỗi BAD_REQUEST
  * - Tạo enrollment mới với các thông tin: studentId, courseId, status, role, method, note
  * 
@@ -252,10 +254,10 @@ export const createEnrollment = async (data: {
   }
 
   // 2.2. Determine default status based on enrollRequiresApproval
-  const defaultStatus = data.status || (course.enrollRequiresApproval ? "pending" : "approved");
+  const defaultStatus = data.status || (course.enrollRequiresApproval ? EnrollmentStatus.PENDING : EnrollmentStatus.APPROVED);
   // Validate: Only pending or approved can be set when creating enrollment
   appAssert(
-    defaultStatus === "pending" || defaultStatus === "approved",
+    defaultStatus === EnrollmentStatus.PENDING || defaultStatus === EnrollmentStatus.APPROVED,
     BAD_REQUEST,
     "Enrollment status must be 'pending' or 'approved'"
   );
@@ -269,8 +271,21 @@ export const createEnrollment = async (data: {
 
   // Nếu đã có enrollment
   if (existingEnrollment) {
-    // Nếu status = "dropped", "rejected", "cancelled" → CHO PHÉP re-enroll
-    if (["dropped", "rejected", "cancelled"].includes(existingEnrollment.status)) {
+    // Chỉ cho phép re-enroll khi status = REJECTED hoặc CANCELLED
+    // - REJECTED: Enrollment bị từ chối duyệt → có thể đăng ký lại
+    // - CANCELLED: Student tự hủy enrollment → có thể đăng ký lại
+    // 
+    // KHÔNG cho phép re-enroll khi:
+    // - DROPPED: Bị đánh rớt → phải đăng ký môn đó ở khóa học KHÁC
+    // - COMPLETED: Đã hoàn thành → phải đăng ký môn đó ở khóa học KHÁC
+    // - PENDING: Đang chờ duyệt → không cần enroll lại
+    // - APPROVED: Đang học → không thể enroll lại
+    const reEnrollableStatuses = [
+      EnrollmentStatus.REJECTED,
+      EnrollmentStatus.CANCELLED,
+    ];
+
+    if (reEnrollableStatuses.includes(existingEnrollment.status as EnrollmentStatus)) {
       // Verify password again for re-enrollment if needed
       if (course.enrollPasswordHash && method === "self") {
         appAssert(password, BAD_REQUEST, "Password is required for this course");
@@ -298,19 +313,26 @@ export const createEnrollment = async (data: {
       return existingEnrollment;
     }
 
-    // Nếu status = "pending", "approved" hoặc "completed" → KHÔNG CHO PHÉP
-    appAssert(
-      false,
-      CONFLICT,
-      "Already enrolled in this course"
-    );
+    // Xử lý các trường hợp không được re-enroll với message cụ thể
+    let errorMessage = "Already enrolled in this course";
+    if (existingEnrollment.status === EnrollmentStatus.DROPPED) {
+      errorMessage = "You have been dropped from this course. Please enroll in another course offering the same subject.";
+    } else if (existingEnrollment.status === EnrollmentStatus.COMPLETED) {
+      errorMessage = "You have already completed this course. Please enroll in another course offering the same subject.";
+    } else if (existingEnrollment.status === EnrollmentStatus.PENDING) {
+      errorMessage = "Your enrollment is pending approval.";
+    } else if (existingEnrollment.status === EnrollmentStatus.APPROVED) {
+      errorMessage = "You are already enrolled in this course.";
+    }
+
+    appAssert(false, CONFLICT, errorMessage);
   }
 
   // 4. Check course capacity
   if (course.capacity) {
     const enrolledCount = await EnrollmentModel.countDocuments({
       courseId,
-      status: "approved",
+      status: EnrollmentStatus.APPROVED,
     });
     appAssert(
       enrolledCount < course.capacity,
@@ -379,16 +401,16 @@ export const updateEnrollment = async (
     updateData.status = data.status;
     
     // Tự động set timestamp khi status thay đổi
-    if (data.status === "approved" || data.status === "rejected") {
+    if (data.status === EnrollmentStatus.APPROVED || data.status === EnrollmentStatus.REJECTED) {
       updateData.respondedAt = new Date();
       if (data.respondedBy) {
         updateData.respondedBy = data.respondedBy;
       }
     }
-    if (data.status === "completed") {
+    if (data.status === EnrollmentStatus.COMPLETED) {
       updateData.completedAt = new Date();
     }
-    if (data.status === "dropped") {
+    if (data.status === EnrollmentStatus.DROPPED) {
       updateData.droppedAt = new Date();
     }
   }
@@ -439,14 +461,14 @@ export const updateSelfEnrollment = async (
 
   // 2. Không cho phép drop nếu đã completed
   appAssert(
-    enrollment.status !== "completed",
+    enrollment.status !== EnrollmentStatus.COMPLETED,
     BAD_REQUEST,
     "Cannot drop a completed course"
   );
 
   // 3. Update status và timestamp
   const updateData: any = { status: data.status };
-  if (data.status === "dropped") {
+  if (data.status === EnrollmentStatus.DROPPED) {
     updateData.droppedAt = new Date();
   }
 
