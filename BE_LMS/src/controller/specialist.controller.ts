@@ -74,7 +74,7 @@ export const createSpecialistHandler = catchErrors(async (req, res) => {
     const data = createSpecialistSchema.parse(req.body);
 
     // Call service
-    const specialist = await createSpecialist({...data, majorId: data.majorId as mongoose.Types.ObjectId});
+    const specialist = await createSpecialist({...data, majorId: data.majorId as unknown as mongoose.Types.ObjectId});
 
     return res.status(CREATED).json({
         message: "Specialist created successfully",
@@ -87,7 +87,7 @@ export const updateSpecialistByIdHandler = catchErrors(async (req, res) => {
     const data = updateSpecialistSchema.parse(req.body);
 
     // Call service
-    const specialist = await updateSpecialistById(specialistId, {...data, majorId: data.majorId as mongoose.Types.ObjectId});
+    const specialist = await updateSpecialistById(specialistId, {...data, majorId: data.majorId as unknown as mongoose.Types.ObjectId});
 
     return res.status(OK).json({
         message: "Specialist updated successfully",
@@ -100,7 +100,7 @@ export const updateSpecialistBySlugHandler = catchErrors(async (req, res) => {
     const data = updateSpecialistSchema.parse(req.body);
 
     // Call service
-    const specialist = await updateSpecialistBySlug(slug, {...data, majorId: data.majorId as mongoose.Types.ObjectId});
+    const specialist = await updateSpecialistBySlug(slug, {...data, majorId: data.majorId as unknown as mongoose.Types.ObjectId});
 
     return res.status(OK).json({
         message: "Specialist updated successfully",
