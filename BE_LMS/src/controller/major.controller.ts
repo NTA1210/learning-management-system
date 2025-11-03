@@ -36,7 +36,7 @@ export const listMajorsHandler = catchErrors(async (req, res) => {
         sortOrder: query.sortOrder,
     });
 
-    return res.status(OK).json({
+    return res.success(OK, {
         message: "Majors retrieved successfully",
         data: result.majors,
         pagination: result.pagination,
@@ -49,7 +49,7 @@ export const getMajorByIdHandler = catchErrors(async (req, res) => {
     // Call service
     const major = await getMajorById(majorId);
 
-    return res.status(OK).json({
+    return res.success(OK, {
         message: "Major retrieved successfully",
         data: major,
     });
@@ -61,7 +61,7 @@ export const getMajorBySlugHandler = catchErrors(async (req, res) => {
     // Call service
     const major = await getMajorBySlug(majorSlug);
 
-    return res.status(OK).json({
+    return res.success(OK, {
         message: "Major retrieved successfully",
         data: major,
     });
@@ -73,7 +73,7 @@ export const createMajorHandler = catchErrors(async (req, res) => {
     // Call service
     const major = await createMajor(data);
 
-    return res.status(CREATED).json({
+    return res.success(CREATED, {
         message: "Major created successfully",
         data: major,
     });
@@ -86,7 +86,7 @@ export const updateMajorByIdHandler = catchErrors(async (req, res) => {
     // Call service
     const major = await updateMajorById(majorId, data);
 
-    return res.status(OK).json({
+    return res.success(OK, {
         message: "Major updated successfully",
         data: major,
     });
@@ -99,7 +99,7 @@ export const updateMajorBySlugHandler = catchErrors(async (req, res) => {
     // Call service
     const major = await updateMajorBySlug(slug, data);
 
-    return res.status(OK).json({
+    return res.success(OK, {
         message: "Major updated successfully",
         data: major,
     });
@@ -111,7 +111,7 @@ export const deleteMajorByIdHandler = catchErrors(async (req, res) => {
     // Call service
     const major = await deleteMajorById(majorId);
 
-    return res.status(OK).json({
+    return res.success(OK, {
         message: "Major deleted successfully",
         data: major,
     });
@@ -123,7 +123,7 @@ export const deleteMajorBySlugHandler = catchErrors(async (req, res) => {
     // Call service
     const major = await deleteMajorBySlug(slug);
 
-    return res.status(OK).json({
+    return res.success(OK, {
         message: "Major deleted successfully",
         data: major,
     });
