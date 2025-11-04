@@ -3,9 +3,9 @@ import mongoose from "mongoose";
 
 export const QuizQuestionSchema = new mongoose.Schema<IQuizQuestion>(
   {
-    courseId: {
+    subjectId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Course",
+      ref: "Subject",
       required: true,
       index: true,
     },
@@ -30,7 +30,7 @@ export const QuizQuestionSchema = new mongoose.Schema<IQuizQuestion>(
 );
 
 //Indexes
-QuizQuestionSchema.index({ courseId: 1, text: 1 });
+QuizQuestionSchema.index({ subjectId: 1, text: 1 });
 QuizQuestionSchema.index({ text: "text" });
 
 const QuizQuestionModel = mongoose.model<IQuizQuestion>(

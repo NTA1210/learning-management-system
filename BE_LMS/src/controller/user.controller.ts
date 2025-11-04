@@ -13,7 +13,9 @@ export const getUserForCourseHandler = catchErrors(async (req, res) => {
 
   const data = await getAllUsers(courseId, request, req.role);
 
-  return res.success(OK, data.users, "Users retrieved successfully", {
+  return res.success(OK, {
+    data: data.users,
+    message: "Users retrieved successfully",
     pagination: data.pagination,
   });
 });

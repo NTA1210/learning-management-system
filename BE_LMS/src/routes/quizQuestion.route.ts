@@ -1,6 +1,7 @@
 import upload from "@/config/multer";
 import {
   exportXMLFileHandler,
+  getAllQuizQuestionsHandler,
   importXMLFileHandler,
 } from "@/controller/quizQuestion.controller";
 import { authorize } from "@/middleware";
@@ -18,5 +19,6 @@ quizQuestionRoutes.post(
 );
 
 quizQuestionRoutes.get("/export/:courseId", exportXMLFileHandler);
+quizQuestionRoutes.get("/", getAllQuizQuestionsHandler);
 
 export default quizQuestionRoutes;

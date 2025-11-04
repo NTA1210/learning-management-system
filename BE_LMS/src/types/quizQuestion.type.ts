@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-export const enum QuizQuestionType {
+export enum QuizQuestionType {
   MCQ = "mcq",
   MULTIPLE_CHOICE = "multichoice",
   TRUE_FALSE = "true_false",
@@ -8,7 +8,7 @@ export const enum QuizQuestionType {
 }
 
 export default interface IQuizQuestion extends mongoose.Document {
-  courseId: mongoose.Types.ObjectId;
+  subjectId: mongoose.Types.ObjectId;
   text: string;
   image?: string;
   type: QuizQuestionType;
@@ -18,5 +18,4 @@ export default interface IQuizQuestion extends mongoose.Document {
   explanation?: string;
   createdAt?: Date;
   updatedAt?: Date;
-  grade(): any;
 }

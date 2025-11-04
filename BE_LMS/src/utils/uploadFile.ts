@@ -1,7 +1,6 @@
 import { BUCKET_NAME, MINIO_ENDPOINT } from "@/constants/env";
 import { minioClient } from "../config/minio";
 import { v4 } from "uuid";
-import { prefixLessonMaterial } from "./filePrefix";
 import mime from "mime-types";
 import { nowLocal } from "./time";
 /**
@@ -9,10 +8,7 @@ import { nowLocal } from "./time";
  * @param file
  * @returns
  */
-export const uploadFile = async (
-  file: Express.Multer.File,
-  prefix = prefixLessonMaterial
-) => {
+export const uploadFile = async (file: Express.Multer.File, prefix: string) => {
   const key = `${prefix}/${v4()}/${file.originalname}`;
   await minioClient.putObject(BUCKET_NAME, key, file.buffer, file.size, {
     "Content-Type":
@@ -36,10 +32,13 @@ export const uploadFile = async (
  * @param files
  * @returns
  */
-export const uploadFiles = async (files: Express.Multer.File[]) => {
+export const uploadFiles = async (
+  files: Express.Multer.File[],
+  prefix: string
+) => {
   const uploaded = [];
   for (const file of files) {
-    const res = await uploadFile(file);
+    const res = await uploadFile(file, prefix);
     uploaded.push(res);
   }
   return uploaded;
