@@ -38,7 +38,10 @@ export const getMyEnrollmentsHandler = catchErrors(async (req, res) => {
     studentId, // Pass studentId for filtering
     ...filters,
   });
-  return res.success(OK, { ...result });
+  return res.success(OK, {
+    data: result.enrollments,
+    pagination: result.pagination,
+  });
 });
 
 // GET /enrollments/student/:studentId - Get all enrollments for a specific student
@@ -50,7 +53,10 @@ export const getStudentEnrollmentsHandler = catchErrors(async (req, res) => {
     studentId,
     ...filters,
   });
-  return res.success(OK, { ...result });
+  return res.success(OK, {
+    data: result.enrollments,
+    pagination: result.pagination,
+  });
 });
 
 // GET /enrollments/course/:courseId - Get all enrollments for a specific course
@@ -62,7 +68,10 @@ export const getCourseEnrollmentsHandler = catchErrors(async (req, res) => {
     courseId,
     ...filters,
   });
-  return res.success(OK, { ...result });
+  return res.success(OK, {
+    data: result.enrollments,
+    pagination: result.pagination,
+  });
 });
 
 // GET /enrollments - Get all enrollments (admin view with filters)
@@ -70,7 +79,10 @@ export const getAllEnrollmentsHandler = catchErrors(async (req, res) => {
   const filters = getEnrollmentsQuerySchema.parse(req.query);
 
   const result = await getAllEnrollments(filters); // No userId passed
-  return res.success(OK, { ...result });
+  return res.success(OK, {
+    data: result.enrollments,
+    pagination: result.pagination,
+  });
 });
 
 // POST /enrollments - Admin tạo enrollment cho student
