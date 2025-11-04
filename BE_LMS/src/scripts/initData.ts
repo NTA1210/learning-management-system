@@ -22,10 +22,13 @@ import {
   SessionModel,
   SpecialistModel,
   QuizQuestionModel,
+  SubjectModel,
 } from "../models";
-import { EnrollmentStatus } from "../types/enrollment.type";
+import { EnrollmentStatus, EnrollmentMethod, EnrollmentRole } from "../types/enrollment.type";
 import { QuizQuestionType } from "@/types/quizQuestion.type";
-import {MONGO_URI} from "@/constants/env";
+import { CourseStatus } from "@/types/course.type";
+import { SubmissionStatus } from "@/types/submission.type";
+import { MONGO_URI } from "@/constants/env";
 
 dotenv.config();
 
@@ -35,11 +38,10 @@ async function seed() {
     console.log("MongoDB connected");
 
     // Drop whole database if exists
-
-    // if (mongoose.connection.db) {
-    //   await mongoose.connection.db.dropDatabase();
-    //   console.log("Database dropped");
-    // }
+    if (mongoose.connection.db) {
+      await mongoose.connection.db.dropDatabase();
+      console.log("Database dropped");
+    }
 
     // Users (2-3)
     const users = await UserModel.create([
@@ -93,31 +95,55 @@ async function seed() {
       { name: "UX", description: "UX specialist", majorId: majors[1]._id },
     ]);
 
+    // Subjects (2)
+    const subjects = await SubjectModel.create([
+      {
+        name: "Introduction to JavaScript",
+        description: "Learn JavaScript from scratch",
+        code: "JS101",
+        slug: "introduction-to-javascript",
+        specialistIds: [specialists[0]._id],
+        credits: 3,
+        isActive: true,
+      },
+      {
+        name: "UI/UX Design Fundamentals",
+        description: "Learn UI/UX Design principles",
+        code: "UX101",
+        slug: "ui-ux-design-fundamentals",
+        specialistIds: [specialists[1]._id],
+        credits: 4,
+        isActive: true,
+      },
+    ]);
+
     // Courses (2-3)
     const courses = await CourseModel.create([
       {
-        title: "Intro to JavaScript",
-        code: "JS101",
+        title: "Intro to JavaScript - Fall 2024",
+        subjectId: subjects[0]._id,
         description: "Learn JavaScript from scratch",
         startDate: new Date(),
-        specialistIds: [specialists[0]._id],
-        endDate: new Date(Date.now() + 3600 * 1000),
-        major: majors[0]._id,
-        teachers: [users[1]._id],
+        endDate: new Date(Date.now() + 90 * 24 * 3600 * 1000), // 90 days
+        teacherIds: [users[1]._id],
         isPublished: true,
         capacity: 50,
+        status: CourseStatus.ONGOING,
+        enrollRequiresApproval: false,
+        createdBy: users[1]._id,
       },
       {
-        title: "UI/UX Design",
-        code: "UX101",
+        title: "UI/UX Design - Fall 2024",
+        subjectId: subjects[1]._id,
         description: "Learn UI/UX Design",
         startDate: new Date(),
-        specialistIds: [specialists[1]._id],
-        endDate: new Date(Date.now() + 3600 * 1000),
-        major: majors[1]._id,
-        teachers: [users[1]._id],
+        endDate: new Date(Date.now() + 60 * 24 * 3600 * 1000), // 60 days
+        teacherIds: [users[1]._id],
         isPublished: true,
         capacity: 30,
+        status: CourseStatus.ONGOING,
+        enrollRequiresApproval: true,
+        createdBy: users[1]._id,
       },
     ]);
 
@@ -143,16 +169,38 @@ async function seed() {
         studentId: users[2]._id,
         courseId: courses[0]._id,
         status: EnrollmentStatus.APPROVED,
+        method: EnrollmentMethod.SELF,
+        role: EnrollmentRole.STUDENT,
+        respondedBy: users[1]._id,
+        respondedAt: new Date(),
+        progress: {
+          totalLessons: 2,
+          completedLessons: 1,
+        },
       },
       {
         studentId: users[3]._id,
         courseId: courses[0]._id,
         status: EnrollmentStatus.APPROVED,
+        method: EnrollmentMethod.INVITED,
+        role: EnrollmentRole.STUDENT,
+        respondedBy: users[1]._id,
+        respondedAt: new Date(),
+        progress: {
+          totalLessons: 2,
+          completedLessons: 0,
+        },
       },
       {
         studentId: users[2]._id,
         courseId: courses[1]._id,
-        status: EnrollmentStatus.APPROVED,
+        status: EnrollmentStatus.PENDING,
+        method: EnrollmentMethod.SELF,
+        role: EnrollmentRole.STUDENT,
+        progress: {
+          totalLessons: 1,
+          completedLessons: 0,
+        },
       },
     ]);
 
@@ -161,26 +209,32 @@ async function seed() {
       {
         title: "JS Basics",
         courseId: courses[0]._id,
-        content: "Basics",
+        content: "Learn the basics of JavaScript including variables, data types, and operators",
         order: 1,
-        durationMinutes: 30,
+        durationSeconds: 1800, // 30 minutes
+        isPublished: true,
         publishedAt: new Date(),
+        createdBy: users[1]._id,
       },
       {
         title: "JS Functions",
         courseId: courses[0]._id,
-        content: "Functions",
+        content: "Understanding JavaScript functions, arrow functions, and callbacks",
         order: 2,
-        durationMinutes: 45,
+        durationSeconds: 2700, // 45 minutes
+        isPublished: true,
         publishedAt: new Date(),
+        createdBy: users[1]._id,
       },
       {
         title: "UI Principles",
         courseId: courses[1]._id,
-        content: "UI",
+        content: "Learn fundamental UI design principles and best practices",
         order: 1,
-        durationMinutes: 60,
+        durationSeconds: 3600, // 60 minutes
+        isPublished: true,
         publishedAt: new Date(),
+        createdBy: users[1]._id,
       },
     ]);
 
@@ -245,16 +299,26 @@ async function seed() {
         studentId: users[2]._id,
         key: "/submissions/js1.pdf",
         originalName: "js1.pdf",
+        mimeType: "application/pdf",
+        size: 1024 * 500, // 500KB
         submittedAt: new Date(),
-        score: 85,
+        grade: 85,
+        feedback: "Great work! Good understanding of JavaScript basics.",
+        gradedBy: users[1]._id,
+        gradedAt: new Date(),
+        isLate: false,
+        status: SubmissionStatus.GRADED,
       },
       {
         assignmentId: assignments[1]._id,
         studentId: users[3]._id,
         key: "/submissions/design1.zip",
         originalName: "design1.zip",
+        mimeType: "application/zip",
+        size: 1024 * 1024 * 2, // 2MB
         submittedAt: new Date(),
-        score: null,
+        isLate: false,
+        status: SubmissionStatus.SUBMITTED,
       },
     ]);
 
@@ -386,12 +450,13 @@ async function seed() {
     ]);
 
     const quizQuestion = await QuizQuestionModel.create({
-      courseId: courses[0]._id,
-      specialistId: users[1]._id,
+      subjectId: subjects[0]._id,
       text: "What is JS?",
       type: QuizQuestionType.MCQ,
       options: ["Language", "Framework"],
-      correctOptions: [1, 0],
+      correctOptions: [0],
+      points: 1,
+      explanation: "JavaScript is a programming language, not a framework.",
     });
 
     console.log("Seeding finished");

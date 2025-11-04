@@ -5,7 +5,7 @@ import UserModel from "../models/user.model";
 import appAssert from "../utils/appAssert";
 import { compareValue } from "../utils/bcrypt";
 import { CourseStatus } from "../types/course.type";
-import { EnrollmentStatus } from "@/types/enrollment.type";
+import { EnrollmentStatus, EnrollmentRole, EnrollmentMethod } from "@/types/enrollment.type";
 
 // Ensure models are registered
 void CourseModel;
@@ -228,13 +228,13 @@ export const getAllEnrollments = async (filters: {
 export const createEnrollment = async (data: {
   studentId: string;
   courseId: string;
-  status?: "pending" | "approved";
-  role?: "student" | "auditor";
-  method?: "self" | "invited" | "password" | "other";
+  status?: EnrollmentStatus.PENDING | EnrollmentStatus.APPROVED;
+  role?: EnrollmentRole;
+  method?: EnrollmentMethod;
   note?: string;
   password?: string;
 }) => {
-  const { studentId, courseId, role = "student", method = "self", note, password } = data;
+  const { studentId, courseId, role = EnrollmentRole.STUDENT, method = EnrollmentMethod.SELF, note, password } = data;
 
   // 1. Check student exists
   const student = await UserModel.findById(studentId);
@@ -251,7 +251,7 @@ export const createEnrollment = async (data: {
   );
 
   // 2.1. Check password if course is password-protected
-  if (course.enrollPasswordHash && method === "self") {
+  if (course.enrollPasswordHash && method === EnrollmentMethod.SELF) {
     appAssert(password, BAD_REQUEST, "Password is required for this course");
     const isValidPassword = await compareValue(password, course.enrollPasswordHash);
     appAssert(isValidPassword, UNAUTHORIZED, "Invalid course password");
@@ -292,7 +292,7 @@ export const createEnrollment = async (data: {
     if (reEnrollableStatuses.includes(existingEnrollment.status as EnrollmentStatus)) {
       // Anti-spam: Chỉ áp dụng cho Student self-enroll
       // Admin/Teacher tạo enrollment sẽ bypass các giới hạn này
-      if (method === "self") {
+      if (method === EnrollmentMethod.SELF) {
         // 1. Check cooldown period: 30 phút
         const COOLDOWN_MINUTES = 30;
         const nextAllowedTime = new Date(existingEnrollment.updatedAt);
@@ -326,7 +326,7 @@ export const createEnrollment = async (data: {
       }
 
       // Verify password again for re-enrollment if needed
-      if (course.enrollPasswordHash && method === "self") {
+      if (course.enrollPasswordHash && method === EnrollmentMethod.SELF) {
         appAssert(password, BAD_REQUEST, "Password is required for this course");
         const isValidPassword = await compareValue(password, course.enrollPasswordHash);
         appAssert(isValidPassword, UNAUTHORIZED, "Invalid course password");
@@ -423,8 +423,8 @@ export const createEnrollment = async (data: {
 export const updateEnrollment = async (
   enrollmentId: string,
   data: {
-    status?: "pending" | "approved" | "rejected" | "cancelled" | "dropped" | "completed";
-    role?: "student" | "auditor";
+    status?: EnrollmentStatus;
+    role?: EnrollmentRole;
     finalGrade?: number;
     note?: string;
     respondedBy?: string;
@@ -472,15 +472,24 @@ export const updateEnrollment = async (
 
 /**
  * Yêu cầu nghiệp vụ:
- * - Student tự cập nhật enrollment của mình (chỉ được phép drop khóa học)
+ * - Student tự hủy (cancel) enrollment của mình
  * - Kiểm tra enrollment tồn tại và thuộc về student này → nếu không trả lỗi NOT_FOUND
- * - Không cho phép drop nếu course đã completed → trả lỗi BAD_REQUEST
- * - Khi drop → set status = "dropped" và droppedAt = new Date()
+ * - Chỉ cho phép cancel khi status = PENDING hoặc APPROVED
+ * - Không cho phép cancel khi:
+ *   + Status = COMPLETED → Đã hoàn thành khóa học
+ *   + Status = DROPPED → Đã bị đánh rớt bởi admin/teacher
+ *   + Status = REJECTED → Đã bị từ chối duyệt
+ *   + Status = CANCELLED → Đã cancel rồi
+ * - Khi cancel → set status = EnrollmentStatus.CANCELLED
+ * 
+ * ⚠️ Phân biệt:
+ * - CANCELLED: Student tự hủy enrollment (student action)
+ * - DROPPED: Admin/Teacher đánh rớt student khỏi khóa học (admin/teacher action)
  * 
  * Input:
  * - enrollmentId (string, bắt buộc)
  * - studentId (string, bắt buộc - để verify ownership)
- * - status (string, chỉ nhận giá trị "dropped")
+ * - status (string, chỉ nhận giá trị "cancelled")
  * 
  * Output: Enrollment đã được cập nhật với thông tin student và course đã populate
  */
@@ -488,7 +497,7 @@ export const updateSelfEnrollment = async (
   enrollmentId: string,
   studentId: string,
   data: {
-    status?: "dropped";
+    status?: EnrollmentStatus.CANCELLED;
   }
 ) => {
   // 1. Check enrollment exists và thuộc về student này
@@ -498,22 +507,27 @@ export const updateSelfEnrollment = async (
   });
   appAssert(enrollment, NOT_FOUND, "Enrollment not found or access denied");
 
-  // 2. Không cho phép drop nếu đã completed
+  // 2. Validate status - chỉ cho phép cancel khi đang PENDING hoặc APPROVED
+  const cancellableStatuses = [EnrollmentStatus.PENDING, EnrollmentStatus.APPROVED];
+  
   appAssert(
-    enrollment.status !== EnrollmentStatus.COMPLETED,
+    cancellableStatuses.includes(enrollment.status),
     BAD_REQUEST,
-    "Cannot drop a completed course"
+    enrollment.status === EnrollmentStatus.COMPLETED
+      ? "Cannot cancel a completed course"
+      : enrollment.status === EnrollmentStatus.DROPPED
+      ? "Cannot cancel this enrollment. You were dropped from this course by admin/teacher."
+      : enrollment.status === EnrollmentStatus.REJECTED
+      ? "Cannot cancel a rejected enrollment"
+      : enrollment.status === EnrollmentStatus.CANCELLED
+      ? "This enrollment is already cancelled"
+      : "Cannot cancel this enrollment"
   );
 
-  // 3. Update status và timestamp
-  const updateData: any = { status: data.status };
-  if (data.status === EnrollmentStatus.DROPPED) {
-    updateData.droppedAt = new Date();
-  }
-
+  // 3. Update status to CANCELLED
   const updatedEnrollment = await EnrollmentModel.findByIdAndUpdate(
     enrollmentId,
-    updateData,
+    { status: EnrollmentStatus.CANCELLED },
     { new: true }
   )
     .populate("studentId", "username email fullname avatar_url")
