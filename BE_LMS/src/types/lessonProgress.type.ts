@@ -1,6 +1,6 @@
-import mongoose from "mongoose";
+import mongoose, { Document } from "mongoose";
 
-export interface ILessonProgress extends Document {
+export default interface ILessonProgress extends Document {
   lessonId: mongoose.Types.ObjectId;
   courseId: mongoose.Types.ObjectId;
   studentId: mongoose.Types.ObjectId;

@@ -8,6 +8,7 @@ import {
   uploadLessonMaterial,
   getMaterialForDownload
 } from "../services/lessonMaterial.service";
+import { getSignedUrl } from "../utils/uploadFile";
 import { catchErrors } from "../utils/asyncHandler";
 import { 
   LessonMaterialQuerySchema, 
@@ -22,7 +23,7 @@ import { OK } from "../constants/http";
 import { Role } from "../types";
 
 // Get all lesson materials with filtering
-export const listAllLessonMaterials = catchErrors(async (req, res) => {
+export const listAllLessonMaterialsController = catchErrors(async (req, res) => {
   const queryParams = LessonMaterialQuerySchema.parse(req.query);
   
   // Get user info from authentication middleware
@@ -32,7 +33,11 @@ export const listAllLessonMaterials = catchErrors(async (req, res) => {
   const result = await getLessonMaterials(queryParams, userId, userRole);
   
   return res
-    .success(OK, result, "Get all lesson materials successfully");
+    .success(OK, { 
+      data: result.materials, 
+      message: "Get all lesson materials successfully",
+      pagination: result.pagination  
+    });
 });
 
 // Get lesson materials by lesson ID
@@ -48,7 +53,10 @@ export const getLessonMaterialsByLessonController = catchErrors(async (req, res)
   const materials = await getLessonMaterialsByLesson(validatedParams.lessonId, userId, userRole);
 
   return res
-    .success(OK, materials, "Get lesson materials by lesson successfully");
+    .success(OK, { 
+      data: materials, 
+      message: "Get lesson materials by lesson successfully" 
+    });
 });
 
 // Get lesson material by ID
@@ -64,7 +72,10 @@ export const getLessonMaterialByIdController = catchErrors(async (req, res) => {
   const material = await getLessonMaterialById(validatedParams.id, userId, userRole);
 
   return res
-    .success(OK, material, "Get lesson material by id successfully");
+    .success(OK, { 
+      data: material, 
+      message: "Get lesson material by id successfully" 
+    });
 });
 
 // Create lesson material
@@ -78,7 +89,10 @@ export const createLessonMaterialController = catchErrors(async (req, res) => {
   const material = await createLessonMaterial(data, userId, userRole);
 
   return res
-    .success(OK, material, "Create lesson material successfully");
+    .success(OK, { 
+      data: material, 
+      message: "Create lesson material successfully" 
+    });
 });
 
 // Update lesson material
@@ -94,7 +108,10 @@ export const updateLessonMaterialController = catchErrors(async (req, res) => {
   const result = await updateLessonMaterial(validatedParams.id, data, userId, userRole);
 
   return res
-    .success(OK, result, "Update lesson material successfully");
+    .success(OK, { 
+      data: result, 
+      message: "Update lesson material successfully" 
+    });
 });
 
 // Delete lesson material
@@ -109,12 +126,25 @@ export const deleteLessonMaterialController = catchErrors(async (req, res) => {
   const material = await deleteLessonMaterial(validatedParams.id, userId, userRole);
 
   return res
-    .success(OK, material, "Delete lesson material successfully");
+    .success(OK, { 
+      data: material, 
+      message: "Delete lesson material successfully" 
+    });
 });
 
-// Upload lesson material with file
+// Upload lesson material with file(s) - handles both single and multiple files
 export const uploadLessonMaterialController = catchErrors(async (req: any, res) => {
-  const file = req.file;
+  // upload.any() puts files in req.files as an array
+  // Convert to appropriate format: single file as object, multiple files as array
+  let file: Express.Multer.File | Express.Multer.File[] | undefined;
+  
+  if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+    // Multiple files or single file in array
+    file = req.files.length === 1 ? req.files[0] : req.files;
+  } else if (req.file) {
+    // Single file (fallback for compatibility)
+    file = req.file;
+  }
   
   if (!file) {
     return res
@@ -129,11 +159,7 @@ export const uploadLessonMaterialController = catchErrors(async (req: any, res) 
   const formData = UploadMaterialSchema.parse({
     lessonId: req.body.lessonId,
     title: req.body.title,
-    description: req.body.description,
     type: req.body.type,
-    isPublic: req.body.isPublic === 'true',
-    tags: req.body.tags ? JSON.parse(req.body.tags) : undefined,
-    order: req.body.order ? parseInt(req.body.order) : undefined,
   });
   
   // Get user info from authentication middleware
@@ -143,7 +169,12 @@ export const uploadLessonMaterialController = catchErrors(async (req: any, res) 
   const material = await uploadLessonMaterial(formData, file, userId, userRole);
 
   return res
-    .success(OK, material, "Upload lesson material successfully");
+    .success(OK, { 
+      data: material, 
+      message: Array.isArray(file) 
+        ? `Uploaded ${file.length} material(s) successfully` 
+        : "Upload lesson material successfully" 
+    });
 });
 
 // Download lesson material
@@ -170,6 +201,41 @@ export const downloadLessonMaterialController = catchErrors(async (req, res) => 
   // Get material for download
   const downloadMaterial = await getMaterialForDownload(validatedParams.id);
 
+  // Check if material has a file (not a manual material without file)
+  if (!downloadMaterial.key || downloadMaterial.key.startsWith('manual-materials/')) {
+    return res
+      .status(404)
+      .json({
+        success: false,
+        message: "This material does not have a file to download"
+      });
+  }
+
+  const signedUrl = await getSignedUrl(
+    downloadMaterial.key,
+    24 * 60 * 60, // 24 hours expiration
+    downloadMaterial.originalName || ''
+  );
+
+  // Prepare data object with all material info and signedUrl
+  const downloadData = {
+    _id: downloadMaterial._id,
+    lessonId: downloadMaterial.lessonId,
+    title: downloadMaterial.title,
+    note: downloadMaterial.note,
+    originalName: downloadMaterial.originalName,
+    mimeType: downloadMaterial.mimeType,
+    key: downloadMaterial.key,
+    size: downloadMaterial.size,
+    uploadedBy: downloadMaterial.uploadedBy,
+    createdAt: downloadMaterial.createdAt,
+    updatedAt: downloadMaterial.updatedAt,
+    signedUrl
+  };
+
   return res
-    .success(OK, downloadMaterial, "Material ready for download");
+    .success(OK, {
+      data: downloadData,
+      message: "Material ready for download"
+    });
 });

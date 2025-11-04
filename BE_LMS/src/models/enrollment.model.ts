@@ -65,9 +65,9 @@ const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
 );
 
 //indexes
-EnrollmentSchema.index({ userId: 1, courseId: 1 }, { unique: true });
-EnrollmentSchema.index({ userId: 1, courseId: 1, status: 1 });
-EnrollmentSchema.index({ userId: 1, status: 1 });
+EnrollmentSchema.index({ studentId: 1, courseId: 1 }, { unique: true });
+EnrollmentSchema.index({ studentId: 1, courseId: 1, status: 1 });
+EnrollmentSchema.index({ studentId: 1, status: 1 });
 
 const EnrollmentModel = mongoose.model<IEnrollment>(
   "Enrollment",

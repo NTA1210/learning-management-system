@@ -27,6 +27,9 @@ import {
   enrollmentRoutes,
   sessionRoutes,
   submissionRoutes,
+  lessonRoutes,
+  lessonMaterialRoutes,
+  lessonProgressRoutes,
   userRoutes,
 } from "./routes";
 
@@ -45,18 +48,18 @@ export const createApp = () => {
   app.use(customResponse);
 
   //example API----------------------------------
-  app.get("/", (req, res) => {
-    res.status(OK).send("Hello World!");
-  });
+  // app.get("/", (req, res) => {
+  //   res.status(OK).send("Hello World!");
+  // });
 
-  app.post("/uploadExample", upload.single("file"), async (req, res) => {
-    const file = req.file;
-    if (!file) {
-      return res.status(400).json({ error: "No file uploaded" });
-    }
-    const result = await uploadFile(file);
-    res.status(200).json(result);
-  });
+  // app.post("/uploadExample", upload.single("file"), async (req, res) => {
+  //   const file = req.file;
+  //   if (!file) {
+  //     return res.status(400).json({ error: "No file uploaded" });
+  //   }
+  //   const result = await uploadFile(file);
+  //   res.status(200).json(result);
+  // });
   //-----------------------------------------------
 
   //auth routes
@@ -66,6 +69,9 @@ export const createApp = () => {
   app.use("/courses", courseRoutes);
   app.use("/assignments", assignmentRoutes);
   app.use("/submissions", submissionRoutes);
+  app.use("/lesson", lessonRoutes);
+  app.use("/lesson-material", lessonMaterialRoutes);
+  app.use("/lesson-progress", lessonProgressRoutes);
 
   //protected routes
   app.use("/users", authenticate, userRoutes);
