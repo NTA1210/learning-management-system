@@ -19,7 +19,7 @@ import {
   updateEnrollment,
   updateSelfEnrollment,
 } from "../services/enrollment.service";
-import { EnrollmentStatus } from "@/types/enrollment.type";
+import { EnrollmentStatus, EnrollmentMethod } from "@/types/enrollment.type";
 
 // GET /enrollments/:id - Get enrollment by ID
 export const getEnrollmentHandler = catchErrors(async (req, res) => {
@@ -106,7 +106,7 @@ export const enrollSelfHandler = catchErrors(async (req, res) => {
     studentId,
     courseId,
     role,
-    method: "self", // Student tự enroll
+    method: EnrollmentMethod.SELF, // Student tự enroll
     password, // Pass password for password-protected courses
   });
   return res.success(CREATED, { data: enrollment, message: "Enrolled successfully" });
