@@ -42,14 +42,18 @@ export const saveCurrentUserFromApi = async (): Promise<CurrentUser> => {
 export const saveUserToLocal = (user: CurrentUser): void => {
   try {
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-  } catch {}
+  } catch (e) {
+    console.warn("[auth] Failed to save user to storage", e);
+  }
 };
 
 export const clearStoredUser = (): void => {
   try {
     localStorage.removeItem(USER_STORAGE_KEY);
     console.log("[auth] cleared stored user");
-  } catch {}
+  } catch (e) {
+    console.warn("[auth] Failed to clear stored user", e);
+  }
 };
 export const authService = {
   login: async (data: LoginRequest): Promise<User> => {
