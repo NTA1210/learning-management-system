@@ -24,6 +24,9 @@ export const listCoursesHandler = catchErrors(async (req, res) => {
   // Validate query parameters
   const query = listCoursesSchema.parse(req.query);
 
+  // ✅ FIX: Get user role from request (undefined if not authenticated)
+  const userRole = (req as any).role;
+
   // Call service
   const result = await listCourses({
     page: query.page,
@@ -37,6 +40,7 @@ export const listCoursesHandler = catchErrors(async (req, res) => {
     onlyDeleted: query.onlyDeleted,
     sortBy: query.sortBy,
     sortOrder: query.sortOrder,
+    userRole, // ✅ FIX: Pass userRole to service for permission check
   });
 
   return res.success(OK, {

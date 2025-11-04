@@ -4,7 +4,7 @@ export const enum CourseStatus {
   DRAFT = "draft",
   ONGOING = "ongoing",
   COMPLETED = "completed",
-  DELETED = "deleted",
+  // ✅ FIX: Removed DELETED status - we use isDeleted field for soft delete instead
 }
 
 export default interface ICourse extends mongoose.Document {
