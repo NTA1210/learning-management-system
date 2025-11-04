@@ -39,5 +39,7 @@ export const deleteSessionHandler = catchErrors(async (req, res) => {
   });
   appAssert(deletedSession, NOT_FOUND, "Session not found");
 
-  return res.success(OK, null, "Session deleted successfully");
+  return res.success(OK, {
+    message: "Session deleted successfully",
+  });
 });
