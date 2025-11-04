@@ -11,6 +11,8 @@ import {
   startOfWeek,
 } from 'date-fns';
 import './Calendar.css';
+import Navbar from './Navbar';
+import Sidebar from './Sidebar';
 import { useTheme } from '../hooks/useTheme';
 
 type ViewMode = 'month' | 'week' | 'day';
@@ -57,6 +59,7 @@ function safeFormatDate(dateValue: string | Date | undefined, fmt: string, fallb
 const Calendar: React.FC = () => {
   const { darkMode } = useTheme();
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [view, setView] = useState<ViewMode>('month');
   const [personalSchedules, setPersonalSchedules] = useState<PersonalSchedule[]>([]);
   const [classSchedules, setClassSchedules] = useState<ClassSchedule[]>([]);
@@ -298,7 +301,10 @@ const Calendar: React.FC = () => {
   const todayEvents = getEventsForDate(today);
 
   return (
-    <div className={`calendar-page${darkMode ? ' dark' : ''}`}>
+    <>
+      <Navbar onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)} />
+      <Sidebar isOpen={isSidebarOpen} />
+      <div className={`calendar-page${darkMode ? ' dark' : ''}`} style={{ paddingTop: 72 }}>
       <div className="calendar-page-header">
         <div className="header-content">
           <h1>Calendar</h1>
@@ -412,7 +418,8 @@ const Calendar: React.FC = () => {
           </div>
         </aside>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 
