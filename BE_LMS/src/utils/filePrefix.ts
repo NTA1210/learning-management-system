@@ -16,9 +16,8 @@ export const prefixSubmission = (
 };
 
 export const prefixQuizQuestionImage = (
-  courseId: mongoose.Types.ObjectId,
-  quizId: mongoose.Types.ObjectId,
-  questionId: mongoose.Types.ObjectId
+  subjectId: string,
+  questionId: string
 ) => {
-  return `courses/${courseId}/quizzes/${quizId}/questions/${questionId}/image`;
+  return `subjects/${subjectId}/questions/${questionId}/image`;
 };

@@ -1,6 +1,7 @@
-import { NOT_FOUND, OK } from "@/constants/http";
+import { CREATED, NOT_FOUND, OK } from "@/constants/http";
 import { QuizQuestionModel } from "@/models";
 import {
+  createQuizQuestion,
   exportXMLFile,
   getAllQuizQuestions,
   importXMLFile,
@@ -9,6 +10,7 @@ import IQuizQuestion from "@/types/quizQuestion.type";
 import appAssert from "@/utils/appAssert";
 import { catchErrors } from "@/utils/asyncHandler";
 import {
+  createQuizQuestionSchema,
   importQuizQuestionParamsSchema,
   listQuizQuestionSchema,
   subjectIdSchema,
@@ -65,7 +67,7 @@ export const exportXMLFileHandler = catchErrors(async (req, res) => {
   });
 });
 
-// GET /quiz-questions/:subjectId - Get all questions
+// GET /quiz-questions/ - Get all questions
 export const getAllQuizQuestionsHandler = catchErrors(async (req, res) => {
   const filters = listQuizQuestionSchema.parse(req.query);
   const { data, pagination } = await getAllQuizQuestions(filters);
@@ -74,5 +76,20 @@ export const getAllQuizQuestionsHandler = catchErrors(async (req, res) => {
     data,
     pagination,
     message: "Questions retrieved successfully",
+  });
+});
+
+// POST /quiz-questions/ - Create a new question
+export const createQuizQuestionHandler = catchErrors(async (req, res) => {
+  const file = req.file;
+  const input = createQuizQuestionSchema.parse({
+    ...req.body,
+    image: file,
+  });
+  const data = await createQuizQuestion(input);
+
+  res.success(CREATED, {
+    data,
+    message: "Question created successfully",
   });
 });

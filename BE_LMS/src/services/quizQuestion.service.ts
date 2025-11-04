@@ -1,9 +1,12 @@
-import { NOT_FOUND } from "@/constants/http";
+import { BAD_REQUEST, NOT_FOUND } from "@/constants/http";
 import { QuizQuestionModel, SubjectModel } from "@/models";
 import { ListParams } from "@/types/dto";
 import IQuizQuestion, { QuizQuestionType } from "@/types/quizQuestion.type";
 import appAssert from "@/utils/appAssert";
-import { FilterQuery } from "mongoose";
+import { prefixQuizQuestionImage } from "@/utils/filePrefix";
+import { uploadFile } from "@/utils/uploadFile";
+import { ICreateQuizQuestionParams } from "@/validators/quizQuestion.schemas";
+import mongoose, { FilterQuery } from "mongoose";
 import { parseStringPromise } from "xml2js";
 import { create } from "xmlbuilder";
 
@@ -211,7 +214,11 @@ export const getAllQuizQuestions = async ({
 }: Partial<IListQuizQuestionParams>) => {
   const query: FilterQuery<IQuizQuestion> = {};
 
-  if (subjectId) query.subjectId = subjectId;
+  if (subjectId) {
+    const subject = await SubjectModel.findById(subjectId);
+    appAssert(subject, NOT_FOUND, "Subject not found");
+    query.subjectId = subjectId;
+  }
   if (type) query.type = type;
   if (search) query.$text = { $search: search };
 
@@ -247,4 +254,68 @@ export const getAllQuizQuestions = async ({
       hasPrev: _page > 1,
     },
   };
+};
+
+/**
+ * Create a new quiz question.
+ *
+ * @param  subjectId - Subject ID
+ * @param  text - Question text
+ * @param  Express.Multer image - Question image
+ * @param  type - Question type
+ * @param  options - Question options
+ * @param  correctOptions - Correct option indices
+ * @param  points - Question points
+ * @param  explanation - Question explanation
+ * @returns  - Created quiz question
+ */
+export const createQuizQuestion = async ({
+  subjectId,
+  text,
+  image,
+  type,
+  options,
+  correctOptions,
+  points,
+  explanation,
+}: ICreateQuizQuestionParams) => {
+  const subject = await SubjectModel.findById(subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+
+  // Validate logic
+  appAssert(
+    correctOptions.every((i) => i >= 0 && i < options.length),
+    BAD_REQUEST,
+    "Invalid correct option index"
+  );
+
+  // 1️⃣ Tạo question trước
+  const newQuizQuestion = await QuizQuestionModel.create({
+    subjectId,
+    text,
+    type,
+    options,
+    correctOptions,
+    points,
+    explanation,
+  });
+
+  // 2️⃣ Nếu có ảnh, upload và cập nhật sau
+  if (image) {
+    try {
+      const questionPrefix = prefixQuizQuestionImage(
+        subjectId,
+        newQuizQuestion.id
+      );
+      const { publicUrl } = await uploadFile(image, questionPrefix);
+      await QuizQuestionModel.findByIdAndUpdate(newQuizQuestion._id, {
+        image: publicUrl,
+      });
+      newQuizQuestion.image = publicUrl;
+    } catch (err) {
+      console.error("Image upload failed:", err);
+    }
+  }
+
+  return newQuizQuestion;
 };
