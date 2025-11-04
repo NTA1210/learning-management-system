@@ -5,7 +5,7 @@ export default interface ILesson extends mongoose.Document {
   courseId: mongoose.Types.ObjectId;
   content?: string;
   order?: number;
-  durationSeconds?: number;
+  durationMinutes?: number;
   isPublished?: boolean;
   publishedAt?: Date;
   createdBy?: mongoose.Types.ObjectId;

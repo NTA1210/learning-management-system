@@ -11,7 +11,7 @@ const LessonSchema = new mongoose.Schema<ILesson>(
     },
     content: { type: String, maxLength: 100000 },
     order: { type: Number, default: 0 },
-    durationSeconds: { type: Number },
+    durationMinutes: { type: Number },
     isPublished: { type: Boolean, default: false },
     publishedAt: { type: Date, default: null },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

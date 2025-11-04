@@ -2,13 +2,25 @@ import { BUCKET_NAME, MINIO_ENDPOINT } from "@/constants/env";
 import { minioClient } from "../config/minio";
 import { v4 } from "uuid";
 import mime from "mime-types";
+<<<<<<< HEAD
+
+=======
 import { nowLocal } from "./time";
+>>>>>>> develop
 /**
  * Upload 1 file, trả về public URL
  * @param file
+ * @param prefix - Optional prefix string, defaults to prefixLessonMaterial with dummy ObjectIds
  * @returns
  */
+<<<<<<< HEAD
+export const uploadFile = async (
+  file: Express.Multer.File,
+  prefix: string
+) => {
+=======
 export const uploadFile = async (file: Express.Multer.File, prefix: string) => {
+>>>>>>> develop
   const key = `${prefix}/${v4()}/${file.originalname}`;
   await minioClient.putObject(BUCKET_NAME, key, file.buffer, file.size, {
     "Content-Type":
@@ -51,6 +63,48 @@ export const uploadFiles = async (
  */
 export const getFile = async (key: string) => {
   return await minioClient.getObject(BUCKET_NAME, key);
+<<<<<<< HEAD
+};
+
+/**
+ *
+ * @param key
+ * @returns
+ */
+export const getPublicUrl = (key: string) =>
+  `https://${MINIO_ENDPOINT}/${BUCKET_NAME}/${key}`;
+
+/**
+ * method to get signed url
+ * @param key
+ * @param expiresIn
+ * @param filename
+ * @returns
+ */
+export const getSignedUrl = async (
+  key: string,
+  expiresIn?: number,
+  filename?: string
+): Promise<string> => {
+  const expiry = expiresIn ?? 24 * 60 * 60;
+  const responseDisposition = filename
+    ? `attachment; filename="${encodeURIComponent(filename)}"`
+    : undefined;
+  
+  return await minioClient.presignedGetObject(
+    BUCKET_NAME,
+    key,
+    expiry,
+    responseDisposition ? { "response-content-disposition": responseDisposition } : undefined
+  );
+};
+
+/**
+ * Xóa file
+ * @param key
+ * @returns
+ */
+=======
 };
 
 /**
@@ -83,6 +137,7 @@ export const getSignedUrl = (
  * @param key
  * @returns
  */
+>>>>>>> develop
 export const removeFile = async (key: string) => {
   return await minioClient.removeObject(BUCKET_NAME, key);
 };
@@ -111,6 +166,56 @@ export const getStatFile = async (key: string) => {
  * @returns
  */
 export async function deleteFilesByPrefix(prefix: string) {
+<<<<<<< HEAD
+  const objectsList: string[] = [];
+
+  try {
+    // ✅ Bọc toàn bộ trong try/catch để tránh crash
+    await new Promise<void>((resolve, reject) => {
+      const stream = minioClient.listObjectsV2(BUCKET_NAME, prefix, true);
+
+      stream.on("data", (obj) => {
+        if (obj.name) objectsList.push(obj.name);
+      });
+
+      stream.on("end", () => resolve());
+      stream.on("error", (err) => {
+        console.error("❌ Error when listing objects:", err);
+        reject(err);
+      });
+    });
+
+    // Không có file nào để xóa
+    if (objectsList.length === 0) {
+      console.log(`⚠️ There is no file to delete in prefix "${prefix}"`);
+      return;
+    }
+
+    // ✅ Xóa từng file thay vì xóa toàn bộ 1 lần — tránh lỗi dừng giữa chừng
+    const failed: string[] = [];
+
+    for (const fileKey of objectsList) {
+      try {
+        await minioClient.removeObject(BUCKET_NAME, fileKey);
+        console.log(`🗑️ Deleted: ${fileKey}`);
+      } catch (err) {
+        console.error(`❌ Error when deleting ${fileKey}:`, err);
+        failed.push(fileKey);
+      }
+    }
+
+    if (failed.length > 0) {
+      console.warn(
+        `⚠️ Failed to delete ${failed.length} file:\n${failed.join(",\n")}`
+      );
+    } else {
+      console.log(
+        `✅ Deleted ${objectsList.length} files in prefix "${prefix}"`
+      );
+    }
+  } catch (err) {
+    // ✅ Nếu toàn bộ stream bị lỗi, không để crash
+=======
   console.log(`🧹 Starting deletion in prefix "${prefix}"...`);
   let totalDeleted = 0;
   const failed: string[] = [];
@@ -178,6 +283,7 @@ export async function deleteFilesByPrefix(prefix: string) {
       );
     }
   } catch (err) {
+>>>>>>> develop
     console.error(`🚨 Fatal error while deleting prefix "${prefix}":`, err);
   }
 }

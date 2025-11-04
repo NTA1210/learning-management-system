@@ -1,7 +1,7 @@
 /node_modules
 .env
 dist
-
+setupTests.unit.ts
 # Logs
 logs
 *.log

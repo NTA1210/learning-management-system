@@ -21,6 +21,18 @@ import {
 
 //routes
 import {
+<<<<<<< HEAD
+  assignmentRoutes,
+  authRoutes,
+  courseRoutes,
+  enrollmentRoutes,
+  sessionRoutes,
+  submissionRoutes,
+  lessonRoutes,
+  lessonMaterialRoutes,
+  lessonProgressRoutes,
+  userRoutes,
+=======
     assignmentRoutes,
     authRoutes,
     courseRoutes,
@@ -29,6 +41,7 @@ import {
     sessionRoutes,
     submissionRoutes,
     userRoutes,
+>>>>>>> develop
 } from "./routes";
 import {majorProtectedRoutes, majorPublicRoutes} from "@/routes/major.route";
 import {specialistProtectedRoutes, specialistPublicRoutes} from "@/routes/specialist.route";
@@ -47,6 +60,22 @@ export const createApp = () => {
     app.use(cookieParser());
     app.use(customResponse);
 
+<<<<<<< HEAD
+  //example API----------------------------------
+  // app.get("/", (req, res) => {
+  //   res.status(OK).send("Hello World!");
+  // });
+
+  // app.post("/uploadExample", upload.single("file"), async (req, res) => {
+  //   const file = req.file;
+  //   if (!file) {
+  //     return res.status(400).json({ error: "No file uploaded" });
+  //   }
+  //   const result = await uploadFile(file);
+  //   res.status(200).json(result);
+  // });
+  //-----------------------------------------------
+=======
     //example API----------------------------------
     app.get("/", (req, res) => {
         res.status(OK).send("Hello World!");
@@ -61,16 +90,27 @@ export const createApp = () => {
         res.status(200).json(result);
     });
     //-----------------------------------------------
+>>>>>>> develop
 
     //auth routes
     app.use("/auth", authRoutes);
 
+<<<<<<< HEAD
+  //public routes
+  app.use("/courses", courseRoutes);
+  app.use("/assignments", assignmentRoutes);
+  app.use("/submissions", submissionRoutes);
+  app.use("/lesson", lessonRoutes);
+  app.use("/lesson-material", lessonMaterialRoutes);
+  app.use("/lesson-progress", lessonProgressRoutes);
+=======
     //public routes
     app.use("/courses", courseRoutes);
     app.use("/assignments", assignmentRoutes);
     app.use("/submissions", submissionRoutes);
     app.use("/majors", majorPublicRoutes);
     app.use("/specialists", specialistPublicRoutes);
+>>>>>>> develop
 
     //protected routes
     app.use("/users", authenticate, userRoutes);

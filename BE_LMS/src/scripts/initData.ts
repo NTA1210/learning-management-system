@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 
 import {
   UserModel,
@@ -24,17 +23,19 @@ import {
   QuizQuestionModel,
   SubjectModel,
 } from "../models";
-import { EnrollmentStatus, EnrollmentMethod, EnrollmentRole } from "../types/enrollment.type";
-import { QuizQuestionType } from "@/types/quizQuestion.type";
-import { CourseStatus } from "@/types/course.type";
-import { SubmissionStatus } from "@/types/submission.type";
-import { MONGO_URI } from "@/constants/env";
-
-dotenv.config();
+import {
+  EnrollmentStatus,
+  EnrollmentMethod,
+  EnrollmentRole,
+} from "../types/enrollment.type";
+import { QuizQuestionType } from "../types/quizQuestion.type";
+import { CourseStatus } from "../types/course.type";
+import { SubmissionStatus } from "../types/submission.type";
+import { MONGO_URI } from "../constants/env";
 
 async function seed() {
   try {
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb+srv://minhhieu69420:fVCAoajSIt8Tg8XG@cluster0.rpp2msz.mongodb.net/lms_local?retryWrites=true&w=majority&appName=Cluster0');
+    await mongoose.connect(MONGO_URI);
     console.log("MongoDB connected");
 
     // Drop whole database if exists
@@ -209,7 +210,8 @@ async function seed() {
       {
         title: "JS Basics",
         courseId: courses[0]._id,
-        content: "Learn the basics of JavaScript including variables, data types, and operators",
+        content:
+          "Learn the basics of JavaScript including variables, data types, and operators",
         order: 1,
         durationSeconds: 1800, // 30 minutes
         isPublished: true,
@@ -219,7 +221,8 @@ async function seed() {
       {
         title: "JS Functions",
         courseId: courses[0]._id,
-        content: "Understanding JavaScript functions, arrow functions, and callbacks",
+        content:
+          "Understanding JavaScript functions, arrow functions, and callbacks",
         order: 2,
         durationSeconds: 2700, // 45 minutes
         isPublished: true,
@@ -302,7 +305,7 @@ async function seed() {
         mimeType: "application/pdf",
         size: 1024 * 500, // 500KB
         submittedAt: new Date(),
-        grade: 85,
+        grade: 8.5,
         feedback: "Great work! Good understanding of JavaScript basics.",
         gradedBy: users[1]._id,
         gradedAt: new Date(),

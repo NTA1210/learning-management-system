@@ -1,9 +1,9 @@
-import { getLessonById, getLessons, getLessonsByCourse,createLessonService, deleteLessonService,updateLessonService } from "../services/lesson.service";
 import { catchErrors } from "../utils/asyncHandler";
-import { CreateLessonSchema, LessonByIdSchema, LessonQuerySchema, LessonByCourseSchema } from "../validators/lesson.schemas";
+import { CreateLessonSchema, LessonByCourseSchema, LessonByIdSchema, LessonQuerySchema } from "../validators/lesson.schemas";
 import { OK } from "../constants/http";
-import { Role } from "../types";
+import { createLessonService, deleteLessonService, getLessonById, getLessons, getLessonsByCourse, updateLessonService } from "@/services/lesson.service";
 
+// GET /lesson/listAllLessons - List lessons with filters, search, pagination (auth required)
 export const listAllLessons = catchErrors(async (req, res) => {
     const queryParams = LessonQuerySchema.parse(req.query);
     
@@ -13,10 +13,13 @@ export const listAllLessons = catchErrors(async (req, res) => {
     
     const result = await getLessons(queryParams, userId, userRole);
     
-    return res
-    .success(OK, result, "Get all lessons successfully");
+    return res.success(OK, {
+        data: result.lessons,
+        message: "Get all lessons successfully",
+        pagination: result.pagination,
+    });
 });
-
+// GET /lesson/byCourse/:courseId - Get lessons for a specific course (auth required)
 export const getLessonsByCourseController = catchErrors(async (req, res) => {
     const { courseId } = req.params;
     
@@ -28,10 +31,12 @@ export const getLessonsByCourseController = catchErrors(async (req, res) => {
     
     const lessons = await getLessonsByCourse(validatedParams.courseId, userId, userRole);
     
-    return res
-    .success(OK, lessons, "Get lessons by course successfully");
+    return res.success(OK, {
+        data: lessons,
+        message: "Get lessons by course successfully",
+    });
 });
-
+// GET /lesson/getLessonById/:id - Get a lesson by id with access control (auth required)
 export const getLessonByIdController = catchErrors(async (req, res) => {
     const { id } = req.params;
     
@@ -43,11 +48,13 @@ export const getLessonByIdController = catchErrors(async (req, res) => {
     
     const lesson = await getLessonById(validatedParams.id, userId, userRole);
       
-    return res
-    .success(OK, lesson, "Get lesson by id successfully");
+    return res.success(OK, {
+        data: lesson,
+        message: "Get lesson by id successfully",
+    });
 });
 
-
+// POST /lesson/createLessons - Create a lesson (teacher/admin)
 export const createLesson = catchErrors(async (req, res) => {
     const data = CreateLessonSchema.parse(req.body);
     
@@ -56,10 +63,13 @@ export const createLesson = catchErrors(async (req, res) => {
     const userRole = req.role;
     
     const lesson = await createLessonService(data, userId, userRole);
-    return res
-    .success(OK, lesson, "Create lesson successfully");
+    return res.success(OK, {
+        data: lesson,
+        message: "Create lesson successfully",
+    });
 });
 
+// DELETE /lesson/deleteLessons/:id - Delete a lesson (teacher/admin)
 export const deleteLesson = catchErrors(async (req, res) => {
     const { id } = req.params;
 
@@ -71,11 +81,13 @@ export const deleteLesson = catchErrors(async (req, res) => {
 
     const lesson = await deleteLessonService(validatedParams.id, userId, userRole);
     
-    return res
-    .success(OK, lesson, "Delete lesson successfully");
-    
+    return res.success(OK, {
+        data: lesson,
+        message: "Delete lesson successfully",
+    });
 });
 
+// PUT /lesson/updateLessons/:id - Update a lesson (teacher/admin)
 export const updateLesson = catchErrors(async (req, res) => {
     const { id } = req.params;
     const validatedParams = LessonByIdSchema.parse({ id });
@@ -86,6 +98,8 @@ export const updateLesson = catchErrors(async (req, res) => {
     const userRole = req.role;
     
     const result = await updateLessonService(validatedParams.id, data, userId, userRole);
-    return res
-    .success(OK, result, "Update lesson successfully");
+    return res.success(OK, {
+        data: result,
+        message: "Update lesson successfully",
+    });
 });
