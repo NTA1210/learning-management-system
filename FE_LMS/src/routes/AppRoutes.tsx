@@ -10,6 +10,8 @@ import {DashboardPage ,
   LoginPage,
   RegisterPage,
   CourseManagementPage,
+  AboutUsPage,
+  FAQPage,
 } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import ProtectedRoute from "../components/ProtectedRoute";
@@ -63,6 +65,20 @@ function AppRoutes() {
         <Route path="/profile" element={
           <ProtectedRoute>
             <Profile />
+          </ProtectedRoute>
+        } />
+
+        {/* About Us */}
+        <Route path="/help/about" element={
+          <ProtectedRoute>
+            <AboutUsPage />
+          </ProtectedRoute>
+        } />
+
+        {/* FAQ */}
+        <Route path="/help/faq" element={
+          <ProtectedRoute>
+            <FAQPage />
           </ProtectedRoute>
         } />
 
