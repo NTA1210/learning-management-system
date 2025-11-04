@@ -16,12 +16,13 @@ const courseRoutes = Router();
 
 // prefix: /courses
 
-// Public routes
+// Protected routes (require authentication)
 // GET /courses - List all courses with pagination and filters
-courseRoutes.get("/", listCoursesHandler);
+// ✅ Students must login to browse courses (university internal system)
+courseRoutes.get("/", authenticate, listCoursesHandler);
 
 // GET /courses/:id - Get course detail by ID
-courseRoutes.get("/:id", getCourseByIdHandler);
+courseRoutes.get("/:id", authenticate, getCourseByIdHandler);
 
 // Protected routes (require authentication)
 // POST /courses - Create new course (Teacher/Admin only)
