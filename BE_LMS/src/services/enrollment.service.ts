@@ -207,6 +207,10 @@ export const getAllEnrollments = async (filters: {
  *   + Nếu status cũ = REJECTED hoặc CANCELLED → CHO PHÉP re-enroll (cập nhật lại)
  *   + Nếu status cũ = DROPPED hoặc COMPLETED → KHÔNG CHO PHÉP (phải học khóa KHÁC)
  *   + Nếu status cũ = PENDING hoặc APPROVED → KHÔNG CHO PHÉP (trả lỗi CONFLICT)
+ * - Anti-spam cho Student self-enroll (method = "self"):
+ *   + Cooldown: Phải đợi 30 phút sau lần re-enroll trước
+ *   + Daily limit: Tối đa 5 lần enrollment/ngày cho cùng 1 course
+ *   + Admin/Teacher bypass các giới hạn này
  * - Kiểm tra capacity (sức chứa) của course → nếu đầy trả lỗi BAD_REQUEST
  * - Tạo enrollment mới với các thông tin: studentId, courseId, status, role, method, note
  * 
@@ -286,6 +290,41 @@ export const createEnrollment = async (data: {
     ];
 
     if (reEnrollableStatuses.includes(existingEnrollment.status as EnrollmentStatus)) {
+      // Anti-spam: Chỉ áp dụng cho Student self-enroll
+      // Admin/Teacher tạo enrollment sẽ bypass các giới hạn này
+      if (method === "self") {
+        // 1. Check cooldown period: 30 phút
+        const COOLDOWN_MINUTES = 30;
+        const nextAllowedTime = new Date(existingEnrollment.updatedAt);
+        nextAllowedTime.setMinutes(nextAllowedTime.getMinutes() + COOLDOWN_MINUTES);
+        
+        if (new Date() < nextAllowedTime) {
+          const remainingMinutes = Math.ceil((nextAllowedTime.getTime() - Date.now()) / 60000);
+          appAssert(
+            false,
+            BAD_REQUEST,
+            `Please wait ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''} before re-enrolling in this course`
+          );
+        }
+
+        // 2. Check daily limit: 5 lần enrollment trong 24 giờ
+        const DAILY_LIMIT = 5;
+        const last24Hours = new Date();
+        last24Hours.setHours(last24Hours.getHours() - 24);
+
+        const enrollAttemptsCount = await EnrollmentModel.countDocuments({
+          studentId,
+          courseId,
+          createdAt: { $gte: last24Hours },
+        });
+
+        appAssert(
+          enrollAttemptsCount < DAILY_LIMIT,
+          BAD_REQUEST,
+          `Maximum ${DAILY_LIMIT} enrollment attempts per day reached for this course. Please try again later.`
+        );
+      }
+
       // Verify password again for re-enrollment if needed
       if (course.enrollPasswordHash && method === "self") {
         appAssert(password, BAD_REQUEST, "Password is required for this course");
