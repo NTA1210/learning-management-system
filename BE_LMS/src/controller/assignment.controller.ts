@@ -28,14 +28,11 @@ export const listAssignmentsHandler = catchErrors(async (req, res) => {
     sortOrder: query.sortOrder,
   });
 
-  // return res.status(OK).json({
-  //   message: "Assignments retrieved successfully",
-  //   data: result.assignments,
-  //   pagination: result.pagination,
-  // });
-  return res.success(OK, result.assignments, "Assignments retrieved successfully", {
-  pagination: result.pagination,
-});
+return res.success(OK,{
+  data:result.assignments,
+  message: "Assignments retrieved successfully",
+  pagination: result.pagination
+})
 });
 
 export const getAssignmentByIdHandler = catchErrors(async (req, res) => {
@@ -46,7 +43,7 @@ export const getAssignmentByIdHandler = catchErrors(async (req, res) => {
   //   message: "Assignment retrieved successfully",
   //   data: assignment,
   // });
-  return res.success(OK, assignment, "Assignment retrieved successfully");
+  return res.success(OK, {data:assignment,message: "Assignment retrieved successfully"});
 });
 
 export const createAssignmentHandler = catchErrors(async (req, res) => {
@@ -57,7 +54,7 @@ export const createAssignmentHandler = catchErrors(async (req, res) => {
   //   message: "Assignment created successfully",
   //   data: assignment,
   // });
-  return res.success(OK, assignment, "Assignment created successfully");
+  return res.success(OK,{ data: assignment,message: "Assignment created successfully"});
 });
 
 export const updateAssignmentHandler = catchErrors(async (req, res) => {
@@ -69,7 +66,7 @@ export const updateAssignmentHandler = catchErrors(async (req, res) => {
   //   message: "Assignment updated successfully",
   //   data: assignment,
   // });
-  return res.success(OK, assignment, "Assignment updated successfully");
+  return res.success(OK, {data:assignment, message:"Assignment updated successfully"});
 });
 
 export const deleteAssignmentHandler = catchErrors(async (req, res) => {
@@ -79,5 +76,5 @@ export const deleteAssignmentHandler = catchErrors(async (req, res) => {
   // return res.status(OK).json({
   //   message: "Assignment deleted successfully",
   // });
-  return res.success(OK, null, "Assignment deleted successfully");
+  return res.success(OK,{data: null,message: "Assignment deleted successfully"});
 });
