@@ -69,8 +69,18 @@ export const createCourseSchema = z
       .min(1, "End date is required")
       .transform((val) => new Date(val)), // Required
     status: z
-      .enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED])
+      .string()
       .optional()
+      .transform((val) => {
+        if (!val) return CourseStatus.DRAFT;
+        // Transform to lowercase to match enum values
+        const normalized = val.toLowerCase();
+        if (normalized === "draft" || normalized === "ongoing" || normalized === "completed") {
+          return normalized as CourseStatus;
+        }
+        return val;
+      })
+      .pipe(z.enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED]))
       .default(CourseStatus.DRAFT),
     teacherIds: z
       .array(z.string())
@@ -78,7 +88,7 @@ export const createCourseSchema = z
     isPublished: z.boolean().optional().default(false),
     capacity: z.number().int().positive().optional(),
     enrollRequiresApproval: z.boolean().optional().default(false),
-    enrollPasswordHash: z.string().optional(), // Pre-hashed password
+    enrollPasswordHash: z.string().nullish(), // Pre-hashed password (can be null or undefined)
     meta: z.record(z.string(), z.any()).optional(),
   })
   .refine((data) => data.endDate > data.startDate, {
@@ -104,13 +114,23 @@ export const updateCourseSchema = z
       .optional()
       .transform((val) => (val ? new Date(val) : undefined)),
     status: z
-      .enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED])
-      .optional(),
+      .string()
+      .optional()
+      .transform((val) => {
+        if (!val) return undefined;
+        // Transform to lowercase to match enum values
+        const normalized = val.toLowerCase();
+        if (normalized === "draft" || normalized === "ongoing" || normalized === "completed") {
+          return normalized as CourseStatus;
+        }
+        return val;
+      })
+      .pipe(z.enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED]).optional()),
     teacherIds: z.array(z.string()).min(1).optional(),
     isPublished: z.boolean().optional(),
     capacity: z.number().int().positive().optional(),
     enrollRequiresApproval: z.boolean().optional(),
-    enrollPasswordHash: z.string().optional(),
+    enrollPasswordHash: z.string().nullish(),
     meta: z.record(z.string(), z.any()).optional(),
   })
   .refine(
