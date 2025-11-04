@@ -32,12 +32,11 @@ import {
   sessionRoutes,
   submissionRoutes,
   userRoutes,
-} from "./routes";
-import { majorProtectedRoutes, majorPublicRoutes } from "@/routes/major.route";
-import {
+  majorProtectedRoutes,
+  majorPublicRoutes,
   specialistProtectedRoutes,
   specialistPublicRoutes,
-} from "@/routes/specialist.route";
+} from "./routes";
 
 export const createApp = () => {
   const app = express();
