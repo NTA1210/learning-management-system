@@ -4,6 +4,7 @@ import {
     resubmitAssignmentHandler,
     getSubmissionStatusHandler,
     listSubmissionsByAssignmentHandler,
+    gradeSubmissionHandler,
 }from "../controller/submission.controller";
 import  authenticate  from "../middleware/authenticate";
 import { Role } from "@/types";
@@ -27,5 +28,8 @@ submissionRoutes.get("/:assignmentId/status", authenticate, getSubmissionStatusH
 
 //GV xem danh sách bài nộp của 1 assignment
 submissionRoutes.get("/:assignmentId/all", authenticate,authorize(Role.ADMIN,Role.TEACHER), listSubmissionsByAssignmentHandler);
+
+//GV chấm điểm bài nộp
+submissionRoutes.put("/:assignmentId/grade", authenticate , authorize(Role.ADMIN, Role.TEACHER),gradeSubmissionHandler);
 
 export default submissionRoutes;

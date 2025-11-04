@@ -10,10 +10,13 @@ import {DashboardPage ,
   LoginPage,
   RegisterPage,
   CourseManagementPage,
+  AboutUsPage,
+  FAQPage,
 } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import ProtectedRoute from "../components/ProtectedRoute";
 import Profile from "../pages/profile";
+import Calendar from "../components/Calendar";
 
 function AppRoutes() {
   return (
@@ -59,10 +62,29 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
 
-        {/* Profile */}
+        {/* Calendar */}
+        <Route path="/calendar" element={
+          <ProtectedRoute>
+            <Calendar />
+          </ProtectedRoute>
+        } />
         <Route path="/profile" element={
           <ProtectedRoute>
             <Profile />
+          </ProtectedRoute>
+        } />
+
+        {/* About Us */}
+        <Route path="/help/about" element={
+          <ProtectedRoute>
+            <AboutUsPage />
+          </ProtectedRoute>
+        } />
+
+        {/* FAQ */}
+        <Route path="/help/faq" element={
+          <ProtectedRoute>
+            <FAQPage />
           </ProtectedRoute>
         } />
 

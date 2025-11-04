@@ -1,7 +1,7 @@
 import z from "zod";
 
-// Schema for listing categories with pagination and filters
-export const listCategoriesSchema = z.object({
+// Schema for listing majors with pagination and filters
+export const listMajorsSchema = z.object({
     page: z
         .string()
         .optional()
@@ -18,31 +18,34 @@ export const listCategoriesSchema = z.object({
     name: z.string().optional(),
     slug: z.string().optional(),
     description: z.string().optional(),
+    createdAt: z.date().optional(),
+    updatedAt: z.date().optional(),
     sortBy: z.enum(["createdAt", "title", "updatedAt"]).optional(),
     sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
-export type ListCategoriesQuery = z.infer<typeof listCategoriesSchema>;
+export type ListMajorsQuery = z.infer<typeof listMajorsSchema>;
 
-// Schema for creating a category
-export const createCategorySchema = z.object({
+// Schema for creating a major
+export const createMajorSchema = z.object({
     name: z.string().min(1, "Name is required").max(255),
-    slug: z.string().min(1, "Slug is required").max(255),
+    slug: z.string().min(1, "Slug is required").max(255).optional(),
     description: z.string().optional(),
 });
 
-export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
+export type CreateMajorInput = z.infer<typeof createMajorSchema>;
 
-// Schema for updating a category
-export const updateCategorySchema = z.object({
+// Schema for updating a major
+export const updateMajorSchema = z.object({
     name: z.string().min(1).max(255).optional(),
     slug: z.string().min(1).max(255).optional(),
     description: z.string().optional(),
 });
 
-export type UpdateCategoryInput = z.infer<typeof updateCategorySchema>;
+export type UpdateMajorInput = z.infer<typeof updateMajorSchema>;
 
-// Schema for course ID param
-export const categoryIdSchema = z.string().min(1, "Category ID is required");
+// Schema for major ID param
+export const majorIdSchema = z.string().min(1, "Major ID is required");
 
-export const categorySlugSchema = z.string().min(1, "Category slug is required");
+export const majorSlugSchema = z.string().min(1, "Major slug is required");
+

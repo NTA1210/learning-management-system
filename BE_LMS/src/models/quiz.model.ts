@@ -28,6 +28,7 @@ const QuizSchema = new mongoose.Schema<IQuiz>(
 
 //Indexes
 QuizSchema.index({ courseId: 1, isPublished: 1, createdAt: -1 });
+QuizSchema.index({ courseId: 1, title: 1 });
 
 //methods create snapshot questions
 QuizSchema.methods.createSnapshot = async function () {
@@ -48,7 +49,6 @@ QuizSchema.methods.createSnapshot = async function () {
   await this.save();
 };
 
-QuizSchema.index({ courseId: 1, title: 1 });
 const QuizModel = mongoose.model<IQuiz>("Quiz", QuizSchema, "quizzes");
 
 export default QuizModel;

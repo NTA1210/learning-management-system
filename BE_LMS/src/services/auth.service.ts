@@ -172,7 +172,7 @@ export const verifyEmail = async (code: string) => {
   const updatedUser = await UserModel.findByIdAndUpdate(
     validCode.userId,
     {
-      verified: true,
+      isVerified: true,
     },
     { new: true }
   );

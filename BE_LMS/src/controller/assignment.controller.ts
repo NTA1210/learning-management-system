@@ -16,7 +16,7 @@ import {
 
 export const listAssignmentsHandler = catchErrors(async (req, res) => {
   const query = listAssignmentsSchema.parse(req.query);
-  
+
   const result = await listAssignments({
     page: query.page,
     limit: query.limit,

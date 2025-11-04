@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-export const enum EnrollmentStatus {
+export enum EnrollmentStatus {
   PENDING = "pending",
   APPROVED = "approved",
   REJECTED = "rejected",
@@ -9,11 +9,11 @@ export const enum EnrollmentStatus {
   COMPLETED = "completed",
 }
 
-export const enum EnrollmentRole {
+export enum EnrollmentRole {
   STUDENT = "student",
   AUDITOR = "auditor",
 }
-export const enum EnrollmentMethod {
+export enum EnrollmentMethod {
   SELF = "self",
   INVITED = "invited",
   PASSWORD = "password",

@@ -10,3 +10,5 @@ export { default as DashboardPage } from "./Dashboard";
 export { default as StudentDashboardPage } from "./StudentDashboard";
 export { default as TeacherDashboardPage } from "./TeacherDashboard";
 export { default as CourseManagementPage } from "./CourseManagement";
+export { default as AboutUsPage } from "./AboutUs";
+export { default as FAQPage } from "./FAQ";

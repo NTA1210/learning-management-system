@@ -27,4 +27,5 @@ export default interface IQuizAttempt extends mongoose.Document {
   userAgent?: string;
   createdAt?: Date;
   updatedAt?: Date;
+  grade(): any;
 }
