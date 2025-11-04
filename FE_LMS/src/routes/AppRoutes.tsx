@@ -14,6 +14,7 @@ import {DashboardPage ,
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import ProtectedRoute from "../components/ProtectedRoute";
 import Profile from "../pages/profile";
+import Calendar from "../components/Calendar";
 
 function AppRoutes() {
   return (
@@ -59,7 +60,12 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
 
-        {/* Profile */}
+        {/* Calendar */}
+        <Route path="/calendar" element={
+          <ProtectedRoute>
+            <Calendar />
+          </ProtectedRoute>
+        } />
         <Route path="/profile" element={
           <ProtectedRoute>
             <Profile />
