@@ -1,5 +1,9 @@
-import { QuizQuestionModel } from "@/models";
+import { NOT_FOUND } from "@/constants/http";
+import { QuizQuestionModel, SubjectModel } from "@/models";
+import { ListParams } from "@/types/dto";
 import IQuizQuestion, { QuizQuestionType } from "@/types/quizQuestion.type";
+import appAssert from "@/utils/appAssert";
+import { FilterQuery } from "mongoose";
 import { parseStringPromise } from "xml2js";
 import { create } from "xmlbuilder";
 
@@ -8,10 +12,10 @@ import { create } from "xmlbuilder";
  * Checks file content, parses XML, and imports questions into the database.
  *
  * @param xmlBuffer - Buffer containing the XML content.
- * @param courseId - ID of the course to import questions into.
+ * @param subjectId - ID of the subject to import questions into.
  * @returns Promise resolving to an array of imported questions.
  */
-export const importXMLFile = async (xmlBuffer: Buffer, courseId: string) => {
+export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
   // 1️⃣ Convert buffer → string
   const xmlContent = xmlBuffer.toString("utf-8");
 
@@ -59,7 +63,7 @@ export const importXMLFile = async (xmlBuffer: Buffer, courseId: string) => {
 
     // Tạo object câu hỏi
     const newQuestion = new QuizQuestionModel({
-      courseId,
+      subjectId,
       text: questionText || questionName,
       type,
       options,
@@ -83,10 +87,14 @@ export const importXMLFile = async (xmlBuffer: Buffer, courseId: string) => {
  * @param quizQuestions Array of questions to export.
  * @returns Object containing XML string and total number of questions.
  */
-export const exportXMLFile = (
+export const exportXMLFile = async (
   quizQuestions: IQuizQuestion[],
-  courseCode = "FU-PRJ321"
+  subjectId: string
 ) => {
+  const subject = await SubjectModel.findById(subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+  const subjectCode = subject.code;
+
   const root = create({ version: "1.0", encoding: "UTF-8" }).ele("quiz");
 
   // --------------------
@@ -99,12 +107,12 @@ export const exportXMLFile = (
   categoryQuestion
     .ele("category")
     .ele("text")
-    .txt(`$course$/top/Default for ${courseCode}`);
+    .txt(`$subject$/top/Default for ${subjectCode}`);
   categoryQuestion
     .ele("info", { format: "moodle_auto_format" })
     .ele("text")
     .txt(
-      `The default category for questions shared in context '${courseCode}'.`
+      `The default category for questions shared in context '${subjectCode}'.`
     );
   categoryQuestion.ele("idnumber").txt("");
 
@@ -169,4 +177,74 @@ export const exportXMLFile = (
   // --------------------
   const xmlString = root.end({ format: "xml", prettyPrint: true } as any);
   return { xmlString, total: quizQuestions.length, exportedTypes };
+};
+
+interface IListQuizQuestionParams extends ListParams {
+  subjectId?: string;
+  type?: QuizQuestionType;
+  from: Date;
+  to: Date;
+}
+/**
+ * Get all quiz questions with pagination and filtering.
+ * @param  params - Parameters for filtering and pagination.
+ * @param  page - Page number to retrieve.
+ * @param  limit - Number of items to retrieve per page.
+ * @param  search - Search query for questions' text.
+ * @param  from - Date range for questions' created date.
+ * @param  to - Date range for questions' created date.
+ * @param  sortBy - Field to sort questions by.
+ * @param  sortOrder - Sort order for questions.
+ * @param subjectId - Subject ID to filter by.
+ * @param  type - Type of questions to filter by.
+ * @returns - Promise resolving to an array of quiz questions.
+ */
+export const getAllQuizQuestions = async ({
+  page = 1,
+  limit = 10,
+  search,
+  from,
+  to,
+  sortOrder = "desc",
+  subjectId,
+  type,
+}: Partial<IListQuizQuestionParams>) => {
+  const query: FilterQuery<IQuizQuestion> = {};
+
+  if (subjectId) query.subjectId = subjectId;
+  if (type) query.type = type;
+  if (search) query.$text = { $search: search };
+
+  if (from || to) {
+    query.createdAt = {};
+    if (from) query.createdAt.$gte = from;
+    if (to) query.createdAt.$lte = to;
+  }
+
+  // validate & limit input
+  const _page = Math.max(1, page);
+  const _limit = Math.min(Math.max(1, limit), 100);
+  const sortDirection = sortOrder === "asc" ? 1 : -1;
+
+  const [data, total] = await Promise.all([
+    QuizQuestionModel.find(query)
+      .sort({ createdAt: sortDirection })
+      .skip((_page - 1) * _limit)
+      .limit(_limit),
+    QuizQuestionModel.countDocuments(query),
+  ]);
+
+  const totalPages = Math.ceil(total / _limit);
+
+  return {
+    data,
+    pagination: {
+      totalItems: total,
+      currentPage: _page,
+      limit: _limit,
+      totalPages,
+      hasNext: _page < totalPages,
+      hasPrev: _page > 1,
+    },
+  };
 };
