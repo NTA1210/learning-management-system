@@ -235,7 +235,7 @@
 
 .week-schedule-item-compact {
   display: grid;
-  grid-template-columns: auto auto 1fr;
+  grid-template-columns: 1fr auto; /* main text + time */
   gap: 8px;
   align-items: center;
   font-size: 12px;
@@ -244,6 +244,7 @@
   border-radius: 10px;
   background: #0b1220; /* deep slate */
   margin-bottom: 6px;
+  height: 44px; /* fixed height for alignment across columns */
 }
 
 .calendar-page:not(.dark) .week-schedule-item-compact {
@@ -270,6 +271,28 @@
 
 .room-info {
   color: #9ca3af; /* gray-400 */
+}
+
+/* Prevent wrapping so heights stay consistent across columns */
+.subject-code,
+.room-info {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Keep time fully visible */
+.time-range {
+  white-space: nowrap;
+}
+
+/* Ensure subject + time always visible in week compact items */
+.week-schedule-item-compact .subject-code {
+  overflow: visible;
+  text-overflow: clip;
+}
+.week-schedule-item-compact .room-info {
+  display: none; /* hide room to prioritize subject + time */
 }
 
 /* Day view */

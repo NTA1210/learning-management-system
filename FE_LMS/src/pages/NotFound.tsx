@@ -11,7 +11,8 @@ function NotFound() {
         thickness={2}
         style={{ borderRadius: 16 }}
         className="w-full max-w-md"
-      >
+
+>
         <div className="bg-gray-800 p-8 rounded-2xl">
           {/* Featured Tag */}
           <div className="inline-block bg-gray-700 text-white text-xs font-medium px-3 py-1 rounded-lg mb-4">

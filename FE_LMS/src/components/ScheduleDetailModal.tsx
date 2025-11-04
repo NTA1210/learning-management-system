@@ -26,3 +26,5 @@ const ScheduleDetailModal: React.FC<Props> = ({ isOpen, onClose }) => {
 export default ScheduleDetailModal;
 
 
+
+
