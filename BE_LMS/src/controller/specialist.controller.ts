@@ -39,11 +39,11 @@ export const listSpecialistsHandler = catchErrors(async (req, res) => {
     sortOrder: query.sortOrder,
   });
 
-  return res.status(OK).json({
-    message: "Specialists retrieved successfully",
-    data: result.specialists,
-    pagination: result.pagination,
-  });
+    return res.success(OK, {
+        message: "Specialists retrieved successfully",
+        data: result.specialists,
+        pagination: result.pagination,
+    });
 });
 
 export const getSpecialistByIdHandler = catchErrors(async (req, res) => {
@@ -52,10 +52,10 @@ export const getSpecialistByIdHandler = catchErrors(async (req, res) => {
   // Call service
   const specialist = await getSpecialistById(specialistId);
 
-  return res.status(OK).json({
-    message: "Specialist retrieved successfully",
-    data: specialist,
-  });
+    return res.success(OK, {
+        message: "Specialist retrieved successfully",
+        data: specialist,
+    });
 });
 
 export const getSpecialistBySlugHandler = catchErrors(async (req, res) => {
@@ -64,57 +64,48 @@ export const getSpecialistBySlugHandler = catchErrors(async (req, res) => {
   // Call service
   const specialist = await getSpecialistBySlug(specialistSlug);
 
-  return res.status(OK).json({
-    message: "Specialist retrieved successfully",
-    data: specialist,
-  });
+    return res.success(OK, {
+        message: "Specialist retrieved successfully",
+        data: specialist,
+    });
 });
 
 export const createSpecialistHandler = catchErrors(async (req, res) => {
   const data = createSpecialistSchema.parse(req.body);
 
-  // Call service
-  const specialist = await createSpecialist({
-    ...data,
-    majorId: data.majorId as mongoose.Types.ObjectId,
-  });
+    // Call service
+    const specialist = await createSpecialist({...data, majorId: data.majorId as unknown as mongoose.Types.ObjectId});
 
-  return res.status(CREATED).json({
-    message: "Specialist created successfully",
-    data: specialist,
-  });
+    return res.success(CREATED, {
+        message: "Specialist created successfully",
+        data: specialist,
+    });
 });
 
 export const updateSpecialistByIdHandler = catchErrors(async (req, res) => {
   const specialistId = specialistIdSchema.parse(req.params.id);
   const data = updateSpecialistSchema.parse(req.body);
 
-  // Call service
-  const specialist = await updateSpecialistById(specialistId, {
-    ...data,
-    majorId: data.majorId as mongoose.Types.ObjectId,
-  });
+    // Call service
+    const specialist = await updateSpecialistById(specialistId, {...data, majorId: data.majorId as unknown as mongoose.Types.ObjectId});
 
-  return res.status(OK).json({
-    message: "Specialist updated successfully",
-    data: specialist,
-  });
+    return res.success(OK, {
+        message: "Specialist updated successfully",
+        data: specialist,
+    });
 });
 
 export const updateSpecialistBySlugHandler = catchErrors(async (req, res) => {
   const slug = specialistSlugSchema.parse(req.params.slug);
   const data = updateSpecialistSchema.parse(req.body);
 
-  // Call service
-  const specialist = await updateSpecialistBySlug(slug, {
-    ...data,
-    majorId: data.majorId as mongoose.Types.ObjectId,
-  });
+    // Call service
+    const specialist = await updateSpecialistBySlug(slug, {...data, majorId: data.majorId as unknown as mongoose.Types.ObjectId});
 
-  return res.status(OK).json({
-    message: "Specialist updated successfully",
-    data: specialist,
-  });
+    return res.success(OK, {
+        message: "Specialist updated successfully",
+        data: specialist,
+    });
 });
 
 export const deleteSpecialistByIdHandler = catchErrors(async (req, res) => {
@@ -123,10 +114,10 @@ export const deleteSpecialistByIdHandler = catchErrors(async (req, res) => {
   // Call service
   const specialist = await deleteSpecialistById(specialistId);
 
-  return res.status(OK).json({
-    message: "Specialist deleted successfully",
-    data: specialist,
-  });
+    return res.success(OK, {
+        message: "Specialist deleted successfully",
+        data: specialist,
+    });
 });
 
 export const deleteSpecialistBySlugHandler = catchErrors(async (req, res) => {
@@ -135,8 +126,8 @@ export const deleteSpecialistBySlugHandler = catchErrors(async (req, res) => {
   // Call service
   const specialist = await deleteSpecialistBySlug(slug);
 
-  return res.status(OK).json({
-    message: "Specialist deleted successfully",
-    data: specialist,
-  });
+    return res.success(OK, {
+        message: "Specialist deleted successfully",
+        data: specialist,
+    });
 });
