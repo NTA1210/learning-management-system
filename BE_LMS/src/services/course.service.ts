@@ -10,6 +10,7 @@ import {
   UpdateCourseInput,
 } from "../validators/course.schemas";
 import { CourseStatus } from "../types/course.type";
+import { Role, UserStatus } from "../types/user.type";
 
 export type ListCoursesParams = {
   page: number;
@@ -23,7 +24,7 @@ export type ListCoursesParams = {
   onlyDeleted?: boolean; // Admin only - show only deleted courses
   sortBy?: string;
   sortOrder?: string;
-  userRole?: string; // ✅ FIX: Added to check permissions for viewing deleted courses
+  userRole?: Role; // ✅ FIX: Added to check permissions for viewing deleted courses
 };
 
 /**
@@ -91,7 +92,7 @@ export const listCourses = async ({
 
   // ✅ SOFT DELETE: Control deleted course visibility
   // ✅ FIX: Only admin can view deleted courses
-  const isAdmin = userRole?.trim().toUpperCase() === "ADMIN";
+  const isAdmin = userRole === Role.ADMIN;
   
   if (onlyDeleted) {
     // Admin viewing recycle bin
@@ -268,8 +269,7 @@ export const createCourse = async (
 
   // Check if all users have teacher or admin role
   const allAreTeachers = teachers.every((teacher) => {
-    const role = teacher.role.trim().toUpperCase();
-    return role === "TEACHER" || role === "ADMIN";
+    return teacher.role === Role.TEACHER || teacher.role === Role.ADMIN;
   });
 
   appAssert(
@@ -280,8 +280,7 @@ export const createCourse = async (
 
   // ❌ FIX: Check if teachers are active (not banned/inactive)
   const allTeachersActive = teachers.every((teacher) => {
-    const status = teacher.status?.trim().toUpperCase();
-    return status === "ACTIVE";
+    return teacher.status === UserStatus.ACTIVE;
   });
 
   appAssert(
@@ -295,8 +294,7 @@ export const createCourse = async (
   const creator = await UserModel.findById(userId);
   appAssert(creator, BAD_REQUEST, "Creator user not found");
 
-  const creatorRole = creator.role.trim().toUpperCase();
-  const isAdmin = creatorRole === "ADMIN";
+  const isAdmin = creator.role === Role.ADMIN;
 
   // Determine final status and publish state
   let finalIsPublished = data.isPublished || false;
@@ -378,8 +376,7 @@ export const updateCourse = async (
     (teacherId) => teacherId.toString() === userId
   );
 
-  const userRole = user.role.trim().toUpperCase();
-  const isAdmin = userRole === "ADMIN";
+  const isAdmin = user.role === Role.ADMIN;
 
   appAssert(
     isTeacherOfCourse || isAdmin,
@@ -427,8 +424,7 @@ export const updateCourse = async (
     );
 
     const allAreTeachers = teachers.every((teacher) => {
-      const role = teacher.role.trim().toUpperCase();
-      return role === "TEACHER" || role === "ADMIN";
+      return teacher.role === Role.TEACHER || teacher.role === Role.ADMIN;
     });
 
     appAssert(
@@ -525,8 +521,7 @@ export const deleteCourse = async (courseId: string, userId: string) => {
   const isTeacherOfCourse = course.teacherIds.some(
     (teacherId) => teacherId.toString() === userId
   );
-  const normalizedRole = user.role.trim().toUpperCase();
-  const isAdmin = normalizedRole === "ADMIN";
+  const isAdmin = user.role === Role.ADMIN;
 
   appAssert(
     isTeacherOfCourse || isAdmin,
@@ -582,8 +577,7 @@ export const restoreCourse = async (courseId: string, userId: string) => {
   const user = await UserModel.findById(userId);
   appAssert(user, NOT_FOUND, "User not found");
 
-  const normalizedRole = user.role.trim().toUpperCase();
-  const isAdmin = normalizedRole === "ADMIN";
+  const isAdmin = user.role === Role.ADMIN;
 
   appAssert(
     isAdmin,
@@ -645,8 +639,7 @@ export const permanentDeleteCourse = async (
   const user = await UserModel.findById(userId);
   appAssert(user, NOT_FOUND, "User not found");
 
-  const normalizedRole = user.role.trim().toUpperCase();
-  const isAdmin = normalizedRole === "ADMIN";
+  const isAdmin = user.role === Role.ADMIN;
 
   appAssert(
     isAdmin,
