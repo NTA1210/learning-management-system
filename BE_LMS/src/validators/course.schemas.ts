@@ -16,9 +16,8 @@ export const listCoursesSchema = z.object({
       message: "Limit must be between 1 and 100",
     }),
   search: z.string().optional(),
-  specialistId: z.string().optional(), // Filter by specialist ID
+  subjectId: z.string().optional(), // Filter by subject ID
   teacherId: z.string().optional(), // Filter by teacher ID
-  code: z.string().optional(), // Filter by course code
   isPublished: z
     .string()
     .optional()
@@ -58,7 +57,7 @@ export type ListCoursesQuery = z.infer<typeof listCoursesSchema>;
 export const createCourseSchema = z
   .object({
     title: z.string().min(1, "Title is required").max(255),
-    code: z.string().min(1).max(50).optional(),
+    subjectId: z.string().optional(), // ✅ NEW: Subject reference
     logo: z.string().optional(), // URL to logo image
     description: z.string().optional(),
     startDate: z
@@ -70,17 +69,26 @@ export const createCourseSchema = z
       .min(1, "End date is required")
       .transform((val) => new Date(val)), // Required
     status: z
-      .enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED])
+      .string()
       .optional()
+      .transform((val) => {
+        if (!val) return CourseStatus.DRAFT;
+        // Transform to lowercase to match enum values
+        const normalized = val.toLowerCase();
+        if (normalized === "draft" || normalized === "ongoing" || normalized === "completed") {
+          return normalized as CourseStatus;
+        }
+        return val;
+      })
+      .pipe(z.enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED]))
       .default(CourseStatus.DRAFT),
     teacherIds: z
       .array(z.string())
       .min(1, "At least one teacher is required"), // Required
-    specialistIds: z.array(z.string()).optional(), // Optional
     isPublished: z.boolean().optional().default(false),
     capacity: z.number().int().positive().optional(),
     enrollRequiresApproval: z.boolean().optional().default(false),
-    enrollPasswordHash: z.string().optional(), // Pre-hashed password
+    enrollPasswordHash: z.string().nullish(), // Pre-hashed password (can be null or undefined)
     meta: z.record(z.string(), z.any()).optional(),
   })
   .refine((data) => data.endDate > data.startDate, {
@@ -94,7 +102,7 @@ export type CreateCourseInput = z.infer<typeof createCourseSchema>;
 export const updateCourseSchema = z
   .object({
     title: z.string().min(1).max(255).optional(),
-    code: z.string().min(1).max(50).optional(),
+    subjectId: z.string().optional(), // ✅ NEW: Subject reference
     logo: z.string().optional(),
     description: z.string().optional(),
     startDate: z
@@ -106,14 +114,23 @@ export const updateCourseSchema = z
       .optional()
       .transform((val) => (val ? new Date(val) : undefined)),
     status: z
-      .enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED])
-      .optional(),
+      .string()
+      .optional()
+      .transform((val) => {
+        if (!val) return undefined;
+        // Transform to lowercase to match enum values
+        const normalized = val.toLowerCase();
+        if (normalized === "draft" || normalized === "ongoing" || normalized === "completed") {
+          return normalized as CourseStatus;
+        }
+        return val;
+      })
+      .pipe(z.enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED]).optional()),
     teacherIds: z.array(z.string()).min(1).optional(),
-    specialistIds: z.array(z.string()).optional(),
     isPublished: z.boolean().optional(),
     capacity: z.number().int().positive().optional(),
     enrollRequiresApproval: z.boolean().optional(),
-    enrollPasswordHash: z.string().optional(),
+    enrollPasswordHash: z.string().nullish(),
     meta: z.record(z.string(), z.any()).optional(),
   })
   .refine(
