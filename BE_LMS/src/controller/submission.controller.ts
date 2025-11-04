@@ -24,16 +24,23 @@ export const submitAssignmentHandler = catchErrors(async (req, res) => {
 
   // ✅ Validate params và body
   const { assignmentId } = submissionParamsSchema.parse(req.params);
-  const { key, originalName, mimeType, size } = submissionBodySchema.parse(req.body);
+  const { key, originalName, mimeType, size } = submissionBodySchema.parse(
+    req.body
+  );
 
-  const submission = await submitAssignment(studentId, assignmentId, key, originalName, mimeType, size);
+  const submission = await submitAssignment(
+    studentId,
+    assignmentId,
+    key,
+    originalName,
+    mimeType,
+    size
+  );
 
-  // return res.status(CREATED).json({
-  //   message: "Assignment submitted successfully",
-  //   data: submission,
-  // });
-  // return res.success(OK, submission, "Assignment submitted successfully")
-  return res.success(OK, {data: submission, message: "Assignment submitted successfully"})
+  return res.success(OK, {
+    data: submission,
+    message: "Assignment submitted successfully",
+  });
 });
 
 // 🟡 2. Nộp lại (Resubmit)
@@ -42,15 +49,23 @@ export const resubmitAssignmentHandler = catchErrors(async (req, res) => {
   appAssert(studentId, BAD_REQUEST, "Missing user ID");
 
   const { assignmentId } = submissionParamsSchema.parse(req.params);
-  const { key, originalName, mimeType, size } = submissionBodySchema.parse(req.body);
+  const { key, originalName, mimeType, size } = submissionBodySchema.parse(
+    req.body
+  );
 
-  const submission = await resubmitAssignment(studentId, assignmentId, key, originalName, mimeType, size);
+  const submission = await resubmitAssignment(
+    studentId,
+    assignmentId,
+    key,
+    originalName,
+    mimeType,
+    size
+  );
 
-  // return res.status(OK).json({
-  //   message: "Assignment resubmitted successfully",
-  //   data: submission,
-  // });
-  return res.success(OK, {data: submission, message: "Assignment resubmitted successfully"});
+  return res.success(OK, {
+    data: submission,
+    message: "Assignment resubmitted successfully",
+  });
 });
 
 // 🔵 3. Xem trạng thái bài nộp
@@ -61,24 +76,24 @@ export const getSubmissionStatusHandler = catchErrors(async (req, res) => {
   const { assignmentId } = submissionParamsSchema.parse(req.params);
   const status = await getSubmissionStatus(studentId, assignmentId);
 
-  // return res.status(OK).json({
-  //   message: "Submission status retrieved successfully",
-  //   data: status,
-  // });
-  return res.success(OK, {data: status,message: "Submission status retrieved successfully"});
+  return res.success(OK, {
+    data: status,
+    message: "Submission status retrieved successfully",
+  });
 });
 
 // 🧩 4. Danh sách bài nộp theo assignment (cho giảng viên)
-export const listSubmissionsByAssignmentHandler = catchErrors(async (req, res) => {
-  const { assignmentId } = submissionParamsSchema.parse(req.params);
-  const submissions = await listSubmissionsByAssignment(assignmentId);
+export const listSubmissionsByAssignmentHandler = catchErrors(
+  async (req, res) => {
+    const { assignmentId } = submissionParamsSchema.parse(req.params);
+    const submissions = await listSubmissionsByAssignment(assignmentId);
 
-  // return res.status(OK).json({
-  //   message: "Submissions retrieved successfully",
-  //   data: submissions,
-  // });
-  return res.success(OK,{ data:submissions, message: "Submissions retrieved successfully"});
-});
+    return res.success(OK, {
+      data: submissions,
+      message: "Submissions retrieved successfully",
+    });
+  }
+);
 
 // 🟥 5. Chấm điểm bài nộp (Teacher/Admin)
 export const gradeSubmissionHandler = catchErrors(async (req, res) => {
@@ -96,5 +111,8 @@ export const gradeSubmissionHandler = catchErrors(async (req, res) => {
     feedback
   );
 
-  return res.success(OK, {data: result,message: "Submission graded successfully"});
+  return res.success(OK, {
+    data: result,
+    message: "Submission graded successfully",
+  });
 });
