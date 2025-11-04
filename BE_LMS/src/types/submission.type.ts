@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-export const enum SubmissionStatus {
+export enum SubmissionStatus {
   NOT_SUBMITTED = "not_submitted",
   SUBMITTED = "submitted",
   RESUBMITTED = "re_submitted",
@@ -20,6 +20,12 @@ export default interface ISubmission extends mongoose.Document {
   feedback?: string;
   gradedBy?: mongoose.Types.ObjectId;
   gradedAt?: Date;
+  gradeHistory?: {
+    grade: number;
+    feedback?: string;
+    gradedBy: mongoose.Types.ObjectId;
+    gradedAt: Date;
+  }[]
   isLate?: boolean;
   status: SubmissionStatus;
 }

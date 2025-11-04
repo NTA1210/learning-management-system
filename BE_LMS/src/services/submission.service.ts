@@ -2,13 +2,17 @@ import SubmissionModel from "../models/submission.model";
 import AssignmentModel from "../models/assignment.model";
 import appAssert from "../utils/appAssert";
 import { NOT_FOUND, BAD_REQUEST } from "../constants/http";
+import mongoose from "mongoose";
+import { SubmissionStatus } from "../types/submission.type";
 
 //submit assign
 export const submitAssignment = async (
   studentId: string,
   assignmentId: string,
-  fileUrl: string,
-  fileName?: string
+  key: string,
+  originalName: string,
+  mimeType?: string,
+  size?: number
 ) => {
   //ktra ass có tồn tại ko
   const assignment = await AssignmentModel.findById(assignmentId);
@@ -32,11 +36,12 @@ export const submitAssignment = async (
   const submission = await SubmissionModel.create({
     assignmentId,
     studentId,
-    fileUrl,
-    fileName,
+    key,
+    originalName,
+    mimeType,
+    size: size || 0,
     submittedAt,
-    // isLate,
-    // status: isLate ? "overdue" : "submitted",
+    status: isLate ? SubmissionStatus.OVERDUE : SubmissionStatus.SUBMITTED,
   });
 
   return await submission.populate("assignmentId","title dueDate");
@@ -47,8 +52,10 @@ export const submitAssignment = async (
 export const resubmitAssignment = async (
   studentId: string,
   assignmentId: string,
-  fileUrl: string,
-  fileName?: string
+  key: string,
+  originalName: string,
+  mimeType?: string,
+  size?: number
 ) => {
   const assignment = await AssignmentModel.findById(assignmentId);
   appAssert(assignment, NOT_FOUND, "Assignment not found");
@@ -60,13 +67,14 @@ export const resubmitAssignment = async (
   appAssert(submission, NOT_FOUND, "Submission not found");
 
   const resubmittedAt = new Date();
-  //const isLate = assignment.dueDate && resubmittedAt > assignment.dueDate;
+  const isLate = assignment.dueDate && resubmittedAt > assignment.dueDate;
 
-  submission.fileUrl = fileUrl;
-  submission.fileName = fileName;
+  submission.key = key;
+  submission.originalName = originalName;
+  if (mimeType) submission.mimeType = mimeType;
+  if (size !== undefined) submission.size = size;
   submission.submittedAt = resubmittedAt;
-  //submission.isLate = isLate;
-  //submission.status = isLate ? "over due" : "submitted";
+  submission.status = isLate ? SubmissionStatus.OVERDUE : SubmissionStatus.RESUBMITTED;
 
   await submission.save();
   return await submission.populate("assignmentId","title dueDate");
@@ -101,4 +109,55 @@ export const listSubmissionsByAssignment = async (assignmentId: string) => {
   return SubmissionModel.find({ assignmentId })
     .populate("studentId", "fullname email")
     .sort({ submittedAt: -1 });
+};
+
+//grade
+export const gradeSubmission = async (
+  assignmentId: string,
+  studentId: string,
+  graderId: string,
+  grade: number,
+  feedback?: string
+) => {
+  // 1️⃣ Kiểm tra Assignment
+  const assignment = await AssignmentModel.findById(assignmentId);
+  appAssert(assignment, NOT_FOUND, "Assignment not found");
+
+  // 2️⃣ Kiểm tra Submission
+  const submission = await SubmissionModel.findOne({ assignmentId, studentId });
+  appAssert(submission, NOT_FOUND, "Submission not found");
+
+  // 3️⃣ Validate điểm
+  const maxScore = assignment.maxScore || 10;
+  appAssert(
+    grade >= 0 && grade <= maxScore,
+    BAD_REQUEST,
+    `Grade must be between 0 and ${maxScore}`
+  );
+
+  // 4️⃣ Cập nhật thông tin chấm điểm
+  submission.grade = grade;
+  submission.feedback = feedback;
+  submission.gradedBy = new mongoose.Types.ObjectId(graderId);
+  submission.gradedAt = new Date();
+  submission.status = SubmissionStatus.GRADED;
+
+  // 5️⃣ Lưu lịch sử chấm điểm
+  if (!submission.gradeHistory) {
+    submission.gradeHistory = [];
+  }
+  submission.gradeHistory.push({
+    grade,
+    feedback: feedback || "",
+    gradedBy: new mongoose.Types.ObjectId(graderId),
+    gradedAt: new Date(),
+  });
+
+  await submission.save();
+
+  // 6️⃣ Populate thông tin trả về
+  return await submission.populate([
+    { path: "studentId", select: "fullname email" },
+    { path: "gradedBy", select: "fullname email" },
+  ]);
 };
