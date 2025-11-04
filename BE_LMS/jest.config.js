@@ -1,4 +1,4 @@
-const tsJestTransformCfg = { '^.+\\.tsx?$': ['ts-jest', {}] };
+const tsJestTransformCfg = { "^.+\\.tsx?$": ["ts-jest", {}] };
 
 /** @type {import("jest").Config} **/
 module.exports = {
@@ -10,11 +10,11 @@ module.exports = {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
   setupFilesAfterEnv: [
-    ["<rootDir>/src/setupTests.ts"], // ✅ load dotenv
+    "<rootDir>/src/setupTests.ts", // ✅ bỏ ngoặc vuông thừa
     // "<rootDir>/src/setupTests.unit.ts",
   ],
   testMatch: [
-    ["**/*.test.ts"],
+    "**/*.test.ts", // ✅ bỏ ngoặc vuông thừa
     // "**/__tests__/{lesson,lessonMaterial,lessonProgress}/**/*.test.ts"
   ],
   verbose: true,
