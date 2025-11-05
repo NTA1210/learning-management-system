@@ -11,6 +11,7 @@ export default interface ICourse extends mongoose.Document {
   title: string;
   subjectId?: mongoose.Types.ObjectId;
   logo?: string;
+  key?: string; // MinIO key for logo file
   description?: string;
   startDate: Date;
   endDate: Date;

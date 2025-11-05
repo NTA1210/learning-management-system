@@ -84,14 +84,40 @@ export const createCourseSchema = z
       .pipe(z.enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED]))
       .default(CourseStatus.DRAFT),
     teacherIds: z
-      .array(z.string())
-      .min(1, "At least one teacher is required"), // Required
-    isPublished: z.boolean().optional().default(false),
+      .union([
+        z.array(z.string()), // Already array
+        z.string().transform((val) => JSON.parse(val)), // Parse JSON string from multipart
+      ])
+      .pipe(z.array(z.string()).min(1, "At least one teacher is required")), // Required
+    isPublished: z
+      .union([
+        z.boolean(),
+        z.string().transform((val) => val === "true" || val === "1"),
+      ])
+      .optional()
+      .default(false),
     // ✅ UNIVERSITY RULE: Capacity must be reasonable (10-500 students per class)
-    capacity: z.number().int().min(1).max(500).optional(),
-    enrollRequiresApproval: z.boolean().optional().default(false),
+    capacity: z
+      .union([
+        z.number(),
+        z.string().transform((val) => parseInt(val, 10)),
+      ])
+      .pipe(z.number().int().min(1).max(500))
+      .optional(),
+    enrollRequiresApproval: z
+      .union([
+        z.boolean(),
+        z.string().transform((val) => val === "true" || val === "1"),
+      ])
+      .optional()
+      .default(false),
     enrollPasswordHash: z.string().nullish(), // Pre-hashed password (can be null or undefined)
-    meta: z.record(z.string(), z.any()).optional(),
+    meta: z
+      .union([
+        z.record(z.string(), z.any()), // Already object
+        z.string().transform((val) => JSON.parse(val)), // Parse JSON string from multipart
+      ])
+      .optional(),
   })
   .refine((data) => data.endDate > data.startDate, {
     message: "End date must be after start date",
@@ -105,7 +131,7 @@ export const updateCourseSchema = z
   .object({
     title: z.string().min(1).max(255).optional(),
     subjectId: z.string().optional(), // ✅ NEW: Subject reference
-    logo: z.string().optional(),
+    logo: z.string().nullish(), // ✅ Allow null or empty string to remove logo
     description: z.string().optional(),
     startDate: z
       .string()
@@ -128,13 +154,40 @@ export const updateCourseSchema = z
         return val;
       })
       .pipe(z.enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED]).optional()),
-    teacherIds: z.array(z.string()).min(1).optional(),
-    isPublished: z.boolean().optional(),
+    teacherIds: z
+      .union([
+        z.array(z.string()),
+        z.string().transform((val) => JSON.parse(val)),
+      ])
+      .pipe(z.array(z.string()).min(1))
+      .optional(),
+    isPublished: z
+      .union([
+        z.boolean(),
+        z.string().transform((val) => val === "true" || val === "1"),
+      ])
+      .optional(),
     // ✅ UNIVERSITY RULE: Capacity must be reasonable (10-500 students per class)
-    capacity: z.number().int().min(1).max(500).optional(),
-    enrollRequiresApproval: z.boolean().optional(),
+    capacity: z
+      .union([
+        z.number(),
+        z.string().transform((val) => parseInt(val, 10)),
+      ])
+      .pipe(z.number().int().min(1).max(500))
+      .optional(),
+    enrollRequiresApproval: z
+      .union([
+        z.boolean(),
+        z.string().transform((val) => val === "true" || val === "1"),
+      ])
+      .optional(),
     enrollPasswordHash: z.string().nullish(),
-    meta: z.record(z.string(), z.any()).optional(),
+    meta: z
+      .union([
+        z.record(z.string(), z.any()),
+        z.string().transform((val) => JSON.parse(val)),
+      ])
+      .optional(),
   })
   .refine(
     (data) => {

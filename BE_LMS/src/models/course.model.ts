@@ -8,6 +8,7 @@ const CourseSchema = new mongoose.Schema<ICourse>(
     // ✅ UNIVERSITY RULE: Course MUST belong to a Subject
     subjectId: { type: mongoose.Schema.Types.ObjectId, ref: "Subject", required: true },
     logo: { type: String },
+    key: { type: String }, // MinIO key for logo file (used for deletion)
     description: { type: String },
     startDate: { type: Date, required: true },
     endDate: {

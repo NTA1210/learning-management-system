@@ -70,14 +70,17 @@ export const getCourseByIdHandler = catchErrors(async (req, res) => {
  * POST /courses - Create new course
  */
 export const createCourseHandler = catchErrors(async (req, res) => {
+  // Get logo file from multer (if uploaded)
+  const logoFile = req.file;
+
   // Validate request body
   const data = createCourseSchema.parse(req.body);
 
   // Get userId from request (set by authenticate middleware)
   const userId = (req as any).userId;
 
-  // Call service
-  const course = await createCourse(data, userId);
+  // Call service with logo file
+  const course = await createCourse(data, userId, logoFile);
 
   return res.success(CREATED, {
     data: course,
@@ -89,6 +92,9 @@ export const createCourseHandler = catchErrors(async (req, res) => {
  * PUT /courses/:id - Update course
  */
 export const updateCourseHandler = catchErrors(async (req, res) => {
+  // Get logo file from multer (if uploaded)
+  const logoFile = req.file;
+
   // Validate course ID
   const courseId = courseIdSchema.parse(req.params.id);
 
@@ -98,9 +104,9 @@ export const updateCourseHandler = catchErrors(async (req, res) => {
   // Get userId from request (set by authenticate middleware)
   const userId = (req as any).userId;
 
-  // Call service
-  const course = await updateCourse(courseId, data, userId);
-
+  // Call service with logo file
+  const course = await updateCourse(courseId, data, userId, logoFile);
+  
   return res.success(OK, {
     data: course,
     message: "Course updated successfully",

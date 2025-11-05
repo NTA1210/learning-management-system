@@ -11,6 +11,8 @@ import {
 } from "../validators/course.schemas";
 import { CourseStatus } from "../types/course.type";
 import { Role, UserStatus } from "../types/user.type";
+import { uploadFile, removeFile } from "../utils/uploadFile";
+import { prefixCourseLogo } from "../utils/filePrefix";
 
 export type ListCoursesParams = {
   page: number;
@@ -211,7 +213,8 @@ export const getCourseById = async (courseId: string) => {
  */
 export const createCourse = async (
   data: CreateCourseInput,
-  userId: string
+  userId: string,
+  logoFile?: Express.Multer.File
 ) => {
   // ❌ FIX: Validate teacherIds array
   appAssert(
@@ -326,8 +329,24 @@ export const createCourse = async (
   // ❌ FIX: Ensure course was created
   appAssert(course, BAD_REQUEST, "Failed to create course");
 
+  // 🖼️ Upload logo if provided
+  if (logoFile) {
+    try {
+      const courseId = String(course._id);
+      const logoPrefix = prefixCourseLogo(courseId);
+      const { publicUrl, key } = await uploadFile(logoFile, logoPrefix);
+      await CourseModel.findByIdAndUpdate(courseId, {
+        logo: publicUrl,
+        key, // Save key for future deletion
+      });
+      course.logo = publicUrl;
+    } catch (err) {
+      console.error("Logo upload failed:", err);
+    }
+  }
+
   // Populate and return
-  const populatedCourse = await CourseModel.findById(course._id)
+  const populatedCourse = await CourseModel.findById(String(course._id))
     .populate("teacherIds", "username email fullname avatar_url")
     .populate("subjectId", "name code slug description credits")
     .populate("createdBy", "username email fullname")
@@ -345,7 +364,8 @@ export const createCourse = async (
 export const updateCourse = async (
     courseId: string,
     data: UpdateCourseInput,
-    userId: string
+    userId: string,
+    logoFile?: Express.Multer.File
 ) => {
   // ❌ FIX: Validate courseId format
   appAssert(
@@ -438,7 +458,7 @@ export const updateCourse = async (
   // ✅ YÊU CẦU 2: Only Admin can approve/publish courses
   // Teacher không thể tự publish course của mình
   // Prepare update data
-  const updateData = { ...data };
+  const updateData: any = { ...data };
 
   // If teacher tries to publish course, prevent it
   if (!isAdmin && data.isPublished === true) {
@@ -452,10 +472,58 @@ export const updateCourse = async (
     updateData.status = CourseStatus.ONGOING;
   }
 
+  // 🗑️ Remove logo if logo field is explicitly set to null/empty string
+  if (data.logo === null || data.logo === "") {
+    // Delete logo file from MinIO
+    if (course.key) {
+      try {
+        await removeFile(course.key);
+        console.log(`🗑️ Deleted logo: ${course.key}`);
+      } catch (err) {
+        console.error("Failed to delete logo:", err);
+      }
+    }
+    // Remove logo field from updateData to avoid conflict
+    delete updateData.logo;
+    // Remove logo and key from database
+    updateData.$unset = { logo: 1, key: 1 };
+  }
+  // 🖼️ Upload new logo if provided
+  else if (logoFile) {
+    try {
+      // Delete old logo if exists
+      if (course.key) {
+        try {
+          await removeFile(course.key);
+          console.log(`🗑️ Deleted old logo: ${course.key}`);
+        } catch (err) {
+          console.error("Failed to delete old logo:", err);
+        }
+      }
+
+      // Upload new logo
+      const logoPrefix = prefixCourseLogo(courseId);
+      const { publicUrl, key } = await uploadFile(logoFile, logoPrefix);
+      updateData.logo = publicUrl;
+      updateData.key = key; // Save key for future deletion
+    } catch (err) {
+      console.error("Logo upload failed:", err);
+    }
+  }
+
   // Update course
+  const updateQuery: any = {};
+  if (updateData.$unset) {
+    updateQuery.$unset = updateData.$unset;
+    delete updateData.$unset;
+  }
+  if (Object.keys(updateData).length > 0) {
+    updateQuery.$set = updateData;
+  }
+
   const updatedCourse = await CourseModel.findByIdAndUpdate(
     courseId,
-    { $set: updateData },
+    updateQuery,
     { new: true, runValidators: true }
   )
     .populate("teacherIds", "username email fullname avatar_url")
@@ -656,6 +724,17 @@ export const permanentDeleteCourse = async (
   //   BAD_REQUEST,
   //   `Cannot permanently delete course with ${enrollmentCount} enrollment(s). Please remove enrollments first.`
   // );
+
+  // 🗑️ Delete logo file from MinIO if exists
+  if (course.key) {
+    try {
+      await removeFile(course.key);
+      console.log(`🗑️ Deleted logo file: ${course.key}`);
+    } catch (err) {
+      console.error("Failed to delete logo file:", err);
+      // Continue with course deletion even if file deletion fails
+    }
+  }
 
   // ✅ HARD DELETE: Remove from database permanently
   await CourseModel.findByIdAndDelete(courseId);
