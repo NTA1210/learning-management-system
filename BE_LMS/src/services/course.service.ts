@@ -3,6 +3,7 @@
 import CourseModel from "../models/course.model";
 import SpecialistModel from "../models/specialist.model";
 import UserModel from "../models/user.model";
+import EnrollmentModel from "../models/enrollment.model";
 import appAssert from "../utils/appAssert";
 import { NOT_FOUND, BAD_REQUEST, FORBIDDEN } from "../constants/http";
 import {
@@ -752,15 +753,14 @@ export const permanentDeleteCourse = async (
     "Only administrators can permanently delete courses"
   );
 
-  // ⚠️ OPTIONAL: Check if course has related data
-  // Uncomment if you want to prevent deletion of courses with enrollments
-  // const EnrollmentModel = require("../models/enrollment.model").default;
-  // const enrollmentCount = await EnrollmentModel.countDocuments({ courseId });
-  // appAssert(
-  //   enrollmentCount === 0,
-  //   BAD_REQUEST,
-  //   `Cannot permanently delete course with ${enrollmentCount} enrollment(s). Please remove enrollments first.`
-  // );
+  // ⚠️ Check if course has related data
+  // Prevent deletion of courses with enrollments
+  const enrollmentCount = await EnrollmentModel.countDocuments({ courseId });
+  appAssert(
+    enrollmentCount === 0,
+    BAD_REQUEST,
+    `Cannot permanently delete course with ${enrollmentCount} enrollment(s). Please remove enrollments first.`
+  );
 
   // 🗑️ Delete logo file from MinIO (if exists)
   if (course.key) {
