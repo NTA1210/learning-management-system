@@ -58,9 +58,11 @@ export const createQuizQuestionSchema = z.object({
 });
 
 export interface IUpdateQuizQuestionParams extends ICreateQuizQuestionParams {
-  quizId: string;
+  quizQuestionId: string;
 }
 
 export const updateQuizQuestionSchema = createQuizQuestionSchema.extend({
-  quizId: subjectIdSchema,
+  quizQuestionId: subjectIdSchema,
 });
+
+export const quizQuestionIdSchema = subjectIdSchema;

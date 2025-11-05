@@ -2,6 +2,7 @@ import { CREATED, NOT_FOUND, OK } from "@/constants/http";
 import { QuizQuestionModel } from "@/models";
 import {
   createQuizQuestion,
+  deleteQuizQuestion,
   exportXMLFile,
   getAllQuizQuestions,
   importXMLFile,
@@ -14,6 +15,7 @@ import {
   createQuizQuestionSchema,
   importQuizQuestionParamsSchema,
   listQuizQuestionSchema,
+  quizQuestionIdSchema,
   subjectIdSchema,
   updateQuizQuestionSchema,
 } from "@/validators/quizQuestion.schemas";
@@ -97,18 +99,30 @@ export const createQuizQuestionHandler = catchErrors(async (req, res) => {
   });
 });
 
-//PUT /quiz-questions/:id - Update a question
+//PUT /quiz-questions/:quizQuestionId - Update a question
 export const updateQuizQuestionByIdHandler = catchErrors(async (req, res) => {
   const file = req.file;
   const input = updateQuizQuestionSchema.parse({
     ...req.body,
     image: file,
-    quizId: req.params.quizId,
+    quizQuestionId: req.params.quizQuestionId,
   });
   const data = await updateQuizQuestion(input);
 
   res.success(CREATED, {
     data,
     message: "Question updated successfully",
+  });
+});
+
+//DELETE /quiz-questions/:quizQuestionId - Delete a question
+export const deleteQuizQuestionByIdHandler = catchErrors(async (req, res) => {
+  const quizQuestionId = quizQuestionIdSchema.parse(req.params.quizQuestionId);
+
+  const data = await deleteQuizQuestion(quizQuestionId);
+
+  return res.success(OK, {
+    data,
+    message: "Question deleted successfully",
   });
 });
