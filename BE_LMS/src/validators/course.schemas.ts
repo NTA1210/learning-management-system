@@ -57,7 +57,8 @@ export type ListCoursesQuery = z.infer<typeof listCoursesSchema>;
 export const createCourseSchema = z
   .object({
     title: z.string().min(1, "Title is required").max(255),
-    subjectId: z.string().optional(), // ✅ NEW: Subject reference
+    // ✅ UNIVERSITY RULE: Subject is required (every course must belong to a subject)
+    subjectId: z.string().min(1, "Subject ID is required"),
     logo: z.string().optional(), // URL to logo image
     description: z.string().optional(),
     startDate: z
@@ -86,7 +87,8 @@ export const createCourseSchema = z
       .array(z.string())
       .min(1, "At least one teacher is required"), // Required
     isPublished: z.boolean().optional().default(false),
-    capacity: z.number().int().positive().optional(),
+    // ✅ UNIVERSITY RULE: Capacity must be reasonable (10-500 students per class)
+    capacity: z.number().int().min(1).max(500).optional(),
     enrollRequiresApproval: z.boolean().optional().default(false),
     enrollPasswordHash: z.string().nullish(), // Pre-hashed password (can be null or undefined)
     meta: z.record(z.string(), z.any()).optional(),
@@ -128,7 +130,8 @@ export const updateCourseSchema = z
       .pipe(z.enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED]).optional()),
     teacherIds: z.array(z.string()).min(1).optional(),
     isPublished: z.boolean().optional(),
-    capacity: z.number().int().positive().optional(),
+    // ✅ UNIVERSITY RULE: Capacity must be reasonable (10-500 students per class)
+    capacity: z.number().int().min(1).max(500).optional(),
     enrollRequiresApproval: z.boolean().optional(),
     enrollPasswordHash: z.string().nullish(),
     meta: z.record(z.string(), z.any()).optional(),

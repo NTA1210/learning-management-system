@@ -10,6 +10,7 @@ import {
   UpdateCourseInput,
 } from "../validators/course.schemas";
 import { CourseStatus } from "../types/course.type";
+import { Role, UserStatus } from "../types/user.type";
 
 export type ListCoursesParams = {
   page: number;
@@ -23,6 +24,7 @@ export type ListCoursesParams = {
   onlyDeleted?: boolean; // Admin only - show only deleted courses
   sortBy?: string;
   sortOrder?: string;
+  userRole?: Role; // ✅ FIX: Added to check permissions for viewing deleted courses
 };
 
 /**
@@ -47,6 +49,7 @@ export const listCourses = async ({
   onlyDeleted,
   sortBy = "createdAt",
   sortOrder = "desc",
+  userRole,
 }: ListCoursesParams) => {
   // ❌ FIX: Validate pagination parameters
   appAssert(
@@ -88,12 +91,24 @@ export const listCourses = async ({
   const filter: any = {};
 
   // ✅ SOFT DELETE: Control deleted course visibility
+  // ✅ FIX: Only admin can view deleted courses
+  const isAdmin = userRole === Role.ADMIN;
+  
   if (onlyDeleted) {
     // Admin viewing recycle bin
-    filter.isDeleted = true;
+    if (!isAdmin) {
+      // Non-admin cannot view recycle bin - show normal courses instead
+      filter.isDeleted = false;
+    } else {
+      filter.isDeleted = true;
+    }
   } else if (includeDeleted) {
-    // Admin viewing all courses (no filter on isDeleted)
-    // Do nothing - show both deleted and non-deleted
+    // Admin viewing all courses (both deleted and non-deleted)
+    if (!isAdmin) {
+      // Non-admin cannot include deleted courses
+      filter.isDeleted = false;
+    }
+    // Admin: no filter on isDeleted, show both
   } else {
     // Default: Only show non-deleted courses
     filter.isDeleted = false;
@@ -226,12 +241,18 @@ export const createCourse = async (
     "End date must be after start date"
   );
 
-  // ❌ FIX: Validate capacity if provided
+  // ✅ UNIVERSITY RULE: Validate subject exists
+  const SubjectModel = (await import("../models/subject.model")).default;
+  const subject = await SubjectModel.findById(data.subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+  appAssert(subject.isActive, BAD_REQUEST, "Cannot create course for inactive subject");
+
+  // ✅ UNIVERSITY RULE: Validate capacity is reasonable
   if (data.capacity !== undefined) {
     appAssert(
-      data.capacity > 0 && data.capacity <= 10000,
+      data.capacity > 0 && data.capacity <= 500,
       BAD_REQUEST,
-      "Capacity must be between 1 and 10000"
+      "Capacity must be between 1 and 500 students"
     );
   }
 
@@ -248,8 +269,7 @@ export const createCourse = async (
 
   // Check if all users have teacher or admin role
   const allAreTeachers = teachers.every((teacher) => {
-    const role = teacher.role.trim().toUpperCase();
-    return role === "TEACHER" || role === "ADMIN";
+    return teacher.role === Role.TEACHER || teacher.role === Role.ADMIN;
   });
 
   appAssert(
@@ -260,8 +280,7 @@ export const createCourse = async (
 
   // ❌ FIX: Check if teachers are active (not banned/inactive)
   const allTeachersActive = teachers.every((teacher) => {
-    const status = teacher.status?.trim().toUpperCase();
-    return status === "ACTIVE";
+    return teacher.status === UserStatus.ACTIVE;
   });
 
   appAssert(
@@ -275,25 +294,29 @@ export const createCourse = async (
   const creator = await UserModel.findById(userId);
   appAssert(creator, BAD_REQUEST, "Creator user not found");
 
-  const creatorRole = creator.role.trim().toUpperCase();
-  const isAdmin = creatorRole === "ADMIN";
+  const isAdmin = creator.role === Role.ADMIN;
 
   // Determine final status and publish state
   let finalIsPublished = data.isPublished || false;
+  let finalStatus = data.status || CourseStatus.DRAFT;
 
   if (!isAdmin) {
     // Teacher CANNOT publish course immediately - cần admin approve
     // Force isPublished = false regardless of input
     finalIsPublished = false;
+  } else {
+    // ✅ AUTO STATUS: Admin tạo và publish luôn → status = ONGOING
+    if (finalIsPublished && finalStatus === CourseStatus.DRAFT) {
+      finalStatus = CourseStatus.ONGOING;
+    }
   }
-  // Admin có thể tạo và publish ngay lập tức
 
   // Create course with createdBy
   const courseData = {
     ...data,
     startDate,
     endDate,
-    status: data.status || CourseStatus.DRAFT,
+    status: finalStatus,
     isPublished: finalIsPublished,
     createdBy: userId,
   };
@@ -353,8 +376,7 @@ export const updateCourse = async (
     (teacherId) => teacherId.toString() === userId
   );
 
-  const userRole = user.role.trim().toUpperCase();
-  const isAdmin = userRole === "ADMIN";
+  const isAdmin = user.role === Role.ADMIN;
 
   appAssert(
     isTeacherOfCourse || isAdmin,
@@ -402,8 +424,7 @@ export const updateCourse = async (
     );
 
     const allAreTeachers = teachers.every((teacher) => {
-      const role = teacher.role.trim().toUpperCase();
-      return role === "TEACHER" || role === "ADMIN";
+      return teacher.role === Role.TEACHER || teacher.role === Role.ADMIN;
     });
 
     appAssert(
@@ -424,6 +445,11 @@ export const updateCourse = async (
     // Teacher cannot publish - only admin can approve
     delete updateData.isPublished;
     // Note: Course will remain unpublished, need admin to approve
+  }
+
+  // ✅ AUTO STATUS: When admin approves (publishes) a DRAFT course, auto change to ONGOING
+  if (isAdmin && data.isPublished === true && course.status === CourseStatus.DRAFT) {
+    updateData.status = CourseStatus.ONGOING;
   }
 
   // Update course
@@ -475,6 +501,19 @@ export const deleteCourse = async (courseId: string, userId: string) => {
     "Cannot delete an ongoing course. Please complete or cancel it first."
   );
 
+  // ✅ UNIVERSITY BUSINESS RULE: Check for active enrollments
+  const EnrollmentModel = (await import("../models/enrollment.model")).default;
+  const activeEnrollmentCount = await EnrollmentModel.countDocuments({
+    courseId,
+    status: { $in: ["pending", "approved"] }, // Active enrollments
+  });
+  
+  appAssert(
+    activeEnrollmentCount === 0,
+    BAD_REQUEST,
+    `Cannot delete course with ${activeEnrollmentCount} active enrollment(s). Please cancel or complete all enrollments first.`
+  );
+
     // Check if user is a teacher of this course or admin
     const user = await UserModel.findById(userId);
     appAssert(user, NOT_FOUND, "User not found");
@@ -482,8 +521,7 @@ export const deleteCourse = async (courseId: string, userId: string) => {
   const isTeacherOfCourse = course.teacherIds.some(
     (teacherId) => teacherId.toString() === userId
   );
-  const normalizedRole = user.role.trim().toUpperCase();
-  const isAdmin = normalizedRole === "ADMIN";
+  const isAdmin = user.role === Role.ADMIN;
 
   appAssert(
     isTeacherOfCourse || isAdmin,
@@ -539,8 +577,7 @@ export const restoreCourse = async (courseId: string, userId: string) => {
   const user = await UserModel.findById(userId);
   appAssert(user, NOT_FOUND, "User not found");
 
-  const normalizedRole = user.role.trim().toUpperCase();
-  const isAdmin = normalizedRole === "ADMIN";
+  const isAdmin = user.role === Role.ADMIN;
 
   appAssert(
     isAdmin,
@@ -602,8 +639,7 @@ export const permanentDeleteCourse = async (
   const user = await UserModel.findById(userId);
   appAssert(user, NOT_FOUND, "User not found");
 
-  const normalizedRole = user.role.trim().toUpperCase();
-  const isAdmin = normalizedRole === "ADMIN";
+  const isAdmin = user.role === Role.ADMIN;
 
   appAssert(
     isAdmin,
