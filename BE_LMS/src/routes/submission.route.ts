@@ -10,6 +10,7 @@ import  authenticate  from "../middleware/authenticate";
 import { Role } from "@/types";
 import authorize from "@/middleware/authorize";
 import sessionRoutes from "./session.route";
+import upload from "@/config/multer";
 
 
 
@@ -18,7 +19,7 @@ const submissionRoutes = Router();
 // prefix: /submissions
 
 //sv nộp bài
-submissionRoutes.post("/:assignmentId", authenticate,submitAssignmentHandler);
+submissionRoutes.post("/", authenticate,upload.single("file"),submitAssignmentHandler);
 
 //sv nộp lại bài (khi được phép)
 submissionRoutes.put("/:assignmentId/resubmit", authenticate, resubmitAssignmentHandler);

@@ -4,16 +4,23 @@ import appAssert from "../utils/appAssert";
 import { NOT_FOUND, BAD_REQUEST } from "../constants/http";
 import mongoose from "mongoose";
 import { SubmissionStatus } from "../types/submission.type";
+import { UserModel } from "@/models";
+import { Role } from "@/types";
+import { uploadFile } from "@/utils/uploadFile";
+import { prefixSubmission } from "@/utils/filePrefix";
 
 //submit assign
 export const submitAssignment = async (
-  studentId: string,
+ {
+  studentId,
+  assignmentId,
+  file
+ }:{ studentId: string,
   assignmentId: string,
-  key: string,
-  originalName: string,
-  mimeType?: string,
-  size?: number
+  file:Express.Multer.File}
 ) => {
+  const student = await UserModel.findOne({id:studentId, role:Role.STUDENT})
+  appAssert(student, BAD_REQUEST, "Missing user ID");
   //ktra ass có tồn tại ko
   const assignment = await AssignmentModel.findById(assignmentId);
   appAssert(assignment, NOT_FOUND, "Assignment not found");
@@ -26,6 +33,11 @@ export const submitAssignment = async (
     BAD_REQUEST,
     "You already submitted and resubmission is not allowed"
   );
+
+  const prefix = prefixSubmission(assignment.courseId,assignmentId,studentId);
+  const {} = uploadFile(file,prefix);
+
+
 }
 
 

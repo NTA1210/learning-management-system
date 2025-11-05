@@ -1,5 +1,5 @@
 import { catchErrors } from "../utils/asyncHandler";
-import { CREATED, OK, BAD_REQUEST } from "../constants/http";
+import {  OK, BAD_REQUEST } from "../constants/http";
 import {
   submitAssignment,
   resubmitAssignment,
@@ -12,21 +12,20 @@ import {
   submissionBodySchema,
 } from "../validators/submission.schemas"; // 🆕 Validate đầu vào
 import appAssert from "../utils/appAssert";
-import { Role } from "../types";
-import authorize from "@/middleware/authorize";
 import { gradeSubmissionSchema } from "../validators/submission.schemas";
 
 // 🟢 1. Nộp bài (Submit)
 export const submitAssignmentHandler = catchErrors(async (req, res) => {
-  // ✅ Sử dụng req.userId (theo global typing)
-  const studentId = req.userId?.toString();
-  appAssert(studentId, BAD_REQUEST, "Missing user ID");
 
-  // ✅ Validate params và body
-  const { assignmentId } = submissionParamsSchema.parse(req.params);
-  const { key, originalName, mimeType, size } = submissionBodySchema.parse(req.body);
+  const file = req.file;
+  const input = submissionBodySchema.parse({
+    file,
+    ...req.body
+  })
 
-  const submission = await submitAssignment(studentId, assignmentId, key, originalName, mimeType, size);
+  const submission = await submitAssignment(
+    input
+  );
 
   // return res.status(CREATED).json({
   //   message: "Assignment submitted successfully",
@@ -42,9 +41,20 @@ export const resubmitAssignmentHandler = catchErrors(async (req, res) => {
   appAssert(studentId, BAD_REQUEST, "Missing user ID");
 
   const { assignmentId } = submissionParamsSchema.parse(req.params);
-  const { key, originalName, mimeType, size } = submissionBodySchema.parse(req.body);
+  const body = submissionBodySchema.parse(req.body);
+  const key = body.key ?? body.fileUrl!;
+  const originalName = body.originalName ?? body.fileName!;
+  const mimeType = body.mimeType;
+  const size = body.size;
 
-  const submission = await resubmitAssignment(studentId, assignmentId, key, originalName, mimeType, size);
+  const submission = await resubmitAssignment(
+    studentId,
+    assignmentId,
+    key,
+    originalName,
+    mimeType,
+    size
+  );
 
   // return res.status(OK).json({
   //   message: "Assignment resubmitted successfully",

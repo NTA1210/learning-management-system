@@ -302,7 +302,7 @@ async function seed() {
         mimeType: "application/pdf",
         size: 1024 * 500, // 500KB
         submittedAt: new Date(),
-        grade: 85,
+        grade: 8.5,
         feedback: "Great work! Good understanding of JavaScript basics.",
         gradedBy: users[1]._id,
         gradedAt: new Date(),
