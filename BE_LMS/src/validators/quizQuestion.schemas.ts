@@ -1,8 +1,7 @@
 import z from "zod";
 import { listParamsSchema } from "./listParams.schema";
 import { ListParams } from "@/types/dto";
-import IQuizQuestion, { QuizQuestionType } from "@/types/quizQuestion.type";
-import multer from "multer";
+import { QuizQuestionType } from "@/types/quizQuestion.type";
 
 export const subjectIdSchema = z.string().length(24, "Invalid subject ID");
 export const importQuizQuestionParamsSchema = z.object({
@@ -42,8 +41,26 @@ export const createQuizQuestionSchema = z.object({
   type: z.enum(QuizQuestionType).default(QuizQuestionType.MCQ),
   options: z.array(z.string()).min(2, "At least two options are required"),
   correctOptions: z
-    .array(z.number())
-    .min(1, "At least one correct option is required"),
+    .array(
+      z.number().refine((v) => v === 0 || v === 1, {
+        message: "Correct option must be 0 or 1",
+        path: ["correctOptions"],
+      })
+    )
+    .min(1, "At least one correct option is required")
+    .refine((v) => v.includes(1), {
+      message: "At least one correct option is required",
+      path: ["correctOptions"],
+    }),
+
   points: z.number().positive().optional().default(1),
   explanation: z.string().optional(),
+});
+
+export interface IUpdateQuizQuestionParams extends ICreateQuizQuestionParams {
+  quizId: string;
+}
+
+export const updateQuizQuestionSchema = createQuizQuestionSchema.extend({
+  quizId: subjectIdSchema,
 });

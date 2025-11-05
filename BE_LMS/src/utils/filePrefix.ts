@@ -8,9 +8,9 @@ export const prefixLessonMaterial = (
 };
 
 export const prefixSubmission = (
-  courseId: mongoose.Types.ObjectId,
-  assignmentId: mongoose.Types.ObjectId,
-  studentId: mongoose.Types.ObjectId
+  courseId: string,
+  assignmentId: string,
+  studentId: string
 ) => {
   return `courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}`;
 };

@@ -5,6 +5,7 @@ import {
   exportXMLFile,
   getAllQuizQuestions,
   importXMLFile,
+  updateQuizQuestion,
 } from "@/services/quizQuestion.service";
 import IQuizQuestion from "@/types/quizQuestion.type";
 import appAssert from "@/utils/appAssert";
@@ -14,7 +15,9 @@ import {
   importQuizQuestionParamsSchema,
   listQuizQuestionSchema,
   subjectIdSchema,
+  updateQuizQuestionSchema,
 } from "@/validators/quizQuestion.schemas";
+import { id } from "zod/v4/locales";
 
 // POST /quiz-questions/import - Import questions from XML file
 export const importXMLFileHandler = catchErrors(async (req, res) => {
@@ -91,5 +94,21 @@ export const createQuizQuestionHandler = catchErrors(async (req, res) => {
   res.success(CREATED, {
     data,
     message: "Question created successfully",
+  });
+});
+
+//PUT /quiz-questions/:id - Update a question
+export const updateQuizQuestionByIdHandler = catchErrors(async (req, res) => {
+  const file = req.file;
+  const input = updateQuizQuestionSchema.parse({
+    ...req.body,
+    image: file,
+    quizId: req.params.quizId,
+  });
+  const data = await updateQuizQuestion(input);
+
+  res.success(CREATED, {
+    data,
+    message: "Question updated successfully",
   });
 });
