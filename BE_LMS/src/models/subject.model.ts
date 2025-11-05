@@ -1,4 +1,4 @@
-import { ISubject } from "@/types";
+import { ISubject } from "../types";
 import mongoose from "mongoose";
 
 const SubjectSchema = new mongoose.Schema<ISubject>(

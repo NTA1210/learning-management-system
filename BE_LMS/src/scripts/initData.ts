@@ -213,7 +213,7 @@ async function seed() {
         content:
           "Learn the basics of JavaScript including variables, data types, and operators",
         order: 1,
-        durationSeconds: 1800, // 30 minutes
+        durationMinutes: 30, // 30 minutes
         isPublished: true,
         publishedAt: new Date(),
         createdBy: users[1]._id,
@@ -224,7 +224,7 @@ async function seed() {
         content:
           "Understanding JavaScript functions, arrow functions, and callbacks",
         order: 2,
-        durationSeconds: 2700, // 45 minutes
+        durationMinutes: 45, // 45 minutes
         isPublished: true,
         publishedAt: new Date(),
         createdBy: users[1]._id,
@@ -234,7 +234,7 @@ async function seed() {
         courseId: courses[1]._id,
         content: "Learn fundamental UI design principles and best practices",
         order: 1,
-        durationSeconds: 3600, // 60 minutes
+        durationMinutes: 60, // 60 minutes
         isPublished: true,
         publishedAt: new Date(),
         createdBy: users[1]._id,
@@ -260,20 +260,25 @@ async function seed() {
     ]);
 
     // LessonProgress (2-3)
+    // Lesson 0: 30 minutes = 1800 seconds, completed (100%) = 1800 seconds spent
+    // Lesson 1: 45 minutes = 2700 seconds, 40% progress = 1080 seconds spent
     const progresses = await LessonProgressModel.create([
       {
         lessonId: lessons[0]._id,
         courseId: courses[0]._id,
         studentId: users[2]._id,
-        completed: true,
-        progressPercent: 100,
+        isCompleted: true,
+        completedAt: new Date(),
+        timeSpentSeconds: 1800, // 30 minutes * 60 = 100% of lesson
+        lastAccessedAt: new Date(),
       },
       {
         lessonId: lessons[1]._id,
         courseId: courses[0]._id,
         studentId: users[2]._id,
-        completed: false,
-        progressPercent: 40,
+        isCompleted: false,
+        timeSpentSeconds: 1080, // 45 minutes * 60 * 0.4 = 40% of lesson
+        lastAccessedAt: new Date(),
       },
     ]);
 

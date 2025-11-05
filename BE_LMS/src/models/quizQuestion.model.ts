@@ -1,4 +1,4 @@
-import IQuizQuestion, { QuizQuestionType } from "@/types/quizQuestion.type";
+import IQuizQuestion, { QuizQuestionType } from "../types/quizQuestion.type";
 import mongoose from "mongoose";
 
 export const QuizQuestionSchema = new mongoose.Schema<IQuizQuestion>(

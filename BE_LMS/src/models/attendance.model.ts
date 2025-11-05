@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { IAttendance } from "../types";
-import { AttendanceStatus } from "@/types/attendance.type";
+import { AttendanceStatus } from "../types/attendance.type";
 
 const AttendanceSchema = new mongoose.Schema<IAttendance>(
   {
