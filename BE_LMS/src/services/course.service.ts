@@ -4,6 +4,7 @@ import CourseModel from "../models/course.model";
 import SpecialistModel from "../models/specialist.model";
 import UserModel from "../models/user.model";
 import EnrollmentModel from "../models/enrollment.model";
+import SubjectModel from "../models/subject.model";
 import appAssert from "../utils/appAssert";
 import { NOT_FOUND, BAD_REQUEST, FORBIDDEN } from "../constants/http";
 import {
@@ -21,6 +22,7 @@ import { prefixCourseLogo } from "../utils/filePrefix";
 
 /**
  * Upload course logo to MinIO and return URL + key
+ 
  */
 async function uploadCourseLogo(courseId: string, logoFile: Express.Multer.File) {
   try {
@@ -29,12 +31,18 @@ async function uploadCourseLogo(courseId: string, logoFile: Express.Multer.File)
     return { publicUrl, key };
   } catch (err) {
     console.error("❌ Logo upload failed:", err);
-    throw err;
+    // Use appAssert to throw error for middleware to handle
+    appAssert(
+      false,
+      BAD_REQUEST,
+      `Failed to upload course logo: ${err instanceof Error ? err.message : 'Unknown error'}`
+    );
   }
 }
 
 /**
  * Delete course logo file from MinIO using key
+ * @throws {AppError} BAD_REQUEST if file deletion fails (via appAssert)
  */
 async function deleteCourseLogoFile(key: string) {
   try {
@@ -42,7 +50,12 @@ async function deleteCourseLogoFile(key: string) {
     console.log(`🗑️ Deleted logo file: ${key}`);
   } catch (err) {
     console.error("⚠️  Failed to delete logo file:", err);
-    // Don't throw - allow operation to continue even if file deletion fails
+    // Throw error so caller can decide how to handle
+    appAssert(
+      false,
+      BAD_REQUEST,
+      `Failed to delete logo file: ${err instanceof Error ? err.message : 'Unknown error'}`
+    );
   }
 }
 
@@ -277,7 +290,6 @@ export const createCourse = async (
   );
 
   // ✅ UNIVERSITY RULE: Validate subject exists
-  const SubjectModel = (await import("../models/subject.model")).default;
   const subject = await SubjectModel.findById(data.subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
   appAssert(subject.isActive, BAD_REQUEST, "Cannot create course for inactive subject");
@@ -363,16 +375,27 @@ export const createCourse = async (
 
   // 🖼️ Upload logo if provided
   if (logoFile) {
+    let uploadedKey: string | null = null;
+    
     try {
       const courseId = String(course._id);
       const { publicUrl, key } = await uploadCourseLogo(courseId, logoFile);
+      uploadedKey = key; // Track uploaded key for cleanup if needed
       
       // Update course with logo URL and key
       await CourseModel.findByIdAndUpdate(courseId, { logo: publicUrl, key });
       course.logo = publicUrl;
     } catch (err) {
-      console.error("⚠️  Logo upload failed, but course was created:", err);
-      // Course created successfully, just without logo
+      // ❌ Rollback: Clean up uploaded logo (if any) and delete course
+      if (uploadedKey) {
+        await deleteCourseLogoFile(uploadedKey).catch(cleanupErr => 
+          console.error("Failed to cleanup uploaded logo:", cleanupErr)
+        );
+      }
+      await CourseModel.findByIdAndDelete(course._id);
+      console.error("❌ Logo upload/update failed, course creation rolled back:", err);
+      // Re-throw error for middleware to handle
+      throw err;
     }
   }
 
@@ -456,6 +479,12 @@ export const updateCourse = async (
         BAD_REQUEST,
         "Cannot change start date of a course that has already started"
       );
+      // Also validate new startDate is in the future
+      appAssert(
+        startDate > now,
+        BAD_REQUEST,
+        "New start date must be in the future"
+      );
       data.startDate = startDate as any;
     }
 
@@ -464,6 +493,14 @@ export const updateCourse = async (
 
   // Validate teachers if provided
   if (data.teacherIds) {
+    // ❌ FIX: Check duplicate teacherIds
+    const uniqueTeachers = new Set(data.teacherIds.map(id => id.toString()));
+    appAssert(
+      uniqueTeachers.size === data.teacherIds.length,
+      BAD_REQUEST,
+      "Teacher list contains duplicate entries"
+    );
+
     const teachers = await UserModel.find({
       _id: { $in: data.teacherIds },
     });
@@ -484,6 +521,16 @@ export const updateCourse = async (
       "All assigned users must have teacher or admin role"
     );
 
+    // ❌ FIX: Check if teachers are active (not banned/inactive)
+    const allTeachersActive = teachers.every((teacher) => {
+      return teacher.status === UserStatus.ACTIVE;
+    });
+
+    appAssert(
+      allTeachersActive,
+      BAD_REQUEST,
+      "Cannot assign inactive or banned teachers to course"
+    );
   }
 
   // ✅ YÊU CẦU 2: Only Admin can approve/publish courses
@@ -524,20 +571,20 @@ export const updateCourse = async (
   } 
   else if (shouldUploadNewLogo) {
     // User wants to upload new logo
-    try {
-      // Delete old logo first (if exists)
-      if (course.key) {
-        await deleteCourseLogoFile(course.key);
-      }
-
-      // Upload new logo
-      const { publicUrl, key } = await uploadCourseLogo(courseId, logoFile);
-      updateData.logo = publicUrl;
-      updateData.key = key;
-    } catch (err) {
-      console.error("⚠️  Failed to upload new logo:", err);
-      // Continue with other updates even if logo upload fails
-    }
+    // ⚠️ Important: Upload new logo FIRST before updating DB
+    // This ensures atomicity - if upload fails, nothing changes
+    const oldKey = course.key;
+    
+    // Upload new logo first 
+    const { publicUrl, key } = await uploadCourseLogo(courseId, logoFile);
+    updateData.logo = publicUrl;
+    updateData.key = key;
+    
+    // Note: Old logo will be deleted ONLY after successful DB update
+    // This is handled below after the DB update succeeds
+    
+    // Store oldKey for cleanup after successful DB update
+    updateData._oldLogoKey = oldKey;
   }
 
   // ====================================
@@ -545,6 +592,10 @@ export const updateCourse = async (
   // ====================================
   // MongoDB requires separate $set and $unset operators
   // Cannot use both in the same object at root level
+  
+  // Extract temporary fields that shouldn't go to DB
+  const oldLogoKey = updateData._oldLogoKey;
+  delete updateData._oldLogoKey;
   
   const updateQuery: any = {};
   
@@ -559,18 +610,43 @@ export const updateCourse = async (
     updateQuery.$set = updateData;
   }
 
-  const updatedCourse = await CourseModel.findByIdAndUpdate(
-    courseId,
-    updateQuery,
-    { new: true, runValidators: true }
-  )
-    .populate("teacherIds", "username email fullname avatar_url")
-    .populate("subjectId", "name code slug description credits")
-    .populate("createdBy", "username email fullname")
-    .lean();
+  // ====================================
+  // 💾 UPDATE DATABASE WITH ROLLBACK
+  // ====================================
+  // Store new logo key for rollback if DB update fails
+  const newLogoKey = updateData.key;
+  
+  let updatedCourse;
+  try {
+    updatedCourse = await CourseModel.findByIdAndUpdate(
+      courseId,
+      updateQuery,
+      { new: true, runValidators: true }
+    )
+      .populate("teacherIds", "username email fullname avatar_url")
+      .populate("subjectId", "name code slug description credits")
+      .populate("createdBy", "username email fullname")
+      .lean();
 
-  // ❌ FIX: Ensure course was updated successfully
-  appAssert(updatedCourse, BAD_REQUEST, "Failed to update course");
+    // ❌ FIX: Ensure course was updated successfully
+    appAssert(updatedCourse, BAD_REQUEST, "Failed to update course");
+    
+    // ✅ DB update successful - now safe to delete old logo if exists
+    if (oldLogoKey) {
+      await deleteCourseLogoFile(oldLogoKey).catch(err =>
+        console.error("⚠️  Failed to delete old logo (non-critical):", err)
+      );
+    }
+  } catch (err) {
+    // ❌ DB update failed - rollback new logo if it was uploaded
+    if (newLogoKey) {
+      await deleteCourseLogoFile(newLogoKey).catch(cleanupErr =>
+        console.error("Failed to cleanup new logo:", cleanupErr)
+      );
+    }
+    console.error("❌ Failed to update course:", err);
+    throw err; // Re-throw to let error handler handle it
+  }
 
   return updatedCourse;
 };
@@ -608,7 +684,6 @@ export const deleteCourse = async (courseId: string, userId: string) => {
   );
 
   // ✅ UNIVERSITY BUSINESS RULE: Check for active enrollments
-  const EnrollmentModel = (await import("../models/enrollment.model")).default;
   const activeEnrollmentCount = await EnrollmentModel.countDocuments({
     courseId,
     status: { $in: ["pending", "approved"] }, // Active enrollments
@@ -764,7 +839,10 @@ export const permanentDeleteCourse = async (
 
   // 🗑️ Delete logo file from MinIO (if exists)
   if (course.key) {
-    await deleteCourseLogoFile(course.key);
+    await deleteCourseLogoFile(course.key).catch(err => {
+      console.error("⚠️  Failed to delete logo file (non-critical):", err);
+      // Continue with course deletion even if logo deletion fails
+    });
   }
 
   // ✅ HARD DELETE: Remove from database permanently
