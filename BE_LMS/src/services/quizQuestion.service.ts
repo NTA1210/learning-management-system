@@ -4,9 +4,10 @@ import { ListParams } from "@/types/dto";
 import IQuizQuestion, { QuizQuestionType } from "@/types/quizQuestion.type";
 import appAssert from "@/utils/appAssert";
 import { prefixQuizQuestionImage } from "@/utils/filePrefix";
-import { uploadFile } from "@/utils/uploadFile";
+import { removeFile, uploadFile } from "@/utils/uploadFile";
 import {
   ICreateQuizQuestionParams,
+  IGetRandomQuestionsParams,
   IUpdateQuizQuestionParams,
 } from "@/validators/quizQuestion.schemas";
 import mongoose, { FilterQuery } from "mongoose";
@@ -303,9 +304,10 @@ export const createQuizQuestion = async ({
         subjectId,
         newQuizQuestion.id
       );
-      const { publicUrl } = await uploadFile(image, questionPrefix);
+      const { publicUrl, key } = await uploadFile(image, questionPrefix);
       await QuizQuestionModel.findByIdAndUpdate(newQuizQuestion._id, {
         image: publicUrl,
+        key,
       });
       newQuizQuestion.image = publicUrl;
     } catch (err) {
@@ -399,5 +401,68 @@ export const deleteQuizQuestion = async (quizQuestionId: string) => {
   );
 
   await QuizQuestionModel.findByIdAndDelete(quizQuestionId);
+  if (question.image) {
+    if (question.key) await removeFile(question.key);
+  }
+
   return question;
+};
+
+/**
+ * Delete multiple questions.
+ * @param  ids - Array of question IDs to delete.
+ * @throws  - If no question IDs are provided.
+ * @throws  - If some questions are in active quizzes.
+ * @returns  - A success message.
+ */
+export const deleteMultipleQuizQuestions = async (ids: string[]) => {
+  appAssert(ids.length > 0, BAD_REQUEST, "No question IDs provided");
+
+  // Kiem tra xem cac ID cua cau hoi co ton tai khong
+  const questions = await QuizQuestionModel.find({
+    _id: { $in: ids },
+  });
+  appAssert(
+    questions.length === ids.length,
+    BAD_REQUEST,
+    "Some question IDs are invalid"
+  );
+
+  // Kiểm tra xem có câu hỏi nào đang được sử dụng trong quiz chưa hoàn tất không
+  const activeQuizzes = await QuizModel.find({
+    questionIds: { $in: ids },
+    isCompleted: false,
+  });
+
+  appAssert(
+    activeQuizzes.length === 0,
+    BAD_REQUEST,
+    "Some questions are in active quizzes"
+  );
+
+  // Xóa thật (hoặc soft delete)
+  await QuizQuestionModel.deleteMany({ _id: { $in: ids } });
+
+  for (const question of questions) {
+    if (question.image) {
+      if (question.key) await removeFile(question.key);
+    }
+  }
+
+  return { message: "Deleted successfully" };
+};
+
+export const getRandomQuestions = async ({
+  count = 10,
+  subjectId,
+}: IGetRandomQuestionsParams) => {
+  const subject = await SubjectModel.findById(subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+
+  const questions = await QuizQuestionModel.aggregate([
+    { $match: { subjectId } },
+    { $sample: { size: count } },
+  ]);
+
+  return questions;
 };

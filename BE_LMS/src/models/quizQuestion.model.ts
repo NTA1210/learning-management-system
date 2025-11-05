@@ -11,6 +11,7 @@ export const QuizQuestionSchema = new mongoose.Schema<IQuizQuestion>(
     },
     text: { type: String, required: true },
     image: { type: String },
+    key: { typ: String },
     type: {
       type: String,
       enum: QuizQuestionType,
