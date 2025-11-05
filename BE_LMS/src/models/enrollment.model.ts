@@ -4,7 +4,7 @@ import {
   EnrollmentMethod,
   EnrollmentRole,
   EnrollmentStatus,
-} from "@/types/enrollment.type";
+} from "../types/enrollment.type";
 
 const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
   {

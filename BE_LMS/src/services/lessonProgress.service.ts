@@ -6,6 +6,7 @@ import EnrollmentModel from "../models/enrollment.model";
 import appAssert from "../utils/appAssert";
 import { FORBIDDEN, NOT_FOUND, BAD_REQUEST } from "../constants/http";
 import { Role } from "../types";
+import { EnrollmentStatus } from "../types/enrollment.type";
 
 function calcProgressPercent(durationMinutes?: number | null, timeSpentSeconds?: number | null) {
   if (!durationMinutes || durationMinutes <= 0 || !timeSpentSeconds || timeSpentSeconds <= 0) return 0;
@@ -87,7 +88,7 @@ export const addTimeForLesson = async (
     const enrolled = await EnrollmentModel.exists({
       studentId: requesterId,
       courseId: (lesson.courseId as any)._id,
-      status: 'active'
+      status: EnrollmentStatus.APPROVED
     });
     appAssert(enrolled, FORBIDDEN, "Not enrolled in this course");
   }
@@ -132,7 +133,7 @@ export const completeLesson = async (
     const enrolled = await EnrollmentModel.exists({
       studentId: requesterId,
       courseId: (lesson.courseId as any)._id,
-      status: 'active'
+      status: EnrollmentStatus.APPROVED
     });
     appAssert(enrolled, FORBIDDEN, "Not enrolled in this course");
   }
@@ -210,6 +211,7 @@ export const getCourseProgress = async (
     lessons: items,
   };
 };
+
 
 
 

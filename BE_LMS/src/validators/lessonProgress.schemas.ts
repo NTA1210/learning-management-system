@@ -8,7 +8,20 @@ export const GetLessonProgressSchema = z.object({
 
 // Schema for adding time to lesson (body only, lessonId comes from params)
 export const AddTimeForLessonBodySchema = z.object({
-  incSeconds: z.coerce.number().int().min(1).max(300, "Time increment must be between 1 and 300 seconds"),
+  incSeconds: z.coerce
+    .number()
+    .refine((val) => !isNaN(val) && val !== null && val !== undefined, {
+      message: "incSeconds is required and must be a valid number",
+    })
+    .refine((val) => Number.isInteger(val), {
+      message: "incSeconds must be an integer",
+    })
+    .refine((val) => val >= 1, {
+      message: "incSeconds must be at least 1 second",
+    })
+    .refine((val) => val <= 300, {
+      message: "Time increment must be between 1 and 300 seconds",
+    }),
 });
 
 // Schema for lessonId validation (from params)

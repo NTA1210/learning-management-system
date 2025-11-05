@@ -29,6 +29,16 @@ export const getLessonProgressController = catchErrors(async (req, res) => {
 // PATCH /lesson-progress/lesson/:lessonId/time - Cộng dồn thời gian học cho 1 bài
 export const addTimeForLessonController = catchErrors(async (req, res) => {
   const validatedParams = LessonIdParamSchema.parse({ lessonId: req.params.lessonId });
+  
+  // Check if body exists and has incSeconds
+  if (!req.body || req.body.incSeconds === undefined) {
+    return res.status(400).json({
+      success: false,
+      message: "Request body is required with incSeconds field",
+      data: null,
+    });
+  }
+  
   const validatedBody = AddTimeForLessonBodySchema.parse(req.body);
   
   const requesterId = req.userId?.toString();
