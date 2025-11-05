@@ -56,7 +56,14 @@ export default function StudentDashboard() {
                 className="text-xl font-semibold mb-4"
                 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}
               >
-                Welcome back! 📚
+                <span className="inline-flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M4 4v15"/>
+                    <path d="M6.5 17H20V6a2 2 0 0 0-2-2H6.5A2.5 2.5 0 0 0 4 6.5"/>
+                  </svg>
+                  Welcome back!
+                </span>
               </h2>
               <p 
                 style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
