@@ -319,7 +319,7 @@ export const createQuizQuestion = async ({
  * Update an existing quiz question.
  * Allow admin to update a question.
  * @param  params - Parameters to update a quiz question.
- * @param  params.quizId - ID of the quiz question to update.
+ * @param  params.quizQuestionId - ID of the quiz question to update.
  * @param  params.subjectId - ID of the subject to update the question for.
  * @param  params.text - Updated text of the question.
  * @param  params.image - Updated image of the question.
@@ -331,7 +331,7 @@ export const createQuizQuestion = async ({
  * @returns  Updated quiz question.
  */
 export const updateQuizQuestion = async ({
-  quizId,
+  quizQuestionId,
   subjectId,
   text,
   image,
@@ -341,14 +341,14 @@ export const updateQuizQuestion = async ({
   points = 1,
   explanation,
 }: IUpdateQuizQuestionParams) => {
-  const quizQuestion = await QuizQuestionModel.findById(quizId);
+  const quizQuestion = await QuizQuestionModel.findById(quizQuestionId);
   appAssert(quizQuestion, NOT_FOUND, "Question not found");
 
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
 
   const updatedQuizQuestion = await QuizQuestionModel.findByIdAndUpdate(
-    quizId,
+    quizQuestionId,
     {
       subjectId,
       text,
@@ -364,9 +364,9 @@ export const updateQuizQuestion = async ({
   // 2️⃣ Nếu có ảnh, upload và cập nhật sau
   if (image) {
     try {
-      const questionPrefix = prefixQuizQuestionImage(subjectId, quizId);
+      const questionPrefix = prefixQuizQuestionImage(subjectId, quizQuestionId);
       const { publicUrl } = await uploadFile(image, questionPrefix);
-      await QuizQuestionModel.findByIdAndUpdate(quizId, {
+      await QuizQuestionModel.findByIdAndUpdate(quizQuestionId, {
         image: publicUrl,
       });
       updatedQuizQuestion!.image = publicUrl;
@@ -377,13 +377,19 @@ export const updateQuizQuestion = async ({
   return updatedQuizQuestion;
 };
 
-export const deleteQuizQuestion = async (quizId: string) => {
-  const question = await QuizQuestionModel.findById(quizId);
+/**
+ * Delete a question.
+ * @param  quizQuestionId - ID of the question to delete.
+ * @returns  - Deleted question.
+ * @throws  - If the question is in an active quiz.
+ */
+export const deleteQuizQuestion = async (quizQuestionId: string) => {
+  const question = await QuizQuestionModel.findById(quizQuestionId);
   appAssert(question, NOT_FOUND, "Question not found");
 
   const isInActiveQuiz = await QuizModel.exists({
     isCompleted: false,
-    questionIds: { $in: [new mongoose.Types.ObjectId(quizId)] }, // ✅ dùng $in cho rõ
+    questionIds: { $in: [new mongoose.Types.ObjectId(quizQuestionId)] }, // ✅ dùng $in cho rõ
   });
 
   appAssert(
@@ -392,6 +398,6 @@ export const deleteQuizQuestion = async (quizId: string) => {
     "Can't delete question in active quiz"
   );
 
-  await QuizQuestionModel.findByIdAndDelete(quizId);
+  await QuizQuestionModel.findByIdAndDelete(quizQuestionId);
   return question;
 };

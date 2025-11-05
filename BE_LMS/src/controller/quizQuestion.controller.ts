@@ -15,7 +15,7 @@ import {
   createQuizQuestionSchema,
   importQuizQuestionParamsSchema,
   listQuizQuestionSchema,
-  quizIdSchema,
+  quizQuestionIdSchema,
   subjectIdSchema,
   updateQuizQuestionSchema,
 } from "@/validators/quizQuestion.schemas";
@@ -99,13 +99,13 @@ export const createQuizQuestionHandler = catchErrors(async (req, res) => {
   });
 });
 
-//PUT /quiz-questions/:quizId - Update a question
+//PUT /quiz-questions/:quizQuestionId - Update a question
 export const updateQuizQuestionByIdHandler = catchErrors(async (req, res) => {
   const file = req.file;
   const input = updateQuizQuestionSchema.parse({
     ...req.body,
     image: file,
-    quizId: req.params.quizId,
+    quizQuestionId: req.params.quizQuestionId,
   });
   const data = await updateQuizQuestion(input);
 
@@ -115,11 +115,11 @@ export const updateQuizQuestionByIdHandler = catchErrors(async (req, res) => {
   });
 });
 
-//DELETE /quiz-questions/:quizId - Delete a question
+//DELETE /quiz-questions/:quizQuestionId - Delete a question
 export const deleteQuizQuestionByIdHandler = catchErrors(async (req, res) => {
-  const quizId = quizIdSchema.parse(req.params.quizId);
+  const quizQuestionId = quizQuestionIdSchema.parse(req.params.quizQuestionId);
 
-  const data = await deleteQuizQuestion(quizId);
+  const data = await deleteQuizQuestion(quizQuestionId);
 
   return res.success(OK, {
     data,
