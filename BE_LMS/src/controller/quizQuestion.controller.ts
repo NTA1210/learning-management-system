@@ -2,9 +2,11 @@ import { CREATED, NOT_FOUND, OK } from "@/constants/http";
 import { QuizQuestionModel } from "@/models";
 import {
   createQuizQuestion,
+  deleteMultipleQuizQuestions,
   deleteQuizQuestion,
   exportXMLFile,
   getAllQuizQuestions,
+  getRandomQuestions,
   importXMLFile,
   updateQuizQuestion,
 } from "@/services/quizQuestion.service";
@@ -15,11 +17,12 @@ import {
   createQuizQuestionSchema,
   importQuizQuestionParamsSchema,
   listQuizQuestionSchema,
+  multiQuizQuestionIdSchema,
   quizQuestionIdSchema,
+  randomQuizQuestionSchema,
   subjectIdSchema,
   updateQuizQuestionSchema,
 } from "@/validators/quizQuestion.schemas";
-import { id } from "zod/v4/locales";
 
 // POST /quiz-questions/import - Import questions from XML file
 export const importXMLFileHandler = catchErrors(async (req, res) => {
@@ -124,5 +127,27 @@ export const deleteQuizQuestionByIdHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     data,
     message: "Question deleted successfully",
+  });
+});
+
+//DELETE /quiz-questions - Delete multiple questions
+export const deleteMultiQuizQuestionByIdHandler = catchErrors(
+  async (req, res) => {
+    const ids = multiQuizQuestionIdSchema.parse(req.body.ids);
+    const data = await deleteMultipleQuizQuestions(ids);
+    return res.success(OK, {
+      data,
+      message: "Question deleted successfully",
+    });
+  }
+);
+
+// GET /quiz-questions/random - Get random questions
+export const getRandomQuestionsHandler = catchErrors(async (req, res) => {
+  const input = randomQuizQuestionSchema.parse(req.query);
+  const data = await getRandomQuestions(input);
+  return res.success(OK, {
+    data,
+    message: "Questions retrieved successfully",
   });
 });
