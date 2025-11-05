@@ -5,7 +5,10 @@ import IQuizQuestion, { QuizQuestionType } from "@/types/quizQuestion.type";
 import appAssert from "@/utils/appAssert";
 import { prefixQuizQuestionImage } from "@/utils/filePrefix";
 import { uploadFile } from "@/utils/uploadFile";
-import { ICreateQuizQuestionParams } from "@/validators/quizQuestion.schemas";
+import {
+  ICreateQuizQuestionParams,
+  IUpdateQuizQuestionParams,
+} from "@/validators/quizQuestion.schemas";
 import mongoose, { FilterQuery } from "mongoose";
 import { parseStringPromise } from "xml2js";
 import { create } from "xmlbuilder";
@@ -261,7 +264,7 @@ export const getAllQuizQuestions = async ({
  *
  * @param  subjectId - Subject ID
  * @param  text - Question text
- * @param  Express.Multer image - Question image
+ * @param  Express.Multer.File image - Question image
  * @param  type - Question type
  * @param  options - Question options
  * @param  correctOptions - Correct option indices
@@ -276,18 +279,11 @@ export const createQuizQuestion = async ({
   type,
   options,
   correctOptions,
-  points,
+  points = 1,
   explanation,
 }: ICreateQuizQuestionParams) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
-
-  // Validate logic
-  appAssert(
-    correctOptions.every((i) => i >= 0 && i < options.length),
-    BAD_REQUEST,
-    "Invalid correct option index"
-  );
 
   // 1️⃣ Tạo question trước
   const newQuizQuestion = await QuizQuestionModel.create({
@@ -316,6 +312,67 @@ export const createQuizQuestion = async ({
       console.error("Image upload failed:", err);
     }
   }
-
   return newQuizQuestion;
+};
+
+/**
+ * Update an existing quiz question.
+ * Allow admin to update a question.
+ * @param  params - Parameters to update a quiz question.
+ * @param  params.quizId - ID of the quiz question to update.
+ * @param  params.subjectId - ID of the subject to update the question for.
+ * @param  params.text - Updated text of the question.
+ * @param  params.image - Updated image of the question.
+ * @param  params.type - Updated type of the question.
+ * @param  params.options - Updated options of the question.
+ * @param  params.correctOptions - Updated correct option indices of the question.
+ * @param  params.points= 1 - Updated points of the question.
+ * @param  params.explanation - Updated explanation of the question.
+ * @returns  Updated quiz question.
+ */
+export const updateQuizQuestion = async ({
+  quizId,
+  subjectId,
+  text,
+  image,
+  type,
+  options,
+  correctOptions,
+  points = 1,
+  explanation,
+}: IUpdateQuizQuestionParams) => {
+  const quizQuestion = await QuizQuestionModel.findById(quizId);
+  appAssert(quizQuestion, NOT_FOUND, "Question not found");
+
+  const subject = await SubjectModel.findById(subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+
+  const updatedQuizQuestion = await QuizQuestionModel.findByIdAndUpdate(
+    quizId,
+    {
+      subjectId,
+      text,
+      type,
+      options,
+      correctOptions,
+      points,
+      explanation,
+    },
+    { new: true }
+  );
+
+  // 2️⃣ Nếu có ảnh, upload và cập nhật sau
+  if (image) {
+    try {
+      const questionPrefix = prefixQuizQuestionImage(subjectId, quizId);
+      const { publicUrl } = await uploadFile(image, questionPrefix);
+      await QuizQuestionModel.findByIdAndUpdate(quizId, {
+        image: publicUrl,
+      });
+      updatedQuizQuestion!.image = publicUrl;
+    } catch (err) {
+      console.error("Image upload failed:", err);
+    }
+  }
+  return updatedQuizQuestion;
 };

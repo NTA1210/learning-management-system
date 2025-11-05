@@ -4,6 +4,7 @@ import {
   exportXMLFileHandler,
   getAllQuizQuestionsHandler,
   importXMLFileHandler,
+  updateQuizQuestionByIdHandler,
 } from "@/controller/quizQuestion.controller";
 import { authorize } from "@/middleware";
 import { Role } from "@/types";
@@ -22,5 +23,10 @@ quizQuestionRoutes.post(
 quizQuestionRoutes.get("/export/:courseId", exportXMLFileHandler);
 quizQuestionRoutes.get("/", getAllQuizQuestionsHandler);
 quizQuestionRoutes.post("/", upload.single("file"), createQuizQuestionHandler);
+quizQuestionRoutes.put(
+  "/:quizId",
+  upload.single("file"),
+  updateQuizQuestionByIdHandler
+);
 
 export default quizQuestionRoutes;
