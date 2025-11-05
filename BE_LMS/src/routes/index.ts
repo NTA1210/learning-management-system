@@ -11,3 +11,4 @@ export { default as userRoutes } from "./user.route";
 export { default as quizQuestionRoutes } from "./quizQuestion.route";
 export * from "./major.route";
 export * from "./specialist.route";
+export * from "./forum.route";
