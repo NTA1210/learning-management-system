@@ -63,7 +63,14 @@ export const uploadFiles = async (
  * @returns
  */
 export const getFile = async (key: string) => {
-  return await minioClient.getObject(BUCKET_NAME, key);
+  try {
+    return await minioClient.getObject(BUCKET_NAME, key);
+  } catch (error) {
+    throw new AppError(
+      `Get file error ${(error as Error).message}`,
+      INTERNAL_SERVER_ERROR
+    );
+  }
 };
 
 /**
@@ -84,12 +91,20 @@ export const getSignedUrl = (
   key: string,
   expiresIn = 24 * 60 * 60,
   filename: string
-) =>
-  minioClient.presignedGetObject(BUCKET_NAME, key, expiresIn, {
-    "response-content-disposition": `attachment; filename="${encodeURIComponent(
-      `${nowLocal()}_${v4()}_${filename ? filename : ""}`
-    )}"`,
-  });
+) => {
+  try {
+    return minioClient.presignedGetObject(BUCKET_NAME, key, expiresIn, {
+      "response-content-disposition": `attachment; filename="${encodeURIComponent(
+        `${nowLocal()}_${v4()}_${filename ? filename : ""}`
+      )}"`,
+    });
+  } catch (error) {
+    throw new AppError(
+      `Get signed url error ${(error as Error).message}`,
+      INTERNAL_SERVER_ERROR
+    );
+  }
+};
 
 /**
  * Xóa file
@@ -97,7 +112,14 @@ export const getSignedUrl = (
  * @returns
  */
 export const removeFile = async (key: string) => {
-  return await minioClient.removeObject(BUCKET_NAME, key);
+  try {
+    return await minioClient.removeObject(BUCKET_NAME, key);
+  } catch (error) {
+    throw new AppError(
+      `Remove file error ${(error as Error).message}`,
+      INTERNAL_SERVER_ERROR
+    );
+  }
 };
 
 /**
@@ -106,7 +128,14 @@ export const removeFile = async (key: string) => {
  * @returns
  */
 export const removeFiles = async (key: string[]) => {
-  return await minioClient.removeObjects(BUCKET_NAME, key);
+  try {
+    return await minioClient.removeObjects(BUCKET_NAME, key);
+  } catch (error) {
+    throw new AppError(
+      `Remove files error ${(error as Error).message}`,
+      INTERNAL_SERVER_ERROR
+    );
+  }
 };
 
 /**
@@ -115,7 +144,14 @@ export const removeFiles = async (key: string[]) => {
  * @returns
  */
 export const getStatFile = async (key: string) => {
-  return await minioClient.statObject(BUCKET_NAME, key);
+  try {
+    return await minioClient.statObject(BUCKET_NAME, key);
+  } catch (error) {
+    throw new AppError(
+      `Get stat file error ${(error as Error).message}`,
+      INTERNAL_SERVER_ERROR
+    );
+  }
 };
 
 /**
