@@ -310,8 +310,10 @@ export const createQuizQuestion = async ({
         key,
       });
       newQuizQuestion.image = publicUrl;
-    } catch (err) {
-      console.error("Image upload failed:", err);
+      newQuizQuestion.key = key;
+    } catch (error) {
+      await QuizQuestionModel.findByIdAndDelete(newQuizQuestion._id);
+      throw error;
     }
   }
   return newQuizQuestion;
@@ -349,6 +351,19 @@ export const updateQuizQuestion = async ({
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
 
+  let publicUrl = quizQuestion.image;
+  let key = quizQuestion.key;
+  // 2️⃣ Nếu có ảnh, upload và cập nhật sau
+  if (image) {
+    if (quizQuestion.image) {
+      if (quizQuestion.key) await removeFile(quizQuestion.key);
+    }
+    const questionPrefix = prefixQuizQuestionImage(subjectId, quizQuestionId);
+    const result = await uploadFile(image, questionPrefix);
+    publicUrl = result.publicUrl;
+    key = result.key;
+  }
+
   const updatedQuizQuestion = await QuizQuestionModel.findByIdAndUpdate(
     quizQuestionId,
     {
@@ -359,23 +374,14 @@ export const updateQuizQuestion = async ({
       correctOptions,
       points,
       explanation,
+      image: publicUrl,
+      key,
     },
     { new: true }
   );
 
-  // 2️⃣ Nếu có ảnh, upload và cập nhật sau
-  if (image) {
-    try {
-      const questionPrefix = prefixQuizQuestionImage(subjectId, quizQuestionId);
-      const { publicUrl } = await uploadFile(image, questionPrefix);
-      await QuizQuestionModel.findByIdAndUpdate(quizQuestionId, {
-        image: publicUrl,
-      });
-      updatedQuizQuestion!.image = publicUrl;
-    } catch (err) {
-      console.error("Image upload failed:", err);
-    }
-  }
+  appAssert(updatedQuizQuestion, NOT_FOUND, "Question not found");
+
   return updatedQuizQuestion;
 };
 

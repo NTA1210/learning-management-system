@@ -3,6 +3,9 @@ import { minioClient } from "../config/minio";
 import { v4 } from "uuid";
 import mime from "mime-types";
 import { nowLocal } from "./time";
+import AppError from "./AppError";
+import { INTERNAL_SERVER_ERROR } from "@/constants/http";
+import AppErrorCode from "@/constants/appErrorCode";
 
 /**
  * Upload 1 file, trả về public URL
@@ -11,22 +14,30 @@ import { nowLocal } from "./time";
  * @returns
  */
 export const uploadFile = async (file: Express.Multer.File, prefix: string) => {
-  const key = `${prefix}/${v4()}/${file.originalname}`;
-  await minioClient.putObject(BUCKET_NAME, key, file.buffer, file.size, {
-    "Content-Type":
-      mime.lookup(file.originalname) || "application/octet-stream",
-  });
+  try {
+    const key = `${prefix}/${v4()}/${file.originalname}`;
+    await minioClient.putObject(BUCKET_NAME, key, file.buffer, file.size, {
+      "Content-Type":
+        mime.lookup(file.originalname) || "application/octet-stream",
+    });
 
-  // URL public
-  const publicUrl = `https://${MINIO_ENDPOINT}/${BUCKET_NAME}/${key}`;
+    // URL public
+    const publicUrl = `https://${MINIO_ENDPOINT}/${BUCKET_NAME}/${key}`;
 
-  return {
-    publicUrl,
-    key,
-    originalName: file.originalname,
-    mimeType: mime.lookup(file.originalname),
-    size: file.size,
-  };
+    return {
+      publicUrl,
+      key,
+      originalName: file.originalname,
+      mimeType: mime.lookup(file.originalname),
+      size: file.size,
+    };
+  } catch (error) {
+    throw new AppError(
+      `Upload file error ${(error as Error).message}`,
+      INTERNAL_SERVER_ERROR,
+      AppErrorCode.UploadFileError
+    );
+  }
 };
 
 /**
