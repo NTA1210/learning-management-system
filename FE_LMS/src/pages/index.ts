@@ -12,3 +12,4 @@ export { default as TeacherDashboardPage } from "./TeacherDashboard";
 export { default as CourseManagementPage } from "./CourseManagement";
 export { default as AboutUsPage } from "./AboutUs";
 export { default as FAQPage } from "./FAQ";
+export { default as CourseDetailPage } from "./CourseDetail";
