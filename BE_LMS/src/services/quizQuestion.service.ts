@@ -1,5 +1,5 @@
 import { BAD_REQUEST, NOT_FOUND } from "@/constants/http";
-import { QuizQuestionModel, SubjectModel } from "@/models";
+import { QuizModel, QuizQuestionModel, SubjectModel } from "@/models";
 import { ListParams } from "@/types/dto";
 import IQuizQuestion, { QuizQuestionType } from "@/types/quizQuestion.type";
 import appAssert from "@/utils/appAssert";
@@ -375,4 +375,23 @@ export const updateQuizQuestion = async ({
     }
   }
   return updatedQuizQuestion;
+};
+
+export const deleteQuizQuestion = async (quizId: string) => {
+  const question = await QuizQuestionModel.findById(quizId);
+  appAssert(question, NOT_FOUND, "Question not found");
+
+  const isInActiveQuiz = await QuizModel.exists({
+    isCompleted: false,
+    questionIds: { $in: [new mongoose.Types.ObjectId(quizId)] }, // ✅ dùng $in cho rõ
+  });
+
+  appAssert(
+    !isInActiveQuiz,
+    BAD_REQUEST,
+    "Can't delete question in active quiz"
+  );
+
+  await QuizQuestionModel.findByIdAndDelete(quizId);
+  return question;
 };

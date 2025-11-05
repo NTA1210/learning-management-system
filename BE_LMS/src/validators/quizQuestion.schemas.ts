@@ -64,3 +64,5 @@ export interface IUpdateQuizQuestionParams extends ICreateQuizQuestionParams {
 export const updateQuizQuestionSchema = createQuizQuestionSchema.extend({
   quizId: subjectIdSchema,
 });
+
+export const quizIdSchema = subjectIdSchema;
