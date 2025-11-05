@@ -14,6 +14,37 @@ import { Role, UserStatus } from "../types/user.type";
 import { uploadFile, removeFile } from "../utils/uploadFile";
 import { prefixCourseLogo } from "../utils/filePrefix";
 
+// ====================================
+// 🎨 HELPER FUNCTIONS FOR LOGO MANAGEMENT
+// ====================================
+
+/**
+ * Upload course logo to MinIO and return URL + key
+ */
+async function uploadCourseLogo(courseId: string, logoFile: Express.Multer.File) {
+  try {
+    const logoPrefix = prefixCourseLogo(courseId);
+    const { publicUrl, key } = await uploadFile(logoFile, logoPrefix);
+    return { publicUrl, key };
+  } catch (err) {
+    console.error("❌ Logo upload failed:", err);
+    throw err;
+  }
+}
+
+/**
+ * Delete course logo file from MinIO using key
+ */
+async function deleteCourseLogoFile(key: string) {
+  try {
+    await removeFile(key);
+    console.log(`🗑️ Deleted logo file: ${key}`);
+  } catch (err) {
+    console.error("⚠️  Failed to delete logo file:", err);
+    // Don't throw - allow operation to continue even if file deletion fails
+  }
+}
+
 export type ListCoursesParams = {
   page: number;
   limit: number;
@@ -333,15 +364,14 @@ export const createCourse = async (
   if (logoFile) {
     try {
       const courseId = String(course._id);
-      const logoPrefix = prefixCourseLogo(courseId);
-      const { publicUrl, key } = await uploadFile(logoFile, logoPrefix);
-      await CourseModel.findByIdAndUpdate(courseId, {
-        logo: publicUrl,
-        key, // Save key for future deletion
-      });
+      const { publicUrl, key } = await uploadCourseLogo(courseId, logoFile);
+      
+      // Update course with logo URL and key
+      await CourseModel.findByIdAndUpdate(courseId, { logo: publicUrl, key });
       course.logo = publicUrl;
     } catch (err) {
-      console.error("Logo upload failed:", err);
+      console.error("⚠️  Logo upload failed, but course was created:", err);
+      // Course created successfully, just without logo
     }
   }
 
@@ -472,51 +502,58 @@ export const updateCourse = async (
     updateData.status = CourseStatus.ONGOING;
   }
 
-  // 🗑️ Remove logo if logo field is explicitly set to null/empty string
-  if (data.logo === null || data.logo === "") {
-    // Delete logo file from MinIO
+  // ====================================
+  // 🖼️ HANDLE LOGO OPERATIONS
+  // ====================================
+  
+  const shouldRemoveLogo = data.logo === null || data.logo === "";
+  const shouldUploadNewLogo = logoFile !== undefined;
+
+  if (shouldRemoveLogo) {
+    // User wants to remove logo
     if (course.key) {
-      try {
-        await removeFile(course.key);
-        console.log(`🗑️ Deleted logo: ${course.key}`);
-      } catch (err) {
-        console.error("Failed to delete logo:", err);
-      }
+      await deleteCourseLogoFile(course.key);
     }
-    // Remove logo field from updateData to avoid conflict
+    
+    // Remove logo field from updateData to avoid MongoDB conflict
     delete updateData.logo;
-    // Remove logo and key from database
+    
+    // Remove both logo and key from database
     updateData.$unset = { logo: 1, key: 1 };
-  }
-  // 🖼️ Upload new logo if provided
-  else if (logoFile) {
+  } 
+  else if (shouldUploadNewLogo) {
+    // User wants to upload new logo
     try {
-      // Delete old logo if exists
+      // Delete old logo first (if exists)
       if (course.key) {
-        try {
-          await removeFile(course.key);
-          console.log(`🗑️ Deleted old logo: ${course.key}`);
-        } catch (err) {
-          console.error("Failed to delete old logo:", err);
-        }
+        await deleteCourseLogoFile(course.key);
       }
 
       // Upload new logo
-      const logoPrefix = prefixCourseLogo(courseId);
-      const { publicUrl, key } = await uploadFile(logoFile, logoPrefix);
+      const { publicUrl, key } = await uploadCourseLogo(courseId, logoFile);
       updateData.logo = publicUrl;
-      updateData.key = key; // Save key for future deletion
+      updateData.key = key;
     } catch (err) {
-      console.error("Logo upload failed:", err);
+      console.error("⚠️  Failed to upload new logo:", err);
+      // Continue with other updates even if logo upload fails
     }
   }
 
-  // Update course
+  // ====================================
+  // 📝 BUILD MONGODB UPDATE QUERY
+  // ====================================
+  // MongoDB requires separate $set and $unset operators
+  // Cannot use both in the same object at root level
+  
   const updateQuery: any = {};
+  
+  // Add $unset operations (remove fields)
   if (updateData.$unset) {
     updateQuery.$unset = updateData.$unset;
-    delete updateData.$unset;
+    delete updateData.$unset; // Remove from updateData to avoid duplication
   }
+  
+  // Add $set operations (update fields)
   if (Object.keys(updateData).length > 0) {
     updateQuery.$set = updateData;
   }
@@ -725,15 +762,9 @@ export const permanentDeleteCourse = async (
   //   `Cannot permanently delete course with ${enrollmentCount} enrollment(s). Please remove enrollments first.`
   // );
 
-  // 🗑️ Delete logo file from MinIO if exists
+  // 🗑️ Delete logo file from MinIO (if exists)
   if (course.key) {
-    try {
-      await removeFile(course.key);
-      console.log(`🗑️ Deleted logo file: ${course.key}`);
-    } catch (err) {
-      console.error("Failed to delete logo file:", err);
-      // Continue with course deletion even if file deletion fails
-    }
+    await deleteCourseLogoFile(course.key);
   }
 
   // ✅ HARD DELETE: Remove from database permanently
