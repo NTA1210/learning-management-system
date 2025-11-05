@@ -33,6 +33,6 @@ quizQuestionRoutes.put(
 );
 quizQuestionRoutes.delete("/:quizQuestionId", deleteQuizQuestionByIdHandler);
 quizQuestionRoutes.delete("/", deleteMultiQuizQuestionByIdHandler);
-quizQuestionRoutes.get("/random_questions", getRandomQuestionsHandler);
+quizQuestionRoutes.get("/random", getRandomQuestionsHandler);
 
 export default quizQuestionRoutes;
