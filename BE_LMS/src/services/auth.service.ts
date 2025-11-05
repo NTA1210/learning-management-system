@@ -1,3 +1,4 @@
+import { Role } from "@/types";
 import { APP_ORIGIN } from "../constants/env";
 import {
   CONFLICT,
@@ -38,6 +39,9 @@ export type CreateAccountParams = {
   userAgent?: string;
 };
 
+// Domain for teacher
+const TEACHER_EMAIL_DOMAIN = "@fe.edu.vn";
+
 export const createAccount = async (data: CreateAccountParams) => {
   //verify existing user does not exist
   const existingUser = await UserModel.exists({ email: data.email });
@@ -46,11 +50,17 @@ export const createAccount = async (data: CreateAccountParams) => {
   //check user name
   const usernameExists = await UserModel.exists({ username: data.username });
   appAssert(!usernameExists, CONFLICT, "Username already in use");
+
+  const role = data.email.endsWith(TEACHER_EMAIL_DOMAIN)
+    ? Role.TEACHER
+    : Role.STUDENT;
+
   //create user
   const user = await UserModel.create({
     username: data.username,
     email: data.email,
     password: data.password,
+    role,
   });
   //create verification code
   const verificationCode = await VerificationCodeModel.create({
