@@ -13,7 +13,7 @@ import {
   getAccessTokenCookieOptions,
   getRefreshTokenCookieOptions,
   setAuthCookies,
-} from "../utils/cookies";
+} from "@/utils/cookies";
 import {
   emailSchema,
   loginSchema,
@@ -22,7 +22,7 @@ import {
   verificationCodeSchema,
 } from "../validators/auth.schemas";
 import { verifyToken } from "../utils/jwt";
-import SessionModel from "../models/session.model";
+import { SessionModel } from "@/models";
 import appAssert from "../utils/appAssert";
 
 //controller architecture
