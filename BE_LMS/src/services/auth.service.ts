@@ -8,9 +8,7 @@ import {
   UNAUTHORIZED,
 } from "../constants/http";
 import VerificationCodeType from "../constants/verificationCode";
-import SessionModel from "../models/session.model";
-import UserModel from "../models/user.model";
-import VerificationCodeModel from "../models/verificationCode.model";
+import { UserModel, SessionModel, VerificationCodeModel } from "@/models";
 import appAssert from "../utils/appAssert";
 import { hashValue } from "../utils/bcrypt";
 import {
@@ -29,7 +27,7 @@ import {
   refreshTokenSignOptions,
   signToKen,
   verifyToken,
-} from "../utils/jwt";
+} from "@/utils/jwt";
 import { sendMail } from "../utils/sendMail";
 
 export type CreateAccountParams = {
@@ -146,7 +144,7 @@ export const refreshUserAccessToken = async (refreshToken: string) => {
 
   //Get user
   const user = await UserModel.findById(session.userId);
-  appAssert(user, INTERNAL_SERVER_ERROR, "User not found");
+  appAssert(user, NOT_FOUND, "User not found");
 
   //Refresh the token if it expires in less than 1 day
   const sessionNeedRefresh = session.expiresAt.getTime() - now <= ONE_DAY_MS;
