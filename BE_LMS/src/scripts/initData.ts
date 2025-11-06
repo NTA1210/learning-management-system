@@ -350,7 +350,8 @@ async function seed() {
         subjectId: subjects[1]._id,
         text: "What does UX stand for?",
         type: QuizQuestionType.FILL_BLANK,
-        correctOptions: ["User Experience"],
+        options: ["User Experience", "User eXperience", "UX"],
+        correctOptions: [1, 1, 0], // First two are correct, third is wrong
         points: 2,
         explanation: "UX stands for User Experience.",
       },
