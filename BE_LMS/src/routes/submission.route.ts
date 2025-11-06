@@ -22,7 +22,7 @@ const submissionRoutes = Router();
 submissionRoutes.post("/", authenticate,upload.single("file"),submitAssignmentHandler);
 
 //sv nộp lại bài (khi được phép)
-submissionRoutes.put("/:assignmentId/resubmit", authenticate, resubmitAssignmentHandler);
+submissionRoutes.put("/", authenticate, upload.single("file"),resubmitAssignmentHandler);
 
 //sv xem trạng thái nộp bài
 submissionRoutes.get("/:assignmentId/status", authenticate, getSubmissionStatusHandler);
