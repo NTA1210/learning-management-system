@@ -179,6 +179,31 @@ describe("Enrollment Controller Unit Tests", () => {
         pagination: mockResult.pagination,
       });
     });
+
+    it("Should handle validation error for invalid query params", async () => {
+      const validationError = new Error("Invalid status");
+      (enrollmentSchemas.getEnrollmentsQuerySchema.parse as jest.Mock).mockImplementation(() => {
+        throw validationError;
+      });
+
+      mockReq.query = { status: "invalid_status" };
+
+      await (getAllEnrollmentsHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(validationError);
+    });
+
+    it("Should handle service error", async () => {
+      const serviceError = new Error("Database error");
+      (enrollmentSchemas.getEnrollmentsQuerySchema.parse as jest.Mock).mockReturnValue({ page: 1, limit: 10 });
+      (enrollmentService.getAllEnrollments as jest.Mock).mockRejectedValue(serviceError);
+
+      mockReq.query = {};
+
+      await (getAllEnrollmentsHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(serviceError);
+    });
   });
 
   describe("createEnrollmentHandler", () => {
@@ -201,6 +226,34 @@ describe("Enrollment Controller Unit Tests", () => {
         data: mockEnrollment,
         message: "Enrollment created successfully",
       });
+    });
+
+    it("Should handle validation error for invalid data", async () => {
+      const validationError = new Error("Invalid studentId format");
+      (enrollmentSchemas.createEnrollmentSchema.parse as jest.Mock).mockImplementation(() => {
+        throw validationError;
+      });
+
+      mockReq.body = { studentId: "invalid", courseId: "course123" };
+
+      await (createEnrollmentHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(validationError);
+    });
+
+    it("Should handle service error when student or course not found", async () => {
+      const serviceError = new Error("Student not found");
+      (enrollmentSchemas.createEnrollmentSchema.parse as jest.Mock).mockReturnValue({
+        studentId: "student123",
+        courseId: "course123",
+      });
+      (enrollmentService.createEnrollment as jest.Mock).mockRejectedValue(serviceError);
+
+      mockReq.body = { studentId: "student123", courseId: "course123" };
+
+      await (createEnrollmentHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(serviceError);
     });
   });
 
@@ -228,6 +281,58 @@ describe("Enrollment Controller Unit Tests", () => {
         message: "Enrolled successfully",
       });
     });
+
+    it("Should handle validation error for invalid courseId", async () => {
+      const validationError = new Error("Invalid courseId format");
+      (enrollmentSchemas.enrollSelfSchema.parse as jest.Mock).mockImplementation(() => {
+        throw validationError;
+      });
+
+      mockReq.body = { courseId: "invalid_id" };
+
+      await (enrollSelfHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(validationError);
+    });
+
+    it("Should handle service error when course not found", async () => {
+      const serviceError = new Error("Course not found");
+      (enrollmentSchemas.enrollSelfSchema.parse as jest.Mock).mockReturnValue({ courseId: "course123" });
+      (enrollmentService.createEnrollment as jest.Mock).mockRejectedValue(serviceError);
+
+      mockReq.body = { courseId: "course123" };
+
+      await (enrollSelfHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(serviceError);
+    });
+
+    it("Should handle service error when already enrolled", async () => {
+      const serviceError = new Error("Already enrolled in this course");
+      (enrollmentSchemas.enrollSelfSchema.parse as jest.Mock).mockReturnValue({ courseId: "course123" });
+      (enrollmentService.createEnrollment as jest.Mock).mockRejectedValue(serviceError);
+
+      mockReq.body = { courseId: "course123" };
+
+      await (enrollSelfHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(serviceError);
+    });
+
+    it("Should handle service error when course password is incorrect", async () => {
+      const serviceError = new Error("Invalid course password");
+      (enrollmentSchemas.enrollSelfSchema.parse as jest.Mock).mockReturnValue({
+        courseId: "course123",
+        password: "wrongpass",
+      });
+      (enrollmentService.createEnrollment as jest.Mock).mockRejectedValue(serviceError);
+
+      mockReq.body = { courseId: "course123", password: "wrongpass" };
+
+      await (enrollSelfHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(serviceError);
+    });
   });
 
   describe("updateEnrollmentHandler", () => {
@@ -249,6 +354,63 @@ describe("Enrollment Controller Unit Tests", () => {
         data: mockUpdatedEnrollment,
         message: "Enrollment updated successfully",
       });
+    });
+
+    it("Should handle validation error for invalid enrollment ID", async () => {
+      const validationError = new Error("Invalid ID format");
+      (enrollmentSchemas.enrollmentIdSchema.parse as jest.Mock).mockImplementation(() => {
+        throw validationError;
+      });
+
+      mockReq.params = { id: "invalid_id" };
+      mockReq.body = { status: "completed" };
+
+      await (updateEnrollmentHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(validationError);
+    });
+
+    it("Should handle validation error for invalid update data", async () => {
+      const validationError = new Error("Invalid finalGrade value");
+      (enrollmentSchemas.enrollmentIdSchema.parse as jest.Mock).mockReturnValue({ id: "enroll123" });
+      (enrollmentSchemas.updateEnrollmentSchema.parse as jest.Mock).mockImplementation(() => {
+        throw validationError;
+      });
+
+      mockReq.params = { id: "enroll123" };
+      mockReq.body = { finalGrade: 150 };
+
+      await (updateEnrollmentHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(validationError);
+    });
+
+    it("Should handle service error when enrollment not found", async () => {
+      const serviceError = new Error("Enrollment not found");
+      (enrollmentSchemas.enrollmentIdSchema.parse as jest.Mock).mockReturnValue({ id: "enroll123" });
+      (enrollmentSchemas.updateEnrollmentSchema.parse as jest.Mock).mockReturnValue({ status: "completed" });
+      (enrollmentService.updateEnrollment as jest.Mock).mockRejectedValue(serviceError);
+
+      mockReq.params = { id: "enroll123" };
+      mockReq.body = { status: "completed" };
+
+      await (updateEnrollmentHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(serviceError);
+    });
+
+    it("Should handle service error when course is expired", async () => {
+      const serviceError = new Error("Cannot update enrollment for an expired course");
+      (enrollmentSchemas.enrollmentIdSchema.parse as jest.Mock).mockReturnValue({ id: "enroll123" });
+      (enrollmentSchemas.updateEnrollmentSchema.parse as jest.Mock).mockReturnValue({ status: "completed" });
+      (enrollmentService.updateEnrollment as jest.Mock).mockRejectedValue(serviceError);
+
+      mockReq.params = { id: "enroll123" };
+      mockReq.body = { status: "completed" };
+
+      await (updateEnrollmentHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(serviceError);
     });
   });
 
@@ -275,6 +437,62 @@ describe("Enrollment Controller Unit Tests", () => {
         data: mockUpdatedEnrollment,
         message: "Enrollment updated successfully",
       });
+    });
+
+    it("Should handle validation error for invalid enrollment ID", async () => {
+      const validationError = new Error("Invalid ID format");
+      (enrollmentSchemas.enrollmentIdSchema.parse as jest.Mock).mockImplementation(() => {
+        throw validationError;
+      });
+
+      mockReq.params = { id: "invalid_id" };
+      mockReq.body = { status: "cancelled" };
+
+      await (updateSelfEnrollmentHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(validationError);
+    });
+
+    it("Should handle service error when enrollment not found or access denied", async () => {
+      const serviceError = new Error("Enrollment not found or access denied");
+      (enrollmentSchemas.enrollmentIdSchema.parse as jest.Mock).mockReturnValue({ id: "enroll123" });
+      (enrollmentSchemas.updateSelfEnrollmentSchema.parse as jest.Mock).mockReturnValue({ status: "cancelled" });
+      (enrollmentService.updateSelfEnrollment as jest.Mock).mockRejectedValue(serviceError);
+
+      mockReq.params = { id: "enroll123" };
+      mockReq.body = { status: "cancelled" };
+
+      await (updateSelfEnrollmentHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(serviceError);
+    });
+
+    it("Should handle service error when trying to cancel completed enrollment", async () => {
+      const serviceError = new Error("Cannot cancel a completed course");
+      (enrollmentSchemas.enrollmentIdSchema.parse as jest.Mock).mockReturnValue({ id: "enroll123" });
+      (enrollmentSchemas.updateSelfEnrollmentSchema.parse as jest.Mock).mockReturnValue({ status: "cancelled" });
+      (enrollmentService.updateSelfEnrollment as jest.Mock).mockRejectedValue(serviceError);
+
+      mockReq.params = { id: "enroll123" };
+      mockReq.body = { status: "cancelled" };
+
+      await (updateSelfEnrollmentHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(serviceError);
+    });
+
+    it("Should handle service error when course is expired", async () => {
+      const serviceError = new Error("Cannot cancel enrollment for an expired course");
+      (enrollmentSchemas.enrollmentIdSchema.parse as jest.Mock).mockReturnValue({ id: "enroll123" });
+      (enrollmentSchemas.updateSelfEnrollmentSchema.parse as jest.Mock).mockReturnValue({ status: "cancelled" });
+      (enrollmentService.updateSelfEnrollment as jest.Mock).mockRejectedValue(serviceError);
+
+      mockReq.params = { id: "enroll123" };
+      mockReq.body = { status: "cancelled" };
+
+      await (updateSelfEnrollmentHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(serviceError);
     });
   });
 });

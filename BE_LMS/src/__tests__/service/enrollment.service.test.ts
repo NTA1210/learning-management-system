@@ -117,7 +117,74 @@ describe("Enrollment Service Unit Tests", () => {
   });
 
   describe("getAllEnrollments", () => {
-    it("Should return all enrollments with or without filters", async () => {
+    it("Should return all enrollments with correct data format", async () => {
+      const mockEnrollments = [
+        { _id: "enroll1", studentId: "student1", courseId: "course1", status: EnrollmentStatus.APPROVED },
+        { _id: "enroll2", studentId: "student2", courseId: "course2", status: EnrollmentStatus.PENDING },
+      ];
+      const mockFind = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue(mockEnrollments),
+      };
+
+      (EnrollmentModel.find as jest.Mock) = jest.fn().mockReturnValue(mockFind);
+      (EnrollmentModel.countDocuments as jest.Mock) = jest.fn().mockResolvedValue(2);
+
+      const result = await getAllEnrollments({ page: 1, limit: 10 });
+
+      expect(result).toHaveProperty("enrollments");
+      expect(result).toHaveProperty("pagination");
+      expect(result.enrollments).toHaveLength(2);
+      expect(result.pagination).toEqual({
+        total: 2,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      });
+    });
+
+    it("Should filter by status correctly", async () => {
+      const mockEnrollments = [
+        { _id: "enroll1", status: EnrollmentStatus.APPROVED },
+      ];
+      const mockFind = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue(mockEnrollments),
+      };
+
+      (EnrollmentModel.find as jest.Mock) = jest.fn().mockReturnValue(mockFind);
+      (EnrollmentModel.countDocuments as jest.Mock) = jest.fn().mockResolvedValue(1);
+
+      const result = await getAllEnrollments({ status: EnrollmentStatus.APPROVED, page: 1, limit: 10 });
+
+      expect(EnrollmentModel.find).toHaveBeenCalledWith({ status: EnrollmentStatus.APPROVED });
+      expect(result.enrollments).toHaveLength(1);
+    });
+
+    it("Should handle pagination correctly", async () => {
+      const mockEnrollments = [{ _id: "enroll3" }];
+      const mockFind = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue(mockEnrollments),
+      };
+
+      (EnrollmentModel.find as jest.Mock) = jest.fn().mockReturnValue(mockFind);
+      (EnrollmentModel.countDocuments as jest.Mock) = jest.fn().mockResolvedValue(25);
+
+      const result = await getAllEnrollments({ page: 3, limit: 10 });
+
+      expect(mockFind.skip).toHaveBeenCalledWith(20); // (3-1) * 10
+      expect(mockFind.limit).toHaveBeenCalledWith(10);
+      expect(result.pagination.totalPages).toBe(3); // Math.ceil(25/10)
+    });
+
+    it("Should return empty array when no enrollments found", async () => {
       const mockFind = {
         populate: jest.fn().mockReturnThis(),
         sort: jest.fn().mockReturnThis(),
@@ -128,9 +195,10 @@ describe("Enrollment Service Unit Tests", () => {
       (EnrollmentModel.find as jest.Mock) = jest.fn().mockReturnValue(mockFind);
       (EnrollmentModel.countDocuments as jest.Mock) = jest.fn().mockResolvedValue(0);
 
-      await getAllEnrollments({ status: EnrollmentStatus.APPROVED });
+      const result = await getAllEnrollments({ page: 1, limit: 10 });
 
-      expect(EnrollmentModel.find).toHaveBeenCalled();
+      expect(result.enrollments).toEqual([]);
+      expect(result.pagination.total).toBe(0);
     });
   });
 
@@ -264,13 +332,25 @@ describe("Enrollment Service Unit Tests", () => {
 
   describe("updateEnrollment", () => {
     it("Should update enrollment successfully", async () => {
-      const mockEnrollment = { _id: "enroll123", status: EnrollmentStatus.APPROVED };
+      const mockCourse = {
+        _id: "course123",
+        status: CourseStatus.ONGOING,
+        endDate: new Date(Date.now() + 86400000), // Tomorrow
+      };
+      const mockEnrollment = {
+        _id: "enroll123",
+        status: EnrollmentStatus.APPROVED,
+        courseId: mockCourse,
+      };
       const updatedEnrollment = { _id: "enroll123", status: EnrollmentStatus.COMPLETED, finalGrade: 85 };
+      const mockPopulateChain = {
+        populate: jest.fn().mockResolvedValue(mockEnrollment),
+      };
       const mockUpdate = { populate: jest.fn().mockReturnThis() };
       mockUpdate.populate.mockReturnValueOnce(mockUpdate);
       mockUpdate.populate.mockResolvedValueOnce(updatedEnrollment);
 
-      (EnrollmentModel.findById as jest.Mock) = jest.fn().mockResolvedValue(mockEnrollment);
+      (EnrollmentModel.findById as jest.Mock) = jest.fn().mockReturnValue(mockPopulateChain);
       (EnrollmentModel.findByIdAndUpdate as jest.Mock) = jest.fn().mockReturnValue(mockUpdate);
 
       const result = await updateEnrollment("enroll123", { status: EnrollmentStatus.COMPLETED, finalGrade: 85 });
@@ -279,7 +359,50 @@ describe("Enrollment Service Unit Tests", () => {
     });
 
     it("Should throw NOT_FOUND when enrollment does not exist", async () => {
-      (EnrollmentModel.findById as jest.Mock) = jest.fn().mockResolvedValue(null);
+      const mockPopulateChain = {
+        populate: jest.fn().mockResolvedValue(null),
+      };
+      (EnrollmentModel.findById as jest.Mock) = jest.fn().mockReturnValue(mockPopulateChain);
+
+      await expect(updateEnrollment("enroll123", { status: EnrollmentStatus.COMPLETED })).rejects.toThrow(AppError);
+    });
+
+    it("Should throw BAD_REQUEST when course is completed", async () => {
+      const mockCourse = {
+        _id: "course123",
+        status: CourseStatus.COMPLETED,
+        endDate: new Date(Date.now() + 86400000),
+      };
+      const mockEnrollment = {
+        _id: "enroll123",
+        status: EnrollmentStatus.APPROVED,
+        courseId: mockCourse,
+      };
+      const mockPopulateChain = {
+        populate: jest.fn().mockResolvedValue(mockEnrollment),
+      };
+
+      (EnrollmentModel.findById as jest.Mock) = jest.fn().mockReturnValue(mockPopulateChain);
+
+      await expect(updateEnrollment("enroll123", { status: EnrollmentStatus.COMPLETED })).rejects.toThrow(AppError);
+    });
+
+    it("Should throw BAD_REQUEST when course is expired", async () => {
+      const mockCourse = {
+        _id: "course123",
+        status: CourseStatus.ONGOING,
+        endDate: new Date(Date.now() - 86400000), // Yesterday
+      };
+      const mockEnrollment = {
+        _id: "enroll123",
+        status: EnrollmentStatus.APPROVED,
+        courseId: mockCourse,
+      };
+      const mockPopulateChain = {
+        populate: jest.fn().mockResolvedValue(mockEnrollment),
+      };
+
+      (EnrollmentModel.findById as jest.Mock) = jest.fn().mockReturnValue(mockPopulateChain);
 
       await expect(updateEnrollment("enroll123", { status: EnrollmentStatus.COMPLETED })).rejects.toThrow(AppError);
     });
@@ -287,12 +410,25 @@ describe("Enrollment Service Unit Tests", () => {
 
   describe("updateSelfEnrollment", () => {
     it("Should allow student to cancel their enrollment", async () => {
-      const mockEnrollment = { _id: "enroll123", studentId: "student123", status: EnrollmentStatus.PENDING };
+      const mockCourse = {
+        _id: "course123",
+        status: CourseStatus.ONGOING,
+        endDate: new Date(Date.now() + 86400000), // Tomorrow
+      };
+      const mockEnrollment = {
+        _id: "enroll123",
+        studentId: "student123",
+        status: EnrollmentStatus.PENDING,
+        courseId: mockCourse,
+      };
+      const mockPopulateChain = {
+        populate: jest.fn().mockResolvedValue(mockEnrollment),
+      };
       const mockUpdate = { populate: jest.fn().mockReturnThis() };
       mockUpdate.populate.mockReturnValueOnce(mockUpdate);
       mockUpdate.populate.mockResolvedValueOnce({ ...mockEnrollment, status: EnrollmentStatus.CANCELLED });
 
-      (EnrollmentModel.findOne as jest.Mock) = jest.fn().mockResolvedValue(mockEnrollment);
+      (EnrollmentModel.findOne as jest.Mock) = jest.fn().mockReturnValue(mockPopulateChain);
       (EnrollmentModel.findByIdAndUpdate as jest.Mock) = jest.fn().mockReturnValue(mockUpdate);
 
       const result = await updateSelfEnrollment("enroll123", "student123", { status: EnrollmentStatus.CANCELLED });
@@ -301,7 +437,10 @@ describe("Enrollment Service Unit Tests", () => {
     });
 
     it("Should throw NOT_FOUND when enrollment not found or access denied", async () => {
-      (EnrollmentModel.findOne as jest.Mock) = jest.fn().mockResolvedValue(null);
+      const mockPopulateChain = {
+        populate: jest.fn().mockResolvedValue(null),
+      };
+      (EnrollmentModel.findOne as jest.Mock) = jest.fn().mockReturnValue(mockPopulateChain);
 
       await expect(
         updateSelfEnrollment("enroll123", "student123", { status: EnrollmentStatus.CANCELLED })
@@ -309,9 +448,68 @@ describe("Enrollment Service Unit Tests", () => {
     });
 
     it("Should not allow canceling completed or dropped enrollment", async () => {
-      const mockEnrollment = { _id: "enroll123", studentId: "student123", status: EnrollmentStatus.COMPLETED };
+      const mockCourse = {
+        _id: "course123",
+        status: CourseStatus.ONGOING,
+        endDate: new Date(Date.now() + 86400000),
+      };
+      const mockEnrollment = {
+        _id: "enroll123",
+        studentId: "student123",
+        status: EnrollmentStatus.COMPLETED,
+        courseId: mockCourse,
+      };
+      const mockPopulateChain = {
+        populate: jest.fn().mockResolvedValue(mockEnrollment),
+      };
 
-      (EnrollmentModel.findOne as jest.Mock) = jest.fn().mockResolvedValue(mockEnrollment);
+      (EnrollmentModel.findOne as jest.Mock) = jest.fn().mockReturnValue(mockPopulateChain);
+
+      await expect(
+        updateSelfEnrollment("enroll123", "student123", { status: EnrollmentStatus.CANCELLED })
+      ).rejects.toThrow(AppError);
+    });
+
+    it("Should throw BAD_REQUEST when course is completed", async () => {
+      const mockCourse = {
+        _id: "course123",
+        status: CourseStatus.COMPLETED,
+        endDate: new Date(Date.now() + 86400000),
+      };
+      const mockEnrollment = {
+        _id: "enroll123",
+        studentId: "student123",
+        status: EnrollmentStatus.PENDING,
+        courseId: mockCourse,
+      };
+      const mockPopulateChain = {
+        populate: jest.fn().mockResolvedValue(mockEnrollment),
+      };
+
+      (EnrollmentModel.findOne as jest.Mock) = jest.fn().mockReturnValue(mockPopulateChain);
+
+      await expect(
+        updateSelfEnrollment("enroll123", "student123", { status: EnrollmentStatus.CANCELLED })
+      ).rejects.toThrow(AppError);
+    });
+
+    it("Should throw BAD_REQUEST when course is expired", async () => {
+      const mockCourse = {
+        _id: "course123",
+        status: CourseStatus.ONGOING,
+        endDate: new Date(Date.now() - 86400000), // Yesterday
+      };
+      const mockEnrollment = {
+        _id: "enroll123",
+        studentId: "student123",
+        status: EnrollmentStatus.PENDING,
+        courseId: mockCourse,
+      };
+      const mockPopulateChain = {
+        populate: jest.fn().mockResolvedValue(mockEnrollment),
+      };
+
+      (EnrollmentModel.findOne as jest.Mock) = jest.fn().mockReturnValue(mockPopulateChain);
 
       await expect(
         updateSelfEnrollment("enroll123", "student123", { status: EnrollmentStatus.CANCELLED })
