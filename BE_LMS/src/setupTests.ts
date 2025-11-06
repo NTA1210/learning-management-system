@@ -23,6 +23,10 @@ beforeEach(async () => {
   }
 });
 
+afterEach(async () => {
+  jest.clearAllMocks();
+});
+
 // Dọn dẹp sau khi tất cả test hoàn tất
 afterAll(async () => {
   await mongoose.connection.dropDatabase();
