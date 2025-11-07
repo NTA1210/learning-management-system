@@ -13,6 +13,7 @@ import {DashboardPage ,
   AboutUsPage,
   FAQPage,
   CourseDetailPage,
+  MajorsSpecialistsPage,
 } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import ProtectedRoute from "../components/ProtectedRoute";
@@ -87,6 +88,13 @@ function AppRoutes() {
         <Route path="/help/faq" element={
           <ProtectedRoute>
             <FAQPage />
+          </ProtectedRoute>
+        } />
+
+        {/* Majors & Specialists */}
+        <Route path="/majors-specialists" element={
+          <ProtectedRoute>
+            <MajorsSpecialistsPage />
           </ProtectedRoute>
         } />
 
