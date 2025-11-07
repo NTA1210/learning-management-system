@@ -7,7 +7,7 @@ import {
   resetPassword,
   sendPasswordResetEmail,
   verifyEmail,
-} from "../services/auth.service";
+} from "@/services/auth.service";
 import {
   clearAuthCookies,
   getAccessTokenCookieOptions,
@@ -20,7 +20,7 @@ import {
   registerSchema,
   resetPasswordSchema,
   verificationCodeSchema,
-} from "../validators/auth.schemas";
+} from "@/validators/auth.schemas";
 import { verifyToken } from "../utils/jwt";
 import { SessionModel } from "@/models";
 import appAssert from "../utils/appAssert";

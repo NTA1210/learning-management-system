@@ -10,17 +10,23 @@ jest.mock("@/services/auth.service", () => ({
 jest.mock("@/validators/auth.schemas", () => ({
   registerSchema: { parse: jest.fn() },
   loginSchema: { parse: jest.fn() },
+  emailSchema: { parse: jest.fn() },
   refreshTokenSchema: { parse: jest.fn() },
   resetPasswordSchema: { parse: jest.fn() },
   sendPasswordResetEmailSchema: { parse: jest.fn() },
-  verifyEmailSchema: { parse: jest.fn() },
+  verificationCodeSchema: { parse: jest.fn() },
 }));
 
 jest.mock("@/utils/cookies", () => {
   return {
     setAuthCookies: jest.fn(),
     clearAuthCookies: jest.fn(),
-    getAccessTokenCookieOptions: jest.fn(),
+    getAccessTokenCookieOptions: jest.fn().mockReturnValue({
+      sameSite: "strict",
+      secure: true,
+      httpOnly: true,
+      expires: "2025-11-07T03:31:13.441Z",
+    }),
     getRefreshTokenCookieOptions: jest.fn(),
   };
 });
@@ -39,17 +45,38 @@ jest.mock("@/utils/jwt", () => ({
   }),
 }));
 
+import { BAD_REQUEST, NOT_FOUND, OK, UNAUTHORIZED } from "@/constants/http";
 // ------------------------//----------------------------------
 import {
   loginHandler,
   logoutHandler,
+  refreshHandler,
   registerHandler,
+  resetPasswordHandler,
+  sendPasswordResetHandler,
+  verifyEmailHandler,
 } from "@/controller/auth.controller";
 import { SessionModel } from "@/models";
-import { createAccount, loginUser } from "@/services/auth.service";
+import {
+  createAccount,
+  loginUser,
+  refreshUserAccessToken,
+  resetPassword,
+  sendPasswordResetEmail,
+  verifyEmail,
+} from "@/services/auth.service";
+import appAssert from "@/utils/appAssert";
+import AppError from "@/utils/AppError";
 import { clearAuthCookies, setAuthCookies } from "@/utils/cookies";
 import { verifyToken } from "@/utils/jwt";
-import { loginSchema, registerSchema } from "@/validators";
+import {
+  emailSchema,
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+  verificationCodeSchema,
+} from "@/validators";
+import { clear } from "console";
 import { ZodError } from "zod";
 
 // ------------------------//----------------------------------
@@ -70,11 +97,12 @@ describe("Auth Controller Unit Tests", () => {
     send: jest.fn().mockReturnThis(),
     success: jest.fn().mockReturnThis(),
     cookie: jest.fn().mockReturnThis(),
+    clearCookie: jest.fn().mockReturnThis(),
   };
 
   const mockNext = jest.fn();
 
-  describe("Register", () => {
+  describe("Register controller", () => {
     const mockUser = {
       username: "user12345",
       email: "user12345@gmail.com",
@@ -176,7 +204,7 @@ describe("Auth Controller Unit Tests", () => {
     });
   });
 
-  describe("Login", () => {
+  describe("Login controller", () => {
     const mockUser = {
       email: "user12345@gmail.com",
       password: "12345678",
@@ -201,6 +229,8 @@ describe("Auth Controller Unit Tests", () => {
         refreshToken: "token",
       });
 
+      (setAuthCookies as jest.Mock).mockReturnValue(mockRes);
+
       await loginHandler(mockReqLogin as any, mockRes as any, mockNext);
 
       expect(setAuthCookies).toHaveBeenCalledWith({
@@ -208,6 +238,8 @@ describe("Auth Controller Unit Tests", () => {
         accessToken: "token",
         refreshToken: "token",
       });
+
+      expect(mockRes.success).toHaveBeenCalledWith(OK, expect.any(Object));
     });
 
     it("should throw error if validation fails", async () => {
@@ -249,7 +281,7 @@ describe("Auth Controller Unit Tests", () => {
     });
   });
 
-  describe("Logout", () => {
+  describe("Logout controller", () => {
     it("should return success and delete session", async () => {
       const mockReq = {
         cookies: {
@@ -263,6 +295,8 @@ describe("Auth Controller Unit Tests", () => {
       });
       (SessionModel.findByIdAndDelete as jest.Mock).mockResolvedValue({});
 
+      (clearAuthCookies as jest.Mock).mockReturnValueOnce(mockRes);
+
       await logoutHandler(mockReq as any, mockRes as any, mockNext);
 
       // Session được xoa
@@ -270,6 +304,11 @@ describe("Auth Controller Unit Tests", () => {
 
       // Cookies được clear
       expect(clearAuthCookies).toHaveBeenCalledWith(mockRes);
+
+      // Res success
+      expect(mockRes.success).toHaveBeenCalledWith(OK, {
+        message: "Logout successfully",
+      });
     });
 
     it("should throw error if find session fails", async () => {
@@ -290,6 +329,207 @@ describe("Auth Controller Unit Tests", () => {
       await logoutHandler(mockReq as any, mockRes as any, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(new Error("Internal server error"));
+    });
+  });
+
+  describe("Refresh Token", () => {
+    it("should return accessToken successfully", async () => {
+      const mockReqWithCookie = {
+        ...mockReq,
+        cookies: { refreshToken: "refresh-token" },
+      };
+
+      (refreshUserAccessToken as jest.Mock).mockResolvedValueOnce({
+        accessToken: "token",
+      });
+
+      await refreshHandler(mockReqWithCookie as any, mockRes as any, mockNext);
+
+      expect(mockRes.cookie).toHaveBeenCalledWith("accessToken", "token", {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        expires: "2025-11-07T03:31:13.441Z",
+      });
+      expect(mockRes.success).toHaveBeenCalledWith(OK, {
+        message: "Token refreshed successfully",
+      });
+    });
+
+    it("should throw error if refresh token is invalid", async () => {
+      const mockReqWithCookie = {
+        ...mockReq,
+        cookies: {},
+      };
+
+      await refreshHandler(mockReqWithCookie as any, mockRes as any, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(
+        new AppError("Missing refresh token", UNAUTHORIZED)
+      );
+    });
+
+    it("should throw error if verify token fails", async () => {
+      const mockReqWithCookie = {
+        ...mockReq,
+        cookies: { refreshToken: "refresh-token" },
+      };
+
+      (refreshUserAccessToken as jest.Mock).mockRejectedValueOnce(
+        new AppError("Invalid refresh token", UNAUTHORIZED)
+      );
+
+      await refreshHandler(mockReqWithCookie as any, mockRes as any, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(
+        new AppError("Invalid refresh token", UNAUTHORIZED)
+      );
+    });
+  });
+
+  describe("Verify email controller", () => {
+    it("should return success", async () => {
+      const mockReq = {
+        params: {
+          code: "123",
+        },
+      };
+      (verificationCodeSchema.parse as jest.Mock).mockReturnValueOnce("123");
+      (verifyEmail as jest.Mock).mockResolvedValueOnce(true);
+      await verifyEmailHandler(mockReq as any, mockRes as any, mockNext);
+      expect(mockRes.success).toHaveBeenCalledWith(OK, {
+        message: "Email verified successfully",
+      });
+    });
+    it("should throw error if code is invalid", async () => {
+      const mockReq = {
+        params: {
+          code: "123",
+        },
+      };
+      (verificationCodeSchema.parse as jest.Mock).mockImplementationOnce(() => {
+        throw new ZodError([]);
+      });
+      await verifyEmailHandler(mockReq as any, mockRes as any, mockNext);
+      expect(mockNext).toHaveBeenCalledWith(new ZodError([]));
+    });
+
+    it("should throw error if verify email fails - cannot find verification code", async () => {
+      const mockReq = {
+        params: {
+          code: "123",
+        },
+      };
+      (verificationCodeSchema.parse as jest.Mock).mockReturnValueOnce("123");
+      (verifyEmail as jest.Mock).mockRejectedValueOnce(
+        new AppError("Invalid or expired verification code", NOT_FOUND)
+      );
+      await verifyEmailHandler(mockReq as any, mockRes as any, mockNext);
+      expect(mockNext).toHaveBeenCalledWith(
+        new AppError("Invalid or expired verification code", NOT_FOUND)
+      );
+    });
+  });
+
+  describe("Send reset password email controller", () => {
+    it("should return success", async () => {
+      const mockReq = {
+        body: {
+          email: "user12345@gmail.com",
+        },
+      };
+      (emailSchema.parse as jest.Mock).mockReturnValueOnce({
+        email: "user12345@gmail.com",
+      });
+      (sendPasswordResetEmail as jest.Mock).mockResolvedValueOnce(true);
+      await sendPasswordResetHandler(mockReq as any, mockRes as any, mockNext);
+      expect(mockRes.success).toHaveBeenCalledWith(OK, {
+        message: "Password reset email sent successfully",
+        info: "Check your email to reset your password",
+      });
+    });
+    it("should throw error if email is invalid", async () => {
+      const mockReq = {
+        body: {
+          email: "user12345@gmail.com",
+        },
+      };
+      (emailSchema.parse as jest.Mock).mockImplementationOnce(() => {
+        throw new ZodError([]);
+      });
+      await sendPasswordResetHandler(mockReq as any, mockRes as any, mockNext);
+      expect(mockNext).toHaveBeenCalledWith(new ZodError([]));
+    });
+    it("should throw error if email not found", async () => {
+      const error = new AppError(
+        "User with this email does not exist",
+        NOT_FOUND
+      );
+      const mockReq = {
+        body: {
+          email: "user12345@gmail.com",
+        },
+      };
+      (emailSchema.parse as jest.Mock).mockReturnValueOnce({
+        email: "user12345@gmail.com",
+      });
+      (sendPasswordResetEmail as jest.Mock).mockRejectedValueOnce(error);
+      await sendPasswordResetHandler(mockReq as any, mockRes as any, mockNext);
+      expect(mockNext).toHaveBeenCalledWith(error);
+    });
+  });
+
+  describe("Reset password controller", () => {
+    it("should return success", async () => {
+      const body = {
+        verificationCode: "123",
+        password: "password",
+      };
+      const mockReq = { body };
+
+      (resetPasswordSchema.parse as jest.Mock).mockReturnValueOnce(body);
+      (resetPassword as jest.Mock).mockResolvedValueOnce(true);
+      (clearAuthCookies as jest.Mock).mockReturnValueOnce(mockRes);
+
+      await resetPasswordHandler(mockReq as any, mockRes as any, mockNext);
+
+      expect(clearAuthCookies).toHaveBeenCalledWith(mockRes);
+      expect(mockRes.success).toHaveBeenCalledWith(OK, {
+        message: "Password reset successfully",
+      });
+    });
+    it("should throw error if verification code is invalid", async () => {
+      const mockReq = {
+        body: {
+          verificationCode: "123",
+          password: "password",
+        },
+      };
+      (resetPasswordSchema.parse as jest.Mock).mockImplementationOnce(() => {
+        throw new ZodError([]);
+      });
+      await resetPasswordHandler(mockReq as any, mockRes as any, mockNext);
+      expect(mockNext).toHaveBeenCalledWith(new ZodError([]));
+    });
+
+    it("should throw error if reset password fails - cannot find verification code", async () => {
+      const mockReq = {
+        body: {
+          verificationCode: "123",
+          password: "password",
+        },
+      };
+      (resetPasswordSchema.parse as jest.Mock).mockReturnValueOnce({
+        verificationCode: "123",
+        password: "password",
+      });
+      (resetPassword as jest.Mock).mockRejectedValueOnce(
+        new AppError("Invalid or expired verification code", NOT_FOUND)
+      );
+      await resetPasswordHandler(mockReq as any, mockRes as any, mockNext);
+      expect(mockNext).toHaveBeenCalledWith(
+        new AppError("Invalid or expired verification code", NOT_FOUND)
+      );
     });
   });
 });
