@@ -119,8 +119,16 @@ describe("📚 Lesson Service Unit Tests", () => {
     });
 
     it("should create lesson successfully for course instructor", async () => {
-      // Mock dependencies
-      (CourseModel.findById as jest.Mock).mockResolvedValue(course);
+      // Mock course with teacherUser as instructor - use custom includes for ObjectId comparison
+      const teacherIdsArray = [teacherUser._id];
+      teacherIdsArray.includes = jest.fn((id: any) => {
+        return teacherIdsArray.some(tid => tid.toString() === id.toString());
+      });
+      const courseWithTeacher = {
+        ...course,
+        teacherIds: teacherIdsArray,
+      };
+      (CourseModel.findById as jest.Mock).mockResolvedValue(courseWithTeacher);
       (LessonModel.exists as jest.Mock).mockResolvedValue(null);
       (LessonModel.create as jest.Mock).mockResolvedValue(lesson);
       
@@ -136,24 +144,60 @@ describe("📚 Lesson Service Unit Tests", () => {
         content: "Test content",
       };
 
-      const result = await createLessonService(lessonData, teacherUser._id.toString(), Role.ADMIN);
+      const result = await createLessonService(lessonData, teacherUser._id.toString(), Role.TEACHER);
 
       expect(result).toBeDefined();
       expect(result?.title).toBe("Test Lesson");
     });
 
+    it("should throw error when lesson title already exists in course", async () => {
+      (CourseModel.findById as jest.Mock).mockResolvedValue(course);
+      (LessonModel.exists as jest.Mock).mockResolvedValue({ _id: lesson._id });
+
+      const lessonData: CreateLessonParams = {
+        title: "Test Lesson",
+        courseId: course._id.toString(),
+        content: "Test content",
+      };
+
+      await expect(
+        createLessonService(lessonData, adminUser._id.toString(), Role.ADMIN)
+      ).rejects.toThrow("Lesson already exists");
+    });
+
     it("should throw error when course not found", async () => {
+      const validCourseId = new mongoose.Types.ObjectId().toString();
+      (LessonModel.exists as jest.Mock).mockResolvedValue(null);
       (CourseModel.findById as jest.Mock).mockResolvedValue(null);
 
       const lessonData: CreateLessonParams = {
         title: "Test Lesson",
-        courseId: "nonexistent",
+        courseId: validCourseId,
         content: "Test content",
       };
 
       await expect(
         createLessonService(lessonData, adminUser._id.toString(), Role.ADMIN)
       ).rejects.toThrow("Course not found");
+    });
+
+    it("should throw error when teacher is not instructor", async () => {
+      const otherCourse = {
+        ...course,
+        teacherIds: [new mongoose.Types.ObjectId()], // Different teacher
+      };
+      (LessonModel.exists as jest.Mock).mockResolvedValue(null);
+      (CourseModel.findById as jest.Mock).mockResolvedValue(otherCourse);
+
+      const lessonData: CreateLessonParams = {
+        title: "Test Lesson",
+        courseId: course._id.toString(),
+        content: "Test content",
+      };
+
+      await expect(
+        createLessonService(lessonData, teacherUser._id.toString(), Role.TEACHER)
+      ).rejects.toThrow("Only course instructors or admins can create lessons");
     });
   });
 
@@ -275,6 +319,36 @@ describe("📚 Lesson Service Unit Tests", () => {
       expect(LessonModel.find).toHaveBeenCalled();
     });
 
+    it("should return lessons for teacher", async () => {
+      // Mock teacher courses
+      const teacherCourses = [{ _id: course._id }];
+      const mockCourseQuery = {
+        select: jest.fn().mockResolvedValue(teacherCourses),
+      };
+      (CourseModel.find as jest.Mock).mockReturnValue(mockCourseQuery);
+
+      // Mock lessons query
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([lesson]),
+      };
+      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
+      (LessonModel.countDocuments as jest.Mock).mockResolvedValue(1);
+
+      // Mock for access checks
+      (LessonModel.findById as jest.Mock).mockReturnValue({
+        populate: jest.fn().mockResolvedValue({ courseId: { _id: course._id, teacherIds: [teacherUser._id] } }),
+      });
+
+      const result = await getLessons({}, teacherUser._id.toString(), Role.TEACHER);
+
+      expect(result).toBeDefined();
+      expect(result).toHaveProperty('lessons');
+    });
+
     it("should return only published lessons for student", async () => {
       const mockQuery = {
         populate: jest.fn().mockReturnThis(),
@@ -317,6 +391,96 @@ describe("📚 Lesson Service Unit Tests", () => {
       expect(result).toBeDefined();
       expect(LessonModel.find).toHaveBeenCalledWith(
         expect.objectContaining({ title: { $regex: "Test", $options: "i" } })
+      );
+    });
+
+    it("should filter lessons by content", async () => {
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([lesson]),
+      };
+      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
+      (LessonModel.countDocuments as jest.Mock).mockResolvedValue(1);
+
+      const result = await getLessons({ content: "content" }, adminUser._id.toString(), Role.ADMIN);
+
+      expect(LessonModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({ content: { $regex: "content", $options: "i" } })
+      );
+    });
+
+    it("should filter lessons by courseId", async () => {
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([lesson]),
+      };
+      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
+      (LessonModel.countDocuments as jest.Mock).mockResolvedValue(1);
+
+      const result = await getLessons({ courseId: course._id.toString() }, adminUser._id.toString(), Role.ADMIN);
+
+      expect(LessonModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({ courseId: course._id.toString() })
+      );
+    });
+
+    it("should filter lessons by order", async () => {
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([lesson]),
+      };
+      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
+      (LessonModel.countDocuments as jest.Mock).mockResolvedValue(1);
+
+      const result = await getLessons({ order: 1 }, adminUser._id.toString(), Role.ADMIN);
+
+      expect(LessonModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({ order: 1 })
+      );
+    });
+
+    it("should filter lessons by durationMinutes", async () => {
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([lesson]),
+      };
+      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
+      (LessonModel.countDocuments as jest.Mock).mockResolvedValue(1);
+
+      const result = await getLessons({ durationMinutes: 10 }, adminUser._id.toString(), Role.ADMIN);
+
+      expect(LessonModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({ durationMinutes: 10 })
+      );
+    });
+
+    it("should use full-text search when search query provided", async () => {
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([lesson]),
+      };
+      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
+      (LessonModel.countDocuments as jest.Mock).mockResolvedValue(1);
+
+      const result = await getLessons({ search: "test" }, adminUser._id.toString(), Role.ADMIN);
+
+      expect(LessonModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({ $text: { $search: "test" } })
       );
     });
   });
@@ -369,6 +533,28 @@ describe("📚 Lesson Service Unit Tests", () => {
 
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
+    });
+
+    it("should return only published lessons for teacher non-instructor", async () => {
+      const otherCourse = {
+        ...course,
+        teacherIds: [new mongoose.Types.ObjectId()], // Different teacher
+      };
+      (CourseModel.findById as jest.Mock).mockResolvedValue(otherCourse);
+      
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([lesson]),
+      };
+      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
+
+      const result = await getLessonsByCourse(course._id.toString(), teacherUser._id.toString(), Role.TEACHER);
+
+      expect(result).toBeDefined();
+      expect(LessonModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({ publishedAt: { $exists: true, $ne: null } })
+      );
     });
 
     it("should throw error for invalid course ID", async () => {
@@ -433,10 +619,11 @@ describe("📚 Lesson Service Unit Tests", () => {
       expect(result.hasAccess).toBe(true);
     });
 
-    it("should return lesson without content for non-enrolled student", async () => {
+    it("should return lesson without content for non-enrolled student if published", async () => {
+      const publishedLesson = { ...lesson, publishedAt: new Date() };
       const mockQuery = {
         populate: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue(lesson),
+        lean: jest.fn().mockResolvedValue(publishedLesson),
       };
       (LessonModel.findById as jest.Mock).mockReturnValue(mockQuery);
       (EnrollmentModel.findOne as jest.Mock).mockResolvedValue(null);
@@ -449,6 +636,22 @@ describe("📚 Lesson Service Unit Tests", () => {
       expect(result.hasAccess).toBe(true);
     });
 
+    it("should return lesson without access for non-enrolled student if not published", async () => {
+      const unpublishedLesson = { ...lesson, publishedAt: null };
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue(unpublishedLesson),
+      };
+      (LessonModel.findById as jest.Mock).mockReturnValue(mockQuery);
+      (EnrollmentModel.findOne as jest.Mock).mockResolvedValue(null);
+
+      const result = await getLessonById(lesson._id.toString(), studentUser._id.toString(), Role.STUDENT);
+
+      expect(result).toBeDefined();
+      expect(result.hasAccess).toBe(false);
+      expect(result.accessReason).toBe("not_enrolled");
+    });
+
     it("should throw error for invalid lesson ID", async () => {
       const mockQuery = {
         populate: jest.fn().mockReturnThis(),
@@ -459,6 +662,42 @@ describe("📚 Lesson Service Unit Tests", () => {
       await expect(
         getLessonById("invalid", adminUser._id.toString(), Role.ADMIN)
       ).rejects.toThrow("Invalid lesson ID format");
+    });
+  });
+
+  describe("updateLessonService", () => {
+    it("should throw error when teacher is not instructor", async () => {
+      const otherCourse = {
+        ...course,
+        teacherIds: [new mongoose.Types.ObjectId()], // Different teacher
+      };
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue({ ...lesson, courseId: otherCourse }),
+      };
+      (LessonModel.findById as jest.Mock).mockReturnValue(mockQuery);
+      (CourseModel.findById as jest.Mock).mockResolvedValue(otherCourse);
+
+      const updateData = { title: "Updated Lesson" };
+
+      await expect(
+        updateLessonService(lesson._id.toString(), updateData, teacherUser._id.toString(), Role.TEACHER)
+      ).rejects.toThrow("Not authorized to update this lesson");
+    });
+  });
+
+  describe("deleteLessonService", () => {
+    it("should throw error when teacher is not instructor", async () => {
+      const otherCourse = {
+        ...course,
+        teacherIds: [new mongoose.Types.ObjectId()], // Different teacher
+      };
+      (LessonModel.findById as jest.Mock).mockResolvedValue({ ...lesson, courseId: otherCourse._id });
+      (CourseModel.findById as jest.Mock).mockResolvedValue(otherCourse);
+
+      await expect(
+        deleteLessonService(lesson._id.toString(), teacherUser._id.toString(), Role.TEACHER)
+      ).rejects.toThrow("Not authorized to delete this lesson");
     });
   });
 });

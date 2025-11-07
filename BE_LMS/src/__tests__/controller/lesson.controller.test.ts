@@ -3,6 +3,30 @@ import { Request, Response } from "express";
 import mongoose from "mongoose";
 import { Role } from "@/types";
 
+// Mock MongoMemoryServer to avoid timeout in unit tests (we don't need real DB)
+jest.mock("mongodb-memory-server", () => ({
+  MongoMemoryServer: jest.fn().mockImplementation(() => ({
+    getUri: jest.fn().mockResolvedValue("mongodb://localhost:27017/test"),
+    stop: jest.fn().mockResolvedValue(undefined),
+  })),
+}));
+
+// Mock mongoose connection
+jest.mock("mongoose", () => {
+  const actualMongoose = jest.requireActual("mongoose");
+  return {
+    ...actualMongoose,
+    connect: jest.fn().mockResolvedValue(actualMongoose),
+    connection: {
+      ...actualMongoose.connection,
+      readyState: 1,
+      collections: {},
+      dropDatabase: jest.fn().mockResolvedValue(undefined),
+      close: jest.fn().mockResolvedValue(undefined),
+    },
+  };
+});
+
 // Mock all services before importing controller
 jest.mock("@/services/lesson.service", () => ({
   getLessons: jest.fn(),
