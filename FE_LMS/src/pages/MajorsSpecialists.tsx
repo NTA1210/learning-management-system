@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import { specialistService, majorService } from "../services";
@@ -6,7 +6,7 @@ import type { Specialist } from "../types/specialist";
 import type { Major } from "../types/specialist";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
-import { Search, ChevronDown, ChevronRight, MoreVertical } from "lucide-react";
+import { Search, ChevronDown, ChevronRight, MoreVertical, Plus, Edit, Trash2 } from "lucide-react";
 
 interface MajorGroup {
   major: {
@@ -40,6 +40,19 @@ const MajorsSpecialists: React.FC = () => {
   const [pageLimit, setPageLimit] = useState(25);
   const [totalMajors, setTotalMajors] = useState(0);
   const [sortOption, setSortOption] = useState<'name_asc' | 'name_desc' | 'date_asc' | 'date_desc'>('date_desc');
+  
+  // CRUD states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingSpecialist, setEditingSpecialist] = useState<Specialist | null>(null);
+  const [openActionMenu, setOpenActionMenu] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    slug: "",
+    description: "",
+    majorId: "",
+  });
+  const actionMenuRef = useRef<HTMLDivElement>(null);
 
 
   // Organize specialists into major groups - now using fetched majors
@@ -166,6 +179,76 @@ const MajorsSpecialists: React.FC = () => {
     });
   };
 
+  // CRUD Handlers
+  const handleCreateSpecialist = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await specialistService.createSpecialist({
+        name: formData.name,
+        slug: formData.slug,
+        description: formData.description,
+        majorId: formData.majorId || undefined,
+      });
+      setShowCreateModal(false);
+      setFormData({ name: "", slug: "", description: "", majorId: "" });
+      await fetchData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to create specialist");
+    }
+  };
+
+  const handleEditSpecialist = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSpecialist) return;
+    try {
+      await specialistService.updateSpecialist(editingSpecialist._id, {
+        name: formData.name,
+        slug: formData.slug,
+        description: formData.description,
+        majorId: formData.majorId || undefined,
+      });
+      setShowEditModal(false);
+      setEditingSpecialist(null);
+      setFormData({ name: "", slug: "", description: "", majorId: "" });
+      await fetchData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to update specialist");
+    }
+  };
+
+  const handleDeleteSpecialist = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this specialist?")) return;
+    try {
+      await specialistService.deleteSpecialist(id);
+      await fetchData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete specialist");
+    }
+  };
+
+  const openEditModal = (specialist: Specialist) => {
+    setEditingSpecialist(specialist);
+    setFormData({
+      name: specialist.name,
+      slug: specialist.slug,
+      description: specialist.description,
+      majorId: specialist.majorId?._id || "",
+    });
+    setShowEditModal(true);
+    setOpenActionMenu(null);
+  };
+
+  // Close action menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (actionMenuRef.current && !actionMenuRef.current.contains(event.target as Node)) {
+        setOpenActionMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -228,18 +311,33 @@ const MajorsSpecialists: React.FC = () => {
                     Browse majors and their associated specialists
                   </p>
                 </div>
-                <button
-                  className="px-4 py-2 rounded-lg text-white flex items-center transition-all duration-200"
-                  style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
-                  onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#5b21b6' : '#4338ca'}
-                  onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#4c1d95' : '#4f46e5'}
-                  onClick={fetchData}
-                >
-                  <svg className="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                  </svg>
-                  Refresh
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    className="px-4 py-2 rounded-lg text-white flex items-center transition-all duration-200"
+                    style={{ backgroundColor: darkMode ? '#059669' : '#10b981' }}
+                    onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#047857' : '#059669'}
+                    onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#059669' : '#10b981'}
+                    onClick={() => {
+                      setFormData({ name: "", slug: "", description: "", majorId: "" });
+                      setShowCreateModal(true);
+                    }}
+                  >
+                    <Plus size={18} className="mr-2" />
+                    Create Specialist
+                  </button>
+                  <button
+                    className="px-4 py-2 rounded-lg text-white flex items-center transition-all duration-200"
+                    style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
+                    onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#5b21b6' : '#4338ca'}
+                    onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#4c1d95' : '#4f46e5'}
+                    onClick={fetchData}
+                  >
+                    <svg className="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Refresh
+                  </button>
+                </div>
               </div>
 
               {/* Search and Filter Controls */}
@@ -586,24 +684,65 @@ const MajorsSpecialists: React.FC = () => {
                                     </span>
                                   </div>
                                 </td>
-                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                  <button
-                                    className="p-1 rounded hover:bg-opacity-20 transition-colors"
-                                    style={{
-                                      backgroundColor: 'transparent',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      color: darkMode ? '#9ca3af' : '#6b7280',
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.backgroundColor = darkMode ? 'rgba(156, 163, 175, 0.2)' : 'rgba(107, 114, 128, 0.1)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.backgroundColor = 'transparent';
-                                    }}
-                                  >
-                                    <MoreVertical size={18} />
-                                  </button>
+                                <td style={{ padding: '12px 16px', textAlign: 'center', position: 'relative' }}>
+                                  <div ref={actionMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
+                                    <button
+                                      className="p-1 rounded hover:bg-opacity-20 transition-colors"
+                                      style={{
+                                        backgroundColor: 'transparent',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        color: darkMode ? '#9ca3af' : '#6b7280',
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.currentTarget.style.backgroundColor = darkMode ? 'rgba(156, 163, 175, 0.2)' : 'rgba(107, 114, 128, 0.1)';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.currentTarget.style.backgroundColor = 'transparent';
+                                      }}
+                                      onClick={() => setOpenActionMenu(openActionMenu === `major-${group.major._id}` ? null : `major-${group.major._id}`)}
+                                    >
+                                      <MoreVertical size={18} />
+                                    </button>
+                                    {openActionMenu === `major-${group.major._id}` && (
+                                      <div
+                                        style={{
+                                          position: 'absolute',
+                                          right: 0,
+                                          top: '100%',
+                                          marginTop: '4px',
+                                          backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+                                          border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                                          borderRadius: '8px',
+                                          boxShadow: darkMode ? '0 4px 6px rgba(0,0,0,0.3)' : '0 4px 6px rgba(0,0,0,0.1)',
+                                          zIndex: 1000,
+                                          minWidth: '150px',
+                                        }}
+                                      >
+                                        <button
+                                          className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
+                                          style={{
+                                            color: darkMode ? '#d1d5db' : '#374151',
+                                            fontSize: '14px',
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = darkMode ? 'rgba(156, 163, 175, 0.2)' : 'rgba(107, 114, 128, 0.1)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'transparent';
+                                          }}
+                                          onClick={() => {
+                                            setFormData({ name: "", slug: "", description: "", majorId: group.major._id });
+                                            setShowCreateModal(true);
+                                            setOpenActionMenu(null);
+                                          }}
+                                        >
+                                          <Plus size={16} />
+                                          Add Specialist
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
 
@@ -681,24 +820,81 @@ const MajorsSpecialists: React.FC = () => {
                                           </span>
                                         </div>
                                       </td>
-                                      <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                        <button
-                                          className="p-1 rounded hover:bg-opacity-20 transition-colors"
-                                          style={{
-                                            backgroundColor: 'transparent',
-                                            border: 'none',
-                                            cursor: 'pointer',
-                                            color: darkMode ? '#9ca3af' : '#6b7280',
-                                          }}
-                                          onMouseEnter={(e) => {
-                                            e.currentTarget.style.backgroundColor = darkMode ? 'rgba(156, 163, 175, 0.2)' : 'rgba(107, 114, 128, 0.1)';
-                                          }}
-                                          onMouseLeave={(e) => {
-                                            e.currentTarget.style.backgroundColor = 'transparent';
-                                          }}
-                                        >
-                                          <MoreVertical size={18} />
-                                        </button>
+                                      <td style={{ padding: '12px 16px', textAlign: 'center', position: 'relative' }}>
+                                        <div ref={actionMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
+                                          <button
+                                            className="p-1 rounded hover:bg-opacity-20 transition-colors"
+                                            style={{
+                                              backgroundColor: 'transparent',
+                                              border: 'none',
+                                              cursor: 'pointer',
+                                              color: darkMode ? '#9ca3af' : '#6b7280',
+                                            }}
+                                            onMouseEnter={(e) => {
+                                              e.currentTarget.style.backgroundColor = darkMode ? 'rgba(156, 163, 175, 0.2)' : 'rgba(107, 114, 128, 0.1)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                              e.currentTarget.style.backgroundColor = 'transparent';
+                                            }}
+                                            onClick={() => setOpenActionMenu(openActionMenu === specialist._id ? null : specialist._id)}
+                                          >
+                                            <MoreVertical size={18} />
+                                          </button>
+                                          {openActionMenu === specialist._id && (
+                                            <div
+                                              style={{
+                                                position: 'absolute',
+                                                right: 0,
+                                                top: '100%',
+                                                marginTop: '4px',
+                                                backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+                                                border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                                                borderRadius: '8px',
+                                                boxShadow: darkMode ? '0 4px 6px rgba(0,0,0,0.3)' : '0 4px 6px rgba(0,0,0,0.1)',
+                                                zIndex: 1000,
+                                                minWidth: '150px',
+                                              }}
+                                            >
+                                              <button
+                                                className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
+                                                style={{
+                                                  color: darkMode ? '#d1d5db' : '#374151',
+                                                  fontSize: '14px',
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                  e.currentTarget.style.backgroundColor = darkMode ? 'rgba(156, 163, 175, 0.2)' : 'rgba(107, 114, 128, 0.1)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                                }}
+                                                onClick={() => openEditModal(specialist)}
+                                              >
+                                                <Edit size={16} />
+                                                Edit
+                                              </button>
+                                              <button
+                                                className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
+                                                style={{
+                                                  color: darkMode ? '#fca5a5' : '#dc2626',
+                                                  fontSize: '14px',
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                  e.currentTarget.style.backgroundColor = darkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  e.currentTarget.style.backgroundColor = 'transparent';
+                                                }}
+                                                onClick={() => {
+                                                  handleDeleteSpecialist(specialist._id);
+                                                  setOpenActionMenu(null);
+                                                }}
+                                              >
+                                                <Trash2 size={16} />
+                                                Delete
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
                                       </td>
                                     </tr>
                                   ))
@@ -794,24 +990,81 @@ const MajorsSpecialists: React.FC = () => {
                                     </span>
                                   </div>
                                 </td>
-                                <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                                  <button
-                                    className="p-1 rounded hover:bg-opacity-20 transition-colors"
-                                    style={{
-                                      backgroundColor: 'transparent',
-                                      border: 'none',
-                                      cursor: 'pointer',
-                                      color: darkMode ? '#9ca3af' : '#6b7280',
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.backgroundColor = darkMode ? 'rgba(156, 163, 175, 0.2)' : 'rgba(107, 114, 128, 0.1)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.backgroundColor = 'transparent';
-                                    }}
-                                  >
-                                    <MoreVertical size={18} />
-                                  </button>
+                                <td style={{ padding: '12px 16px', textAlign: 'center', position: 'relative' }}>
+                                  <div ref={actionMenuRef} style={{ position: 'relative', display: 'inline-block' }}>
+                                    <button
+                                      className="p-1 rounded hover:bg-opacity-20 transition-colors"
+                                      style={{
+                                        backgroundColor: 'transparent',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        color: darkMode ? '#9ca3af' : '#6b7280',
+                                      }}
+                                      onMouseEnter={(e) => {
+                                        e.currentTarget.style.backgroundColor = darkMode ? 'rgba(156, 163, 175, 0.2)' : 'rgba(107, 114, 128, 0.1)';
+                                      }}
+                                      onMouseLeave={(e) => {
+                                        e.currentTarget.style.backgroundColor = 'transparent';
+                                      }}
+                                      onClick={() => setOpenActionMenu(openActionMenu === item.specialist._id ? null : item.specialist._id)}
+                                    >
+                                      <MoreVertical size={18} />
+                                    </button>
+                                    {openActionMenu === item.specialist._id && (
+                                      <div
+                                        style={{
+                                          position: 'absolute',
+                                          right: 0,
+                                          top: '100%',
+                                          marginTop: '4px',
+                                          backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+                                          border: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                                          borderRadius: '8px',
+                                          boxShadow: darkMode ? '0 4px 6px rgba(0,0,0,0.3)' : '0 4px 6px rgba(0,0,0,0.1)',
+                                          zIndex: 1000,
+                                          minWidth: '150px',
+                                        }}
+                                      >
+                                        <button
+                                          className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
+                                          style={{
+                                            color: darkMode ? '#d1d5db' : '#374151',
+                                            fontSize: '14px',
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = darkMode ? 'rgba(156, 163, 175, 0.2)' : 'rgba(107, 114, 128, 0.1)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'transparent';
+                                          }}
+                                          onClick={() => openEditModal(item.specialist)}
+                                        >
+                                          <Edit size={16} />
+                                          Edit
+                                        </button>
+                                        <button
+                                          className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
+                                          style={{
+                                            color: darkMode ? '#fca5a5' : '#dc2626',
+                                            fontSize: '14px',
+                                          }}
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = darkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)';
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'transparent';
+                                          }}
+                                          onClick={() => {
+                                            handleDeleteSpecialist(item.specialist._id);
+                                            setOpenActionMenu(null);
+                                          }}
+                                        >
+                                          <Trash2 size={16} />
+                                          Delete
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             ))}
@@ -845,6 +1098,232 @@ const MajorsSpecialists: React.FC = () => {
             </div>
           </main>
         </div>
+
+        {/* Create Specialist Modal */}
+        {showCreateModal && (
+          <div 
+            className="fixed inset-0 flex items-center justify-center z-[9999] p-4"
+            style={{ 
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              backdropFilter: 'blur(4px)',
+            }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowCreateModal(false);
+                setFormData({ name: "", slug: "", description: "", majorId: "" });
+              }
+            }}
+          >
+            <div
+              className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+              style={{ 
+                backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+                border: darkMode ? '1px solid rgba(75, 85, 99, 0.3)' : '1px solid #e5e7eb'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-2xl font-bold mb-4" style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Create New Specialist</h2>
+              <form onSubmit={handleCreateSpecialist} className="space-y-4">
+                <div>
+                  <label className="block mb-2 font-semibold" style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Name *</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2 font-semibold" style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Slug *</label>
+                  <input
+                    type="text"
+                    value={formData.slug}
+                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2 font-semibold" style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Description *</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2 font-semibold" style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Major (Optional)</label>
+                  <select
+                    value={formData.majorId}
+                    onChange={(e) => setFormData({ ...formData, majorId: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                  >
+                    <option value="">None (Ungrouped)</option>
+                    {majors.map(major => (
+                      <option key={major._id} value={major._id}>{major.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex space-x-4">
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 rounded-lg text-white transition-all duration-200"
+                    style={{ backgroundColor: darkMode ? '#059669' : '#10b981' }}
+                  >
+                    Create
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCreateModal(false);
+                      setFormData({ name: "", slug: "", description: "", majorId: "" });
+                    }}
+                    className="flex-1 px-4 py-2 rounded-lg text-white transition-all duration-200"
+                    style={{ backgroundColor: darkMode ? '#6b7280' : '#9ca3af' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Specialist Modal */}
+        {showEditModal && editingSpecialist && (
+          <div 
+            className="fixed inset-0 flex items-center justify-center z-[9999] p-4"
+            style={{ 
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              backdropFilter: 'blur(4px)',
+            }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowEditModal(false);
+                setEditingSpecialist(null);
+                setFormData({ name: "", slug: "", description: "", majorId: "" });
+              }
+            }}
+          >
+            <div
+              className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+              style={{ 
+                backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+                border: darkMode ? '1px solid rgba(75, 85, 99, 0.3)' : '1px solid #e5e7eb'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="text-2xl font-bold mb-4" style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Edit Specialist</h2>
+              <form onSubmit={handleEditSpecialist} className="space-y-4">
+                <div>
+                  <label className="block mb-2 font-semibold" style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Name *</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2 font-semibold" style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Slug *</label>
+                  <input
+                    type="text"
+                    value={formData.slug}
+                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2 font-semibold" style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Description *</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block mb-2 font-semibold" style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Major (Optional)</label>
+                  <select
+                    value={formData.majorId}
+                    onChange={(e) => setFormData({ ...formData, majorId: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                  >
+                    <option value="">None (Ungrouped)</option>
+                    {majors.map(major => (
+                      <option key={major._id} value={major._id}>{major.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex space-x-4">
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2 rounded-lg text-white transition-all duration-200"
+                    style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
+                  >
+                    Update
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEditModal(false);
+                      setEditingSpecialist(null);
+                      setFormData({ name: "", slug: "", description: "", majorId: "" });
+                    }}
+                    className="flex-1 px-4 py-2 rounded-lg text-white transition-all duration-200"
+                    style={{ backgroundColor: darkMode ? '#6b7280' : '#9ca3af' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

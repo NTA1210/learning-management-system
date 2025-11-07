@@ -89,9 +89,13 @@ const CourseManagement: React.FC = () => {
   // Check if teacher can edit a specific course
   const canTeacherEditCourse = (course: Course) => {
     if (isAdmin) return true;
-    if (isTeacher && currentTeacherId) {
-      // Teacher can only edit courses they are assigned to
-      return course.teachers.some(teacher => teacher._id === currentTeacherId);
+    if (isTeacher) {
+      // Use user._id directly (more reliable than currentTeacherId which might not be loaded yet)
+      const teacherId = user?._id || currentTeacherId;
+      if (teacherId) {
+        // Teacher can only edit courses they are assigned to
+        return course.teachers.some(teacher => teacher._id === teacherId);
+      }
     }
     return false;
   };
@@ -99,9 +103,13 @@ const CourseManagement: React.FC = () => {
   // Check if teacher can delete a specific course
   const canTeacherDeleteCourse = (course: Course) => {
     if (isAdmin) return true;
-    if (isTeacher && currentTeacherId) {
-      // Teacher can delete courses they are assigned to
-      return course.teachers.some(teacher => teacher._id === currentTeacherId);
+    if (isTeacher) {
+      // Use user._id directly (more reliable than currentTeacherId which might not be loaded yet)
+      const teacherId = user?._id || currentTeacherId;
+      if (teacherId) {
+        // Teacher can delete courses they are assigned to
+        return course.teachers.some(teacher => teacher._id === teacherId);
+      }
     }
     return false;
   };

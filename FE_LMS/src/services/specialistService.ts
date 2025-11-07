@@ -1,6 +1,21 @@
 import http from "../utils/http";
 import type { Specialist, SpecialistFilters } from "../types/specialist";
 
+export interface CreateSpecialistData {
+  name: string;
+  slug: string;
+  description: string;
+  majorId?: string;
+}
+
+export interface UpdateSpecialistData {
+  name?: string;
+  slug?: string;
+  description?: string;
+  majorId?: string;
+  isActive?: boolean;
+}
+
 export const specialistService = {
   // Get all specialists with optional filters
   getAllSpecialists: async (filters?: SpecialistFilters): Promise<{ specialists: Specialist[]; pagination: unknown }> => {
@@ -30,6 +45,23 @@ export const specialistService = {
   getSpecialistById: async (id: string): Promise<Specialist> => {
     const response = await http.get<Specialist>(`/specialists/${id}`);
     return response.data;
+  },
+
+  // Create a new specialist
+  createSpecialist: async (data: CreateSpecialistData): Promise<Specialist> => {
+    const response = await http.post<Specialist>("/specialists", data);
+    return response.data;
+  },
+
+  // Update a specialist
+  updateSpecialist: async (id: string, data: UpdateSpecialistData): Promise<Specialist> => {
+    const response = await http.patch<Specialist>(`/specialists/id/${id}`, data);
+    return response.data;
+  },
+
+  // Delete a specialist
+  deleteSpecialist: async (id: string): Promise<void> => {
+    await http.del(`/specialists/id/${id}`);
   },
 };
 
