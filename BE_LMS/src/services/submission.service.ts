@@ -76,13 +76,17 @@ export const resubmitAssignment = async (
   const assignment = await AssignmentModel.findById(assignmentId);
   appAssert(assignment, NOT_FOUND, "Assignment not found");
   //ktra quyền nộp lại
-  appAssert(assignment.allowLate, BAD_REQUEST, "Resubmission is not allowed");
+  const resubmittedAt = new Date();
+  const isLate = assignment.dueDate && resubmittedAt > assignment.dueDate;
+  if (isLate && !assignment.allowLate) {
+  appAssert(false, BAD_REQUEST, "Submission deadline has expired");
+}
 
   const submission = await SubmissionModel.findOne({ assignmentId, studentId });
   appAssert(submission, NOT_FOUND, "Submission not found");
 
-  const resubmittedAt = new Date();
-  const isLate = assignment.dueDate && resubmittedAt > assignment.dueDate;
+  // const resubmittedAt = new Date();
+  // const isLate = assignment.dueDate && resubmittedAt > assignment.dueDate;
   const prefix = prefixSubmission(assignment.courseId.toString(),assignmentId,studentId);
   const {key,originalName,mimeType,size} = await uploadFile(file,prefix);
 
@@ -102,6 +106,13 @@ export const getSubmissionStatus = async (
   studentId: string,
   assignmentId: string
 ) => {
+
+  const student = await UserModel.findOne({ _id: studentId, role: Role.STUDENT });
+  appAssert(student, NOT_FOUND, "Student not found");
+
+  const assignment = await AssignmentModel.findById(assignmentId);
+  appAssert(assignment, NOT_FOUND, "Assignment not found");
+
   const submission = await SubmissionModel.findOne({ assignmentId, studentId })
     .populate("assignmentId", "title dueDate allowLate")
     .populate("gradedBy", "fullname email");
