@@ -4,75 +4,96 @@ import appAssert from "../utils/appAssert";
 import { NOT_FOUND, BAD_REQUEST } from "../constants/http";
 import mongoose from "mongoose";
 import { SubmissionStatus } from "../types/submission.type";
+import { UserModel } from "@/models";
+import { Role } from "@/types";
+import { uploadFile } from "@/utils/uploadFile";
+import { prefixSubmission } from "@/utils/filePrefix";
 
 //submit assign
-export const submitAssignment = async (
-  studentId: string,
-  assignmentId: string,
-  key: string,
-  originalName: string,
-  mimeType?: string,
-  size?: number
-) => {
-  //ktra ass có tồn tại ko
+export const submitAssignment = async ({
+  studentId,
+  assignmentId,
+  file,
+}: {
+  studentId: string;
+  assignmentId: string;
+  file: Express.Multer.File;
+}) => {
+  const student = await UserModel.findOne({ _id: studentId, role: Role.STUDENT });
+  appAssert(student, BAD_REQUEST, "Missing user ID");
+  appAssert(file,NOT_FOUND, "File is required");
+
   const assignment = await AssignmentModel.findById(assignmentId);
   appAssert(assignment, NOT_FOUND, "Assignment not found");
 
-  //ktra nộp chưa
-  const existing = await SubmissionModel.findOne({ assignmentId, studentId });
-  if (existing) {
-  appAssert(
-    assignment.allowLate,
-    BAD_REQUEST,
-    "You already submitted and resubmission is not allowed"
-  );
-}
-
-
-  //ktra nộp trễ
+  // Kiểm tra nộp trễ
   const submittedAt = new Date();
   const isLate = assignment.dueDate && submittedAt > assignment.dueDate;
+  if (isLate && !assignment.allowLate) {
+    appAssert(false, BAD_REQUEST, "Submission deadline has expired");
+  }
+
+  // Kiểm tra đã nộp chưa
+  const existing = await SubmissionModel.findOne({ assignmentId, studentId });
+  if (existing) {
+    appAssert(
+      assignment.allowLate,
+      BAD_REQUEST,
+      "You already submitted and resubmission is not allowed"
+    );
+    return existing;
+  }
+
+  const prefix = prefixSubmission(assignment.courseId.toString(), assignmentId, studentId);
+  const { key, originalName, mimeType, size } = await uploadFile(file, prefix);
 
   const submission = await SubmissionModel.create({
     assignmentId,
     studentId,
-    key,
     originalName,
     mimeType,
-    size: size || 0,
+    size,
+    key,
     submittedAt,
     status: isLate ? SubmissionStatus.OVERDUE : SubmissionStatus.SUBMITTED,
   });
 
-  return await submission.populate("assignmentId","title dueDate");
+  return await submission.populate("assignmentId", "title dueDate");
 };
-
  //sửa bt resubmit
  // Chỉ cho phép nếu assignment.allowLate === true
 export const resubmitAssignment = async (
-  studentId: string,
+  {
+  studentId,
+  assignmentId,
+  file
+ }:{ studentId: string,
   assignmentId: string,
-  key: string,
-  originalName: string,
-  mimeType?: string,
-  size?: number
+  file:Express.Multer.File}
 ) => {
+
+  appAssert(file,NOT_FOUND, "File is required");
   const assignment = await AssignmentModel.findById(assignmentId);
   appAssert(assignment, NOT_FOUND, "Assignment not found");
-
   //ktra quyền nộp lại
-  appAssert(assignment.allowLate, BAD_REQUEST, "Resubmission is not allowed");
+  const resubmittedAt = new Date();
+  const isLate = assignment.dueDate && resubmittedAt > assignment.dueDate;
+  if (isLate && !assignment.allowLate) {
+  appAssert(false, BAD_REQUEST, "Submission deadline has expired");
+}
 
   const submission = await SubmissionModel.findOne({ assignmentId, studentId });
   appAssert(submission, NOT_FOUND, "Submission not found");
 
-  const resubmittedAt = new Date();
-  const isLate = assignment.dueDate && resubmittedAt > assignment.dueDate;
+  // const resubmittedAt = new Date();
+  // const isLate = assignment.dueDate && resubmittedAt > assignment.dueDate;
+  const prefix = prefixSubmission(assignment.courseId.toString(),assignmentId,studentId);
+  const {key,originalName,mimeType,size} = await uploadFile(file,prefix);
 
-  submission.key = key;
   submission.originalName = originalName;
-  if (mimeType) submission.mimeType = mimeType;
-  if (size !== undefined) submission.size = size;
+  submission.mimeType = mimeType;
+  submission.size = size;
+  submission.key = key;
   submission.submittedAt = resubmittedAt;
   submission.status = isLate ? SubmissionStatus.OVERDUE : SubmissionStatus.RESUBMITTED;
 
@@ -85,6 +106,13 @@ export const getSubmissionStatus = async (
   studentId: string,
   assignmentId: string
 ) => {
+
+  const student = await UserModel.findOne({ _id: studentId, role: Role.STUDENT });
+  appAssert(student, NOT_FOUND, "Student not found");
+
+  const assignment = await AssignmentModel.findById(assignmentId);
+  appAssert(assignment, NOT_FOUND, "Assignment not found");
+
   const submission = await SubmissionModel.findOne({ assignmentId, studentId })
     .populate("assignmentId", "title dueDate allowLate")
     .populate("gradedBy", "fullname email");
@@ -119,15 +147,17 @@ export const gradeSubmission = async (
   grade: number,
   feedback?: string
 ) => {
-  // 1️⃣ Kiểm tra Assignment
+  const student = await UserModel.findOne({ _id: studentId, role: Role.STUDENT });
+  appAssert(student, BAD_REQUEST, "Missing user ID");
+  //Kiểm tra Assignment
   const assignment = await AssignmentModel.findById(assignmentId);
   appAssert(assignment, NOT_FOUND, "Assignment not found");
 
-  // 2️⃣ Kiểm tra Submission
+  //Kiểm tra Submission
   const submission = await SubmissionModel.findOne({ assignmentId, studentId });
   appAssert(submission, NOT_FOUND, "Submission not found");
 
-  // 3️⃣ Validate điểm
+  // Validate điểm
   const maxScore = assignment.maxScore || 10;
   appAssert(
     grade >= 0 && grade <= maxScore,
@@ -135,14 +165,14 @@ export const gradeSubmission = async (
     `Grade must be between 0 and ${maxScore}`
   );
 
-  // 4️⃣ Cập nhật thông tin chấm điểm
+  //Cập nhật thông tin chấm điểm
   submission.grade = grade;
   submission.feedback = feedback;
   submission.gradedBy = new mongoose.Types.ObjectId(graderId);
   submission.gradedAt = new Date();
   submission.status = SubmissionStatus.GRADED;
 
-  // 5️⃣ Lưu lịch sử chấm điểm
+  // Lưu lịch sử chấm điểm
   if (!submission.gradeHistory) {
     submission.gradeHistory = [];
   }
@@ -155,7 +185,7 @@ export const gradeSubmission = async (
 
   await submission.save();
 
-  // 6️⃣ Populate thông tin trả về
+  //Populate thông tin trả về
   return await submission.populate([
     { path: "studentId", select: "fullname email" },
     { path: "gradedBy", select: "fullname email" },
