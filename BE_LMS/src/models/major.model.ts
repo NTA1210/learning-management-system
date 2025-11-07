@@ -1,4 +1,4 @@
-import IMajor from "@/types/major.type";
+import IMajor from "../types/major.type";
 import mongoose from "mongoose";
 
 const MajorSchema = new mongoose.Schema<IMajor>(

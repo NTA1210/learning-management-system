@@ -102,6 +102,10 @@ const LandingPage = () => {
     }
   };
 
+  const handleCourseClick = (slug: string) => {
+    navigate(`/courses/${slug}`);
+  };
+
   const handleMoonPositionChange = (data: { lightPosition: number[] }) => {
     setMoonLightPosition(data.lightPosition);
   };
@@ -114,7 +118,7 @@ const LandingPage = () => {
     setIsPageShaking(true);
     setTimeout(() => {
       setIsPageShaking(false);
-    }, 1000); // 3 times longer than building animation
+    }, 1000); 
   };
 
   // Open book modal when ModelViewer dispatches the event
@@ -867,6 +871,7 @@ const LandingPage = () => {
               style={{
                 backgroundColor: isDarkMode ? '#1f2937' : '#f5eaff'
               }}
+              onClick={() => handleCourseClick('html-css')}
             >
               <img
                 src={
@@ -902,6 +907,7 @@ const LandingPage = () => {
               style={{
                 backgroundColor: isDarkMode ? '#1f2937' : '#f5eaff'
               }}
+              onClick={() => handleCourseClick('html-css')}
             >
               <img
                 src={"https://files.fullstack.edu.vn/f8-prod/courses/2.png"}
@@ -935,6 +941,7 @@ const LandingPage = () => {
               style={{
                 backgroundColor: isDarkMode ? '#1f2937' : '#f5eaff'
               }}
+              onClick={() => handleCourseClick('javascript')}
             >
               <img
                 src={"https://files.fullstack.edu.vn/f8-prod/courses/3.png"}
@@ -947,7 +954,7 @@ const LandingPage = () => {
                   color: isDarkMode ? '#ffffff' : '#1c1c1c'
                 }}
               >
-                Responsive WEB
+                JavaScript
               </h3>
                 <p 
                   className="text-[14px] font-normal leading-[20px] font-poppins transition-colors duration-300"
@@ -1000,6 +1007,7 @@ const LandingPage = () => {
               style={{
                 backgroundColor: isDarkMode ? '#1f2937' : '#f5eaff'
               }}
+              onClick={() => handleCourseClick('node-expressjs')}
             >
               <img
                 src={"https://files.fullstack.edu.vn/f8-prod/courses/6.png"}
@@ -1033,6 +1041,7 @@ const LandingPage = () => {
               style={{
                 backgroundColor: isDarkMode ? '#1f2937' : '#f5eaff'
               }}
+              onClick={() => handleCourseClick('ai')}
             >
               <img
                 src={

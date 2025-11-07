@@ -1,4 +1,4 @@
-import ISpecialist from "@/types/specialist.type";
+import ISpecialist from "../types/specialist.type";
 import mongoose from "mongoose";
 
 const SpecialistSchema = new mongoose.Schema<ISpecialist>(

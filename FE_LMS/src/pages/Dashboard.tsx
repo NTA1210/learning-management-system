@@ -75,7 +75,12 @@ export default function Dashboard() {
                       color: darkMode ? '#a78bfa' : '#4f46e5'
                     }}
                   >
-                    <span>📊</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M3 3v18h18"/>
+                      <rect x="7" y="13" width="3" height="5"/>
+                      <rect x="12" y="9" width="3" height="9"/>
+                      <rect x="17" y="5" width="3" height="13"/>
+                    </svg>
                     <span>Overview</span>
                   </button>
                   <button 
@@ -93,7 +98,12 @@ export default function Dashboard() {
                       (e.target as HTMLElement).style.borderColor = 'transparent';
                     }}
                   >
-                    <span>👥</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/>
+                      <circle cx="9" cy="7" r="4"/>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
                     <span>Users</span>
                   </button>
                   <button 
@@ -111,7 +121,10 @@ export default function Dashboard() {
                       (e.target as HTMLElement).style.borderColor = 'transparent';
                     }}
                   >
-                    <span>🔐</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="3" y="11" width="18" height="10" rx="2"/>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
                     <span>Sessions</span>
                   </button>
                   <button 
@@ -129,7 +142,11 @@ export default function Dashboard() {
                       (e.target as HTMLElement).style.borderColor = 'transparent';
                     }}
                   >
-                    <span>⚠️</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                      <line x1="12" y1="9" x2="12" y2="13"/>
+                      <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
                     <span>Alerts</span>
                   </button>
                   <button 
@@ -147,7 +164,10 @@ export default function Dashboard() {
                       (e.target as HTMLElement).style.borderColor = 'transparent';
                     }}
                   >
-                    <span>⚙️</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 9 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0A1.65 1.65 0 0 0 21 12h0a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
                     <span>System</span>
                   </button>
                   <button 
@@ -165,7 +185,10 @@ export default function Dashboard() {
                       (e.target as HTMLElement).style.borderColor = 'transparent';
                     }}
                   >
-                    <span>🛠️</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M14.7 6.3a4 4 0 1 0-5.4 5.4L19 21l3-3-7.3-7.3z"/>
+                      <path d="M5 11l-3 3"/>
+                    </svg>
                     <span>Actions</span>
                   </button>
                 </nav>

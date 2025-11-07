@@ -1,4 +1,4 @@
-import { ILessonProgress } from "@/types/lessonProgress.type";
+import { ILessonProgress } from "../types/lessonProgress.type";
 import mongoose from "mongoose";
 
 const LessonProgressSchema = new mongoose.Schema<ILessonProgress>(
@@ -27,9 +27,9 @@ const LessonProgressSchema = new mongoose.Schema<ILessonProgress>(
 );
 
 //Indexes
-LessonProgressSchema.index({ userId: 1, lessonId: 1 }, { unique: true });
+LessonProgressSchema.index({ studentId: 1, lessonId: 1 }, { unique: true });
 LessonProgressSchema.index({ lessonId: 1, completedAt: 1 });
-LessonProgressSchema.index({ userId: 1, courseId: 1 });
+LessonProgressSchema.index({ studentId: 1, courseId: 1 });
 LessonProgressSchema.index({ courseId: 1, isCompleted: 1 });
 
 //Hooks

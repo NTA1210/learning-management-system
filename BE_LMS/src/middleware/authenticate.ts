@@ -4,8 +4,9 @@ import AppErrorCode from "../constants/appErrorCode";
 import { UNAUTHORIZED } from "../constants/http";
 import { verifyToken } from "../utils/jwt";
 import { SessionModel } from "@/models";
+import { catchErrors } from "../utils/asyncHandler";
 
-const authenticate: RequestHandler = async (req, res, next) => {
+const authenticate: RequestHandler = catchErrors(async (req, res, next) => {
   const accessToken = req.cookies.accessToken as string | undefined;
   appAssert(
     accessToken,
@@ -35,6 +36,6 @@ const authenticate: RequestHandler = async (req, res, next) => {
   req.role = payload.role;
   req.sessionId = payload.sessionId;
   next();
-};
+});
 
 export default authenticate;

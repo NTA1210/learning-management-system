@@ -1,4 +1,4 @@
-import IQuizQuestion, { QuizQuestionType } from "@/types/quizQuestion.type";
+import IQuizQuestion, { QuizQuestionType } from "../types/quizQuestion.type";
 import mongoose from "mongoose";
 
 export const QuizQuestionSchema = new mongoose.Schema<IQuizQuestion>(
@@ -11,14 +11,10 @@ export const QuizQuestionSchema = new mongoose.Schema<IQuizQuestion>(
     },
     text: { type: String, required: true },
     image: { type: String },
+    key: { typ: String },
     type: {
       type: String,
-      enum: [
-        QuizQuestionType.MCQ,
-        QuizQuestionType.MULTIPLE_CHOICE,
-        QuizQuestionType.TRUE_FALSE,
-        QuizQuestionType.FILL_BLANK,
-      ],
+      enum: QuizQuestionType,
       default: QuizQuestionType.MCQ,
     },
     options: [String],

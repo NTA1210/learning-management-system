@@ -83,7 +83,7 @@ describe("🔐 Auth API Integration Tests", () => {
       });
       await UserModel.findOneAndUpdate(
         { email },
-        { verified: true },
+        { isVerified: true },
         { new: true }
       );
 

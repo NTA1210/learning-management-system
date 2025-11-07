@@ -1,4 +1,4 @@
-import { ISubject } from "@/types";
+import { ISubject } from "../types";
 import mongoose from "mongoose";
 
 const SubjectSchema = new mongoose.Schema<ISubject>(
@@ -22,10 +22,14 @@ const SubjectSchema = new mongoose.Schema<ISubject>(
 // ✅ Indexes tối ưu
 SubjectSchema.index({ name: 1 }, { unique: true });
 SubjectSchema.index({ slug: 1 }, { unique: true });
+SubjectSchema.index({ code: 1 }, { unique: true });
 SubjectSchema.index({ specialistIds: 1 });
 
-// ✅ Text index (nếu có tính năng search)
-SubjectSchema.index({ name: "text", description: "text" });
+// ✅ Text index (nếu có tính năng search) + weights ưu tiên name > code > description
+SubjectSchema.index(
+  { name: "text", description: "text", code: "text" },
+  { weights: { name: 10, code: 6, description: 2 } }
+);
 
 // ✅ Hook: Tạo slug tự động
 SubjectSchema.pre("save", function (next) {

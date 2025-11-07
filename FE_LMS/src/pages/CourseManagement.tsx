@@ -7,11 +7,13 @@ import type { CourseFilters } from "../services/courseService";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { Search, Trash } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 
 const CourseManagement: React.FC = () => {
   const { darkMode } = useTheme();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -156,14 +158,15 @@ const CourseManagement: React.FC = () => {
 
       const filters: CourseFilters = {
         ...(searchTerm && { search: searchTerm }),
-        // ...(selectedTeacher && { teacherId: selectedTeacher }), // not used
         page: currentPage,
         limit: pageLimit,
         ...(isName ? { sortBy: 'title' } : {}),
         ...(order ? { sortOrder: order } : {}),
       };
       const result = await courseService.getAllCourses(filters);
-      setCourses(result.courses);
+
+      // An toàn khi set danh sách courses
+      setCourses(Array.isArray(result.courses) ? result.courses : []);
       setError("");
       if (result.pagination && typeof result.pagination === 'object') {
         if ('total' in result.pagination)
@@ -173,13 +176,20 @@ const CourseManagement: React.FC = () => {
       const categories = new Map<string, { _id: string; name: string }>();
       const teachers = new Map<string, { _id: string; username: string; email: string }>();
       
-      result.courses.forEach(course => {
-        if (course.category && !categories.has(course.category._id)) {
-          categories.set(course.category._id, { _id: course.category._id, name: course.category.name });
+      (Array.isArray(result.courses) ? result.courses : []).forEach(course => {
+        const cat = course.category;
+        if (cat && cat._id && !categories.has(cat._id)) {
+          categories.set(cat._id, { _id: cat._id, name: cat.name });
         }
-        course.teachers.forEach(teacher => {
-          if (!teachers.has(teacher._id)) {
-            teachers.set(teacher._id, { _id: teacher._id, username: teacher.username, email: teacher.email });
+
+        const courseTeachers = Array.isArray(course.teachers) ? course.teachers : [];
+        courseTeachers.forEach(teacher => {
+          if (teacher && teacher._id && !teachers.has(teacher._id)) {
+            teachers.set(teacher._id, {
+              _id: teacher._id,
+              username: teacher.username ?? "",
+              email: teacher.email ?? ""
+            });
           }
         });
       });
@@ -241,7 +251,7 @@ const CourseManagement: React.FC = () => {
     setCategorySearchTerm(course.category?.name || "");
     setShowEditModal(true);
   };
-
+  console.log('courses', courses);
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -771,14 +781,12 @@ const CourseManagement: React.FC = () => {
                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: darkMode ? '#6b7280' : '#9ca3af' }}>
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
-                        <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                          {course.teachers.length} teacher{course.teachers.length !== 1 ? 's' : ''}
-                        </span>
+                     
                       </div>
                     </div>
 
                     {/* Teachers List */}
-                    {course.teachers.length > 0 && (
+                    {course?.teachers?.length > 0 && (
                       <div className="mb-4">
                         <div className="flex flex-wrap gap-2">
                           {course.teachers.map((teacher) => (
@@ -813,8 +821,9 @@ const CourseManagement: React.FC = () => {
                           e.currentTarget.style.backgroundColor = darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff';
                           e.currentTarget.style.transform = 'scale(1)';
                         }}
-                        onClick={() => openDetail(course)}
+                        onClick={() => navigate(`/courses/${course._id}`)}
                       >
+                        {/* Điều hướng đến page chi tiết bằng _id */}
                         {isStudent ? 'View Course' : 'View Details'}
                       </button>
                       {canTeacherEditCourse(course) && (

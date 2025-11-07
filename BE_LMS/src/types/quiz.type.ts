@@ -5,11 +5,14 @@ export default interface IQuiz extends mongoose.Document {
   courseId: mongoose.Types.ObjectId;
   title: string;
   description?: string;
-  timeLimitMinutes?: number;
+  startTime: Date;
+  endTime: Date;
   shuffleQuestions?: boolean;
   questionIds: mongoose.Types.ObjectId[];
   snapshotQuestions: IQuizQuestion[] | [];
   isPublished?: boolean;
+  isCompleted?: boolean;
+  createdBy?: mongoose.Types.ObjectId;
   createdAt?: Date;
   updatedAt?: Date;
   createSnapshot(): void;

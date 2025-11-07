@@ -12,6 +12,7 @@ import {DashboardPage ,
   CourseManagementPage,
   AboutUsPage,
   FAQPage,
+  CourseDetailPage,
 } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import ProtectedRoute from "../components/ProtectedRoute";
@@ -22,9 +23,15 @@ function AppRoutes() {
   return (
     <Router>
       <Routes>
+        {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
-        
-        {/* Auth pages */}
+        {/* Trang chi tiết khóa học */}
+        <Route path="/courses/:id" element={
+          <ProtectedRoute>
+            <CourseDetailPage />
+          </ProtectedRoute>
+        } />
+        {/* Auth routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/email-verify" element={<EmailVerifyPage />} />

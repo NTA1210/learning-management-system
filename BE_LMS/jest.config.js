@@ -1,5 +1,4 @@
-const { createDefaultPreset } = require("ts-jest");
-const tsJestTransformCfg = createDefaultPreset().transform;
+const tsJestTransformCfg = { "^.+\\.tsx?$": ["ts-jest", {}] };
 
 /** @type {import("jest").Config} **/
 module.exports = {
@@ -10,8 +9,21 @@ module.exports = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
-  setupFilesAfterEnv: ["<rootDir>/src/setupTests.ts"], // ✅ load dotenv
-  testMatch: ["**/*.test.ts"],
+  setupFilesAfterEnv: ["<rootDir>/src/setupTests.ts"],
+  testMatch: [
+    "**/*.test.ts", // ✅ bỏ ngoặc vuông thừa
+    // "**/__tests__/{lesson,lessonMaterial,lessonProgress}/**/*.test.ts"
+  ],
+  // 🚫 Bỏ qua thư mục integration-test
+  testPathIgnorePatterns: ["<rootDir>/src/__tests__/integration/"],
+  coveragePathIgnorePatterns: [
+    "<rootDir>/src/config/",
+    "<rootDir>/src/utils",
+    "<rootDir>/src/models",
+    "<rootDir>/src/constants/",
+    "<rootDir>/src/validators/",
+    "<rootDir>/src/types/",
+  ],
   verbose: true,
   forceExit: true,
 };

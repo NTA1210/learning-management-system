@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { IForum } from "../types";
+import { ForumType } from "@/types/forum.type";
 
 const ForumSchema = new mongoose.Schema<IForum>(
   {
@@ -11,6 +12,7 @@ const ForumSchema = new mongoose.Schema<IForum>(
     },
     title: { type: String, required: true },
     description: { type: String },
+    forumType: { type: String, enum: ForumType, default: ForumType.DISCUSSION },
     isActive: { type: Boolean, default: true },
     isArchived: { type: Boolean, default: false },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

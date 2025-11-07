@@ -7,9 +7,7 @@ const MaterialTypeEnum = z.enum(["pdf", "video", "ppt", "link", "other"]);
 export const LessonMaterialQuerySchema = z.object({
   title: z.string().optional(),
   type: MaterialTypeEnum.optional(),
-  fileUrl: z.string().optional(),
-  fileName: z.string().optional(),
-  sizeBytes: z.coerce.number().int().positive().optional(),
+  size: z.coerce.number().int().positive().optional(),
   uploadedBy: z.string().optional(),
   lessonId: z.string().min(1).optional(),
   search: z.string().optional(), // For full-text search
@@ -18,14 +16,17 @@ export const LessonMaterialQuerySchema = z.object({
 });
 
 // Schema for creating lesson material
+// Note: uploadedBy is automatically set from auth, type is only for filtering
 export const CreateLessonMaterialSchema = z.object({
   lessonId: z.string().min(1, "Lesson ID is required"),
   title: z.string().min(1, "Title is required").max(255, "Title too long"),
-  type: MaterialTypeEnum.default("other"),
-  fileUrl: z.string().url("Invalid URL format").optional(),
-  fileName: z.string().max(255, "File name too long").optional(),
-  sizeBytes: z.number().int().positive("File size must be positive").optional(),
-});
+  note: z.string().optional(),
+  // Optional fields for full material creation
+  originalName: z.string().optional(),
+  mimeType: z.string().optional(),
+  size: z.coerce.number().int().nonnegative().optional(),
+  key: z.string().optional(), // If not provided, will auto-generate manual-materials/{lessonId}/{uuid}
+}).passthrough(); // Allow unknown fields but ignore them
 
 // Schema for updating lesson material
 export const UpdateLessonMaterialSchema = CreateLessonMaterialSchema.partial().omit({ lessonId: true });
