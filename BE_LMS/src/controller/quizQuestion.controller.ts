@@ -2,9 +2,13 @@ import { CREATED, NOT_FOUND, OK } from "@/constants/http";
 import { QuizQuestionModel } from "@/models";
 import {
   createQuizQuestion,
+  deleteMultipleQuizQuestions,
+  deleteQuizQuestion,
   exportXMLFile,
   getAllQuizQuestions,
+  getRandomQuestions,
   importXMLFile,
+  updateQuizQuestion,
 } from "@/services/quizQuestion.service";
 import IQuizQuestion from "@/types/quizQuestion.type";
 import appAssert from "@/utils/appAssert";
@@ -13,7 +17,11 @@ import {
   createQuizQuestionSchema,
   importQuizQuestionParamsSchema,
   listQuizQuestionSchema,
+  multiQuizQuestionIdSchema,
+  quizQuestionIdSchema,
+  randomQuizQuestionSchema,
   subjectIdSchema,
+  updateQuizQuestionSchema,
 } from "@/validators/quizQuestion.schemas";
 
 // POST /quiz-questions/import - Import questions from XML file
@@ -91,5 +99,55 @@ export const createQuizQuestionHandler = catchErrors(async (req, res) => {
   res.success(CREATED, {
     data,
     message: "Question created successfully",
+  });
+});
+
+//PUT /quiz-questions/:quizQuestionId - Update a question
+export const updateQuizQuestionByIdHandler = catchErrors(async (req, res) => {
+  const file = req.file;
+  const input = updateQuizQuestionSchema.parse({
+    ...req.body,
+    image: file,
+    quizQuestionId: req.params.quizQuestionId,
+  });
+  const data = await updateQuizQuestion(input);
+
+  res.success(CREATED, {
+    data,
+    message: "Question updated successfully",
+  });
+});
+
+//DELETE /quiz-questions/:quizQuestionId - Delete a question
+export const deleteQuizQuestionByIdHandler = catchErrors(async (req, res) => {
+  const quizQuestionId = quizQuestionIdSchema.parse(req.params.quizQuestionId);
+
+  const data = await deleteQuizQuestion(quizQuestionId);
+
+  return res.success(OK, {
+    data,
+    message: "Question deleted successfully",
+  });
+});
+
+//DELETE /quiz-questions - Delete multiple questions
+export const deleteMultiQuizQuestionByIdHandler = catchErrors(
+  async (req, res) => {
+    const ids = multiQuizQuestionIdSchema.parse(req.body.ids);
+    const data = await deleteMultipleQuizQuestions(ids);
+    return res.success(OK, {
+      data,
+      message: "Question deleted successfully",
+    });
+  }
+);
+
+// GET /quiz-questions/random - Get random questions
+export const getRandomQuestionsHandler = catchErrors(async (req, res) => {
+  const input = randomQuizQuestionSchema.parse(req.query);
+  const data = await getRandomQuestions(input);
+  return res.success(OK, {
+    data,
+    message: "Questions retrieved successfully",
   });
 });

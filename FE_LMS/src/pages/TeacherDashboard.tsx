@@ -217,7 +217,13 @@ export default function TeacherDashboard() {
                 className="text-xl font-semibold mb-4"
                 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}
               >
-                Welcome back! 👨‍🏫
+                <span className="inline-flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <circle cx="12" cy="7" r="4"/>
+                    <path d="M6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
+                  </svg>
+                  Welcome back!
+                </span>
               </h2>
               <p
                 style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
