@@ -9,10 +9,7 @@ module.exports = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
-  setupFilesAfterEnv: [
-    "<rootDir>/src/setupTests.ts", // ✅ bỏ ngoặc vuông thừa
-    // "<rootDir>/src/setupTests.unit.ts",
-  ],
+  setupFilesAfterEnv: ["<rootDir>/src/setupTests.ts"],
   testMatch: [
     "**/*.test.ts", // ✅ bỏ ngoặc vuông thừa
     // "**/__tests__/{lesson,lessonMaterial,lessonProgress}/**/*.test.ts"

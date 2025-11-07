@@ -10,6 +10,6 @@ export default interface ISubject
   credits: number;
   isActive?: boolean;
   prerequisites?: mongoose.Types.ObjectId[];
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
 }

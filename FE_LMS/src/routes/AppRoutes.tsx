@@ -26,7 +26,12 @@ function AppRoutes() {
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
-        <Route path="/courses/:slug" element={<CourseDetailPage />} />
+        {/* Trang chi tiết khóa học */}
+        <Route path="/courses/:id" element={
+          <ProtectedRoute>
+            <CourseDetailPage />
+          </ProtectedRoute>
+        } />
         {/* Auth routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />

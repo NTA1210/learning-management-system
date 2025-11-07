@@ -80,6 +80,59 @@ describe("📎 LessonMaterial Service Unit Tests", () => {
       expect(result.pagination.total).toBe(1);
     });
 
+    it("admin filters by title", async () => {
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([material]),
+      };
+      (LessonMaterialModel.find as any).mockReturnValue(mockQuery);
+      (LessonMaterialModel.countDocuments as any).mockResolvedValue(1);
+
+      const result = await getLessonMaterials({ page: 1, limit: 10, title: "Doc" }, userIds.admin, Role.ADMIN);
+      expect(LessonMaterialModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({ title: { $regex: "Doc", $options: "i" } })
+      );
+    });
+
+    it("teacher sees materials from their courses or uploaded by them", async () => {
+      // Mock teacher courses
+      const teacherCourses = [{ _id: courseId }];
+      const mockCourseQuery = {
+        select: jest.fn().mockResolvedValue(teacherCourses),
+      };
+      (CourseModel.find as any).mockReturnValue(mockCourseQuery);
+
+      // Mock teacher lessons
+      const teacherLessons = [{ _id: lessonId }];
+      const mockLessonQuery = {
+        select: jest.fn().mockResolvedValue(teacherLessons),
+      };
+      (LessonModel.find as any).mockReturnValue(mockLessonQuery);
+
+      // Mock materials query
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([material]),
+      };
+      (LessonMaterialModel.find as any).mockReturnValue(mockQuery);
+      (LessonMaterialModel.countDocuments as any).mockResolvedValue(1);
+
+      // Mock for access checks inside map
+      (LessonModel.findById as any).mockReturnValue({ 
+        populate: jest.fn().mockResolvedValue({ courseId: { _id: courseId, teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } }) 
+      });
+      (EnrollmentModel.findOne as any).mockResolvedValue(null);
+      
+      const result = await getLessonMaterials({ page: 1, limit: 10 }, userIds.teacher, Role.TEACHER);
+      expect(result.materials).toBeDefined();
+    });
+
     it("student filtered by enrolled lessons", async () => {
       (EnrollmentModel.find as any).mockReturnValue({ select: jest.fn().mockResolvedValue([{ courseId }]) });
       (LessonModel.find as any).mockReturnValue({ select: jest.fn().mockResolvedValue([{ _id: lessonId }]) });
@@ -109,14 +162,66 @@ describe("📎 LessonMaterial Service Unit Tests", () => {
       expect(result).toHaveLength(1);
     });
 
+    it("teacher instructor gets all materials", async () => {
+      (LessonModel.findById as any).mockReturnValue({ 
+        populate: jest.fn().mockResolvedValue({ 
+          ...lesson, 
+          courseId: { _id: courseId, teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } 
+        }) 
+      });
+      (LessonMaterialModel.find as any).mockReturnValue({ 
+        populate: jest.fn().mockReturnThis(), 
+        sort: jest.fn().mockReturnThis(), 
+        lean: jest.fn().mockResolvedValue([material]) 
+      });
+      const result = await getLessonMaterialsByLesson(lessonId.toString(), userIds.teacher, Role.TEACHER);
+      expect(result).toHaveLength(1);
+    });
+
+    it("teacher non-instructor gets only own materials", async () => {
+      const otherTeacherId = new mongoose.Types.ObjectId();
+      (LessonModel.findById as any).mockReturnValue({ 
+        populate: jest.fn().mockResolvedValue({ 
+          ...lesson, 
+          courseId: { _id: courseId, teacherIds: [otherTeacherId] } 
+        }) 
+      });
+      (LessonMaterialModel.find as any).mockReturnValue({ 
+        populate: jest.fn().mockReturnThis(), 
+        sort: jest.fn().mockReturnThis(), 
+        lean: jest.fn().mockResolvedValue([material]) 
+      });
+      const result = await getLessonMaterialsByLesson(lessonId.toString(), userIds.teacher, Role.TEACHER);
+      expect(LessonMaterialModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({ uploadedBy: userIds.teacher })
+      );
+    });
+
     it("student must be enrolled", async () => {
       (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ ...lesson }) });
       (EnrollmentModel.findOne as any).mockResolvedValue(null);
       await expect(getLessonMaterialsByLesson(lessonId.toString(), userIds.student, Role.STUDENT)).rejects.toThrow("Not enrolled in this course");
     });
+
+    it("throws error for invalid lesson ID", async () => {
+      await expect(getLessonMaterialsByLesson("invalid", userIds.admin, Role.ADMIN)).rejects.toThrow("Invalid lesson ID format");
+    });
+
+    it("throws error when lesson not found", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue(null) });
+      await expect(getLessonMaterialsByLesson(lessonId.toString(), userIds.admin, Role.ADMIN)).rejects.toThrow("Lesson not found");
+    });
   });
 
   describe("getLessonMaterialById", () => {
+    it("admin has access", async () => {
+      const m = { ...material, key: "files/a.pdf" };
+      (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(m) });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [] } }) });
+      const result = await getLessonMaterialById(materialId.toString(), userIds.admin, Role.ADMIN);
+      expect(result.hasAccess).toBe(true);
+    });
+
     it("teacher uploader has access and gets signed url if not manual", async () => {
       const m = { ...material, key: "files/a.pdf", uploadedBy: { _id: new mongoose.Types.ObjectId(userIds.uploader) } };
       (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(m) });
@@ -125,10 +230,47 @@ describe("📎 LessonMaterial Service Unit Tests", () => {
       expect(result.hasAccess).toBe(true);
       expect(result.signedUrl).toBeDefined();
     });
+
+    it("teacher instructor has access", async () => {
+      const m = { ...material, key: "files/a.pdf" };
+      (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(m) });
+      // Mock teacherIds as array with includes method that compares by value
+      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      teacherIdsArray.includes = jest.fn((id: any) => {
+        return teacherIdsArray.some(tid => tid.toString() === id.toString());
+      });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: teacherIdsArray } }) });
+      const result = await getLessonMaterialById(materialId.toString(), userIds.teacher, Role.TEACHER);
+      expect(result.hasAccess).toBe(true);
+    });
+
+    it("student enrolled has access", async () => {
+      const m = { ...material, key: "files/a.pdf" };
+      (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(m) });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { _id: courseId } }) });
+      (EnrollmentModel.findOne as any).mockResolvedValue({ studentId: userIds.student, courseId, status: "active" });
+      const result = await getLessonMaterialById(materialId.toString(), userIds.student, Role.STUDENT);
+      expect(result.hasAccess).toBe(true);
+    });
+
+    it("student not enrolled has no access", async () => {
+      const m = { ...material, key: "files/a.pdf" };
+      (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(m) });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { _id: courseId } }) });
+      (EnrollmentModel.findOne as any).mockResolvedValue(null);
+      const result = await getLessonMaterialById(materialId.toString(), userIds.student, Role.STUDENT);
+      expect(result.hasAccess).toBe(false);
+    });
+
+    it("throws error when material not found", async () => {
+      const validMaterialId = new mongoose.Types.ObjectId().toString();
+      (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(null) });
+      await expect(getLessonMaterialById(validMaterialId, userIds.admin, Role.ADMIN)).rejects.toThrow("Material not found");
+    });
   });
 
   describe("createLessonMaterial", () => {
-    it("teacher instructor can create manual material", async () => {
+    it("admin can create manual material", async () => {
       (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } }) });
       (LessonMaterialModel.exists as any).mockResolvedValue(null);
       (LessonMaterialModel.create as any).mockResolvedValue({ _id: materialId });
@@ -138,10 +280,46 @@ describe("📎 LessonMaterial Service Unit Tests", () => {
       const result = await createLessonMaterial(data, userIds.admin, Role.ADMIN);
       expect(result).toBeDefined();
     });
+
+    it("teacher instructor can create manual material", async () => {
+      // Mock teacherIds with custom includes that compares by value
+      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      teacherIdsArray.includes = jest.fn((id: any) => {
+        return teacherIdsArray.some(tid => tid.toString() === id.toString());
+      });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: teacherIdsArray } }) });
+      (LessonMaterialModel.exists as any).mockResolvedValue(null);
+      (LessonMaterialModel.create as any).mockResolvedValue({ _id: materialId });
+      (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(material) });
+
+      const data = { lessonId: lessonId.toString(), title: "Doc 1", note: "n" } as any;
+      const result = await createLessonMaterial(data, userIds.teacher, Role.TEACHER);
+      expect(result).toBeDefined();
+    });
+
+    it("throws error when lesson not found", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue(null) });
+      const data = { lessonId: lessonId.toString(), title: "Doc 1" } as any;
+      await expect(createLessonMaterial(data, userIds.admin, Role.ADMIN)).rejects.toThrow("Lesson not found");
+    });
+
+    it("throws error when title conflict exists", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } }) });
+      (LessonMaterialModel.exists as any).mockResolvedValue({ _id: materialId });
+      const data = { lessonId: lessonId.toString(), title: "Doc 1" } as any;
+      await expect(createLessonMaterial(data, userIds.admin, Role.ADMIN)).rejects.toThrow("Material with this title already exists");
+    });
+
+    it("throws error when unauthorized (not instructor)", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [] } }) });
+      (LessonMaterialModel.exists as any).mockResolvedValue(null);
+      const data = { lessonId: lessonId.toString(), title: "Doc 1" } as any;
+      await expect(createLessonMaterial(data, userIds.teacher, Role.TEACHER)).rejects.toThrow("Only course instructors can add materials");
+    });
   });
 
   describe("updateLessonMaterial", () => {
-    it("instructor updates title", async () => {
+    it("admin updates title", async () => {
       (LessonMaterialModel.findById as any).mockResolvedValue({ ...material });
       (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } }) });
       (LessonMaterialModel.exists as any).mockResolvedValue(null);
@@ -149,6 +327,40 @@ describe("📎 LessonMaterial Service Unit Tests", () => {
 
       const res = await updateLessonMaterial(materialId.toString(), { title: "New" }, userIds.admin, Role.ADMIN);
       expect(res?.title).toBe("New");
+    });
+
+    it("instructor updates title", async () => {
+      (LessonMaterialModel.findById as any).mockResolvedValue({ ...material });
+      // Mock teacherIds with custom includes that compares by value
+      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      teacherIdsArray.includes = jest.fn((id: any) => {
+        return teacherIdsArray.some(tid => tid.toString() === id.toString());
+      });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: teacherIdsArray } }) });
+      (LessonMaterialModel.exists as any).mockResolvedValue(null);
+      (LessonMaterialModel.findByIdAndUpdate as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue({ ...material, title: "New" }) });
+
+      const res = await updateLessonMaterial(materialId.toString(), { title: "New" }, userIds.teacher, Role.TEACHER);
+      expect(res?.title).toBe("New");
+    });
+
+    it("throws error when material not found", async () => {
+      const validMaterialId = new mongoose.Types.ObjectId().toString();
+      (LessonMaterialModel.findById as any).mockResolvedValue(null);
+      await expect(updateLessonMaterial(validMaterialId, { title: "New" }, userIds.admin, Role.ADMIN)).rejects.toThrow("Material not found");
+    });
+
+    it("throws error when title conflict exists", async () => {
+      (LessonMaterialModel.findById as any).mockResolvedValue({ ...material, title: "Old Title" });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } }) });
+      (LessonMaterialModel.exists as any).mockResolvedValue({ _id: new mongoose.Types.ObjectId() });
+      await expect(updateLessonMaterial(materialId.toString(), { title: "Existing Title" }, userIds.admin, Role.ADMIN)).rejects.toThrow("Material with this title already exists");
+    });
+
+    it("throws error when unauthorized (not instructor)", async () => {
+      (LessonMaterialModel.findById as any).mockResolvedValue({ ...material });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [] } }) });
+      await expect(updateLessonMaterial(materialId.toString(), { title: "New" }, userIds.teacher, Role.TEACHER)).rejects.toThrow("Not authorized");
     });
   });
 
@@ -159,10 +371,35 @@ describe("📎 LessonMaterial Service Unit Tests", () => {
       const res = await deleteLessonMaterial(materialId.toString(), userIds.admin, Role.ADMIN);
       expect(res).toBeDefined();
     });
+
+    it("instructor deletes", async () => {
+      (LessonMaterialModel.findById as any).mockResolvedValue({ ...material });
+      // Mock teacherIds with custom includes that compares by value
+      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      teacherIdsArray.includes = jest.fn((id: any) => {
+        return teacherIdsArray.some(tid => tid.toString() === id.toString());
+      });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: teacherIdsArray } }) });
+      (LessonMaterialModel.findByIdAndDelete as any).mockResolvedValue(material);
+      const res = await deleteLessonMaterial(materialId.toString(), userIds.teacher, Role.TEACHER);
+      expect(res).toBeDefined();
+    });
+
+    it("throws error when material not found", async () => {
+      const validMaterialId = new mongoose.Types.ObjectId().toString();
+      (LessonMaterialModel.findById as any).mockResolvedValue(null);
+      await expect(deleteLessonMaterial(validMaterialId, userIds.admin, Role.ADMIN)).rejects.toThrow("Material not found");
+    });
+
+    it("throws error when unauthorized (not instructor)", async () => {
+      (LessonMaterialModel.findById as any).mockResolvedValue({ ...material });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [] } }) });
+      await expect(deleteLessonMaterial(materialId.toString(), userIds.teacher, Role.TEACHER)).rejects.toThrow("Not authorized");
+    });
   });
 
   describe("uploadLessonMaterial", () => {
-    it("single file upload by instructor", async () => {
+    it("single file upload by admin", async () => {
       (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ _id: lessonId, courseId: { _id: courseId, teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } }) });
       (LessonMaterialModel.exists as any).mockResolvedValue(null);
       (LessonMaterialModel.create as any).mockResolvedValue({ _id: materialId });
@@ -170,6 +407,22 @@ describe("📎 LessonMaterial Service Unit Tests", () => {
 
       const file = { size: 10 } as any;
       const res = await uploadLessonMaterial({ lessonId: lessonId.toString(), title: "A" }, file, userIds.admin, Role.ADMIN);
+      expect(res).toBeDefined();
+    });
+
+    it("single file upload by instructor", async () => {
+      // Mock teacherIds with custom includes that compares by value
+      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      teacherIdsArray.includes = jest.fn((id: any) => {
+        return teacherIdsArray.some(tid => tid.toString() === id.toString());
+      });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ _id: lessonId, courseId: { _id: courseId, teacherIds: teacherIdsArray } }) });
+      (LessonMaterialModel.exists as any).mockResolvedValue(null);
+      (LessonMaterialModel.create as any).mockResolvedValue({ _id: materialId });
+      (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(material) });
+
+      const file = { size: 10 } as any;
+      const res = await uploadLessonMaterial({ lessonId: lessonId.toString(), title: "A" }, file, userIds.teacher, Role.TEACHER);
       expect(res).toBeDefined();
     });
 
@@ -181,6 +434,18 @@ describe("📎 LessonMaterial Service Unit Tests", () => {
       const res = await uploadLessonMaterial({ lessonId: lessonId.toString(), title: "A" }, files, userIds.admin, Role.ADMIN);
       expect(Array.isArray(res)).toBe(true);
     });
+
+    it("throws error when lesson not found", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue(null) });
+      const file = { size: 10 } as any;
+      await expect(uploadLessonMaterial({ lessonId: lessonId.toString(), title: "A" }, file, userIds.admin, Role.ADMIN)).rejects.toThrow("Lesson not found");
+    });
+
+    it("throws error when unauthorized (not instructor)", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ _id: lessonId, courseId: { _id: courseId, teacherIds: [] } }) });
+      const file = { size: 10 } as any;
+      await expect(uploadLessonMaterial({ lessonId: lessonId.toString(), title: "A" }, file, userIds.teacher, Role.TEACHER)).rejects.toThrow("Only course instructors can upload materials");
+    });
   });
 
   describe("getMaterialForDownload", () => {
@@ -188,6 +453,12 @@ describe("📎 LessonMaterial Service Unit Tests", () => {
       (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(material) });
       const res = await getMaterialForDownload(materialId.toString());
       expect(res).toBeDefined();
+    });
+
+    it("throws error when material not found", async () => {
+      const validMaterialId = new mongoose.Types.ObjectId().toString();
+      (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(null) });
+      await expect(getMaterialForDownload(validMaterialId)).rejects.toThrow("Material not found");
     });
   });
 });
