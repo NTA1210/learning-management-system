@@ -23,39 +23,35 @@ import { create } from "xmlbuilder";
  * @returns Promise resolving to an array of imported questions.
  */
 export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
-  // 1️⃣ Convert buffer → string
+  const subject = await SubjectModel.findById(subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+
   const xmlContent = xmlBuffer.toString("utf-8");
 
-  // 2️⃣ Parse XML → JSON
   const result = await parseStringPromise(xmlContent, {
     explicitArray: true,
     trim: true,
   });
+
   const questions = result.quiz?.question || [];
-
-  const importedQuestions = [];
   const importedTypes = new Set<QuizQuestionType>();
+  const questionDocs = [];
 
-  // 3️⃣ Duyệt từng câu hỏi
   for (const q of questions) {
     const typeAttr = q.$?.type || "mcq";
     if (typeAttr === "category") continue;
 
-    // Tên và text câu hỏi
     const questionName = q.name?.[0]?.text?.[0] || "Unnamed question";
     const questionText = q.questiontext?.[0]?.text?.[0] || "";
 
-    // Loại câu hỏi
     let type = QuizQuestionType.MCQ;
     if (typeAttr === "truefalse") type = QuizQuestionType.TRUE_FALSE;
     else if (typeAttr === "multichoice")
       type = QuizQuestionType.MULTIPLE_CHOICE;
     else if (typeAttr === "shortanswer") type = QuizQuestionType.FILL_BLANK;
 
-    // Kiem tra loai cau hoi
     importedTypes.add(type);
 
-    // Đáp án
     const answers = q.answer || [];
     const options: string[] = [];
     const correctOptions: number[] = [];
@@ -64,12 +60,10 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
       const text = ans.text?.[0] || "";
       const fraction = parseFloat(ans.$?.fraction || "0");
       options.push(text);
-      if (fraction > 0) correctOptions.push(1);
-      else correctOptions.push(0);
+      correctOptions.push(fraction > 0 ? 1 : 0);
     });
 
-    // Tạo object câu hỏi
-    const newQuestion = new QuizQuestionModel({
+    questionDocs.push({
       subjectId,
       text: questionText || questionName,
       type,
@@ -78,14 +72,15 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
       points: parseFloat(q.defaultgrade?.[0] || "1"),
       explanation: "",
     });
-
-    await newQuestion.save();
-    importedQuestions.push(newQuestion);
   }
+
+  // ✅ Thay vì save từng cái, insert 1 lần
+  const importedQuestions = await QuizQuestionModel.insertMany(questionDocs);
+
   return {
     data: importedQuestions,
     total: importedQuestions.length,
-    importedTypes: importedTypes,
+    importedTypes,
   };
 };
 
@@ -94,12 +89,20 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
  * @param quizQuestions Array of questions to export.
  * @returns Object containing XML string and total number of questions.
  */
-export const exportXMLFile = async (
-  quizQuestions: IQuizQuestion[],
-  subjectId: string
-) => {
+export const exportXMLFile = async (subjectId: string) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
+
+  const quizQuestions = await QuizQuestionModel.find({
+    subjectId,
+  }).lean<IQuizQuestion[]>();
+
+  appAssert(
+    quizQuestions.length > 0,
+    NOT_FOUND,
+    "No questions found for this subject"
+  );
+
   const subjectCode = subject.code;
 
   const root = create({ version: "1.0", encoding: "UTF-8" }).ele("quiz");
