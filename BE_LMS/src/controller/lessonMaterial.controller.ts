@@ -19,8 +19,9 @@ import {
   UploadMaterialSchema
   
 } from "../validators/lessonMaterial.shemas";
-import { OK } from "../constants/http";
+import { BAD_REQUEST, FORBIDDEN, NOT_FOUND, OK } from "../constants/http";
 import { Role } from "../types";
+import appAssert from "@/utils/appAssert";
 
 // Get all lesson materials with filtering
 export const listAllLessonMaterialsController = catchErrors(async (req, res) => {
@@ -147,12 +148,7 @@ export const uploadLessonMaterialController = catchErrors(async (req: any, res) 
   }
   
   if (!file) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "No file uploaded"
-      });
+    appAssert(false, BAD_REQUEST, "No file uploaded");
   }
 
   // Parse form data
@@ -190,12 +186,7 @@ export const downloadLessonMaterialController = catchErrors(async (req, res) => 
   const material = await getLessonMaterialById(validatedParams.id, userId, userRole);
   
   if (!material.hasAccess) {
-    return res
-      .status(403)
-      .json({
-        success: false,
-        message: "You don't have permission to download this material"
-      });
+    appAssert(false, FORBIDDEN, "You don't have permission to download this material");
   }
 
   // Get material for download
@@ -203,12 +194,7 @@ export const downloadLessonMaterialController = catchErrors(async (req, res) => 
 
   // Check if material has a file (not a manual material without file)
   if (!downloadMaterial.key || downloadMaterial.key.startsWith('manual-materials/')) {
-    return res
-      .status(404)
-      .json({
-        success: false,
-        message: "This material does not have a file to download"
-      });
+   appAssert(false, NOT_FOUND, "This material does not have a file to download");
   }
 
   const signedUrl = await getSignedUrl(
