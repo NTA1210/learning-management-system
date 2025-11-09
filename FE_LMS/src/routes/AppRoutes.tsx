@@ -1,18 +1,19 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import {DashboardPage ,
-  StudentDashboardPage,
-  TeacherDashboardPage,
-  LandingPage,
-  NotFoundPage,
-  EmailVerifyPage,
-  ForgotPasswordPage,
-  ResetPasswordPage,
-  LoginPage,
-  RegisterPage,
-  CourseManagementPage,
-  ListAllLessonsPage,
-} from "../pages";
+      StudentDashboardPage,
+      TeacherDashboardPage,
+      LandingPage,
+      NotFoundPage,
+      EmailVerifyPage,
+      ForgotPasswordPage,
+      ResetPasswordPage,
+      LoginPage,
+      RegisterPage,
+      CourseManagementPage,
+      ListAllLessonsPage,
+    } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
+import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
 import ProtectedRoute from "../components/ProtectedRoute";
 import Profile from "../pages/profile";
 
@@ -71,6 +72,11 @@ function AppRoutes() {
         <Route path="/materials" element={
           <ProtectedRoute>
             <ListAllLessonsPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/materials/:lessonId" element={
+          <ProtectedRoute>
+            <LessonMaterialDetailPage />
           </ProtectedRoute>
         } />
 
