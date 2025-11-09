@@ -7,11 +7,19 @@ import type { CourseFilters } from "../services/courseService";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { Search, Trash } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+
+// Constant: Subject options for course creation
+const SUBJECT_OPTIONS = [
+  { label: 'Introduction to JavaScript', id: '690ca6e23f693bc2ef752c9c' },
+  { label: 'UI/UX Design Fundamentals', id: '690ca6e23f693bc2ef752c9d' },
+];
 
 
 const CourseManagement: React.FC = () => {
   const { darkMode } = useTheme();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -30,10 +38,17 @@ const CourseManagement: React.FC = () => {
   const [formData, setFormData] = useState({
     title: "",
     code: "",
+    subjectId: "",
     description: "",
-    category: "",
+    logo: "",
+    startDate: "",
+    endDate: "",
     isPublished: false,
+    enrollRequiresApproval: true,
     capacity: 0,
+    status: "draft",
+    metaLevel: "",
+    metaDuration: "",
   });
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailCourse, setDetailCourse] = useState<Course | null>(null);
@@ -156,14 +171,15 @@ const CourseManagement: React.FC = () => {
 
       const filters: CourseFilters = {
         ...(searchTerm && { search: searchTerm }),
-        // ...(selectedTeacher && { teacherId: selectedTeacher }), // not used
         page: currentPage,
         limit: pageLimit,
         ...(isName ? { sortBy: 'title' } : {}),
         ...(order ? { sortOrder: order } : {}),
       };
       const result = await courseService.getAllCourses(filters);
-      setCourses(result.courses);
+
+      // An toàn khi set danh sách courses
+      setCourses(Array.isArray(result.courses) ? result.courses : []);
       setError("");
       if (result.pagination && typeof result.pagination === 'object') {
         if ('total' in result.pagination)
@@ -173,13 +189,20 @@ const CourseManagement: React.FC = () => {
       const categories = new Map<string, { _id: string; name: string }>();
       const teachers = new Map<string, { _id: string; username: string; email: string }>();
       
-      result.courses.forEach(course => {
-        if (course.category && !categories.has(course.category._id)) {
-          categories.set(course.category._id, { _id: course.category._id, name: course.category.name });
+      (Array.isArray(result.courses) ? result.courses : []).forEach(course => {
+        const cat = course.category;
+        if (cat && cat._id && !categories.has(cat._id)) {
+          categories.set(cat._id, { _id: cat._id, name: cat.name });
         }
-        course.teachers.forEach(teacher => {
-          if (!teachers.has(teacher._id)) {
-            teachers.set(teacher._id, { _id: teacher._id, username: teacher.username, email: teacher.email });
+
+        const courseTeachers = Array.isArray(course.teachers) ? course.teachers : [];
+        courseTeachers.forEach(teacher => {
+          if (teacher && teacher._id && !teachers.has(teacher._id)) {
+            teachers.set(teacher._id, {
+              _id: teacher._id,
+              username: teacher.username ?? "",
+              email: teacher.email ?? ""
+            });
           }
         });
       });
@@ -230,59 +253,77 @@ const CourseManagement: React.FC = () => {
   const handleEdit = (course: Course) => {
     setEditingCourse(course);
     setFormData({
-      title: course.title,
-      code: course.code || "",
-      description: course.description || "",
-      category: course.category?._id || "",
-      isPublished: course.isPublished,
-      capacity: course.capacity || 0,
+      title: "",
+      code: "",
+      subjectId: "",
+      description: "",
+      logo: "",
+      startDate: "",
+      endDate: "",
+      isPublished: false,
+      enrollRequiresApproval: true,
+      capacity: 0,
+      status: "draft",
+      metaLevel: "",
+      metaDuration: "", 
     });
     setSelectedTeachers(course.teachers.map(t => t._id));
     setCategorySearchTerm(course.category?.name || "");
     setShowEditModal(true);
   };
-
+  console.log('courses', courses);
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // For teachers, they are automatically assigned, so we don't need to check selectedTeachers.length
-    const hasTeachers = isTeacher ? true : selectedTeachers.length > 0;
-    
-    if (!formData.category || !hasTeachers) {
-      const errorMessage = !formData.category 
-        ? "Please select a category" 
-        : "Please select at least one teacher";
-      alert(errorMessage);
-      return;
-    }
+
+    // Validate according to new schema
+
 
     try {
       // If teacher is creating course, add their ID from state
       let teachersToAssign = selectedTeachers;
-      
       if (isTeacher && currentTeacherId && !teachersToAssign.includes(currentTeacherId)) {
         teachersToAssign = [...teachersToAssign, currentTeacherId];
       }
 
-      await courseService.createCourse({
+      const payload = {
         title: formData.title,
-        code: formData.code,
         description: formData.description,
-        category: formData.category,
+        subjectId: formData.subjectId,
+        startDate: formData.startDate || undefined,
+        endDate: formData.endDate || undefined,
+        status: formData.status,
+        teacherIds: '69099fd7e974ab828624f093',
         isPublished: formData.isPublished,
         capacity: formData.capacity,
-        teachers: teachersToAssign,
-      });
+        enrollRequiresApproval: formData.enrollRequiresApproval,
+        meta: {
+          level: formData.metaLevel,
+          duration: formData.metaDuration,
+        },
+        logo: formData.logo || undefined,
+      };
+
+      // Send to API with relaxed typing
+      await courseService.createCourse(payload as any);
+
       setShowCreateModal(false);
       setFormData({
         title: "",
         code: "",
+        subjectId: "",
         description: "",
-        category: "",
+        logo: "",
+        startDate: "",
+        endDate: "",
         isPublished: false,
+        enrollRequiresApproval: true,
         capacity: 0,
+        status: "draft",
+        metaLevel: "",
+        metaDuration: "",
       });
       setSelectedTeachers([]);
+      setTeacherSearchTerm("");
       setCategorySearchTerm("");
       setShowCategoryDropdown(false);
       await fetchCourses();
@@ -298,20 +339,13 @@ const CourseManagement: React.FC = () => {
     // For teachers, they are automatically assigned, so we don't need to check selectedTeachers.length
     const hasTeachers = isTeacher ? true : selectedTeachers.length > 0;
     
-    if (!formData.category || !hasTeachers) {
-      const errorMessage = !formData.category 
-        ? "Please select a category" 
-        : "Please select at least one teacher";
-      alert(errorMessage);
-      return;
-    }
+
     
     try {
       await courseService.updateCourse(editingCourse._id, {
         title: formData.title,
         code: formData.code,
         description: formData.description,
-        category: formData.category,
         isPublished: formData.isPublished,
         capacity: formData.capacity,
         teachers: selectedTeachers,
@@ -771,14 +805,12 @@ const CourseManagement: React.FC = () => {
                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: darkMode ? '#6b7280' : '#9ca3af' }}>
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
-                        <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                          {course.teachers.length} teacher{course.teachers.length !== 1 ? 's' : ''}
-                        </span>
+                     
                       </div>
                     </div>
 
                     {/* Teachers List */}
-                    {course.teachers.length > 0 && (
+                    {course?.teachers?.length > 0 && (
                       <div className="mb-4">
                         <div className="flex flex-wrap gap-2">
                           {course.teachers.map((teacher) => (
@@ -813,8 +845,9 @@ const CourseManagement: React.FC = () => {
                           e.currentTarget.style.backgroundColor = darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff';
                           e.currentTarget.style.transform = 'scale(1)';
                         }}
-                        onClick={() => openDetail(course)}
+                        onClick={() => navigate(`/courses/${course._id}`)}
                       >
+                        {/* Điều hướng đến page chi tiết bằng _id */}
                         {isStudent ? 'View Course' : 'View Details'}
                       </button>
                       {canTeacherEditCourse(course) && (
@@ -912,12 +945,7 @@ const CourseManagement: React.FC = () => {
       {/* Create Course Modal */}
       {showCreateModal && (
         <div 
-          className="fixed inset-0 flex items-center justify-center z-[9999] p-4 transition-all duration-300"
-          style={{ 
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            backdropFilter: 'blur(4px)',
-            animation: 'fadeIn 0.3s ease-out'
-          }}
+          className={`fixed inset-0 z-[9999] p-4 flex items-center justify-center transition-all duration-300 bg-black/40 ${modalAnim === 'enter' ? 'modal-fade-enter' : modalAnim === 'leave' ? 'modal-fade-leave' : ''}`}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowCreateModal(false);
@@ -927,39 +955,118 @@ const CourseManagement: React.FC = () => {
           }}
         >
           <div
-            className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto transition-all duration-300 transform shadow-2xl"
-            style={{ 
-              backgroundColor: darkMode ? '#1f2937' : '#ffffff',
-              animation: 'scaleIn 0.3s ease-out',
-              border: darkMode ? '1px solid rgba(75, 85, 99, 0.3)' : '1px solid #e5e7eb'
-            }}
+            className="w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl"
+            style={{ backgroundColor: darkMode ? '#0b132b' : '#ffffff', border: '1px solid rgba(255,255,255,0.08)' }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold mb-4">Create New Course</h2>
-            <form onSubmit={handleCreateCourse} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <label className="block mb-2 font-semibold">Title *</label>
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid #eee' }}>
+              <h3 className="text-xl font-semibold" style={{ color: darkMode ? '#ffffff' : '#111827' }}>
+                Create Course
+              </h3>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setCategorySearchTerm("");
+                  setShowCategoryDropdown(false);
+                }}
+                className="px-3 py-1 rounded-lg text-sm"
+                style={{ backgroundColor: darkMode ? '#1f2937' : '#f3f4f6', color: darkMode ? '#e5e7eb' : '#111827' }}
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCourse} className="px-6 py-6">
+              {/* General */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Title *
+                  </label>
                   <input
                     type="text"
                     value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
+                    onChange={e => setFormData({ ...formData, title: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="Advanced React Development"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Subject ID
+                  </label>
+                  <select
+                    value={formData.subjectId ?? ''}
+                    onChange={e => setFormData({ ...formData, subjectId: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
                     style={{
                       backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
                       borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
                       color: darkMode ? '#ffffff' : '#000000',
                     }}
                     required
-                  />
+                  >
+                    <option value="" disabled>Chọn môn học</option>
+                    {SUBJECT_OPTIONS.map(opt => (
+                      <option key={opt.id} value={opt.id}>{opt.label}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label className="block mb-2 font-semibold">Code</label>
+                
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Logo URL or Path
+                  </label>
                   <input
                     type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
+                    value={formData.logo}
+                    onChange={e => setFormData({ ...formData, logo: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="https://storage.../logo.jpg"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Description
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border h-24"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="Learn advanced React patterns..."
+                  />
+                </div>
+              </div>
+
+              {/* Schedule */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.startDate}
+                    onChange={e => setFormData({ ...formData, startDate: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
                     style={{
                       backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
                       borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
@@ -968,229 +1075,185 @@ const CourseManagement: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block mb-2 font-semibold">Capacity</label>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.endDate}
+                    onChange={e => setFormData({ ...formData, endDate: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Capacity
+                  </label>
                   <input
                     type="number"
+                    min={0}
                     value={formData.capacity}
-                    onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) || 0 })}
-                    className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
+                    onChange={e => setFormData({ ...formData, capacity: Number(e.target.value) })}
+                    className="w-full px-4 py-2 rounded-lg border"
                     style={{
                       backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
                       borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
                       color: darkMode ? '#ffffff' : '#000000',
                     }}
+                    placeholder="50"
                   />
                 </div>
-                <div>
-                  <label className="block mb-2 font-semibold">Category *</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search or select category..."
-                      value={categorySearchTerm}
-                      onChange={(e) => {
-                        setCategorySearchTerm(e.target.value);
-                        setShowCategoryDropdown(true);
-                        // If user types and finds exact match, select it
-                        const exactMatch = availableCategories.find(cat => 
-                          cat.name.toLowerCase() === e.target.value.toLowerCase()
-                        );
-                        if (exactMatch) {
-                          setFormData({ ...formData, category: exactMatch._id });
-                        }
-                      }}
-                      onFocus={() => setShowCategoryDropdown(true)}
-                      className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
-                      style={{
-                        backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                        borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                        color: darkMode ? '#ffffff' : '#000000',
-                      }}
-                      required
-                    />
-                    {showCategoryDropdown && (
-                      <div 
-                        className="absolute z-10 w-full mt-1 max-h-40 overflow-y-auto border rounded transition-colors duration-300"
-                        style={{
-                          backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.95)' : '#ffffff',
-                          borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                        }}
-                      >
-                        {availableCategories
-                          .filter(cat => 
-                            cat.name.toLowerCase().includes(categorySearchTerm.toLowerCase())
-                          )
-                          .map(cat => (
-                            <div
-                              key={cat._id}
-                              className="p-2 cursor-pointer transition-colors duration-200"
-                              style={{
-                                backgroundColor: formData.category === cat._id ? 
-                                  (darkMode ? 'rgba(99, 102, 241, 0.3)' : '#eef2ff') : 'transparent',
-                                color: darkMode ? '#ffffff' : '#000000',
-                              }}
-                              onMouseEnter={(e) => {
-                                if (formData.category !== cat._id) {
-                                  e.currentTarget.style.backgroundColor = darkMode ? 'rgba(75, 85, 99, 0.3)' : '#f3f4f6';
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (formData.category !== cat._id) {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                }
-                              }}
-                              onClick={() => {
-                                setFormData({ ...formData, category: cat._id });
-                                setCategorySearchTerm(cat.name);
-                                setShowCategoryDropdown(false);
-                              }}
-                            >
-                              {cat.name}
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formData.isPublished}
-                    onChange={(e) => setFormData({ ...formData, isPublished: e.target.checked })}
-                    className="mr-2"
-                  />
-                  <label>Published</label>
-                </div>
               </div>
-              <div>
-                <label className="block mb-2 font-semibold">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
-                  style={{
-                    backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                    borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                    color: darkMode ? '#ffffff' : '#000000',
-                  }}
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="block mb-2 font-semibold">
+
+              {/* Instructors */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium mb-3" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
                   Select Teachers * ({isTeacher && user?._id ? 1 : selectedTeachers.length} selected)
                   {isTeacher && (
-                    <span className="text-sm text-blue-500 ml-2">
+                    <span className="text-xs text-blue-500 ml-2">
                       (You are automatically assigned as the teacher)
                     </span>
                   )}
                 </label>
-                <input
-                  type="text"
-                  placeholder={isTeacher ? `${user?.username} (You)` : "Search teachers..."}
-                  value={teacherSearchTerm}
-                  onChange={(e) => setTeacherSearchTerm(e.target.value)}
-                  disabled={isTeacher}
-                  style={{
-                    backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                    borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                    color: darkMode ? '#ffffff' : '#000000',
-                  }}
-                />
-                <div 
-                  className="max-h-40 overflow-y-auto border rounded transition-colors duration-300"
-                  style={{
-                    backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                    borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                  }}
-                >
-                  {(isTeacher ? 
-                    // For teachers, only show themselves (get ID from state)
-                    availableTeachers.filter(teacher => teacher._id === currentTeacherId) :
-                    // For admins, show all teachers with search filter
-                    availableTeachers.filter(teacher => 
-                      teacher.username.toLowerCase().includes(teacherSearchTerm.toLowerCase()) ||
-                      teacher.email.toLowerCase().includes(teacherSearchTerm.toLowerCase())
-                    )
-                  ).map(teacher => (
-                      <div 
-                        key={teacher._id} 
-                        className="flex items-center p-2 cursor-pointer transition-all duration-300 hover:scale-[1.02]"
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {(isTeacher
+                    ? availableTeachers.filter(t => t._id === currentTeacherId)
+                    : availableTeachers
+                  ).map(t => {
+                    const checked = selectedTeachers.includes(t._id);
+                    return (
+                      <label key={t._id} className="flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer"
                         style={{
-                          backgroundColor: selectedTeachers.includes(teacher._id) ? 
-                            (darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff') : 'transparent',
-                          borderRadius: '8px',
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!selectedTeachers.includes(teacher._id)) {
-                            e.currentTarget.style.backgroundColor = darkMode ? 'rgba(75, 85, 99, 0.3)' : '#f3f4f6';
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!selectedTeachers.includes(teacher._id)) {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }
-                        }}
-                        onClick={() => {
-                          if (selectedTeachers.includes(teacher._id)) {
-                            setSelectedTeachers(selectedTeachers.filter(id => id !== teacher._id));
-                          } else {
-                            setSelectedTeachers([...selectedTeachers, teacher._id]);
-                          }
-                        }}
-                      >
-                        <div className="mr-3 flex items-center">
-                          <div 
-                            className="w-4 h-4 border-2 rounded transition-all duration-200 flex items-center justify-center"
-                            style={{
-                              borderColor: selectedTeachers.includes(teacher._id) ? 
-                                (darkMode ? '#a5b4fc' : '#4f46e5') : 
-                                (darkMode ? 'rgba(75, 85, 99, 0.5)' : '#d1d5db'),
-                              backgroundColor: selectedTeachers.includes(teacher._id) ? 
-                                (darkMode ? '#6366f1' : '#4f46e5') : 'transparent',
-                            }}
-                          >
-                            {selectedTeachers.includes(teacher._id) && (
-                              <svg 
-                                className="w-3 h-3 text-white" 
-                                fill="currentColor" 
-                                viewBox="0 0 20 20"
-                              >
-                                <path 
-                                  fillRule="evenodd" 
-                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" 
-                                  clipRule="evenodd" 
-                                />
-                              </svg>
-                            )}
-                          </div>
-                        </div>
-                        <span 
-                          className="flex-1 transition-colors duration-200"
-                          style={{ 
-                            color: selectedTeachers.includes(teacher._id) ? 
-                              (darkMode ? '#a5b4fc' : '#4f46e5') : 
-                              (darkMode ? '#ffffff' : '#000000')
+                          backgroundColor: darkMode ? 'rgba(31,41,55,0.6)' : '#ffffff',
+                          borderColor: darkMode ? 'rgba(75,85,99,0.3)' : '#e5e7eb',
+                          color: darkMode ? '#e5e7eb' : '#111827'
+                        }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            setSelectedTeachers(prev =>
+                              e.target.checked ? [...prev, t._id] : prev.filter(id => id !== t._id)
+                            );
                           }}
-                        >
-                          {teacher.username} ({teacher.email})
-                        </span>
-                      </div>
-                    ))}
+                          disabled={isTeacher && t._id === currentTeacherId}
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{t.username}</span>
+                          <span className="text-xs opacity-70">{t.email}</span>
+                        </div>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
-              <div className="flex space-x-4 col-span-2">
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg"
-                >
-                  Create
-                </button>
+
+              {/* Meta & Publish */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Status
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={e => setFormData({ ...formData, status: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="active">Active</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Meta Level
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.metaLevel}
+                    onChange={e => setFormData({ ...formData, metaLevel: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="intermediate"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Meta Duration
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.metaDuration}
+                    onChange={e => setFormData({ ...formData, metaDuration: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="6 months"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <label className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={formData.isPublished}
+                    onChange={e => setFormData({ ...formData, isPublished: e.target.checked })}
+                  />
+                  <span style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>Published</span>
+                </label>
+                <label className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={formData.enrollRequiresApproval}
+                    onChange={e => setFormData({ ...formData, enrollRequiresApproval: e.target.checked })}
+                  />
+                  <span style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>Enroll requires approval</span>
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 px-1">
                 <button
                   type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setCategorySearchTerm("");
+                    setShowCategoryDropdown(false);
+                  }}
+                  className="px-4 py-2 rounded-lg"
+                  style={{ backgroundColor: darkMode ? '#1f2937' : '#e5e7eb', color: darkMode ? '#e5e7eb' : '#111827' }}
                 >
                   Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-lg text-white font-medium transition-all duration-200"
+                  style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#5b21b6' : '#4338ca';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#4c1d95' : '#4f46e5';
+                  }}
+                >
+                  Create
                 </button>
               </div>
             </form>
@@ -1273,74 +1336,7 @@ const CourseManagement: React.FC = () => {
                 </div>
                 <div>
                   <label className="block mb-2 font-semibold">Category *</label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search or select category..."
-                      value={categorySearchTerm}
-                      onChange={(e) => {
-                        setCategorySearchTerm(e.target.value);
-                        setShowCategoryDropdown(true);
-                        // If user types and finds exact match, select it
-                        const exactMatch = availableCategories.find(cat => 
-                          cat.name.toLowerCase() === e.target.value.toLowerCase()
-                        );
-                        if (exactMatch) {
-                          setFormData({ ...formData, category: exactMatch._id });
-                        }
-                      }}
-                      onFocus={() => setShowCategoryDropdown(true)}
-                      className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
-                      style={{
-                        backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                        borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                        color: darkMode ? '#ffffff' : '#000000',
-                      }}
-                      required
-                    />
-                    {showCategoryDropdown && (
-                      <div 
-                        className="absolute z-10 w-full mt-1 max-h-40 overflow-y-auto border rounded transition-colors duration-300"
-                        style={{
-                          backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.95)' : '#ffffff',
-                          borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                        }}
-                      >
-                        {availableCategories
-                          .filter(cat => 
-                            cat.name.toLowerCase().includes(categorySearchTerm.toLowerCase())
-                          )
-                          .map(cat => (
-                            <div
-                              key={cat._id}
-                              className="p-2 cursor-pointer transition-colors duration-200"
-                              style={{
-                                backgroundColor: formData.category === cat._id ? 
-                                  (darkMode ? 'rgba(99, 102, 241, 0.3)' : '#eef2ff') : 'transparent',
-                                color: darkMode ? '#ffffff' : '#000000',
-                              }}
-                              onMouseEnter={(e) => {
-                                if (formData.category !== cat._id) {
-                                  e.currentTarget.style.backgroundColor = darkMode ? 'rgba(75, 85, 99, 0.3)' : '#f3f4f6';
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (formData.category !== cat._id) {
-                                  e.currentTarget.style.backgroundColor = 'transparent';
-                                }
-                              }}
-                              onClick={() => {
-                                setFormData({ ...formData, category: cat._id });
-                                setCategorySearchTerm(cat.name);
-                                setShowCategoryDropdown(false);
-                              }}
-                            >
-                              {cat.name}
-                            </div>
-                          ))}
-                      </div>
-                    )}
-                  </div>
+         
                 </div>
                 <div className="flex items-center">
                   <input

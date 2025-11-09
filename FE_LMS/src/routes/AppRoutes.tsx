@@ -10,12 +10,16 @@ import {DashboardPage ,
       LoginPage,
       RegisterPage,
       CourseManagementPage,
+      CourseDetailPage,
       ListAllLessonsPage,
+      AboutUsPage,
+      FAQPage,
     } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
 import ProtectedRoute from "../components/ProtectedRoute";
 import Profile from "../pages/profile";
+import Calendar from "../components/Calendar";
 
 function AppRoutes() {
   return (
@@ -23,7 +27,14 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         
-        {/* Auth pages */}
+        {/* Course detail */}
+        <Route path="/courses/:id" element={
+          <ProtectedRoute>
+            <CourseDetailPage />
+          </ProtectedRoute>
+        } />
+        
+        {/* Auth routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/email-verify" element={<EmailVerifyPage />} />
@@ -61,6 +72,13 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
 
+        {/* Calendar */}
+        <Route path="/calendar" element={
+          <ProtectedRoute>
+            <Calendar />
+          </ProtectedRoute>
+        } />
+
         {/* Profile */}
         <Route path="/profile" element={
           <ProtectedRoute>
@@ -77,6 +95,20 @@ function AppRoutes() {
         <Route path="/materials/:lessonId" element={
           <ProtectedRoute>
             <LessonMaterialDetailPage />
+          </ProtectedRoute>
+        } />
+
+        {/* About Us */}
+        <Route path="/help/about" element={
+          <ProtectedRoute>
+            <AboutUsPage />
+          </ProtectedRoute>
+        } />
+
+        {/* FAQ */}
+        <Route path="/help/faq" element={
+          <ProtectedRoute>
+            <FAQPage />
           </ProtectedRoute>
         } />
 
