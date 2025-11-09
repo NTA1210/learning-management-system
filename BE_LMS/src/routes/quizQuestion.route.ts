@@ -16,12 +16,7 @@ import { Router } from "express";
 const quizQuestionRoutes = Router();
 //prefix: /quiz-questions
 
-quizQuestionRoutes.post(
-  "/import",
-  authorize(Role.ADMIN),
-  upload.single("file"),
-  importXMLFileHandler
-);
+quizQuestionRoutes.post("/import", upload.single("file"), importXMLFileHandler);
 
 quizQuestionRoutes.get("/export/:courseId", exportXMLFileHandler);
 quizQuestionRoutes.get("/", getAllQuizQuestionsHandler);
