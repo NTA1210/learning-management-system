@@ -14,3 +14,4 @@ export { default as AboutUsPage } from "./AboutUs";
 export { default as FAQPage } from "./FAQ";
 export { default as CourseDetailPage } from "./CourseDetail";
 export { default as ListAllLessonsPage } from "./ListAllLessonsPage";
+export { default as AssignmentPage } from "./AssignmentPage";

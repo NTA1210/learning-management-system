@@ -14,6 +14,7 @@ import {DashboardPage ,
       ListAllLessonsPage,
       AboutUsPage,
       FAQPage,
+      AssignmentPage,
     } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -95,6 +96,13 @@ function AppRoutes() {
         <Route path="/materials/:lessonId" element={
           <ProtectedRoute>
             <LessonMaterialDetailPage />
+          </ProtectedRoute>
+        } />
+
+        {/* Assignments */}
+        <Route path="/assignments" element={
+          <ProtectedRoute>
+            <AssignmentPage />
           </ProtectedRoute>
         } />
 
