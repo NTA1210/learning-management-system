@@ -24,7 +24,7 @@ export default function StudentsByBatchChart() {
               backgroundColor: darkMode ? '#1f2937' : '#ffffff',
               border: darkMode ? '1px solid #374151' : '1px solid #e5e7eb',
               borderRadius: '8px',
-              color: darkMode ? '# ' : '#374151'
+              color: darkMode ? '#ffffff' : '#374151'
             }}
           />
           <Bar 

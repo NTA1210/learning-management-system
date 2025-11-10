@@ -228,13 +228,24 @@ const Calendar: React.FC = () => {
             ];
             return (
               <div key={day.toISOString()} className="week-day-column">
-                {items.map((it) => (
-                  <div key={it.id} className="week-schedule-item-compact">
-                    <div className="subject-code">{it.code}</div>
-                    <div className="time-range">({it.time})</div>
-                    {it.room && <div className="room-info">{it.room}</div>}
+                <div className="week-day-row">
+                  {/* Mobile-only day label; hidden on desktop */}
+                  <div className="week-day-label-mobile">
+                    <div className="week-day-name">{safeFormatDate(day, 'EEE').toUpperCase()}</div>
+                    <div className={`week-day-number ${isSameDay(day, new Date()) ? 'today' : ''}`}>
+                      {safeFormatDate(day, 'd')}
+                    </div>
                   </div>
-                ))}
+                  <div className="week-day-items">
+                    {items.map((it) => (
+                      <div key={it.id} className="week-schedule-item-compact">
+                        <div className="subject-code">{it.code}</div>
+                        <div className="time-range">({it.time})</div>
+                        {it.room && <div className="room-info">{it.room}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             );
           })}
