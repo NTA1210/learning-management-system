@@ -83,27 +83,12 @@ export const createCourseSchema = z
       })
       .pipe(z.enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED]))
       .default(CourseStatus.DRAFT),
-    teacherIds: z.preprocess(
-      (val) => {
-        // If already array → return as is (JSON case)
-        if (Array.isArray(val)) {
-          return val;
-        }
-        // If string → parse to array (Form data case)
-        if (typeof val === 'string') {
-          try {
-            const parsed = JSON.parse(val);
-            return Array.isArray(parsed) ? parsed : [parsed];
-          } catch {
-            // If parse fails, treat as single ID
-            return [val];
-          }
-        }
-        return val;
-      },
-      z.array(z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid teacher ID format"))
-        .min(1, "At least one teacher is required")
-    ), // Required
+    teacherIds: z
+      .union([
+        z.array(z.string()), // Already array
+        z.string().transform((val) => JSON.parse(val)), // Parse JSON string from multipart
+      ])
+      .pipe(z.array(z.string()).min(1, "At least one teacher is required")), // Required
     isPublished: z
       .union([
         z.boolean(),
@@ -130,7 +115,7 @@ export const createCourseSchema = z
     meta: z
       .union([
         z.record(z.string(), z.any()), // Already object
-       
+        z.string().transform((val) => JSON.parse(val)), // Parse JSON string from multipart
       ])
       .optional(),
   })
@@ -169,31 +154,13 @@ export const updateCourseSchema = z
         return val;
       })
       .pipe(z.enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED]).optional()),
-    teacherIds: z.preprocess(
-      (val) => {
-        // If undefined/null → return undefined (optional field)
-        if (val === undefined || val === null) {
-          return undefined;
-        }
-        // If already array → return as is (JSON case)
-        if (Array.isArray(val)) {
-          return val;
-        }
-        // If string → parse to array (Form data case)
-        if (typeof val === 'string') {
-          try {
-            const parsed = JSON.parse(val);
-            return Array.isArray(parsed) ? parsed : [parsed];
-          } catch {
-            return [val];
-          }
-        }
-        return val;
-      },
-      z.array(z.string().regex(/^[0-9a-fA-F]{24}$/, "Invalid teacher ID format"))
-        .min(1, "At least one teacher is required")
-        .optional()
-    ),
+    teacherIds: z
+      .union([
+        z.array(z.string()),
+        z.string().transform((val) => JSON.parse(val)),
+      ])
+      .pipe(z.array(z.string()).min(1))
+      .optional(),
     isPublished: z
       .union([
         z.boolean(),
@@ -218,7 +185,7 @@ export const updateCourseSchema = z
     meta: z
       .union([
         z.record(z.string(), z.any()),
-   
+        z.string().transform((val) => JSON.parse(val)),
       ])
       .optional(),
   })
