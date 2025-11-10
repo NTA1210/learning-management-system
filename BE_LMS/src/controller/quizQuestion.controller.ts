@@ -52,27 +52,21 @@ export const importXMLFileHandler = catchErrors(async (req, res) => {
 export const exportXMLFileHandler = catchErrors(async (req, res) => {
   const { subjectId } = req.params;
   subjectIdSchema.parse(subjectId);
-  const quizQuestions = await QuizQuestionModel.find({
-    subjectId,
-  }).lean<IQuizQuestion[]>();
 
-  appAssert(
-    quizQuestions.length > 0,
-    NOT_FOUND,
-    "No questions found for this subject"
-  );
+  const { xmlString, total, exportedTypes } = await exportXMLFile(subjectId);
 
-  const { xmlString, total, exportedTypes } = await exportXMLFile(
-    quizQuestions,
-    subjectId
-  );
+  // res.success(OK, {
+  //   xmlString,
+  //   total,
+  //   exportedTypes,
+  //   message: "Questions exported successfully",
+  // });
+  res.setHeader("Content-Type", "application/xml");
+  res.setHeader("Content-Disposition", `attachment; filename="abc.xml"`);
+  /**Content-Type: application/xml → cho biết đây là dữ liệu XML.
+  Content-Disposition: attachment; filename="..." → ép trình duyệt mở hộp thoại tải file. */
 
-  res.success(OK, {
-    xmlString,
-    total,
-    exportedTypes,
-    message: "Questions exported successfully",
-  });
+  res.status(OK).send(xmlString);
 });
 
 // GET /quiz-questions/ - Get all questions
