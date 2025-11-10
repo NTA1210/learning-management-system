@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
@@ -46,6 +47,7 @@ interface ApiResponse {
 }
 
 const AssignmentPage: React.FC = () => {
+  const navigate = useNavigate();
   const { darkMode } = useTheme();
   const { user } = useAuth();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -363,6 +365,7 @@ const AssignmentPage: React.FC = () => {
                     return (
                       <div
                         key={assignment._id}
+                        onClick={() => navigate(`/assignments/${assignment._id}`)}
                         className="rounded-lg shadow-md overflow-hidden transition-all duration-200 hover:shadow-lg cursor-pointer flex flex-col"
                         style={{
                           backgroundColor: darkMode ? "rgba(31, 41, 55, 0.8)" : "rgba(255, 255, 255, 0.9)",

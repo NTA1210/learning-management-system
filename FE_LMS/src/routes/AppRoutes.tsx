@@ -18,6 +18,7 @@ import {DashboardPage ,
     } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
+import AssignmentDetailPage from "../pages/AssignmentDetailPage";
 import ProtectedRoute from "../components/ProtectedRoute";
 import Profile from "../pages/profile";
 import Calendar from "../components/Calendar";
@@ -103,6 +104,11 @@ function AppRoutes() {
         <Route path="/assignments" element={
           <ProtectedRoute>
             <AssignmentPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/assignments/:id" element={
+          <ProtectedRoute>
+            <AssignmentDetailPage />
           </ProtectedRoute>
         } />
 

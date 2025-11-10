@@ -15,3 +15,4 @@ export { default as FAQPage } from "./FAQ";
 export { default as CourseDetailPage } from "./CourseDetail";
 export { default as ListAllLessonsPage } from "./ListAllLessonsPage";
 export { default as AssignmentPage } from "./AssignmentPage";
+export { default as AssignmentDetailPage } from "./AssignmentDetailPage";
