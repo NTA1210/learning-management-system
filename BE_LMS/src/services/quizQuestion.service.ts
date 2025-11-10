@@ -35,6 +35,11 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
 
   const importedQuestions = [];
   const importedTypes = new Set<QuizQuestionType>();
+  const typeMap: Record<string, QuizQuestionType> = {
+    truefalse: QuizQuestionType.TRUE_FALSE,
+    multichoice: QuizQuestionType.MULTIPLE_CHOICE,
+    shortanswer: QuizQuestionType.FILL_BLANK,
+  };
 
   // 3️⃣ Duyệt từng câu hỏi
   for (const q of questions) {
@@ -46,11 +51,7 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
     const questionText = q.questiontext?.[0]?.text?.[0] || "";
 
     // Loại câu hỏi
-    let type = QuizQuestionType.MCQ;
-    if (typeAttr === "truefalse") type = QuizQuestionType.TRUE_FALSE;
-    else if (typeAttr === "multichoice")
-      type = QuizQuestionType.MULTIPLE_CHOICE;
-    else if (typeAttr === "shortanswer") type = QuizQuestionType.FILL_BLANK;
+    const type = typeMap[typeAttr] || QuizQuestionType.MCQ;
 
     // Kiem tra loai cau hoi
     importedTypes.add(type);
@@ -69,7 +70,7 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
     });
 
     // Tạo object câu hỏi
-    const newQuestion = new QuizQuestionModel({
+    const newQuestion = {
       subjectId,
       text: questionText || questionName,
       type,
@@ -77,13 +78,12 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
       correctOptions,
       points: parseFloat(q.defaultgrade?.[0] || "1"),
       explanation: "",
-    });
-
-    await newQuestion.save();
+    };
     importedQuestions.push(newQuestion);
   }
+  const quizzes = await QuizQuestionModel.insertMany(importedQuestions);
   return {
-    data: importedQuestions,
+    data: quizzes,
     total: importedQuestions.length,
     importedTypes: importedTypes,
   };
@@ -217,14 +217,21 @@ export const getAllQuizQuestions = async ({
   type,
 }: Partial<IListQuizQuestionParams>) => {
   const query: FilterQuery<IQuizQuestion> = {};
+  const projection: any = {};
 
   if (subjectId) {
     const subject = await SubjectModel.findById(subjectId);
     appAssert(subject, NOT_FOUND, "Subject not found");
     query.subjectId = subjectId;
   }
+
   if (type) query.type = type;
-  if (search) query.$text = { $search: search };
+
+  // Nếu có search => dùng $text
+  if (search) {
+    query.$text = { $search: search };
+    projection.score = { $meta: "textScore" };
+  }
 
   if (from || to) {
     query.createdAt = {};
@@ -232,14 +239,17 @@ export const getAllQuizQuestions = async ({
     if (to) query.createdAt.$lte = to;
   }
 
-  // validate & limit input
   const _page = Math.max(1, page);
   const _limit = Math.min(Math.max(1, limit), 100);
   const sortDirection = sortOrder === "asc" ? 1 : -1;
 
+  // Nếu có search, sort theo score trước, sau đó mới sort theo createdAt nếu muốn
+  let sortObj: any = { createdAt: sortDirection };
+  if (search) sortObj = { score: { $meta: "textScore" } };
+
   const [data, total] = await Promise.all([
-    QuizQuestionModel.find(query)
-      .sort({ createdAt: sortDirection })
+    QuizQuestionModel.find(query, projection)
+      .sort(sortObj)
       .skip((_page - 1) * _limit)
       .limit(_limit),
     QuizQuestionModel.countDocuments(query),
@@ -248,7 +258,7 @@ export const getAllQuizQuestions = async ({
   const totalPages = Math.ceil(total / _limit);
 
   return {
-    data,
+    data, // mỗi document sẽ có thêm field "score" nếu search
     pagination: {
       totalItems: total,
       currentPage: _page,

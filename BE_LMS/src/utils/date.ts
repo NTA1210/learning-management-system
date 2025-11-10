@@ -18,3 +18,15 @@ export const fiveMinutesAgo = () => {
 export const oneHourFromNow = () => {
   return new Date(Date.now() + 1 * 60 * 60 * 1000);
 };
+
+export const isDateInFuture = (val: Date) => {
+  if (!val) return false;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // đầu ngày hôm nay
+
+  const dateToCheck = new Date(val);
+  dateToCheck.setHours(0, 0, 0, 0); // đầu ngày của val
+
+  return dateToCheck > today;
+};

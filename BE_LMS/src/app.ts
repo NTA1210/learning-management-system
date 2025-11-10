@@ -44,6 +44,7 @@ import {
 export const createApp = () => {
   const app = express();
 
+  app.use(customResponse);
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use(
@@ -53,7 +54,6 @@ export const createApp = () => {
     })
   );
   app.use(cookieParser());
-  app.use(customResponse);
 
   //example API----------------------------------
   app.get("/", (req, res) => {

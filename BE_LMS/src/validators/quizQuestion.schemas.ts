@@ -2,6 +2,7 @@ import z from "zod";
 import { listParamsSchema } from "./listParams.schema";
 import { ListParams } from "@/types/dto";
 import { QuizQuestionType } from "@/types/quizQuestion.type";
+import { datePreprocess } from "./helpers/date.schema";
 
 export const subjectIdSchema = z.string().length(24, "Invalid subject ID");
 export const importQuizQuestionParamsSchema = z.object({
@@ -16,12 +17,25 @@ interface IListQuizQuestionParams extends ListParams {
   to?: Date;
 }
 
-export const listQuizQuestionSchema = listParamsSchema.extend({
-  subjectId: subjectIdSchema.optional(),
-  type: z.enum(QuizQuestionType).optional(),
-  from: z.date().optional(),
-  to: z.date().optional(),
-}) satisfies z.ZodType<IListQuizQuestionParams>;
+export const listQuizQuestionSchema = listParamsSchema
+  .extend({
+    subjectId: subjectIdSchema.optional(),
+    type: z.enum(QuizQuestionType).optional(),
+    from: datePreprocess,
+    to: datePreprocess,
+  })
+  .refine(
+    (val) => {
+      if (val.from && val.to) {
+        return val.from.getTime() <= val.to.getTime();
+      }
+      return true;
+    },
+    {
+      message: "From date must be less than or equal to To date",
+      path: ["to"],
+    }
+  ) satisfies z.ZodType<IListQuizQuestionParams>;
 
 export interface ICreateQuizQuestionParams {
   subjectId: string;
@@ -34,28 +48,30 @@ export interface ICreateQuizQuestionParams {
   explanation?: string;
 }
 
-export const createQuizQuestionSchema = z.object({
-  subjectId: subjectIdSchema,
-  text: z.string().min(1, "Text is required"),
-  image: z.any().optional(),
-  type: z.enum(QuizQuestionType).default(QuizQuestionType.MCQ),
-  options: z.array(z.string()).min(2, "At least two options are required"),
-  correctOptions: z
-    .array(
-      z.number().refine((v) => v === 0 || v === 1, {
-        message: "Correct option must be 0 or 1",
-        path: ["correctOptions"],
-      })
-    )
-    .min(1, "At least one correct option is required")
-    .refine((v) => v.includes(1), {
-      message: "At least one correct option is required",
-      path: ["correctOptions"],
-    }),
-
-  points: z.number().positive().optional().default(1),
-  explanation: z.string().optional(),
-});
+export const createQuizQuestionSchema = z
+  .object({
+    subjectId: subjectIdSchema,
+    text: z.string().min(1, "Text is required"),
+    image: z.any().optional(),
+    type: z.enum(QuizQuestionType).default(QuizQuestionType.MCQ),
+    options: z.array(z.string()).min(2, "At least two options are required"),
+    correctOptions: z
+      .array(
+        z.number().refine((v) => v === 0 || v === 1, {
+          message: "Correct option must be 0 or 1",
+        })
+      )
+      .min(1, "At least one correct option is required")
+      .refine((arr) => arr.includes(1), {
+        message: "At least one correct option is required",
+      }),
+    points: z.number().positive().optional().default(1),
+    explanation: z.string().optional(),
+  })
+  .refine((val) => val.options.length === val.correctOptions.length, {
+    message: "Number of options and correct options must be equal",
+    path: ["correctOptions"],
+  });
 
 export interface IUpdateQuizQuestionParams extends ICreateQuizQuestionParams {
   quizQuestionId: string;
@@ -64,7 +80,7 @@ export const quizQuestionIdSchema = z
   .string()
   .length(24, "Invalid question ID");
 
-export const updateQuizQuestionSchema = createQuizQuestionSchema.extend({
+export const updateQuizQuestionSchema = createQuizQuestionSchema.safeExtend({
   quizQuestionId: quizQuestionIdSchema,
 });
 

@@ -18,7 +18,7 @@ const quizQuestionRoutes = Router();
 
 quizQuestionRoutes.post("/import", upload.single("file"), importXMLFileHandler);
 
-quizQuestionRoutes.get("/export/:courseId", exportXMLFileHandler);
+quizQuestionRoutes.get("/export/:subjectId", exportXMLFileHandler);
 quizQuestionRoutes.get("/", getAllQuizQuestionsHandler);
 quizQuestionRoutes.post("/", upload.single("file"), createQuizQuestionHandler);
 quizQuestionRoutes.put(
