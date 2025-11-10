@@ -363,7 +363,7 @@ export const updateQuizQuestion = async ({
 
   let publicUrl = quizQuestion.image;
   let key = quizQuestion.key;
-  // 2️⃣ Nếu có ảnh, upload và cập nhật sau
+  // 2️⃣ Nếu có ảnh, upload và cập nhật sau 1
   if (image) {
     if (quizQuestion.image) {
       if (quizQuestion.key) await removeFile(quizQuestion.key);
