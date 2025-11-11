@@ -1,5 +1,5 @@
 import { catchErrors } from "../utils/asyncHandler";
-import { OK } from "../constants/http";
+import { BAD_REQUEST, OK } from "../constants/http";
 import { Role } from "../types";
 import { addTimeForLesson, completeLesson, getCourseProgress, getLessonProgress } from "@/services/lessonProgress.service";
 import {
@@ -8,6 +8,7 @@ import {
   LessonIdParamSchema,
   GetCourseProgressSchema,
 } from "../validators/lessonProgress.schemas";
+import appAssert from "@/utils/appAssert";
 
 // GET /lesson-progress/lesson/:lessonId - Lấy tiến độ 1 bài học
 export const getLessonProgressController = catchErrors(async (req, res) => {
@@ -32,11 +33,7 @@ export const addTimeForLessonController = catchErrors(async (req, res) => {
   
   // Check if body exists and has incSeconds
   if (!req.body || req.body.incSeconds === undefined) {
-    return res.status(400).json({
-      success: false,
-      message: "Request body is required with incSeconds field",
-      data: null,
-    });
+    appAssert(false, BAD_REQUEST, "Request body is required with incSeconds field");
   }
   
   const validatedBody = AddTimeForLessonBodySchema.parse(req.body);
