@@ -11,6 +11,7 @@ jest.mock("@/services/lessonMaterial.service", () => ({
   deleteLessonMaterial: jest.fn(),
   uploadLessonMaterial: jest.fn(),
   getMaterialForDownload: jest.fn(),
+  deleteFileOfMaterial: jest.fn(),
 }));
 
 jest.mock("@/utils/uploadFile", () => ({
@@ -37,6 +38,7 @@ import {
   deleteLessonMaterialController,
   uploadLessonMaterialController,
   downloadLessonMaterialController,
+  deleteLessonMaterialFile,
 } from "@/controller/lessonMaterial.controller";
 
 describe("📎 LessonMaterial Controller Unit Tests", () => {
@@ -316,11 +318,10 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
       req.files = undefined;
       req.file = undefined;
       await uploadLessonMaterialController(req as Request, res as Response, next);
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: "No file uploaded"
-      });
+      expect(next).toHaveBeenCalled();
+      const error = (next as jest.Mock).mock.calls[0][0];
+      expect(error.message).toBe("No file uploaded");
+      expect(error.statusCode).toBe(400);
     });
 
     it("handles validation errors", async () => {
@@ -376,11 +377,10 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
       (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockReturnValue({ id });
       (service.getLessonMaterialById as jest.Mock).mockResolvedValue({ hasAccess: false });
       await downloadLessonMaterialController(req as Request, res as Response, next);
-      expect(res.status).toHaveBeenCalledWith(403);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: "You don't have permission to download this material"
-      });
+      expect(next).toHaveBeenCalled();
+      const error = (next as jest.Mock).mock.calls[0][0];
+      expect(error.message).toBe("You don't have permission to download this material");
+      expect(error.statusCode).toBe(403);
     });
 
     it("returns 404 when material is manual (no file)", async () => {
@@ -394,11 +394,10 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
         originalName: null
       });
       await downloadLessonMaterialController(req as Request, res as Response, next);
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: "This material does not have a file to download"
-      });
+      expect(next).toHaveBeenCalled();
+      const error = (next as jest.Mock).mock.calls[0][0];
+      expect(error.message).toBe("This material does not have a file to download");
+      expect(error.statusCode).toBe(404);
     });
 
     it("returns 404 when material has no key", async () => {
@@ -412,11 +411,10 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
         originalName: null
       });
       await downloadLessonMaterialController(req as Request, res as Response, next);
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: "This material does not have a file to download"
-      });
+      expect(next).toHaveBeenCalled();
+      const error = (next as jest.Mock).mock.calls[0][0];
+      expect(error.message).toBe("This material does not have a file to download");
+      expect(error.statusCode).toBe(404);
     });
 
     it("handles validation errors", async () => {
@@ -447,6 +445,57 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
       const serviceError = new Error("Service error");
       (service.getMaterialForDownload as jest.Mock).mockRejectedValue(serviceError);
       await downloadLessonMaterialController(req as Request, res as Response, next);
+      expect(next).toHaveBeenCalledWith(serviceError);
+    });
+  });
+
+  describe("deleteLessonMaterialFile", () => {
+    it("works with valid material id", async () => {
+      const id = new mongoose.Types.ObjectId().toString();
+      req.params = { id };
+      (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockReturnValue({ id });
+      const mockResult = {
+        material: { _id: id, title: "Test Material" },
+        deletedKey: "files/test.pdf",
+        message: "File deleted successfully"
+      };
+      (service.deleteFileOfMaterial as jest.Mock).mockResolvedValue(mockResult);
+      await deleteLessonMaterialFile(req as Request, res as Response, next);
+      expect(service.deleteFileOfMaterial).toHaveBeenCalledWith(id, req.userId.toString(), req.role);
+      expect(res.success).toHaveBeenCalledWith(200, {
+        data: mockResult,
+        message: "Deleted file successfully"
+      });
+    });
+
+    it("handles invalid id parameter", async () => {
+      req.params = { id: "invalid" };
+      const validationError = new Error("Invalid material ID format");
+      (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockImplementation(() => {
+        throw validationError;
+      });
+      await deleteLessonMaterialFile(req as Request, res as Response, next);
+      expect(next).toHaveBeenCalledWith(validationError);
+    });
+
+    it("handles service errors", async () => {
+      const id = new mongoose.Types.ObjectId().toString();
+      req.params = { id };
+      (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockReturnValue({ id });
+      const serviceError = new Error("Material not found");
+      (service.deleteFileOfMaterial as jest.Mock).mockRejectedValue(serviceError);
+      await deleteLessonMaterialFile(req as Request, res as Response, next);
+      expect(next).toHaveBeenCalledWith(serviceError);
+    });
+
+    it("handles permission errors", async () => {
+      const id = new mongoose.Types.ObjectId().toString();
+      req.params = { id };
+      req.role = "STUDENT";
+      (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockReturnValue({ id });
+      const serviceError = new Error("Students cannot delete lesson material files");
+      (service.deleteFileOfMaterial as jest.Mock).mockRejectedValue(serviceError);
+      await deleteLessonMaterialFile(req as Request, res as Response, next);
       expect(next).toHaveBeenCalledWith(serviceError);
     });
   });

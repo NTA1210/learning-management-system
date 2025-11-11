@@ -11,6 +11,7 @@ jest.mock("@/utils/appAssert");
 jest.mock("@/utils/uploadFile", () => ({
   uploadFile: jest.fn().mockResolvedValue({ key: "k", originalName: "f.pdf", mimeType: "application/pdf", size: 10 }),
   getSignedUrl: jest.fn().mockResolvedValue("https://signed-url"),
+  removeFile: jest.fn().mockResolvedValue(undefined),
 }));
 
 import LessonMaterialModel from "@/models/lessonMaterial.model";
@@ -18,6 +19,7 @@ import LessonModel from "@/models/lesson.model";
 import CourseModel from "@/models/course.model";
 import EnrollmentModel from "@/models/enrollment.model";
 import appAssert from "@/utils/appAssert";
+import { removeFile } from "@/utils/uploadFile";
 
 import {
   getLessonMaterials,
@@ -28,6 +30,7 @@ import {
   deleteLessonMaterial,
   uploadLessonMaterial,
   getMaterialForDownload,
+  deleteFileOfMaterial,
 } from "@/services/lessonMaterial.service";
 
 describe("📎 LessonMaterial Service Unit Tests", () => {
@@ -459,6 +462,159 @@ describe("📎 LessonMaterial Service Unit Tests", () => {
       const validMaterialId = new mongoose.Types.ObjectId().toString();
       (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(null) });
       await expect(getMaterialForDownload(validMaterialId)).rejects.toThrow("Material not found");
+    });
+  });
+
+  describe("deleteFileOfMaterial", () => {
+    const materialWithFile = {
+      _id: materialId,
+      lessonId,
+      title: "Doc 1",
+      key: "files/test.pdf",
+      originalName: "test.pdf",
+      mimeType: "application/pdf",
+      size: 1000,
+      uploadedBy: new mongoose.Types.ObjectId(userIds.uploader),
+    } as any;
+
+    const updatedMaterial = {
+      _id: materialId,
+      lessonId,
+      title: "Doc 1",
+      key: undefined,
+      originalName: undefined,
+      mimeType: undefined,
+      size: undefined,
+      uploadedBy: { _id: new mongoose.Types.ObjectId(userIds.uploader) },
+    } as any;
+
+    it("admin deletes file successfully", async () => {
+      (LessonMaterialModel.findById as any).mockResolvedValue(materialWithFile);
+      (LessonModel.findById as any).mockReturnValue({ 
+        populate: jest.fn().mockResolvedValue({ 
+          courseId: { _id: courseId, teacherIds: [] } 
+        }) 
+      });
+      (removeFile as jest.Mock).mockResolvedValue(undefined);
+      (LessonMaterialModel.findByIdAndUpdate as any).mockReturnValue({ 
+        populate: jest.fn().mockReturnThis(), 
+        lean: jest.fn().mockResolvedValue(updatedMaterial) 
+      });
+
+      const result = await deleteFileOfMaterial(materialId.toString(), userIds.admin, Role.ADMIN);
+      expect(result.material).toBeDefined();
+      expect(result.deletedKey).toBe("files/test.pdf");
+      expect(removeFile).toHaveBeenCalledWith("files/test.pdf");
+      expect(LessonMaterialModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        materialId.toString(),
+        { $unset: { key: "", originalName: "", mimeType: "", size: "" } },
+        { new: true }
+      );
+    });
+
+    it("teacher instructor deletes file successfully", async () => {
+      (LessonMaterialModel.findById as any).mockResolvedValue(materialWithFile);
+      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      (LessonModel.findById as any).mockReturnValue({ 
+        populate: jest.fn().mockResolvedValue({ 
+          courseId: { _id: courseId, teacherIds: teacherIdsArray } 
+        }) 
+      });
+      (removeFile as jest.Mock).mockResolvedValue(undefined);
+      (LessonMaterialModel.findByIdAndUpdate as any).mockReturnValue({ 
+        populate: jest.fn().mockReturnThis(), 
+        lean: jest.fn().mockResolvedValue(updatedMaterial) 
+      });
+
+      const result = await deleteFileOfMaterial(materialId.toString(), userIds.teacher, Role.TEACHER);
+      expect(result.material).toBeDefined();
+      expect(removeFile).toHaveBeenCalled();
+    });
+
+    it("teacher uploader deletes file successfully", async () => {
+      (LessonMaterialModel.findById as any).mockResolvedValue(materialWithFile);
+      (LessonModel.findById as any).mockReturnValue({ 
+        populate: jest.fn().mockResolvedValue({ 
+          courseId: { _id: courseId, teacherIds: [] } 
+        }) 
+      });
+      (removeFile as jest.Mock).mockResolvedValue(undefined);
+      (LessonMaterialModel.findByIdAndUpdate as any).mockReturnValue({ 
+        populate: jest.fn().mockReturnThis(), 
+        lean: jest.fn().mockResolvedValue(updatedMaterial) 
+      });
+
+      const result = await deleteFileOfMaterial(materialId.toString(), userIds.uploader, Role.TEACHER);
+      expect(result.material).toBeDefined();
+      expect(removeFile).toHaveBeenCalled();
+    });
+
+    it("throws error when material not found", async () => {
+      const validMaterialId = new mongoose.Types.ObjectId().toString();
+      (LessonMaterialModel.findById as any).mockResolvedValue(null);
+      await expect(deleteFileOfMaterial(validMaterialId, userIds.admin, Role.ADMIN)).rejects.toThrow("Material not found");
+    });
+
+    it("throws error when material has no file (manual material)", async () => {
+      const manualMaterial = {
+        ...materialWithFile,
+        key: "manual-materials/test/uuid"
+      };
+      (LessonMaterialModel.findById as any).mockResolvedValue(manualMaterial);
+      await expect(deleteFileOfMaterial(materialId.toString(), userIds.admin, Role.ADMIN)).rejects.toThrow("This material does not have a file to delete");
+    });
+
+    it("throws error when material has no key", async () => {
+      const materialNoKey = {
+        ...materialWithFile,
+        key: null
+      };
+      (LessonMaterialModel.findById as any).mockResolvedValue(materialNoKey);
+      await expect(deleteFileOfMaterial(materialId.toString(), userIds.admin, Role.ADMIN)).rejects.toThrow("This material does not have a file to delete");
+    });
+
+    it("throws error when lesson not found", async () => {
+      (LessonMaterialModel.findById as any).mockResolvedValue(materialWithFile);
+      (LessonModel.findById as any).mockReturnValue({ 
+        populate: jest.fn().mockResolvedValue(null) 
+      });
+      await expect(deleteFileOfMaterial(materialId.toString(), userIds.admin, Role.ADMIN)).rejects.toThrow("Lesson not found");
+    });
+
+    it("throws error when student tries to delete", async () => {
+      (LessonMaterialModel.findById as any).mockResolvedValue(materialWithFile);
+      (LessonModel.findById as any).mockReturnValue({ 
+        populate: jest.fn().mockResolvedValue({ 
+          courseId: { _id: courseId, teacherIds: [] } 
+        }) 
+      });
+      await expect(deleteFileOfMaterial(materialId.toString(), userIds.student, Role.STUDENT)).rejects.toThrow("Students cannot delete lesson material files");
+    });
+
+    it("throws error when teacher is not authorized", async () => {
+      const otherTeacherId = new mongoose.Types.ObjectId();
+      (LessonMaterialModel.findById as any).mockResolvedValue(materialWithFile);
+      (LessonModel.findById as any).mockReturnValue({ 
+        populate: jest.fn().mockResolvedValue({ 
+          courseId: { _id: courseId, teacherIds: [otherTeacherId] } 
+        }) 
+      });
+      await expect(deleteFileOfMaterial(materialId.toString(), userIds.teacher, Role.TEACHER)).rejects.toThrow("Not authorized to delete this material file");
+    });
+
+    it("throws error when MinIO deletion fails", async () => {
+      (LessonMaterialModel.findById as any).mockResolvedValue(materialWithFile);
+      (LessonModel.findById as any).mockReturnValue({ 
+        populate: jest.fn().mockResolvedValue({ 
+          courseId: { _id: courseId, teacherIds: [] } 
+        }) 
+      });
+      (removeFile as jest.Mock).mockRejectedValue(new Error("MinIO error"));
+      await expect(deleteFileOfMaterial(materialId.toString(), userIds.admin, Role.ADMIN)).rejects.toThrow("Failed to delete file from storage");
+    });
+
+    it("throws error for invalid material ID format", async () => {
+      await expect(deleteFileOfMaterial("invalid", userIds.admin, Role.ADMIN)).rejects.toThrow("Invalid material ID format");
     });
   });
 });

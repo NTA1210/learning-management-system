@@ -18,6 +18,7 @@ import {
   AnnouncementModel,
   LessonProgressModel,
   MajorModel,
+  SessionModel,
   SpecialistModel,
   QuizQuestionModel,
   SubjectModel,
@@ -30,9 +31,6 @@ import {
 import { QuizQuestionType } from "../types/quizQuestion.type";
 import { CourseStatus } from "../types/course.type";
 import { SubmissionStatus } from "../types/submission.type";
-import { ForumType } from "../types/forum.type";
-import { NotificationType } from "../types/notification.type";
-import { AttendanceStatus } from "../types/attendance.type";
 import { MONGO_URI } from "../constants/env";
 
 async function seed() {
@@ -150,6 +148,22 @@ async function seed() {
       },
     ]);
 
+    // Sessions (2)
+    const sessions = await SessionModel.create([
+      {
+        courseId: courses[0]._id,
+        title: "Session 1",
+        startAt: new Date(),
+        endAt: new Date(Date.now() + 3600 * 1000),
+      },
+      {
+        courseId: courses[1]._id,
+        title: "Session A",
+        startAt: new Date(),
+        endAt: new Date(Date.now() + 7200 * 1000),
+      },
+    ]);
+
     // Enrollments (2-3)
     const enrollments = await EnrollmentModel.create([
       {
@@ -232,21 +246,15 @@ async function seed() {
       {
         lessonId: lessons[0]._id,
         title: "JS Basics PDF",
-        note: "Essential JavaScript concepts and syntax",
-        originalName: "js-basics.pdf",
-        mimeType: "application/pdf",
-        key: `courses/${courses[0]._id}/lessons/${lessons[0]._id}/js-basics.pdf`,
-        size: 1024 * 512, // 512KB
+        type: "pdf",
+        fileUrl: "/files/js-basics.pdf",
         uploadedBy: users[1]._id,
       },
       {
         lessonId: lessons[2]._id,
-        title: "UI Design Slides",
-        note: "UI principles and best practices",
-        originalName: "ui-design.pptx",
-        mimeType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        key: `courses/${courses[1]._id}/lessons/${lessons[2]._id}/ui-design.pptx`,
-        size: 1024 * 1024 * 3, // 3MB
+        title: "UI Slides",
+        type: "ppt",
+        fileUrl: "/files/ui-design.ppt",
         uploadedBy: users[1]._id,
       },
     ]);
@@ -279,20 +287,16 @@ async function seed() {
       {
         courseId: courses[0]._id,
         title: "JS Exercise 1",
-        description: "Complete exercises on variables, functions, and control structures",
         maxScore: 100,
         createdBy: users[1]._id,
         dueDate: new Date(Date.now() + 7 * 24 * 3600 * 1000),
-        allowLate: true,
       },
       {
         courseId: courses[1]._id,
         title: "Design Project",
-        description: "Create a wireframe and mockup for a mobile app",
         maxScore: 100,
         createdBy: users[1]._id,
         dueDate: new Date(Date.now() + 10 * 24 * 3600 * 1000),
-        allowLate: false,
       },
     ]);
 
@@ -326,62 +330,31 @@ async function seed() {
       },
     ]);
 
-    // Quiz Questions (3-4)
-    const quizQuestions = await QuizQuestionModel.create([
-      {
-        subjectId: subjects[0]._id,
-        text: "What is JS?",
-        type: QuizQuestionType.MCQ,
-        options: ["Language", "Framework", "Library", "Tool"],
-        correctOptions: [0],
-        points: 1,
-        explanation: "JavaScript is a programming language.",
-      },
-      {
-        subjectId: subjects[0]._id,
-        text: "Is JS client-side only?",
-        type: QuizQuestionType.TRUE_FALSE,
-        options: ["True", "False"],
-        correctOptions: [1],
-        points: 1,
-        explanation: "JavaScript can run on both client-side (browser) and server-side (Node.js).",
-      },
-      {
-        subjectId: subjects[1]._id,
-        text: "What does UX stand for?",
-        type: QuizQuestionType.FILL_BLANK,
-        options: ["User Experience", "User eXperience", "UX"],
-        correctOptions: [1, 1, 0], // First two are correct, third is wrong
-        points: 2,
-        explanation: "UX stands for User Experience.",
-      },
-    ]);
-
-    // Quizzes (2)
+    // Quizzes with nested questions (2)
     const quizzes = await QuizModel.create([
       {
         courseId: courses[0]._id,
         title: "JS Quiz 1",
-        description: "Test your JavaScript knowledge",
-        startTime: new Date(),
-        endTime: new Date(Date.now() + 7 * 24 * 3600 * 1000), // 7 days
-        shuffleQuestions: true,
-        questionIds: [quizQuestions[0]._id, quizQuestions[1]._id],
-        isPublished: true,
-        isCompleted: false,
-        createdBy: users[1]._id,
+        questions: [
+          {
+            text: "What is JS?",
+            type: "mcq",
+            options: ["Language", "Framework"],
+            correct: 0,
+          },
+          {
+            text: "Is JS client-side only?",
+            type: "truefalse",
+            correct: false,
+          },
+        ],
       },
       {
         courseId: courses[1]._id,
         title: "Design Quiz",
-        description: "UX/UI Design basics",
-        startTime: new Date(),
-        endTime: new Date(Date.now() + 10 * 24 * 3600 * 1000), // 10 days
-        shuffleQuestions: false,
-        questionIds: [quizQuestions[2]._id],
-        isPublished: true,
-        isCompleted: false,
-        createdBy: users[1]._id,
+        questions: [
+          { text: "What is UX?", type: "short", correct: "User Experience" },
+        ],
       },
     ]);
 
@@ -390,32 +363,13 @@ async function seed() {
       {
         quizId: quizzes[0]._id,
         studentId: users[2]._id,
-        startedAt: new Date(),
-        submittedAt: new Date(),
-        durationSeconds: 600, // 10 minutes
-        score: 80,
         status: "completed",
-        answers: [
-          {
-            questionId: quizQuestions[0]._id,
-            answer: [0],
-            correct: true,
-            pointsEarned: 1,
-          },
-          {
-            questionId: quizQuestions[1]._id,
-            answer: [1],
-            correct: true,
-            pointsEarned: 1,
-          },
-        ],
+        score: 80,
       },
       {
         quizId: quizzes[1]._id,
         studentId: users[3]._id,
-        startedAt: new Date(),
         status: "in_progress",
-        answers: [],
       },
     ]);
 
@@ -424,19 +378,11 @@ async function seed() {
       {
         courseId: courses[0]._id,
         title: "General Discussion",
-        description: "A place to discuss JavaScript topics",
-        forumType: ForumType.DISCUSSION,
-        isActive: true,
-        isArchived: false,
         createdBy: users[1]._id,
       },
       {
         courseId: courses[1]._id,
-        title: "Course Announcements",
-        description: "Important updates about the course",
-        forumType: ForumType.ANNOUNCEMENT,
-        isActive: true,
-        isArchived: false,
+        title: "Design Talk",
         createdBy: users[1]._id,
       },
     ]);
@@ -445,135 +391,83 @@ async function seed() {
       {
         forumId: forums[0]._id,
         authorId: users[2]._id,
-        title: "Welcome Post",
-        content: "Hello everyone! Excited to learn JavaScript together.",
-        pinned: true,
-        replyCount: 1,
+        content: "Hello everyone!",
       },
       {
         forumId: forums[1]._id,
-        authorId: users[1]._id,
-        title: "Design Assignment Tips",
-        content: "Here are some helpful tips for the upcoming design assignment.",
-        pinned: false,
-        replyCount: 1,
+        authorId: users[3]._id,
+        content: "Design tips?",
       },
     ]);
 
     const replies = await ForumReplyModel.create([
-      {
-        postId: posts[0]._id,
-        authorId: users[1]._id,
-        content: "Welcome! Great to have you here.",
-      },
+      { postId: posts[0]._id, authorId: users[1]._id, content: "Welcome!" },
       {
         postId: posts[1]._id,
         authorId: users[1]._id,
-        content: "Start with user research and understanding your target audience.",
+        content: "Start with user research.",
       },
     ]);
 
-    // Nested reply (reply to a reply)
-    const nestedReply = await ForumReplyModel.create({
-      postId: posts[0]._id,
-      authorId: users[2]._id,
-      content: "Thank you! Looking forward to learning together.",
-      parentReplyId: replies[0]._id,
-    });
-
-    // Attendance (3)
+    // Attendance (2)
     const attendance = await AttendanceModel.create([
       {
         courseId: courses[0]._id,
         studentId: users[2]._id,
         date: new Date(),
-        status: AttendanceStatus.PRESENT,
+        status: "present",
         markedBy: users[1]._id,
       },
       {
         courseId: courses[0]._id,
         studentId: users[3]._id,
         date: new Date(),
-        status: AttendanceStatus.ABSENT,
-        markedBy: users[1]._id,
-      },
-      {
-        courseId: courses[1]._id,
-        studentId: users[2]._id,
-        date: new Date(Date.now() - 24 * 3600 * 1000), // Yesterday
-        status: AttendanceStatus.LATE,
+        status: "absent",
         markedBy: users[1]._id,
       },
     ]);
 
-    // Notifications (3)
+    // Notifications (2)
     const notifications = await NotificationModel.create([
       {
-        title: "Welcome to LMS",
-        message: "Welcome to our Learning Management System! Start exploring courses.",
-        sender: users[0]._id,
+        title: "Welcome",
+        message: "Welcome to LMS!",
         recipientUser: users[2]._id,
-        recipientType: NotificationType.USER,
-        isRead: false,
       },
       {
-        title: "Assignment Due Soon",
-        message: "JS Exercise 1 is due in 7 days. Don't forget to submit!",
-        sender: users[1]._id,
+        title: "Assignment due",
+        message: "Assignment is due soon",
         recipientUser: users[3]._id,
-        recipientType: NotificationType.USER,
-        isRead: false,
-      },
-      {
-        title: "New Quiz Available",
-        message: "A new quiz has been published in JavaScript course",
-        sender: users[1]._id,
-        recipientCourse: courses[0]._id,
-        recipientType: NotificationType.COURSE,
-        isRead: false,
       },
     ]);
 
     // Announcements (2)
     const announcements = await AnnouncementModel.create([
       {
-        title: "New Course Available",
-        content: "We're excited to announce our new JavaScript course! Enrollment is now open.",
+        title: "New Course",
+        content: "Check out our new course",
         courseId: courses[0]._id,
         authorId: users[1]._id,
-        publishedAt: new Date(),
       },
       {
-        title: "System Maintenance Scheduled",
-        content: "System maintenance is scheduled for this weekend. The platform may be unavailable for a few hours.",
+        title: "Maintenance",
+        content: "System maintenance scheduled",
         courseId: null,
         authorId: users[0]._id,
-        publishedAt: new Date(),
       },
     ]);
 
+    const quizQuestion = await QuizQuestionModel.create({
+      subjectId: subjects[0]._id,
+      text: "What is JS?",
+      type: QuizQuestionType.MCQ,
+      options: ["Language", "Framework"],
+      correctOptions: [0],
+      points: 1,
+      explanation: "JavaScript is a programming language, not a framework.",
+    });
+
     console.log("Seeding finished");
-    console.log(`Created:`);
-    console.log(`- ${users.length} users`);
-    console.log(`- ${majors.length} majors`);
-    console.log(`- ${specialists.length} specialists`);
-    console.log(`- ${subjects.length} subjects`);
-    console.log(`- ${courses.length} courses`);
-    console.log(`- ${enrollments.length} enrollments`);
-    console.log(`- ${lessons.length} lessons`);
-    console.log(`- ${materials.length} lesson materials`);
-    console.log(`- ${progresses.length} lesson progresses`);
-    console.log(`- ${assignments.length} assignments`);
-    console.log(`- ${submissions.length} submissions`);
-    console.log(`- ${quizQuestions.length} quiz questions`);
-    console.log(`- ${quizzes.length} quizzes`);
-    console.log(`- ${quizAttempts.length} quiz attempts`);
-    console.log(`- ${forums.length} forums`);
-    console.log(`- ${posts.length} forum posts`);
-    console.log(`- ${replies.length} forum replies`);
-    console.log(`- ${attendance.length} attendance records`);
-    console.log(`- ${notifications.length} notifications`);
-    console.log(`- ${announcements.length} announcements`);
     process.exit(0);
   } catch (err) {
     console.error("Seeding error:", err);

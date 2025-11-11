@@ -18,8 +18,9 @@ import {
   UpdateLessonMaterialSchema,
   UploadMaterialSchema,
 } from "../validators/lessonMaterial.shemas";
-import { OK } from "../constants/http";
+import { BAD_REQUEST, FORBIDDEN, NOT_FOUND, OK } from "../constants/http";
 import { Role } from "../types";
+import appAssert from "@/utils/appAssert";
 
 // Get all lesson materials with filtering
 export const listAllLessonMaterialsController = catchErrors(

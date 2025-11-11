@@ -39,7 +39,12 @@ import {
   specialistPublicRoutes,
   forumProtectedRoutes,
   forumPublicRoutes,
+<<<<<<< BE_LMS/src/app.ts
+  subjectProtectedRoutes,
+  subjectPublicRoutes,
+=======
   quizRoutes,
+>>>>>>> BE_LMS/src/app.ts
 } from "./routes";
 
 export const createApp = () => {
@@ -60,7 +65,7 @@ export const createApp = () => {
   app.get("/", (req, res) => {
     res.status(OK).send("Hello World!");
   });
-
+ 
   app.post("/uploadExample", upload.single("file"), async (req, res) => {
     const file = req.file;
     if (!file) {
@@ -84,7 +89,7 @@ export const createApp = () => {
   app.use("/majors", majorPublicRoutes);
   app.use("/specialists", specialistPublicRoutes);
   app.use("/forums", forumPublicRoutes);
-
+  app.use("/subjects", subjectPublicRoutes);
   //protected routes
   app.use("/users", authenticate, userRoutes);
   app.use("/sessions", authenticate, authorize(Role.ADMIN), sessionRoutes);
@@ -94,8 +99,8 @@ export const createApp = () => {
   app.use("/majors", authenticate, majorProtectedRoutes);
   app.use("/specialists", authenticate, specialistProtectedRoutes);
   app.use("/forums", authenticate, forumProtectedRoutes);
+  app.use("/subjects", authenticate, subjectProtectedRoutes);
   app.use("/quizzes", quizRoutes);
-
   app.use(errorHandler);
 
   return app;
