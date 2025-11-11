@@ -46,7 +46,14 @@ export const listCoursesSchema = z.object({
       return false;
     }), // Admin only - show only deleted courses
   sortBy: z
-    .enum(["createdAt", "title", "updatedAt", "startDate", "endDate", "deletedAt"])
+    .enum([
+      "createdAt",
+      "title",
+      "updatedAt",
+      "startDate",
+      "endDate",
+      "deletedAt",
+    ])
     .optional(),
   sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
 });
@@ -76,17 +83,27 @@ export const createCourseSchema = z
         if (!val) return CourseStatus.DRAFT;
         // Transform to lowercase to match enum values
         const normalized = val.toLowerCase();
-        if (normalized === "draft" || normalized === "ongoing" || normalized === "completed") {
+        if (
+          normalized === "draft" ||
+          normalized === "ongoing" ||
+          normalized === "completed"
+        ) {
           return normalized as CourseStatus;
         }
         return val;
       })
-      .pipe(z.enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED]))
+      .pipe(
+        z.enum([
+          CourseStatus.DRAFT,
+          CourseStatus.ONGOING,
+          CourseStatus.COMPLETED,
+        ])
+      )
       .default(CourseStatus.DRAFT),
     teacherIds: z
       .union([
-        z.array(z.string()), // Already array
         z.string().transform((val) => JSON.parse(val)), // Parse JSON string from multipart
+        z.array(z.string()), // Already array
       ])
       .pipe(z.array(z.string()).min(1, "At least one teacher is required")), // Required
     isPublished: z
@@ -98,10 +115,7 @@ export const createCourseSchema = z
       .default(false),
     // ✅ UNIVERSITY RULE: Capacity must be reasonable (10-500 students per class)
     capacity: z
-      .union([
-        z.number(),
-        z.string().transform((val) => parseInt(val, 10)),
-      ])
+      .union([z.number(), z.string().transform((val) => parseInt(val, 10))])
       .pipe(z.number().int().min(1).max(500))
       .optional(),
     enrollRequiresApproval: z
@@ -148,12 +162,24 @@ export const updateCourseSchema = z
         if (!val) return undefined;
         // Transform to lowercase to match enum values
         const normalized = val.toLowerCase();
-        if (normalized === "draft" || normalized === "ongoing" || normalized === "completed") {
+        if (
+          normalized === "draft" ||
+          normalized === "ongoing" ||
+          normalized === "completed"
+        ) {
           return normalized as CourseStatus;
         }
         return val;
       })
-      .pipe(z.enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED]).optional()),
+      .pipe(
+        z
+          .enum([
+            CourseStatus.DRAFT,
+            CourseStatus.ONGOING,
+            CourseStatus.COMPLETED,
+          ])
+          .optional()
+      ),
     teacherIds: z
       .union([
         z.array(z.string()),
@@ -169,10 +195,7 @@ export const updateCourseSchema = z
       .optional(),
     // ✅ UNIVERSITY RULE: Capacity must be reasonable (10-500 students per class)
     capacity: z
-      .union([
-        z.number(),
-        z.string().transform((val) => parseInt(val, 10)),
-      ])
+      .union([z.number(), z.string().transform((val) => parseInt(val, 10))])
       .pipe(z.number().int().min(1).max(500))
       .optional(),
     enrollRequiresApproval: z

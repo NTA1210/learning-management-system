@@ -13,8 +13,8 @@ export default interface IQuizQuestion extends mongoose.Document {
   image?: string;
   key?: string;
   type: QuizQuestionType;
-  options?: string[]; // for MCQ
-  correctOptions?: any; // for auto-graded (index or array)
+  options: string[]; // for MCQ
+  correctOptions: any; // for auto-graded (index or array)
   points: number | 0;
   explanation?: string;
   createdAt?: Date;

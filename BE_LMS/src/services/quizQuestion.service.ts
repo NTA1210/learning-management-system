@@ -4,7 +4,7 @@ import { ListParams } from "@/types/dto";
 import IQuizQuestion, { QuizQuestionType } from "@/types/quizQuestion.type";
 import appAssert from "@/utils/appAssert";
 import { prefixQuizQuestionImage } from "@/utils/filePrefix";
-import { removeFile, uploadFile } from "@/utils/uploadFile";
+import { removeFile, removeFiles, uploadFile } from "@/utils/uploadFile";
 import {
   ICreateQuizQuestionParams,
   IGetRandomQuestionsParams,
@@ -23,39 +23,37 @@ import { create } from "xmlbuilder";
  * @returns Promise resolving to an array of imported questions.
  */
 export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
-  // 1️⃣ Convert buffer → string
+  const subject = await SubjectModel.findById(subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+
   const xmlContent = xmlBuffer.toString("utf-8");
 
-  // 2️⃣ Parse XML → JSON
   const result = await parseStringPromise(xmlContent, {
     explicitArray: true,
     trim: true,
   });
+
   const questions = result.quiz?.question || [];
-
-  const importedQuestions = [];
   const importedTypes = new Set<QuizQuestionType>();
+  const typeMap: Record<string, QuizQuestionType> = {
+    truefalse: QuizQuestionType.TRUE_FALSE,
+    multichoice: QuizQuestionType.MULTIPLE_CHOICE,
+    shortanswer: QuizQuestionType.FILL_BLANK,
+  };
+  const importedQuestions: Partial<IQuizQuestion>[] = [];
 
-  // 3️⃣ Duyệt từng câu hỏi
   for (const q of questions) {
     const typeAttr = q.$?.type || "mcq";
     if (typeAttr === "category") continue;
 
-    // Tên và text câu hỏi
     const questionName = q.name?.[0]?.text?.[0] || "Unnamed question";
     const questionText = q.questiontext?.[0]?.text?.[0] || "";
 
     // Loại câu hỏi
-    let type = QuizQuestionType.MCQ;
-    if (typeAttr === "truefalse") type = QuizQuestionType.TRUE_FALSE;
-    else if (typeAttr === "multichoice")
-      type = QuizQuestionType.MULTIPLE_CHOICE;
-    else if (typeAttr === "shortanswer") type = QuizQuestionType.FILL_BLANK;
+    const type = typeMap[typeAttr] || QuizQuestionType.MCQ;
 
-    // Kiem tra loai cau hoi
     importedTypes.add(type);
 
-    // Đáp án
     const answers = q.answer || [];
     const options: string[] = [];
     const correctOptions: number[] = [];
@@ -64,28 +62,26 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
       const text = ans.text?.[0] || "";
       const fraction = parseFloat(ans.$?.fraction || "0");
       options.push(text);
-      if (fraction > 0) correctOptions.push(1);
-      else correctOptions.push(0);
+      correctOptions.push(fraction > 0 ? 1 : 0);
     });
 
     // Tạo object câu hỏi
-    const newQuestion = new QuizQuestionModel({
-      subjectId,
+    const newQuestion = {
+      subjectId: new mongoose.Types.ObjectId(subjectId),
       text: questionText || questionName,
       type,
       options,
       correctOptions,
       points: parseFloat(q.defaultgrade?.[0] || "1"),
       explanation: "",
-    });
-
-    await newQuestion.save();
+    };
     importedQuestions.push(newQuestion);
   }
+  const quizzes = await QuizQuestionModel.insertMany(importedQuestions);
   return {
-    data: importedQuestions,
+    data: quizzes,
     total: importedQuestions.length,
-    importedTypes: importedTypes,
+    importedTypes,
   };
 };
 
@@ -94,12 +90,20 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
  * @param quizQuestions Array of questions to export.
  * @returns Object containing XML string and total number of questions.
  */
-export const exportXMLFile = async (
-  quizQuestions: IQuizQuestion[],
-  subjectId: string
-) => {
+export const exportXMLFile = async (subjectId: string) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
+
+  const quizQuestions = await QuizQuestionModel.find({
+    subjectId,
+  }).lean<IQuizQuestion[]>();
+
+  appAssert(
+    quizQuestions.length > 0,
+    NOT_FOUND,
+    "No questions found for this subject"
+  );
+
   const subjectCode = subject.code;
 
   const root = create({ version: "1.0", encoding: "UTF-8" }).ele("quiz");
@@ -217,14 +221,21 @@ export const getAllQuizQuestions = async ({
   type,
 }: Partial<IListQuizQuestionParams>) => {
   const query: FilterQuery<IQuizQuestion> = {};
+  const projection: any = {};
 
   if (subjectId) {
     const subject = await SubjectModel.findById(subjectId);
     appAssert(subject, NOT_FOUND, "Subject not found");
     query.subjectId = subjectId;
   }
+
   if (type) query.type = type;
-  if (search) query.$text = { $search: search };
+
+  // Nếu có search => dùng $text
+  if (search) {
+    query.$text = { $search: search };
+    projection.score = { $meta: "textScore" };
+  }
 
   if (from || to) {
     query.createdAt = {};
@@ -232,14 +243,17 @@ export const getAllQuizQuestions = async ({
     if (to) query.createdAt.$lte = to;
   }
 
-  // validate & limit input
   const _page = Math.max(1, page);
   const _limit = Math.min(Math.max(1, limit), 100);
   const sortDirection = sortOrder === "asc" ? 1 : -1;
 
+  // Nếu có search, sort theo score trước, sau đó mới sort theo createdAt nếu muốn
+  let sortObj: any = { createdAt: sortDirection };
+  if (search) sortObj = { score: { $meta: "textScore" } };
+
   const [data, total] = await Promise.all([
-    QuizQuestionModel.find(query)
-      .sort({ createdAt: sortDirection })
+    QuizQuestionModel.find(query, projection)
+      .sort(sortObj)
       .skip((_page - 1) * _limit)
       .limit(_limit),
     QuizQuestionModel.countDocuments(query),
@@ -248,7 +262,7 @@ export const getAllQuizQuestions = async ({
   const totalPages = Math.ceil(total / _limit);
 
   return {
-    data,
+    data, // mỗi document sẽ có thêm field "score" nếu search
     pagination: {
       totalItems: total,
       currentPage: _page,
@@ -258,6 +272,20 @@ export const getAllQuizQuestions = async ({
       hasPrev: _page > 1,
     },
   };
+};
+
+const handleImageUpload = async (
+  file: Express.Multer.File,
+  subjectId: string,
+  quizQuestionId: string,
+  oldKey?: string
+) => {
+  if (oldKey) await removeFile(oldKey);
+  const prefix = prefixQuizQuestionImage(subjectId, quizQuestionId);
+  const result = await uploadFile(file, prefix);
+  console.log("TYPE UPLOAD : ", typeof result.key);
+
+  return result;
 };
 
 /**
@@ -300,11 +328,11 @@ export const createQuizQuestion = async ({
   // 2️⃣ Nếu có ảnh, upload và cập nhật sau
   if (image) {
     try {
-      const questionPrefix = prefixQuizQuestionImage(
+      const { publicUrl, key } = await handleImageUpload(
+        image,
         subjectId,
         newQuizQuestion.id
       );
-      const { publicUrl, key } = await uploadFile(image, questionPrefix);
       await QuizQuestionModel.findByIdAndUpdate(newQuizQuestion._id, {
         image: publicUrl,
         key,
@@ -322,6 +350,7 @@ export const createQuizQuestion = async ({
 /**
  * Update an existing quiz question.
  * Allow admin to update a question.
+ * Kiem tra options va correctOptions khi update có trùng length khong
  * @param  params - Parameters to update a quiz question.
  * @param  params.quizQuestionId - ID of the quiz question to update.
  * @param  params.subjectId - ID of the subject to update the question for.
@@ -345,21 +374,49 @@ export const updateQuizQuestion = async ({
   points = 1,
   explanation,
 }: IUpdateQuizQuestionParams) => {
-  const quizQuestion = await QuizQuestionModel.findById(quizQuestionId);
+  const quizQuestion = await QuizQuestionModel.findById(quizQuestionId).lean();
   appAssert(quizQuestion, NOT_FOUND, "Question not found");
 
-  const subject = await SubjectModel.findById(subjectId);
-  appAssert(subject, NOT_FOUND, "Subject not found");
+  if (subjectId) {
+    const subject = await SubjectModel.findById(subjectId);
+    appAssert(subject, NOT_FOUND, "Subject not found");
+  }
+
+  // 1️⃣ Kiem tra options va correctOptions khi update có trùng length khong
+  let optionsLength = quizQuestion.options.length;
+  let correctOptionsLength = quizQuestion.correctOptions.length;
+
+  if (options) {
+    optionsLength = options.length;
+  }
+
+  if (correctOptions) {
+    correctOptionsLength = correctOptions.length;
+  }
+
+  const optionsErrorMessage =
+    options && correctOptions
+      ? "Options and correct options must have the same length"
+      : options
+      ? `Options must have the length of ${correctOptionsLength}`
+      : `Correct options must have the length of ${optionsLength}`;
+
+  appAssert(
+    optionsLength === correctOptionsLength,
+    BAD_REQUEST,
+    optionsErrorMessage
+  );
 
   let publicUrl = quizQuestion.image;
   let key = quizQuestion.key;
-  // 2️⃣ Nếu có ảnh, upload và cập nhật sau
+  // 2️⃣ Nếu có ảnh, upload và cập nhật sau 1
   if (image) {
-    if (quizQuestion.image) {
-      if (quizQuestion.key) await removeFile(quizQuestion.key);
-    }
-    const questionPrefix = prefixQuizQuestionImage(subjectId, quizQuestionId);
-    const result = await uploadFile(image, questionPrefix);
+    const result = await handleImageUpload(
+      image,
+      subjectId?.toString() || quizQuestion.subjectId.toString(),
+      quizQuestionId,
+      key
+    );
     publicUrl = result.publicUrl;
     key = result.key;
   }
@@ -367,7 +424,7 @@ export const updateQuizQuestion = async ({
   const updatedQuizQuestion = await QuizQuestionModel.findByIdAndUpdate(
     quizQuestionId,
     {
-      subjectId,
+      subjectId: subjectId || quizQuestion.subjectId,
       text,
       type,
       options,
@@ -427,7 +484,7 @@ export const deleteMultipleQuizQuestions = async (ids: string[]) => {
   // Kiem tra xem cac ID cua cau hoi co ton tai khong
   const questions = await QuizQuestionModel.find({
     _id: { $in: ids },
-  });
+  }).lean();
   appAssert(
     questions.length === ids.length,
     BAD_REQUEST,
@@ -449,11 +506,9 @@ export const deleteMultipleQuizQuestions = async (ids: string[]) => {
   // Xóa thật (hoặc soft delete)
   await QuizQuestionModel.deleteMany({ _id: { $in: ids } });
 
-  for (const question of questions) {
-    if (question.image) {
-      if (question.key) await removeFile(question.key);
-    }
-  }
+  const fileKeys: string[] = questions.flatMap((q) => (q.key ? [q.key] : []));
+
+  await removeFiles(fileKeys);
 
   return { message: "Deleted successfully" };
 };
@@ -466,9 +521,15 @@ export const getRandomQuestions = async ({
   appAssert(subject, NOT_FOUND, "Subject not found");
 
   const questions = await QuizQuestionModel.aggregate([
-    { $match: { subjectId } },
+    { $match: { subjectId: subject._id } },
     { $sample: { size: count } },
   ]);
 
-  return questions;
+  const questionTypes = new Set(questions.map((q) => q.type));
+
+  return {
+    data: questions,
+    total: questions.length,
+    questionTypes: Array.from(questionTypes),
+  };
 };
