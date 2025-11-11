@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { AnyConnectionBulkWriteModel } from "mongoose";
 import LessonMaterialModel from "../models/lessonMaterial.model";
 import LessonModel from "../models/lesson.model";
 import CourseModel from "../models/course.model";
@@ -15,9 +15,10 @@ import {
   BAD_REQUEST,
 } from "../constants/http";
 import { Role } from "../types";
-import { uploadFile, uploadFiles, getSignedUrl } from "../utils/uploadFile";
+import { uploadFile, uploadFiles, getSignedUrl, removeFile, removeFiles } from "../utils/uploadFile";
 import { prefixLessonMaterial } from "../utils/filePrefix";
 import { v4 } from "uuid";
+import { removeDirAndFiles } from "minio";
 // Get all lesson materials with filtering and access control
 /**
  * Yêu cầu nghiệp vụ: Liệt kê tài liệu bài học với lọc/tìm kiếm/phân trang.
@@ -760,4 +761,89 @@ export const getMaterialForDownload = async (id: string) => {
   
   appAssert(material, NOT_FOUND, "Material not found");
   return material;
+};
+
+//Delete file of material
+/** 
+ * Yêu cầu nghiệp vụ: Xóa file của tài liệu bởi admin và giảng viên dạy bộ môn đó
+ * - Xóa file trên MinIO (nếu có key)
+ * - Xóa các thông tin liên quan đến file trong DB (key, originalName, mimeType, size)
+ * - Giữ lại material record (chỉ xóa thông tin file)
+ */
+export const deleteFileOfMaterial = async (
+  materialId: string,
+  userId: string,
+  userRole: Role
+) => {
+  // ✅ Validate material ID
+  appAssert(
+    mongoose.Types.ObjectId.isValid(materialId),
+    NOT_FOUND,
+    "Invalid material ID format"
+  );
+
+  // ✅ Lấy thông tin material
+  const material = await LessonMaterialModel.findById(materialId);
+  appAssert(material, NOT_FOUND, "Material not found");
+
+  // ✅ Kiểm tra material có file không
+  if (!material.key || material.key.startsWith('manual-materials/')) {
+    appAssert(false, BAD_REQUEST, "This material does not have a file to delete");
+  }
+
+  // ✅ Lấy thông tin lesson và kiểm tra quyền
+  const lesson = await LessonModel.findById(material.lessonId).populate(
+    "courseId",
+    "teacherIds"
+  );
+  appAssert(lesson, NOT_FOUND, "Lesson not found");
+
+  if (userRole === Role.STUDENT) {
+    appAssert(false, FORBIDDEN, "Students cannot delete lesson material files");
+  } else if (userRole === Role.TEACHER) {
+    // Check if teacher uploaded this material or is instructor of the lesson's course
+    const isUploader = material.uploadedBy && material.uploadedBy.toString() === userId;
+    const isInstructor = lesson && (lesson.courseId as any).teacherIds.some(
+      (t: mongoose.Types.ObjectId) => t.toString() === userId
+    );
+    appAssert(
+      isUploader || isInstructor,
+      FORBIDDEN,
+      "Not authorized to delete this material file"
+    );
+  }
+
+  // ✅ Lưu key để xóa trên MinIO
+  const fileKey = material.key;
+
+  // ✅ Xóa file vật lý trên MinIO
+  try {
+    await removeFile(fileKey);
+  } catch (err) {
+    console.error("❌ Error removing file from MinIO:", err);
+    appAssert(false, BAD_REQUEST, "Failed to delete file from storage");
+  }
+
+  // ✅ Xóa thông tin file trong MongoDB (giữ lại material record)
+  const updatedMaterial = await LessonMaterialModel.findByIdAndUpdate(
+    materialId,
+    {
+      $unset: {
+        key: "",
+        originalName: "",
+        mimeType: "",
+        size: ""
+      }
+    },
+    { new: true }
+  )
+    .populate('lessonId', 'title courseId')
+    .populate('uploadedBy', 'firstName lastName email')
+    .lean();
+
+  return {
+    material: updatedMaterial,
+    deletedKey: fileKey,
+    message: "File deleted successfully"
+  };
 };

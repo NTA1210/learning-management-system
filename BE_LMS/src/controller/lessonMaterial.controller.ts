@@ -6,7 +6,8 @@ import {
   updateLessonMaterial,
   deleteLessonMaterial,
   uploadLessonMaterial,
-  getMaterialForDownload
+  getMaterialForDownload,
+  deleteFileOfMaterial
 } from "../services/lessonMaterial.service";
 import { getSignedUrl } from "../utils/uploadFile";
 import { catchErrors } from "../utils/asyncHandler";
@@ -17,7 +18,6 @@ import {
   CreateLessonMaterialSchema,
   UpdateLessonMaterialSchema,
   UploadMaterialSchema
-  
 } from "../validators/lessonMaterial.shemas";
 import { BAD_REQUEST, FORBIDDEN, NOT_FOUND, OK } from "../constants/http";
 import { Role } from "../types";
@@ -224,4 +224,28 @@ export const downloadLessonMaterialController = catchErrors(async (req, res) => 
       data: downloadData,
       message: "Material ready for download"
     });
+});
+
+export const deleteLessonMaterialFile = catchErrors(async (req, res) => {
+  const { id } = req.params; // id của material
+
+  // Validate material ID
+  const validatedParams = LessonMaterialByIdSchema.parse({ id });
+
+  // Lấy thông tin người dùng từ middleware xác thực
+  const userId = req.userId?.toString();
+  const userRole = req.role;
+
+  // Gọi service để xử lý logic xóa file của material
+  const result = await deleteFileOfMaterial(
+    validatedParams.id, // materialId
+    userId,
+    userRole
+  );
+
+  // Trả kết quả cho client
+  return res.success(OK, {
+    data: result,
+    message: "Deleted file successfully",
+  });
 });

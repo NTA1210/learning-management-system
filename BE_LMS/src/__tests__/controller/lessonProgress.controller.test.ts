@@ -106,12 +106,10 @@ describe("⏳ LessonProgress Controller Unit Tests", () => {
       req.body = null;
       (schemas.LessonIdParamSchema.parse as jest.Mock).mockReturnValue({ lessonId });
       await addTimeForLessonController(req as Request, res as Response, next);
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: "Request body is required with incSeconds field",
-        data: null
-      });
+      expect(next).toHaveBeenCalled();
+      const error = (next as jest.Mock).mock.calls[0][0];
+      expect(error.message).toBe("Request body is required with incSeconds field");
+      expect(error.statusCode).toBe(400);
     });
 
     it("returns 400 when incSeconds is missing", async () => {
@@ -120,12 +118,10 @@ describe("⏳ LessonProgress Controller Unit Tests", () => {
       req.body = {};
       (schemas.LessonIdParamSchema.parse as jest.Mock).mockReturnValue({ lessonId });
       await addTimeForLessonController(req as Request, res as Response, next);
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: "Request body is required with incSeconds field",
-        data: null
-      });
+      expect(next).toHaveBeenCalled();
+      const error = (next as jest.Mock).mock.calls[0][0];
+      expect(error.message).toBe("Request body is required with incSeconds field");
+      expect(error.statusCode).toBe(400);
     });
 
     it("handles validation errors for params", async () => {

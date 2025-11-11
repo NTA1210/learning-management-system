@@ -14,7 +14,7 @@ import {
   autocompleteSchema,
   relatedSubjectsSchema,
 
-} from "../validators/subject.schemas";
+} from "../validators/subject.schemas"; 
 import {
   listSubjects,
   getSubjectById,
@@ -22,7 +22,6 @@ import {
   listPrerequisites,
   searchSubjectsAutocomplete,
   getRelatedSubjects,
- 
 } from "../services/subject.service";
 
 // GET /subjects - Liệt kê Subject (search, lọc, phân trang, sắp xếp)

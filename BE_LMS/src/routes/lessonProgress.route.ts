@@ -31,3 +31,5 @@ lessonProgressRoutes.get("/course/:courseId", authenticate, getCourseProgressCon
 export default lessonProgressRoutes;
 
 
+
+

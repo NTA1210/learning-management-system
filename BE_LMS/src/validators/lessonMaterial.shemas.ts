@@ -48,6 +48,8 @@ export const UploadMaterialSchema = z.object({
   type: MaterialTypeEnum.default("other"),
 });
 
+
+
 // Export types
 export type LessonMaterialQueryParams = z.infer<typeof LessonMaterialQuerySchema>;
 export type CreateLessonMaterialParams = z.infer<typeof CreateLessonMaterialSchema>;
