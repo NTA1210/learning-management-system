@@ -156,4 +156,180 @@ export const getRelatedSubjects = async (subjectId: string, limit = 10) => {
 };
 
 
+/**
+ * Nghiệp vụ: Tạo mới Subject.
+ * - Chặn trùng name/slug/code.
+ */
+export const createSubject = async (
+  data: Omit<ISubject, keyof mongoose.Document<mongoose.Types.ObjectId>>
+) => {
+  const existingByName = await SubjectModel.findOne({ name: data.name });
+  appAssert(!existingByName, CONFLICT, "Subject with this name already exists");
 
+  if (data.slug) {
+    const existingBySlug = await SubjectModel.findOne({ slug: data.slug });
+    appAssert(!existingBySlug, CONFLICT, "Subject with this slug already exists");
+  }
+
+  if (data.code) {
+    const existingByCode = await SubjectModel.findOne({ code: data.code });
+    appAssert(!existingByCode, CONFLICT, "Subject with this code already exists");
+  }
+
+  return await SubjectModel.create(data);
+};
+
+/**
+ * Nghiệp vụ: Cập nhật Subject theo ID.
+ * - Kiểm tra xung đột name/slug/code.
+ */
+export const updateSubjectById = async (
+  subjectId: string,
+  data: Partial<ISubject>
+) => {
+  const subject = await SubjectModel.findById(subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+
+  if (data.name && data.name !== subject.name) {
+    const existingByName = await SubjectModel.findOne({ name: data.name });
+    appAssert(!existingByName, CONFLICT, "Subject with this name already exists");
+  }
+
+  if (data.slug && data.slug !== subject.slug) {
+    const existingBySlug = await SubjectModel.findOne({ slug: data.slug });
+    appAssert(!existingBySlug, CONFLICT, "Subject with this slug already exists");
+  }
+
+  if (data.code && data.code !== subject.code) {
+    const existingByCode = await SubjectModel.findOne({ code: data.code });
+    appAssert(!existingByCode, CONFLICT, "Subject with this code already exists");
+  }
+
+  Object.assign(subject, { ...data, updatedAt: new Date() });
+  await subject.save();
+  return subject;
+};
+
+/**
+ * Nghiệp vụ: Cập nhật Subject theo slug.
+ * - Kiểm tra xung đột name/slug/code.
+ */
+export const updateSubjectBySlug = async (
+  slug: string,
+  data: Partial<ISubject>
+) => {
+  const subject = await SubjectModel.findOne({ slug });
+  appAssert(subject, NOT_FOUND, "Subject not found");
+
+  if (data.name && data.name !== subject.name) {
+    const existingByName = await SubjectModel.findOne({ name: data.name });
+    appAssert(!existingByName, CONFLICT, "Subject with this name already exists");
+  }
+
+  if (data.slug && data.slug !== subject.slug) {
+    const existingBySlug = await SubjectModel.findOne({ slug: data.slug });
+    appAssert(!existingBySlug, CONFLICT, "Subject with this slug already exists");
+  }
+
+  if (data.code && data.code !== subject.code) {
+    const existingByCode = await SubjectModel.findOne({ code: data.code });
+    appAssert(!existingByCode, CONFLICT, "Subject with this code already exists");
+  }
+
+  Object.assign(subject, { ...data, updatedAt: new Date() });
+  await subject.save();
+  return subject;
+};
+
+/**
+ * Nghiệp vụ: Xóa Subject theo ID.
+ * - Chặn xóa nếu đang được Course sử dụng.
+ */
+export const deleteSubjectById = async (subjectId: string) => {
+  const subject = await SubjectModel.findById(subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+
+  const coursesUsing = await CourseModel.countDocuments({ subjectId });
+  appAssert(
+    coursesUsing === 0,
+    CONFLICT,
+    `Cannot delete subject. ${coursesUsing} course${coursesUsing > 1 ? "s are" : " is"} using this subject.`
+  );
+
+  return SubjectModel.deleteOne({ _id: subjectId });
+};
+
+/**
+ * Nghiệp vụ: Xóa Subject theo slug.
+ * - Chặn xóa nếu đang được Course sử dụng.
+ */
+export const deleteSubjectBySlug = async (slug: string) => {
+  const subject = await SubjectModel.findOne({ slug });
+  appAssert(subject, NOT_FOUND, "Subject not found");
+
+  const coursesUsing = await CourseModel.countDocuments({ subjectId: subject.id });
+  appAssert(
+    coursesUsing === 0,
+    CONFLICT,
+    `Cannot delete subject. ${coursesUsing} course${coursesUsing > 1 ? "s are" : " is"} using this subject.`
+  );
+
+  return SubjectModel.deleteOne({ slug });
+};
+
+/**
+ * Nghiệp vụ: Bật trạng thái hoạt động cho Subject.
+ */
+export const activateSubjectById = async (subjectId: string) => {
+  const subject = await SubjectModel.findById(subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+  subject.isActive = true;
+  subject.updatedAt = new Date();
+  await subject.save();
+  return subject;
+};
+
+/**
+ * Nghiệp vụ: Tắt trạng thái hoạt động cho Subject.
+ */
+export const deactivateSubjectById = async (subjectId: string) => {
+  const subject = await SubjectModel.findById(subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+  subject.isActive = false;
+  subject.updatedAt = new Date();
+  await subject.save();
+  return subject;
+};
+
+/**
+ * Nghiệp vụ: Thêm danh sách môn tiên quyết cho Subject.
+ * - Bỏ qua các ID đã tồn tại.
+ * - Chặn self-reference.
+ */
+export const addPrerequisites = async (subjectId: string, prerequisiteIds: string[]) => {
+  const subject = await SubjectModel.findById(subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+  const toAdd = prerequisiteIds
+    .filter((id) => id && id !== subjectId)
+    .map((id) => new mongoose.Types.ObjectId(id));
+  const set = new Set([...(subject.prerequisites || [] as any)].map((x: any) => x.toString()));
+  for (const oid of toAdd) {
+    if (!set.has(oid.toString())) (subject.prerequisites as any) = [...(subject.prerequisites || [] as any), oid];
+  }
+  subject.updatedAt = new Date();
+  await subject.save();
+  return subject.toObject();
+};
+
+/**
+ * Nghiệp vụ: Gỡ một môn tiên quyết khỏi Subject.
+ */
+export const removePrerequisite = async (subjectId: string, prerequisiteId: string) => {
+  const subject = await SubjectModel.findById(subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+  const target = new mongoose.Types.ObjectId(prerequisiteId);
+  subject.prerequisites = (subject.prerequisites || []).filter((x: any) => !x.equals(target));
+  subject.updatedAt = new Date();
+  await subject.save();
+  return subject.toObject();
+};

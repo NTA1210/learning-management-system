@@ -39,8 +39,7 @@ import {
   specialistPublicRoutes,
   forumProtectedRoutes,
   forumPublicRoutes,
-  subjectProtectedRoutes,
-  subjectPublicRoutes,
+  subjectRouter,
   quizRoutes,
 } from "./routes";
 
@@ -85,8 +84,6 @@ export const createApp = () => {
   app.use("/lesson-progress", lessonProgressRoutes);
   app.use("/majors", majorPublicRoutes);
   app.use("/specialists", specialistPublicRoutes);
-  app.use("/forums", forumPublicRoutes);
-  app.use("/subjects", subjectPublicRoutes);
   //protected routes
   app.use("/users", authenticate, userRoutes);
   app.use("/sessions", authenticate, authorize(Role.ADMIN), sessionRoutes);
@@ -96,7 +93,7 @@ export const createApp = () => {
   app.use("/majors", authenticate, majorProtectedRoutes);
   app.use("/specialists", authenticate, specialistProtectedRoutes);
   app.use("/forums", authenticate, forumProtectedRoutes);
-  app.use("/subjects", authenticate, subjectProtectedRoutes);
+  app.use("/subjects", authenticate, subjectRouter);`  `
   app.use("/quizzes", quizRoutes);
   app.use(errorHandler);
 
