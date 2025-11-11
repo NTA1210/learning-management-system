@@ -12,6 +12,7 @@ import {DashboardPage ,
   CourseManagementPage,
   AboutUsPage,
   FAQPage,
+  FeedbackPage,
   CourseDetailPage,
 } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
@@ -92,6 +93,13 @@ function AppRoutes() {
         <Route path="/help/faq" element={
           <ProtectedRoute>
             <FAQPage />
+          </ProtectedRoute>
+        } />
+
+        {/* Feedback */}
+        <Route path="/help/feedback" element={
+          <ProtectedRoute>
+            <FeedbackPage />
           </ProtectedRoute>
         } />
 
