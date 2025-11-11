@@ -38,11 +38,13 @@ import {
   specialistPublicRoutes,
   forumProtectedRoutes,
   forumPublicRoutes,
+  quizRoutes,
 } from "./routes";
 
 export const createApp = () => {
   const app = express();
 
+  app.use(customResponse);
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use(
@@ -52,7 +54,6 @@ export const createApp = () => {
     })
   );
   app.use(cookieParser());
-  app.use(customResponse);
 
   //example API----------------------------------
   app.get("/", (req, res) => {
@@ -91,6 +92,7 @@ export const createApp = () => {
   app.use("/majors", authenticate, majorProtectedRoutes);
   app.use("/specialists", authenticate, specialistProtectedRoutes);
   app.use("/forums", authenticate, forumProtectedRoutes);
+  app.use("/quizzes", quizRoutes);
 
   app.use(errorHandler);
 

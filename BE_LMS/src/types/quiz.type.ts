@@ -15,5 +15,6 @@ export default interface IQuiz extends mongoose.Document {
   createdBy?: mongoose.Types.ObjectId;
   createdAt?: Date;
   updatedAt?: Date;
-  createSnapshot(): void;
+  createSnapshot(): Promise<void>;
+  addSnapshotQuestions(questions: any[]): Promise<void>;
 }
