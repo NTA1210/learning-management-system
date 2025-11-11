@@ -1,21 +1,19 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import {DashboardPage ,
-      StudentDashboardPage,
-      TeacherDashboardPage,
-      LandingPage,
-      NotFoundPage,
-      EmailVerifyPage,
-      ForgotPasswordPage,
-      ResetPasswordPage,
-      LoginPage,
-      RegisterPage,
-      CourseManagementPage,
-      CourseDetailPage,
-      ListAllLessonsPage,
-      AboutUsPage,
-      FAQPage,
-      AssignmentPage,
-    } from "../pages";
+  StudentDashboardPage,
+  TeacherDashboardPage,
+  LandingPage,
+  NotFoundPage,
+  EmailVerifyPage,
+  ForgotPasswordPage,
+  ResetPasswordPage,
+  LoginPage,
+  RegisterPage,
+  CourseManagementPage,
+  AboutUsPage,
+  FAQPage,
+  CourseDetailPage,
+} from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
 import AssignmentDetailPage from "../pages/AssignmentDetailPage";
@@ -123,6 +121,13 @@ function AppRoutes() {
         <Route path="/help/faq" element={
           <ProtectedRoute>
             <FAQPage />
+          </ProtectedRoute>
+        } />
+
+        {/* Feedback */}
+        <Route path="/help/feedback" element={
+          <ProtectedRoute>
+            <FeedbackPage />
           </ProtectedRoute>
         } />
 
