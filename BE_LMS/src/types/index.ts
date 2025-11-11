@@ -22,3 +22,4 @@ export { default as IVerificationCode } from "./verificationCode.type";
 export { default as ISpecialist } from "./specialist.type";
 export { default as IMajor } from "./major.type";
 export { default as ISubject } from "./subject.type";
+export { default as IFeedback } from "./feedback.type";
