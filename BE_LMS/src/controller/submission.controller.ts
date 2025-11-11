@@ -6,6 +6,7 @@ import {
   getSubmissionStatus,
   listSubmissionsByAssignment,
   gradeSubmission,
+  listAllGradesByStudent,
 } from "../services/submission.service";
 import { submissionBodySchema, assignmentIdParamSchema, gradeSubmissionSchema } from "../validators/submission.schemas"; // Validate đầu vào
 import appAssert from "../utils/appAssert";
@@ -93,5 +94,18 @@ export const gradeSubmissionHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     data: result,
     message: "Submission graded successfully",
+  });
+});
+
+
+export const listAllGradesByStudentHandler = catchErrors(async (req, res) => {
+  const studentId = req.userId?.toString();
+  appAssert(studentId, BAD_REQUEST, "Missing user ID");
+
+  const result = await listAllGradesByStudent(studentId);
+
+  return res.success(OK, {
+    data: result,
+    message: "All grades retrieved successfully",
   });
 });

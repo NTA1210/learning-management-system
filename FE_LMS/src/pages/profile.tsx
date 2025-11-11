@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../hooks/useTheme";
 import Navbar from "../components/Navbar.tsx";
@@ -61,6 +61,8 @@ const Profile: React.FC = () => {
   const [studentImageUrl, setStudentImageUrl] = useState("");
   // original image url not needed currently
   const [userClasses, setUserClasses] = useState<ClassLike[]>([]);
+  const [loadingClasses, setLoadingClasses] = useState(false);
+  const [classError, setClassError] = useState("");
 
   // default avatar handled below
 
@@ -205,6 +207,8 @@ const Profile: React.FC = () => {
   const fetchUserClasses = async () => {
     if (!safeUser) return;
     try {
+      setLoadingClasses(true);
+      setClassError("");
       const role = safeUser.role;
 
       if (role === "lecturer") {
@@ -212,6 +216,8 @@ const Profile: React.FC = () => {
         if (res.ok) {
           const data: ClassLike[] = await res.json();
           setUserClasses(data);
+        } else {
+          setClassError("Failed to fetch classes");
         }
       } else if (role === "student") {
         const res = await fetch(`${API_BASE}/classes`);
@@ -233,10 +239,15 @@ const Profile: React.FC = () => {
             }
           }
           setUserClasses(studentClasses);
+        } else {
+          setClassError("Failed to fetch classes");
         }
       }
     } catch (err) {
+      setClassError("An error occurred while fetching classes");
       console.error(err);
+    } finally {
+      setLoadingClasses(false);
     }
   };
 
