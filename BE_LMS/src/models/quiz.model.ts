@@ -75,7 +75,7 @@ cron.schedule("0 */5 * * * *", async () => {
     { isCompleted: true }
   );
 
-//   if (quizzes.modifiedCount > 0) {
-//     console.log(`✅ Updated ${quizzes.modifiedCount} completed quizzes.`);
-//   }
-// });
+  if (quizzes.modifiedCount > 0) {
+    console.log(`✅ Updated ${quizzes.modifiedCount} completed quizzes.`);
+  }
+});

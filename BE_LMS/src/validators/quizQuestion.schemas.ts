@@ -73,16 +73,19 @@ export const createQuizQuestionSchema = z
     path: ["correctOptions"],
   });
 
-export interface IUpdateQuizQuestionParams extends ICreateQuizQuestionParams {
+export interface IUpdateQuizQuestionParams
+  extends Partial<ICreateQuizQuestionParams> {
   quizQuestionId: string;
 }
 export const quizQuestionIdSchema = z
   .string()
   .length(24, "Invalid question ID");
 
-export const updateQuizQuestionSchema = createQuizQuestionSchema.safeExtend({
-  quizQuestionId: quizQuestionIdSchema,
-});
+export const updateQuizQuestionSchema = createQuizQuestionSchema
+  .partial()
+  .safeExtend({
+    quizQuestionId: quizQuestionIdSchema,
+  });
 
 export const multiQuizQuestionIdSchema = z.array(quizQuestionIdSchema);
 
@@ -92,9 +95,11 @@ export interface IGetRandomQuestionsParams {
 }
 export const randomQuizQuestionSchema = z.object({
   subjectId: subjectIdSchema,
-  count: z
-    .number()
-    .min(1, " Count must be at least 1 ")
-    .max(100, " Count must be at most 100")
-    .default(10),
+  count: z.preprocess((val) => {
+    if (typeof val === "string" && val.trim() !== "") {
+      const num = Number(val);
+      return isNaN(num) ? undefined : num;
+    }
+    return val;
+  }, z.number().min(1, "Count must be at least 1").max(100, "Count must be at most 100").default(10).optional()),
 });

@@ -13,6 +13,7 @@ import {
 import IQuizQuestion from "@/types/quizQuestion.type";
 import appAssert from "@/utils/appAssert";
 import { catchErrors } from "@/utils/asyncHandler";
+import { parseFormData } from "@/utils/parseFormData";
 import {
   createQuizQuestionSchema,
   importQuizQuestionParamsSchema,
@@ -84,10 +85,12 @@ export const getAllQuizQuestionsHandler = catchErrors(async (req, res) => {
 // POST /quiz-questions/ - Create a new question
 export const createQuizQuestionHandler = catchErrors(async (req, res) => {
   const file = req.file;
-  const input = createQuizQuestionSchema.parse({
-    ...req.body,
-    image: file,
-  });
+  const input = createQuizQuestionSchema.parse(
+    parseFormData({
+      ...req.body,
+      image: file,
+    })
+  );
   const data = await createQuizQuestion(input);
 
   res.success(CREATED, {
@@ -99,11 +102,13 @@ export const createQuizQuestionHandler = catchErrors(async (req, res) => {
 //PUT /quiz-questions/:quizQuestionId - Update a question
 export const updateQuizQuestionByIdHandler = catchErrors(async (req, res) => {
   const file = req.file;
-  const input = updateQuizQuestionSchema.parse({
-    ...req.body,
-    image: file,
-    quizQuestionId: req.params.quizQuestionId,
-  });
+  const input = updateQuizQuestionSchema.parse(
+    parseFormData({
+      ...req.body,
+      image: file,
+      quizQuestionId: req.params.quizQuestionId,
+    })
+  );
   const data = await updateQuizQuestion(input);
 
   res.success(CREATED, {
@@ -139,9 +144,11 @@ export const deleteMultiQuizQuestionByIdHandler = catchErrors(
 // GET /quiz-questions/random - Get random questions
 export const getRandomQuestionsHandler = catchErrors(async (req, res) => {
   const input = randomQuizQuestionSchema.parse(req.query);
-  const data = await getRandomQuestions(input);
+  const { data, total, questionTypes } = await getRandomQuestions(input);
   return res.success(OK, {
     data,
+    total,
+    questionTypes,
     message: "Questions retrieved successfully",
   });
 });
