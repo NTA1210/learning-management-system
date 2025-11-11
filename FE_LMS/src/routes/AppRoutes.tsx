@@ -13,6 +13,9 @@ import {DashboardPage ,
   AboutUsPage,
   FAQPage,
   CourseDetailPage,
+  FeedbackPage,
+  ListAllLessonsPage,
+  AssignmentPage,
 } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
