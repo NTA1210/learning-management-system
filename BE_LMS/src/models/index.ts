@@ -2,6 +2,7 @@ export { default as AnnouncementModel } from "./announcement.model";
 export { default as AssignmentModel } from "./assignment.model";
 export { default as AttendanceModel } from "./attendance.model";
 export { default as CourseModel } from "./course.model";
+export { default as CourseInviteModel } from "./courseInvite.model";
 export { default as EnrollmentModel } from "./enrollment.model";
 export { default as ForumModel } from "./forum.model";
 export { default as ForumPostModel } from "./forumPost.model";
