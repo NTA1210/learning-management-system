@@ -39,12 +39,9 @@ import {
   specialistPublicRoutes,
   forumProtectedRoutes,
   forumPublicRoutes,
-<<<<<<< BE_LMS/src/app.ts
   subjectProtectedRoutes,
   subjectPublicRoutes,
-=======
   quizRoutes,
->>>>>>> BE_LMS/src/app.ts
 } from "./routes";
 
 export const createApp = () => {
@@ -65,7 +62,7 @@ export const createApp = () => {
   app.get("/", (req, res) => {
     res.status(OK).send("Hello World!");
   });
- 
+
   app.post("/uploadExample", upload.single("file"), async (req, res) => {
     const file = req.file;
     if (!file) {
