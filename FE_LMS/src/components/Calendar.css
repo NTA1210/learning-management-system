@@ -21,6 +21,13 @@
   margin: 0;
   font-size: 18px;
   color: #f3f4f6; /* gray-100 */
+  font-weight: 700; /* keep same weight across themes */
+  letter-spacing: .2px;
+}
+
+/* Month title contrast in light mode */
+.calendar-page:not(.dark) .calendar-navigation h2 {
+  color: #111827; /* gray-900 for better readability on white */
 }
 
 .calendar-view-toggle {
@@ -185,13 +192,12 @@
 .week-view {
   display: flex;
   flex-direction: column;
+  /* No horizontal scroll on desktop */
+  overflow-x: visible;
 }
 
 .week-header {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  background: #111827; /* gray-900 */
-  border-bottom: 1px solid #374151; /* gray-700 */
+  display: none; /* unified layout: header hidden across breakpoints */
 }
 
 .week-day-header {
@@ -207,28 +213,53 @@
   font-size: 12px;
   font-weight: 700;
   color: #9ca3af; /* gray-400 */
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.25);
 }
 
 .week-day-number {
   font-size: 22px;
   font-weight: 700;
+  line-height: 1.1;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.25);
 }
 
 .week-day-number.today {
   color: #60a5fa; /* blue-400 */
+  text-shadow: 0 1px 0 rgba(0,0,0,0.35);
 }
 
 .week-content {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: 1fr; /* unified: one row per day */
+}
+
+.week-day-row {
+  display: grid;
+  grid-template-columns: 110px 1fr; /* label left + items right on desktop */
+  gap: 12px;
+  align-items: start;
+}
+
+.week-day-label-mobile {
+  display: flex; /* visible on all screens in unified layout */
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 6px 0;
 }
 
 .week-day-column {
   min-height: 240px;
-  border-right: 1px solid #1f2937; /* gray-800 */
+  border-right: none;
   padding: 8px;
+  position: relative;
+  border-bottom: 3px solid #1f2937; /* visible day separator (dark) */
 }
 
+.calendar-page:not(.dark) .week-day-column {
+  border-bottom: 3px solid #e5e7eb; /* visible day separator (light) */
+}
 .week-day-column:last-child {
   border-right: none;
 }
@@ -245,12 +276,13 @@
   background: #0b1220; /* deep slate */
   margin-bottom: 6px;
   height: 44px; /* fixed height for alignment across columns */
+  box-shadow: 0 1px 0 rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.03);
 }
 
 .calendar-page:not(.dark) .week-schedule-item-compact {
   border-color: #e5e7eb;
   background: #ffffff;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.5);
 }
 .calendar-page:not(.dark) .subject-code {
   color: #111827;
@@ -261,12 +293,17 @@
 }
 
 .subject-code {
-  font-weight: 700;
+  font-weight: 800;
   color: #f3f4f6; /* gray-100 */
+  letter-spacing: .3px;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.35);
 }
 
 .time-range {
   color: #9ca3af; /* gray-400 */
+  font-weight: 600;
+  letter-spacing: .2px;
+  text-shadow: 0 1px 0 rgba(0,0,0,0.25);
 }
 
 .room-info {
@@ -293,6 +330,83 @@
 }
 .week-schedule-item-compact .room-info {
   display: none; /* hide room to prioritize subject + time */
+}
+
+/* --- Responsive layout for Week view (mobile) --- */
+@media (max-width: 768px) {
+  /* Stack days vertically so the whole week is visible without horizontal scroll */
+  .week-view {
+    overflow-x: visible;
+  }
+
+  .week-header {
+    display: none; /* hide separate header on mobile */
+  }
+
+  .week-content {
+    grid-template-columns: 1fr; /* one row per day */
+  }
+
+  .week-day-number {
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  .week-day-column {
+    min-height: 140px;
+    padding: 6px;
+    border-right: none;
+    border-bottom: 3px solid #1f2937; /* stronger divider in dark */
+  }
+  .calendar-page:not(.dark) .week-day-column {
+    border-bottom: 3px solid #e5e7eb; /* stronger divider in light */
+  }
+
+  /* Create two-column row: day label (left) + items (right) */
+  .week-day-row {
+    display: grid;
+    grid-template-columns: 78px 1fr;
+    gap: 8px;
+    align-items: start;
+  }
+
+  .week-day-label-mobile {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 6px 0;
+    position: sticky;
+    left: 0;
+  }
+
+  .week-day-label-mobile .week-day-name {
+    font-size: 12px;
+    font-weight: 800;
+    color: #9ca3af; /* gray-400 */
+    letter-spacing: .6px;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.25);
+  }
+
+  .week-day-label-mobile .week-day-number {
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.35);
+  }
+
+  .week-schedule-item-compact {
+    height: 36px;
+    padding: 5px 6px;
+    gap: 6px;
+    margin-bottom: 4px;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .week-day-header {
+    border-right: none;
+    border-bottom: 1px solid #1f2937; /* gray-800 */
+  }
 }
 
 /* Day view */

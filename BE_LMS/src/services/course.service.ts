@@ -17,7 +17,7 @@ import { uploadFile, removeFile } from "../utils/uploadFile";
 import { prefixCourseLogo } from "../utils/filePrefix";
 
 // ====================================
-// 🎨 HELPER FUNCTIONS FOR LOGO MANAGEMENT
+// HELPER FUNCTIONS FOR LOGO MANAGEMENT
 // ====================================
 
 /**
@@ -42,7 +42,7 @@ async function uploadCourseLogo(courseId: string, logoFile: Express.Multer.File)
 
 /**
  * Delete course logo file from MinIO using key
- * @throws {AppError} BAD_REQUEST if file deletion fails (via appAssert)
+ 
  */
 async function deleteCourseLogoFile(key: string) {
   try {
@@ -336,6 +336,39 @@ export const createCourse = async (
     "Cannot assign inactive or banned teachers to course"
   );
 
+  // ✅ UNIVERSITY RULE: Validate teacher specialization matches subject
+  // Only teachers with matching specialist can teach the course
+  const subjectSpecialistIds = subject.specialistIds?.map((id) => id.toString()) || [];
+  
+  if (subjectSpecialistIds.length > 0) {
+    // Check each teacher has at least one matching specialist
+    const invalidTeachers: string[] = [];
+    
+    for (const teacher of teachers) {
+      const teacherSpecialistIds = teacher.specialistIds?.map((id) => id.toString()) || [];
+      
+      // Admin can bypass specialist check
+      if (teacher.role === Role.ADMIN) {
+        continue;
+      }
+      
+      // Check if teacher has at least one matching specialist
+      const hasMatchingSpecialist = teacherSpecialistIds.some((teacherSpecId) =>
+        subjectSpecialistIds.includes(teacherSpecId)
+      );
+      
+      if (!hasMatchingSpecialist) {
+        invalidTeachers.push((teacher.fullname || teacher.username) as string);
+      }
+    }
+    
+    appAssert(
+      invalidTeachers.length === 0,
+      BAD_REQUEST,
+      `The following teachers do not have the required specialization for this subject: ${invalidTeachers.join(", ")}`
+    );
+  }
+
   // ✅ YÊU CẦU 2: Teacher tạo course cần Admin approve
   // Get creator info to determine permissions
   const creator = await UserModel.findById(userId);
@@ -531,6 +564,42 @@ export const updateCourse = async (
       BAD_REQUEST,
       "Cannot assign inactive or banned teachers to course"
     );
+
+    // ✅ UNIVERSITY RULE: Validate teacher specialization matches subject
+    // Get subject to check specialization requirement
+    const courseSubject = await SubjectModel.findById(course.subjectId);
+    appAssert(courseSubject, NOT_FOUND, "Course subject not found");
+
+    const subjectSpecialistIds = courseSubject.specialistIds?.map((id) => id.toString()) || [];
+    
+    if (subjectSpecialistIds.length > 0) {
+      // Check each teacher has at least one matching specialist
+      const invalidTeachers: string[] = [];
+      
+      for (const teacher of teachers) {
+        const teacherSpecialistIds = teacher.specialistIds?.map((id) => id.toString()) || [];
+        
+        // Admin can bypass specialist check
+        if (teacher.role === Role.ADMIN) {
+          continue;
+        }
+        
+        // Check if teacher has at least one matching specialist
+        const hasMatchingSpecialist = teacherSpecialistIds.some((teacherSpecId) =>
+          subjectSpecialistIds.includes(teacherSpecId)
+        );
+        
+        if (!hasMatchingSpecialist) {
+          invalidTeachers.push((teacher.fullname || teacher.username) as string);
+        }
+      }
+      
+      appAssert(
+        invalidTeachers.length === 0,
+        BAD_REQUEST,
+        `The following teachers do not have the required specialization for this subject: ${invalidTeachers.join(", ")}`
+      );
+    }
   }
 
   // ✅ YÊU CẦU 2: Only Admin can approve/publish courses
