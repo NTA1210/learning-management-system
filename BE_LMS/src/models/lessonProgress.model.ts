@@ -1,5 +1,4 @@
-
-import ILessonProgress from "@/types/lessonProgress.type";
+import { ILessonProgress } from "../types/lessonProgress.type";
 import mongoose from "mongoose";
 
 const LessonProgressSchema = new mongoose.Schema<ILessonProgress>(

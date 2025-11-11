@@ -11,6 +11,7 @@ import {
 import authenticate from "../middleware/authenticate";
 import authorize from "../middleware/authorize";
 import { Role } from "../types";
+import upload from "../config/multer";
 
 const courseRoutes = Router();
 
@@ -27,10 +28,12 @@ courseRoutes.get("/:id", authenticate, getCourseByIdHandler);
 // Protected routes (require authentication)
 // POST /courses - Create new course (Teacher/Admin only)
 // ✅ FIX: Added authorize middleware to prevent students from creating courses
-courseRoutes.post("/", authenticate, authorize(Role.TEACHER, Role.ADMIN), createCourseHandler);
+// 🖼️ Added multer middleware to handle logo upload
+courseRoutes.post("/", authenticate, authorize(Role.TEACHER, Role.ADMIN), upload.single("logo"), createCourseHandler);
 
 // PUT /courses/:id - Update course (Teacher of course or Admin only)
-courseRoutes.put("/:id", authenticate, updateCourseHandler);
+// 🖼️ Added multer middleware to handle logo upload
+courseRoutes.put("/:id", authenticate, upload.single("logo"), updateCourseHandler);
 
 // DELETE /courses/:id - Soft delete course (Teacher of course or Admin only)
 courseRoutes.delete("/:id", authenticate, deleteCourseHandler);

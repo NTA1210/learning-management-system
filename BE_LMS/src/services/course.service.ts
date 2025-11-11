@@ -3,6 +3,8 @@
 import CourseModel from "../models/course.model";
 import SpecialistModel from "../models/specialist.model";
 import UserModel from "../models/user.model";
+import EnrollmentModel from "../models/enrollment.model";
+import SubjectModel from "../models/subject.model";
 import appAssert from "../utils/appAssert";
 import { NOT_FOUND, BAD_REQUEST, FORBIDDEN } from "../constants/http";
 import {
@@ -11,6 +13,51 @@ import {
 } from "../validators/course.schemas";
 import { CourseStatus } from "../types/course.type";
 import { Role, UserStatus } from "../types/user.type";
+import { uploadFile, removeFile } from "../utils/uploadFile";
+import { prefixCourseLogo } from "../utils/filePrefix";
+
+// ====================================
+// HELPER FUNCTIONS FOR LOGO MANAGEMENT
+// ====================================
+
+/**
+ * Upload course logo to MinIO and return URL + key
+ 
+ */
+async function uploadCourseLogo(courseId: string, logoFile: Express.Multer.File) {
+  try {
+    const logoPrefix = prefixCourseLogo(courseId);
+    const { publicUrl, key } = await uploadFile(logoFile, logoPrefix);
+    return { publicUrl, key };
+  } catch (err) {
+    console.error("❌ Logo upload failed:", err);
+    // Use appAssert to throw error for middleware to handle
+    appAssert(
+      false,
+      BAD_REQUEST,
+      `Failed to upload course logo: ${err instanceof Error ? err.message : 'Unknown error'}`
+    );
+  }
+}
+
+/**
+ * Delete course logo file from MinIO using key
+ 
+ */
+async function deleteCourseLogoFile(key: string) {
+  try {
+    await removeFile(key);
+    console.log(`🗑️ Deleted logo file: ${key}`);
+  } catch (err) {
+    console.error("⚠️  Failed to delete logo file:", err);
+    // Throw error so caller can decide how to handle
+    appAssert(
+      false,
+      BAD_REQUEST,
+      `Failed to delete logo file: ${err instanceof Error ? err.message : 'Unknown error'}`
+    );
+  }
+}
 
 export type ListCoursesParams = {
   page: number;
@@ -211,7 +258,8 @@ export const getCourseById = async (courseId: string) => {
  */
 export const createCourse = async (
   data: CreateCourseInput,
-  userId: string
+  userId: string,
+  logoFile?: Express.Multer.File
 ) => {
   // ❌ FIX: Validate teacherIds array
   appAssert(
@@ -242,7 +290,6 @@ export const createCourse = async (
   );
 
   // ✅ UNIVERSITY RULE: Validate subject exists
-  const SubjectModel = (await import("../models/subject.model")).default;
   const subject = await SubjectModel.findById(data.subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
   appAssert(subject.isActive, BAD_REQUEST, "Cannot create course for inactive subject");
@@ -289,6 +336,39 @@ export const createCourse = async (
     "Cannot assign inactive or banned teachers to course"
   );
 
+  // ✅ UNIVERSITY RULE: Validate teacher specialization matches subject
+  // Only teachers with matching specialist can teach the course
+  const subjectSpecialistIds = subject.specialistIds?.map((id) => id.toString()) || [];
+  
+  if (subjectSpecialistIds.length > 0) {
+    // Check each teacher has at least one matching specialist
+    const invalidTeachers: string[] = [];
+    
+    for (const teacher of teachers) {
+      const teacherSpecialistIds = teacher.specialistIds?.map((id) => id.toString()) || [];
+      
+      // Admin can bypass specialist check
+      if (teacher.role === Role.ADMIN) {
+        continue;
+      }
+      
+      // Check if teacher has at least one matching specialist
+      const hasMatchingSpecialist = teacherSpecialistIds.some((teacherSpecId) =>
+        subjectSpecialistIds.includes(teacherSpecId)
+      );
+      
+      if (!hasMatchingSpecialist) {
+        invalidTeachers.push((teacher.fullname || teacher.username) as string);
+      }
+    }
+    
+    appAssert(
+      invalidTeachers.length === 0,
+      BAD_REQUEST,
+      `The following teachers do not have the required specialization for this subject: ${invalidTeachers.join(", ")}`
+    );
+  }
+
   // ✅ YÊU CẦU 2: Teacher tạo course cần Admin approve
   // Get creator info to determine permissions
   const creator = await UserModel.findById(userId);
@@ -326,8 +406,34 @@ export const createCourse = async (
   // ❌ FIX: Ensure course was created
   appAssert(course, BAD_REQUEST, "Failed to create course");
 
+  // 🖼️ Upload logo if provided
+  if (logoFile) {
+    let uploadedKey: string | null = null;
+    
+    try {
+      const courseId = String(course._id);
+      const { publicUrl, key } = await uploadCourseLogo(courseId, logoFile);
+      uploadedKey = key; // Track uploaded key for cleanup if needed
+      
+      // Update course with logo URL and key
+      await CourseModel.findByIdAndUpdate(courseId, { logo: publicUrl, key });
+      course.logo = publicUrl;
+    } catch (err) {
+      // ❌ Rollback: Clean up uploaded logo (if any) and delete course
+      if (uploadedKey) {
+        await deleteCourseLogoFile(uploadedKey).catch(cleanupErr => 
+          console.error("Failed to cleanup uploaded logo:", cleanupErr)
+        );
+      }
+      await CourseModel.findByIdAndDelete(course._id);
+      console.error("❌ Logo upload/update failed, course creation rolled back:", err);
+      // Re-throw error for middleware to handle
+      throw err;
+    }
+  }
+
   // Populate and return
-  const populatedCourse = await CourseModel.findById(course._id)
+  const populatedCourse = await CourseModel.findById(String(course._id))
     .populate("teacherIds", "username email fullname avatar_url")
     .populate("subjectId", "name code slug description credits")
     .populate("createdBy", "username email fullname")
@@ -345,7 +451,8 @@ export const createCourse = async (
 export const updateCourse = async (
     courseId: string,
     data: UpdateCourseInput,
-    userId: string
+    userId: string,
+    logoFile?: Express.Multer.File
 ) => {
   // ❌ FIX: Validate courseId format
   appAssert(
@@ -405,6 +512,12 @@ export const updateCourse = async (
         BAD_REQUEST,
         "Cannot change start date of a course that has already started"
       );
+      // Also validate new startDate is in the future
+      appAssert(
+        startDate > now,
+        BAD_REQUEST,
+        "New start date must be in the future"
+      );
       data.startDate = startDate as any;
     }
 
@@ -413,6 +526,14 @@ export const updateCourse = async (
 
   // Validate teachers if provided
   if (data.teacherIds) {
+    // ❌ FIX: Check duplicate teacherIds
+    const uniqueTeachers = new Set(data.teacherIds.map(id => id.toString()));
+    appAssert(
+      uniqueTeachers.size === data.teacherIds.length,
+      BAD_REQUEST,
+      "Teacher list contains duplicate entries"
+    );
+
     const teachers = await UserModel.find({
       _id: { $in: data.teacherIds },
     });
@@ -433,12 +554,58 @@ export const updateCourse = async (
       "All assigned users must have teacher or admin role"
     );
 
+    // ❌ FIX: Check if teachers are active (not banned/inactive)
+    const allTeachersActive = teachers.every((teacher) => {
+      return teacher.status === UserStatus.ACTIVE;
+    });
+
+    appAssert(
+      allTeachersActive,
+      BAD_REQUEST,
+      "Cannot assign inactive or banned teachers to course"
+    );
+
+    // ✅ UNIVERSITY RULE: Validate teacher specialization matches subject
+    // Get subject to check specialization requirement
+    const courseSubject = await SubjectModel.findById(course.subjectId);
+    appAssert(courseSubject, NOT_FOUND, "Course subject not found");
+
+    const subjectSpecialistIds = courseSubject.specialistIds?.map((id) => id.toString()) || [];
+    
+    if (subjectSpecialistIds.length > 0) {
+      // Check each teacher has at least one matching specialist
+      const invalidTeachers: string[] = [];
+      
+      for (const teacher of teachers) {
+        const teacherSpecialistIds = teacher.specialistIds?.map((id) => id.toString()) || [];
+        
+        // Admin can bypass specialist check
+        if (teacher.role === Role.ADMIN) {
+          continue;
+        }
+        
+        // Check if teacher has at least one matching specialist
+        const hasMatchingSpecialist = teacherSpecialistIds.some((teacherSpecId) =>
+          subjectSpecialistIds.includes(teacherSpecId)
+        );
+        
+        if (!hasMatchingSpecialist) {
+          invalidTeachers.push((teacher.fullname || teacher.username) as string);
+        }
+      }
+      
+      appAssert(
+        invalidTeachers.length === 0,
+        BAD_REQUEST,
+        `The following teachers do not have the required specialization for this subject: ${invalidTeachers.join(", ")}`
+      );
+    }
   }
 
   // ✅ YÊU CẦU 2: Only Admin can approve/publish courses
   // Teacher không thể tự publish course của mình
   // Prepare update data
-  const updateData = { ...data };
+  const updateData: any = { ...data };
 
   // If teacher tries to publish course, prevent it
   if (!isAdmin && data.isPublished === true) {
@@ -452,19 +619,103 @@ export const updateCourse = async (
     updateData.status = CourseStatus.ONGOING;
   }
 
-  // Update course
-  const updatedCourse = await CourseModel.findByIdAndUpdate(
-    courseId,
-    { $set: updateData },
-    { new: true, runValidators: true }
-  )
-    .populate("teacherIds", "username email fullname avatar_url")
-    .populate("subjectId", "name code slug description credits")
-    .populate("createdBy", "username email fullname")
-    .lean();
+  // ====================================
+  // 🖼️ HANDLE LOGO OPERATIONS
+  // ====================================
+  
+  const shouldRemoveLogo = data.logo === null || data.logo === "";
+  const shouldUploadNewLogo = logoFile !== undefined;
 
-  // ❌ FIX: Ensure course was updated successfully
-  appAssert(updatedCourse, BAD_REQUEST, "Failed to update course");
+  if (shouldRemoveLogo) {
+    // User wants to remove logo
+    if (course.key) {
+      await deleteCourseLogoFile(course.key);
+    }
+    
+    // Remove logo field from updateData to avoid MongoDB conflict
+    delete updateData.logo;
+    
+    // Remove both logo and key from database
+    updateData.$unset = { logo: 1, key: 1 };
+  } 
+  else if (shouldUploadNewLogo) {
+    // User wants to upload new logo
+    // ⚠️ Important: Upload new logo FIRST before updating DB
+    // This ensures atomicity - if upload fails, nothing changes
+    const oldKey = course.key;
+    
+    // Upload new logo first 
+    const { publicUrl, key } = await uploadCourseLogo(courseId, logoFile);
+    updateData.logo = publicUrl;
+    updateData.key = key;
+    
+    // Note: Old logo will be deleted ONLY after successful DB update
+    // This is handled below after the DB update succeeds
+    
+    // Store oldKey for cleanup after successful DB update
+    updateData._oldLogoKey = oldKey;
+  }
+
+  // ====================================
+  // 📝 BUILD MONGODB UPDATE QUERY
+  // ====================================
+  // MongoDB requires separate $set and $unset operators
+  // Cannot use both in the same object at root level
+  
+  // Extract temporary fields that shouldn't go to DB
+  const oldLogoKey = updateData._oldLogoKey;
+  delete updateData._oldLogoKey;
+  
+  const updateQuery: any = {};
+  
+  // Add $unset operations (remove fields)
+  if (updateData.$unset) {
+    updateQuery.$unset = updateData.$unset;
+    delete updateData.$unset; // Remove from updateData to avoid duplication
+  }
+  
+  // Add $set operations (update fields)
+  if (Object.keys(updateData).length > 0) {
+    updateQuery.$set = updateData;
+  }
+
+  // ====================================
+  // 💾 UPDATE DATABASE WITH ROLLBACK
+  // ====================================
+  // Store new logo key for rollback if DB update fails
+  const newLogoKey = updateData.key;
+  
+  let updatedCourse;
+  try {
+    updatedCourse = await CourseModel.findByIdAndUpdate(
+      courseId,
+      updateQuery,
+      { new: true, runValidators: true }
+    )
+      .populate("teacherIds", "username email fullname avatar_url")
+      .populate("subjectId", "name code slug description credits")
+      .populate("createdBy", "username email fullname")
+      .lean();
+
+    // ❌ FIX: Ensure course was updated successfully
+    appAssert(updatedCourse, BAD_REQUEST, "Failed to update course");
+    
+    // ✅ DB update successful - now safe to delete old logo if exists
+    if (oldLogoKey) {
+      await deleteCourseLogoFile(oldLogoKey).catch(err =>
+        console.error("⚠️  Failed to delete old logo (non-critical):", err)
+      );
+    }
+  } catch (err) {
+    // ❌ DB update failed - rollback new logo if it was uploaded
+    if (newLogoKey) {
+      await deleteCourseLogoFile(newLogoKey).catch(cleanupErr =>
+        console.error("Failed to cleanup new logo:", cleanupErr)
+      );
+    }
+    console.error("❌ Failed to update course:", err);
+    throw err; // Re-throw to let error handler handle it
+  }
 
   return updatedCourse;
 };
@@ -502,7 +753,6 @@ export const deleteCourse = async (courseId: string, userId: string) => {
   );
 
   // ✅ UNIVERSITY BUSINESS RULE: Check for active enrollments
-  const EnrollmentModel = (await import("../models/enrollment.model")).default;
   const activeEnrollmentCount = await EnrollmentModel.countDocuments({
     courseId,
     status: { $in: ["pending", "approved"] }, // Active enrollments
@@ -647,15 +897,22 @@ export const permanentDeleteCourse = async (
     "Only administrators can permanently delete courses"
   );
 
-  // ⚠️ OPTIONAL: Check if course has related data
-  // Uncomment if you want to prevent deletion of courses with enrollments
-  // const EnrollmentModel = require("../models/enrollment.model").default;
-  // const enrollmentCount = await EnrollmentModel.countDocuments({ courseId });
-  // appAssert(
-  //   enrollmentCount === 0,
-  //   BAD_REQUEST,
-  //   `Cannot permanently delete course with ${enrollmentCount} enrollment(s). Please remove enrollments first.`
-  // );
+  // ⚠️ Check if course has related data
+  // Prevent deletion of courses with enrollments
+  const enrollmentCount = await EnrollmentModel.countDocuments({ courseId });
+  appAssert(
+    enrollmentCount === 0,
+    BAD_REQUEST,
+    `Cannot permanently delete course with ${enrollmentCount} enrollment(s). Please remove enrollments first.`
+  );
+
+  // 🗑️ Delete logo file from MinIO (if exists)
+  if (course.key) {
+    await deleteCourseLogoFile(course.key).catch(err => {
+      console.error("⚠️  Failed to delete logo file (non-critical):", err);
+      // Continue with course deletion even if logo deletion fails
+    });
+  }
 
   // ✅ HARD DELETE: Remove from database permanently
   await CourseModel.findByIdAndDelete(courseId);

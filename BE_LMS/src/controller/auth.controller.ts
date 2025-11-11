@@ -7,22 +7,22 @@ import {
   resetPassword,
   sendPasswordResetEmail,
   verifyEmail,
-} from "../services/auth.service";
+} from "@/services/auth.service";
 import {
   clearAuthCookies,
   getAccessTokenCookieOptions,
   getRefreshTokenCookieOptions,
   setAuthCookies,
-} from "../utils/cookies";
+} from "@/utils/cookies";
 import {
   emailSchema,
   loginSchema,
   registerSchema,
   resetPasswordSchema,
   verificationCodeSchema,
-} from "../validators/auth.schemas";
+} from "@/validators/auth.schemas";
 import { verifyToken } from "../utils/jwt";
-import SessionModel from "../models/session.model";
+import { SessionModel } from "@/models";
 import appAssert from "../utils/appAssert";
 
 //controller architecture

@@ -1,3 +1,4 @@
+import { Role } from "@/types";
 import { APP_ORIGIN } from "../constants/env";
 import {
   CONFLICT,
@@ -7,9 +8,7 @@ import {
   UNAUTHORIZED,
 } from "../constants/http";
 import VerificationCodeType from "../constants/verificationCode";
-import SessionModel from "../models/session.model";
-import UserModel from "../models/user.model";
-import VerificationCodeModel from "../models/verificationCode.model";
+import { UserModel, SessionModel, VerificationCodeModel } from "@/models";
 import appAssert from "../utils/appAssert";
 import { hashValue } from "../utils/bcrypt";
 import {
@@ -28,7 +27,7 @@ import {
   refreshTokenSignOptions,
   signToKen,
   verifyToken,
-} from "../utils/jwt";
+} from "@/utils/jwt";
 import { sendMail } from "../utils/sendMail";
 
 export type CreateAccountParams = {
@@ -38,6 +37,9 @@ export type CreateAccountParams = {
   userAgent?: string;
 };
 
+// Domain for teacher
+const TEACHER_EMAIL_DOMAIN = "@fe.edu.vn";
+
 export const createAccount = async (data: CreateAccountParams) => {
   //verify existing user does not exist
   const existingUser = await UserModel.exists({ email: data.email });
@@ -46,11 +48,17 @@ export const createAccount = async (data: CreateAccountParams) => {
   //check user name
   const usernameExists = await UserModel.exists({ username: data.username });
   appAssert(!usernameExists, CONFLICT, "Username already in use");
+
+  const role = data.email.endsWith(TEACHER_EMAIL_DOMAIN)
+    ? Role.TEACHER
+    : Role.STUDENT;
+
   //create user
   const user = await UserModel.create({
     username: data.username,
     email: data.email,
     password: data.password,
+    role,
   });
   //create verification code
   const verificationCode = await VerificationCodeModel.create({
@@ -136,7 +144,7 @@ export const refreshUserAccessToken = async (refreshToken: string) => {
 
   //Get user
   const user = await UserModel.findById(session.userId);
-  appAssert(user, INTERNAL_SERVER_ERROR, "User not found");
+  appAssert(user, NOT_FOUND, "User not found");
 
   //Refresh the token if it expires in less than 1 day
   const sessionNeedRefresh = session.expiresAt.getTime() - now <= ONE_DAY_MS;

@@ -1,12 +1,13 @@
 import { BAD_REQUEST, NOT_FOUND } from "@/constants/http";
-import { QuizQuestionModel, SubjectModel } from "@/models";
+import { QuizModel, QuizQuestionModel, SubjectModel } from "@/models";
 import { ListParams } from "@/types/dto";
 import IQuizQuestion, { QuizQuestionType } from "@/types/quizQuestion.type";
 import appAssert from "@/utils/appAssert";
 import { prefixQuizQuestionImage } from "@/utils/filePrefix";
-import { uploadFile } from "@/utils/uploadFile";
+import { removeFile, uploadFile } from "@/utils/uploadFile";
 import {
   ICreateQuizQuestionParams,
+  IGetRandomQuestionsParams,
   IUpdateQuizQuestionParams,
 } from "@/validators/quizQuestion.schemas";
 import mongoose, { FilterQuery } from "mongoose";
@@ -303,13 +304,16 @@ export const createQuizQuestion = async ({
         subjectId,
         newQuizQuestion.id
       );
-      const { publicUrl } = await uploadFile(image, questionPrefix);
+      const { publicUrl, key } = await uploadFile(image, questionPrefix);
       await QuizQuestionModel.findByIdAndUpdate(newQuizQuestion._id, {
         image: publicUrl,
+        key,
       });
       newQuizQuestion.image = publicUrl;
-    } catch (err) {
-      console.error("Image upload failed:", err);
+      newQuizQuestion.key = key;
+    } catch (error) {
+      await QuizQuestionModel.findByIdAndDelete(newQuizQuestion._id);
+      throw error;
     }
   }
   return newQuizQuestion;
@@ -319,7 +323,7 @@ export const createQuizQuestion = async ({
  * Update an existing quiz question.
  * Allow admin to update a question.
  * @param  params - Parameters to update a quiz question.
- * @param  params.quizId - ID of the quiz question to update.
+ * @param  params.quizQuestionId - ID of the quiz question to update.
  * @param  params.subjectId - ID of the subject to update the question for.
  * @param  params.text - Updated text of the question.
  * @param  params.image - Updated image of the question.
@@ -331,7 +335,7 @@ export const createQuizQuestion = async ({
  * @returns  Updated quiz question.
  */
 export const updateQuizQuestion = async ({
-  quizId,
+  quizQuestionId,
   subjectId,
   text,
   image,
@@ -341,14 +345,27 @@ export const updateQuizQuestion = async ({
   points = 1,
   explanation,
 }: IUpdateQuizQuestionParams) => {
-  const quizQuestion = await QuizQuestionModel.findById(quizId);
+  const quizQuestion = await QuizQuestionModel.findById(quizQuestionId);
   appAssert(quizQuestion, NOT_FOUND, "Question not found");
 
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
 
+  let publicUrl = quizQuestion.image;
+  let key = quizQuestion.key;
+  // 2️⃣ Nếu có ảnh, upload và cập nhật sau
+  if (image) {
+    if (quizQuestion.image) {
+      if (quizQuestion.key) await removeFile(quizQuestion.key);
+    }
+    const questionPrefix = prefixQuizQuestionImage(subjectId, quizQuestionId);
+    const result = await uploadFile(image, questionPrefix);
+    publicUrl = result.publicUrl;
+    key = result.key;
+  }
+
   const updatedQuizQuestion = await QuizQuestionModel.findByIdAndUpdate(
-    quizId,
+    quizQuestionId,
     {
       subjectId,
       text,
@@ -357,22 +374,101 @@ export const updateQuizQuestion = async ({
       correctOptions,
       points,
       explanation,
+      image: publicUrl,
+      key,
     },
     { new: true }
   );
 
-  // 2️⃣ Nếu có ảnh, upload và cập nhật sau
-  if (image) {
-    try {
-      const questionPrefix = prefixQuizQuestionImage(subjectId, quizId);
-      const { publicUrl } = await uploadFile(image, questionPrefix);
-      await QuizQuestionModel.findByIdAndUpdate(quizId, {
-        image: publicUrl,
-      });
-      updatedQuizQuestion!.image = publicUrl;
-    } catch (err) {
-      console.error("Image upload failed:", err);
+  appAssert(updatedQuizQuestion, NOT_FOUND, "Question not found");
+
+  return updatedQuizQuestion;
+};
+
+/**
+ * Delete a question.
+ * @param  quizQuestionId - ID of the question to delete.
+ * @returns  - Deleted question.
+ * @throws  - If the question is in an active quiz.
+ */
+export const deleteQuizQuestion = async (quizQuestionId: string) => {
+  const question = await QuizQuestionModel.findById(quizQuestionId);
+  appAssert(question, NOT_FOUND, "Question not found");
+
+  const isInActiveQuiz = await QuizModel.exists({
+    isCompleted: false,
+    questionIds: { $in: [new mongoose.Types.ObjectId(quizQuestionId)] }, // ✅ dùng $in cho rõ
+  });
+
+  appAssert(
+    !isInActiveQuiz,
+    BAD_REQUEST,
+    "Can't delete question in active quiz"
+  );
+
+  await QuizQuestionModel.findByIdAndDelete(quizQuestionId);
+  if (question.image) {
+    if (question.key) await removeFile(question.key);
+  }
+
+  return question;
+};
+
+/**
+ * Delete multiple questions.
+ * @param  ids - Array of question IDs to delete.
+ * @throws  - If no question IDs are provided.
+ * @throws  - If some questions are in active quizzes.
+ * @returns  - A success message.
+ */
+export const deleteMultipleQuizQuestions = async (ids: string[]) => {
+  appAssert(ids.length > 0, BAD_REQUEST, "No question IDs provided");
+
+  // Kiem tra xem cac ID cua cau hoi co ton tai khong
+  const questions = await QuizQuestionModel.find({
+    _id: { $in: ids },
+  });
+  appAssert(
+    questions.length === ids.length,
+    BAD_REQUEST,
+    "Some question IDs are invalid"
+  );
+
+  // Kiểm tra xem có câu hỏi nào đang được sử dụng trong quiz chưa hoàn tất không
+  const activeQuizzes = await QuizModel.find({
+    questionIds: { $in: ids },
+    isCompleted: false,
+  });
+
+  appAssert(
+    activeQuizzes.length === 0,
+    BAD_REQUEST,
+    "Some questions are in active quizzes"
+  );
+
+  // Xóa thật (hoặc soft delete)
+  await QuizQuestionModel.deleteMany({ _id: { $in: ids } });
+
+  for (const question of questions) {
+    if (question.image) {
+      if (question.key) await removeFile(question.key);
     }
   }
-  return updatedQuizQuestion;
+
+  return { message: "Deleted successfully" };
+};
+
+export const getRandomQuestions = async ({
+  count = 10,
+  subjectId,
+}: IGetRandomQuestionsParams) => {
+  const subject = await SubjectModel.findById(subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+
+  const questions = await QuizQuestionModel.aggregate([
+    { $match: { subjectId } },
+    { $sample: { size: count } },
+  ]);
+
+  return questions;
 };

@@ -403,6 +403,9 @@ export const createEnrollment = async (data: {
  * Yêu cầu nghiệp vụ:
  * - Cập nhật thông tin enrollment (dành cho Admin hoặc Teacher)
  * - Kiểm tra enrollment tồn tại → nếu không tồn tại trả lỗi NOT_FOUND
+ * - Kiểm tra course tồn tại và chưa hết hạn:
+ *   + Nếu course.status = COMPLETED → không cho phép update
+ *   + Nếu course.endDate < new Date() → không cho phép update (course đã hết hạn)
  * - Cho phép cập nhật: status, role, finalGrade, note, respondedBy
  * - Tự động set timestamp khi status thay đổi:
  *   + status = "approved" hoặc "rejected" → set respondedAt = new Date()
@@ -431,10 +434,27 @@ export const updateEnrollment = async (
   }
 ) => {
   // 1. Check enrollment exists
-  const enrollment = await EnrollmentModel.findById(enrollmentId);
+  const enrollment = await EnrollmentModel.findById(enrollmentId).populate("courseId");
   appAssert(enrollment, NOT_FOUND, "Enrollment not found");
 
-  // 2. Update fields
+  // 2. Check course exists and not expired
+  const course = enrollment.courseId as any;
+  appAssert(course, NOT_FOUND, "Course not found");
+  
+  appAssert(
+    course.status !== CourseStatus.COMPLETED,
+    BAD_REQUEST,
+    "Cannot update enrollment for a completed course"
+  );
+  
+  const now = new Date();
+  appAssert(
+    new Date(course.endDate) > now,
+    BAD_REQUEST,
+    "Cannot update enrollment for an expired course"
+  );
+
+  // 3. Update fields
   const updateData: any = {};
   if (data.status !== undefined) {
     updateData.status = data.status;
@@ -458,7 +478,7 @@ export const updateEnrollment = async (
   if (data.note !== undefined) updateData.note = data.note;
   if (data.respondedBy !== undefined) updateData.respondedBy = data.respondedBy;
 
-  // 3. Update enrollment
+  // 4. Update enrollment
   const updatedEnrollment = await EnrollmentModel.findByIdAndUpdate(
     enrollmentId,
     updateData,
@@ -474,6 +494,9 @@ export const updateEnrollment = async (
  * Yêu cầu nghiệp vụ:
  * - Student tự hủy (cancel) enrollment của mình
  * - Kiểm tra enrollment tồn tại và thuộc về student này → nếu không trả lỗi NOT_FOUND
+ * - Kiểm tra course tồn tại và chưa hết hạn:
+ *   + Nếu course.status = COMPLETED → không cho phép cancel
+ *   + Nếu course.endDate < new Date() → không cho phép cancel (course đã hết hạn)
  * - Chỉ cho phép cancel khi status = PENDING hoặc APPROVED
  * - Không cho phép cancel khi:
  *   + Status = COMPLETED → Đã hoàn thành khóa học
@@ -504,10 +527,27 @@ export const updateSelfEnrollment = async (
   const enrollment = await EnrollmentModel.findOne({
     _id: enrollmentId,
     studentId,
-  });
+  }).populate("courseId");
   appAssert(enrollment, NOT_FOUND, "Enrollment not found or access denied");
 
-  // 2. Validate status - chỉ cho phép cancel khi đang PENDING hoặc APPROVED
+  // 2. Check course exists and not expired
+  const course = enrollment.courseId as any;
+  appAssert(course, NOT_FOUND, "Course not found");
+  
+  appAssert(
+    course.status !== CourseStatus.COMPLETED,
+    BAD_REQUEST,
+    "Cannot cancel enrollment for a completed course"
+  );
+  
+  const now = new Date();
+  appAssert(
+    new Date(course.endDate) > now,
+    BAD_REQUEST,
+    "Cannot cancel enrollment for an expired course"
+  );
+
+  // 3. Validate status - chỉ cho phép cancel khi đang PENDING hoặc APPROVED
   const cancellableStatuses = [EnrollmentStatus.PENDING, EnrollmentStatus.APPROVED];
   
   appAssert(
@@ -524,7 +564,7 @@ export const updateSelfEnrollment = async (
       : "Cannot cancel this enrollment"
   );
 
-  // 3. Update status to CANCELLED
+  // 4. Update status to CANCELLED
   const updatedEnrollment = await EnrollmentModel.findByIdAndUpdate(
     enrollmentId,
     { status: EnrollmentStatus.CANCELLED },

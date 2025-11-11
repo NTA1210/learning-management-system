@@ -58,9 +58,27 @@ export const createQuizQuestionSchema = z.object({
 });
 
 export interface IUpdateQuizQuestionParams extends ICreateQuizQuestionParams {
-  quizId: string;
+  quizQuestionId: string;
 }
+export const quizQuestionIdSchema = z
+  .string()
+  .length(24, "Invalid question ID");
 
 export const updateQuizQuestionSchema = createQuizQuestionSchema.extend({
-  quizId: subjectIdSchema,
+  quizQuestionId: quizQuestionIdSchema,
+});
+
+export const multiQuizQuestionIdSchema = z.array(quizQuestionIdSchema);
+
+export interface IGetRandomQuestionsParams {
+  count?: number;
+  subjectId: string;
+}
+export const randomQuizQuestionSchema = z.object({
+  subjectId: subjectIdSchema,
+  count: z
+    .number()
+    .min(1, " Count must be at least 1 ")
+    .max(100, " Count must be at most 100")
+    .default(10),
 });

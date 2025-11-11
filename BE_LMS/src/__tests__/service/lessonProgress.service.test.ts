@@ -31,6 +31,13 @@ describe("⏳ LessonProgress Service Unit Tests", () => {
   });
 
   describe("getLessonProgress", () => {
+    it("admin can get any progress", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.lesson, courseId: { teacherIds: [], isPublished: true }, durationMinutes: 10 }) }) });
+      (LessonProgressModel.findOne as any).mockReturnValue({ lean: jest.fn().mockResolvedValue({ lessonId: ids.lesson, studentId: ids.student, timeSpentSeconds: 60 }) });
+      const res = await getLessonProgress(ids.lesson.toString(), ids.admin, Role.ADMIN, ids.student);
+      expect(res.progressPercent).toBeGreaterThanOrEqual(0);
+    });
+
     it("student can get own progress", async () => {
       (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.lesson, courseId: { teacherIds: [new mongoose.Types.ObjectId(ids.teacher)], isPublished: true }, durationMinutes: 10 }) }) });
       (LessonProgressModel.findOne as any).mockReturnValue({ lean: jest.fn().mockResolvedValue({ lessonId: ids.lesson, studentId: ids.student, timeSpentSeconds: 60 }) });
@@ -38,14 +45,36 @@ describe("⏳ LessonProgress Service Unit Tests", () => {
       expect(res.progressPercent).toBeGreaterThanOrEqual(0);
     });
 
+    it("student cannot view other student's progress", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.lesson, courseId: { teacherIds: [], isPublished: true } }) }) });
+      const otherStudentId = new mongoose.Types.ObjectId().toString();
+      await expect(getLessonProgress(ids.lesson.toString(), ids.student, Role.STUDENT, otherStudentId)).rejects.toThrow("Cannot view other student's progress");
+    });
+
+    it("teacher instructor can view student progress", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.lesson, courseId: { teacherIds: [new mongoose.Types.ObjectId(ids.teacher)], isPublished: true }, durationMinutes: 10 }) }) });
+      (LessonProgressModel.findOne as any).mockReturnValue({ lean: jest.fn().mockResolvedValue({ lessonId: ids.lesson, studentId: ids.student, timeSpentSeconds: 60 }) });
+      const res = await getLessonProgress(ids.lesson.toString(), ids.teacher, Role.TEACHER, ids.student);
+      expect(res.progressPercent).toBeGreaterThanOrEqual(0);
+    });
+
     it("teacher must be instructor", async () => {
       (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.lesson, courseId: { teacherIds: [] } }) }) });
       await expect(getLessonProgress(ids.lesson.toString(), ids.teacher, Role.TEACHER, ids.student)).rejects.toThrow("Not authorized to view progress for this lesson");
     });
+
+    it("throws error for invalid lesson ID", async () => {
+      await expect(getLessonProgress("invalid", ids.admin, Role.ADMIN)).rejects.toThrow("Invalid lesson ID");
+    });
+
+    it("throws error when lesson not found", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }) });
+      await expect(getLessonProgress(ids.lesson.toString(), ids.admin, Role.ADMIN)).rejects.toThrow("Lesson not found");
+    });
   });
 
   describe("addTimeForLesson", () => {
-    it("increments time and may complete at 100%", async () => {
+    it("student increments time and may complete at 100%", async () => {
       (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.lesson, courseId: { _id: ids.course }, durationMinutes: 1 }) }) });
       (EnrollmentModel.exists as any).mockResolvedValue(true);
       const progressDoc = {
@@ -59,9 +88,51 @@ describe("⏳ LessonProgress Service Unit Tests", () => {
       expect(res.progressPercent).toBe(100);
     });
 
+    it("student increments time without completing", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.lesson, courseId: { _id: ids.course }, durationMinutes: 10 }) }) });
+      (EnrollmentModel.exists as any).mockResolvedValue(true);
+      const progressDoc = {
+        toObject: () => ({ lessonId: ids.lesson, courseId: ids.course, studentId: ids.student, timeSpentSeconds: 60, isCompleted: false }),
+        save: jest.fn(),
+        isCompleted: false,
+        timeSpentSeconds: 60,
+      } as any;
+      (LessonProgressModel.findOneAndUpdate as any).mockResolvedValue(progressDoc);
+      const res = await addTimeForLesson(ids.lesson.toString(), 60, ids.student, Role.STUDENT);
+      expect(res.progressPercent).toBeLessThan(100);
+    });
+
     it("rejects teacher updating time", async () => {
       (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.lesson, courseId: { _id: ids.course } }) }) });
       await expect(addTimeForLesson(ids.lesson.toString(), 10, ids.teacher, Role.TEACHER)).rejects.toThrow("Teacher cannot update student's time");
+    });
+
+    it("admin can update time", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.lesson, courseId: { _id: ids.course }, durationMinutes: 10 }) }) });
+      const progressDoc = {
+        toObject: () => ({ lessonId: ids.lesson, courseId: ids.course, studentId: ids.admin, timeSpentSeconds: 60, isCompleted: false }),
+        save: jest.fn(),
+        isCompleted: false,
+        timeSpentSeconds: 60,
+      } as any;
+      (LessonProgressModel.findOneAndUpdate as any).mockResolvedValue(progressDoc);
+      const res = await addTimeForLesson(ids.lesson.toString(), 60, ids.admin, Role.ADMIN);
+      expect(res).toBeDefined();
+    });
+
+    it("throws error when lesson not found", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }) });
+      await expect(addTimeForLesson(ids.lesson.toString(), 10, ids.student, Role.STUDENT)).rejects.toThrow("Lesson not found");
+    });
+
+    it("throws error when student not enrolled", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.lesson, courseId: { _id: ids.course } }) }) });
+      (EnrollmentModel.exists as any).mockResolvedValue(false);
+      await expect(addTimeForLesson(ids.lesson.toString(), 10, ids.student, Role.STUDENT)).rejects.toThrow("Not enrolled");
+    });
+
+    it("throws error for invalid lesson ID", async () => {
+      await expect(addTimeForLesson("invalid", 10, ids.student, Role.STUDENT)).rejects.toThrow();
     });
   });
 
@@ -73,15 +144,65 @@ describe("⏳ LessonProgress Service Unit Tests", () => {
       const res = await completeLesson(ids.lesson.toString(), ids.student, Role.STUDENT);
       expect(res.isCompleted).toBe(true);
     });
+
+    it("throws error when lesson not found", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue(null) }) });
+      await expect(completeLesson(ids.lesson.toString(), ids.student, Role.STUDENT)).rejects.toThrow("Lesson not found");
+    });
+
+    it("throws error when student not enrolled", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.lesson, courseId: { _id: ids.course } }) }) });
+      (EnrollmentModel.exists as any).mockResolvedValue(false);
+      await expect(completeLesson(ids.lesson.toString(), ids.student, Role.STUDENT)).rejects.toThrow("Not enrolled");
+    });
+
+    it("throws error when teacher tries to complete", async () => {
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.lesson, courseId: { _id: ids.course } }) }) });
+      await expect(completeLesson(ids.lesson.toString(), ids.teacher, Role.TEACHER)).rejects.toThrow("Teacher cannot complete for student");
+    });
+
+    it("throws error for invalid lesson ID", async () => {
+      await expect(completeLesson("invalid", ids.student, Role.STUDENT)).rejects.toThrow();
+    });
   });
 
   describe("getCourseProgress", () => {
-    it("computes completion rate", async () => {
+    it("admin can view any student progress", async () => {
+      (CourseModel.findById as any).mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.course, teacherIds: [new mongoose.Types.ObjectId(ids.teacher)] }) });
+      (LessonModel.find as any).mockReturnValue({ sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([{ _id: new mongoose.Types.ObjectId(), title: "A", order: 1, durationMinutes: 1 }]) }) });
+      (LessonProgressModel.find as any).mockReturnValue({ lean: jest.fn().mockResolvedValue([{ lessonId: new mongoose.Types.ObjectId(), isCompleted: true, timeSpentSeconds: 60 }]) });
+      const res = await getCourseProgress(ids.course.toString(), ids.admin, Role.ADMIN, ids.student);
+      expect(res).toHaveProperty("completionRate");
+    });
+
+    it("teacher instructor can view student progress", async () => {
       (CourseModel.findById as any).mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.course, teacherIds: [new mongoose.Types.ObjectId(ids.teacher)] }) });
       (LessonModel.find as any).mockReturnValue({ sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([{ _id: new mongoose.Types.ObjectId(), title: "A", order: 1, durationMinutes: 1 }, { _id: new mongoose.Types.ObjectId(), title: "B", order: 2, durationMinutes: 2 }]) }) });
-      (LessonProgressModel.find as any).mockReturnValue({ lean: jest.fn().mockResolvedValue([{ lessonId: { toString: () => "x" }, isCompleted: true, timeSpentSeconds: 60 }]) });
+      (LessonProgressModel.find as any).mockReturnValue({ lean: jest.fn().mockResolvedValue([{ lessonId: new mongoose.Types.ObjectId(), isCompleted: true, timeSpentSeconds: 60 }]) });
       const res = await getCourseProgress(ids.course.toString(), ids.teacher, Role.TEACHER, ids.student);
       expect(res).toHaveProperty("completionRate");
+    });
+
+    it("teacher non-instructor cannot view student progress", async () => {
+      (CourseModel.findById as any).mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.course, teacherIds: [] }) });
+      await expect(getCourseProgress(ids.course.toString(), ids.teacher, Role.TEACHER, ids.student)).rejects.toThrow("Not authorized");
+    });
+
+    it("student can view own progress", async () => {
+      (CourseModel.findById as any).mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.course, teacherIds: [] }) });
+      (LessonModel.find as any).mockReturnValue({ sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([{ _id: new mongoose.Types.ObjectId(), title: "A", order: 1, durationMinutes: 1 }]) }) });
+      (LessonProgressModel.find as any).mockReturnValue({ lean: jest.fn().mockResolvedValue([{ lessonId: new mongoose.Types.ObjectId(), isCompleted: true, timeSpentSeconds: 60 }]) });
+      const res = await getCourseProgress(ids.course.toString(), ids.student, Role.STUDENT);
+      expect(res).toHaveProperty("completionRate");
+    });
+
+    it("throws error when course not found", async () => {
+      (CourseModel.findById as any).mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
+      await expect(getCourseProgress(ids.course.toString(), ids.admin, Role.ADMIN, ids.student)).rejects.toThrow("Course not found");
+    });
+
+    it("throws error for invalid course ID", async () => {
+      await expect(getCourseProgress("invalid", ids.admin, Role.ADMIN, ids.student)).rejects.toThrow();
     });
   });
 });
