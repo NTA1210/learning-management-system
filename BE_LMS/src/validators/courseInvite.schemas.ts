@@ -20,3 +20,11 @@ export const createCourseInviteSchema = z.object({
 
 export type TCreateCourseInvite = z.infer<typeof createCourseInviteSchema>;
 
+export const joinCourseInviteSchema = z.object({
+  token: z
+    .string()
+    .length(64, "Invalid invite token format")
+    .regex(/^[a-f0-9]{64}$/, "Invalid invite token format"),
+})
+
+export type TJoinCourseInvite = z.infer<typeof joinCourseInviteSchema>;

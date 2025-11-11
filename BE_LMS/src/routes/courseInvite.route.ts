@@ -14,7 +14,6 @@ const courseInviteRoutes = Router();
  */
 courseInviteRoutes.post(
   "/",
-  authenticate,
   authorize(Role.TEACHER, Role.ADMIN),
   createCourseInviteHandler
 );

@@ -10,7 +10,7 @@ import { createCourseInvite } from "@/services/courseInvite.service";
  */
 export const createCourseInviteHandler = catchErrors(async (req, res) => {
   const request = createCourseInviteSchema.parse(req.body);
-  const createdBy = req.userId!.toString();
+  const createdBy = req.userId!.toString(); 
 
   const result = await createCourseInvite(request, createdBy);
 

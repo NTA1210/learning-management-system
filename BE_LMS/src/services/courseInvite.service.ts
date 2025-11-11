@@ -1,11 +1,12 @@
 import crypto from "crypto";
 import {
+  BAD_REQUEST,
   FORBIDDEN,
   INTERNAL_SERVER_ERROR,
   NOT_FOUND,
 } from "@/constants/http";
-import { CourseInviteModel, CourseModel, UserModel } from "@/models";
-import { Role } from "@/types";
+import { CourseInviteModel, CourseModel, UserModel, EnrollmentModel } from "@/models";
+import { Role, EnrollmentStatus, EnrollmentMethod} from "@/types";
 import appAssert from "@/utils/appAssert";
 import { APP_ORIGIN } from "@/constants/env";
 import { TCreateCourseInvite } from "@/validators/courseInvite.schemas";
@@ -68,7 +69,7 @@ export const createCourseInvite = async (
     expiresAt,
     isActive: true,
   });
-
+// kiểm tra tạo invite trong db thành công chưa
   appAssert(invite, INTERNAL_SERVER_ERROR, "Failed to create invite link");
 
   // Tạo link với token gốc (KHÔNG lưu token gốc vào DB)
@@ -87,3 +88,91 @@ export const createCourseInvite = async (
     inviteLink,
   };
 };
+
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Student click vào link mời để tham gia khóa học
+ * - Hash token từ query string và tìm trong DB
+ * - Kiểm tra link còn hợp lệ (chưa hết hạn, chưa vượt giới hạn, đang active)
+ * - Kiểm tra student chưa enroll vào khóa học
+ * - Tự động tạo enrollment cho student
+ * - Tăng usedCount
+ *
+ * Input: token (từ query string), userId (student đang login)
+ * Output: enrollment record
+ */
+
+export const joinCourseByInvite = async (token: string, userId: string) => {
+  //Hash token bằng SHA256 để tìm trong DB
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex")
+
+  // Tìm invite trong DB
+  const invite = await CourseInviteModel.findOne({tokenHash}).populate(
+    "courseId",
+    "title"
+  )
+
+  //ktra tồn tại
+
+  appAssert(invite, NOT_FOUND, "Invalid or expired invite link");
+
+  //ktra active === true
+  appAssert(invite.isActive, BAD_REQUEST, "This invite link is no longer active");
+
+  //ktra hết hạn
+  appAssert(invite.expiresAt > new Date(), BAD_REQUEST, "This invite link has expired");
+
+  //ktra số lần dùng 
+  if (invite.maxUses !== null){
+    appAssert(
+      invite.usedCount < invite.maxUses,
+      BAD_REQUEST,
+      "This invite link has reached its maximum number of uses"
+    )
+  }
+
+  //ktra user tồn tại, check role student
+  const user = await UserModel.findById(userId);
+  appAssert(user, NOT_FOUND, "User not found");
+  appAssert(user.role === Role.STUDENT, BAD_REQUEST, "Only students can join courses via invite links");
+
+  //ktra student đã enroll chưa
+  const existingEnrollment = await EnrollmentModel.findOne({
+    courseId: invite.courseId._id,
+    studentId: userId,
+  });
+  if (existingEnrollment) {
+    return {
+      message: `You are already enrolled in the course "${(invite.courseId as any).title}".`,
+      enrollment: existingEnrollment,
+      alreadyEnrolled: true,
+    };
+  }
+
+  //tạo enrollment mới
+
+  const enrollment = await EnrollmentModel.create({
+    courseId: invite.courseId._id,
+    studentId: userId,
+    status: EnrollmentStatus.APPROVED,
+    method: EnrollmentMethod.INVITED,
+    enrolledAt: new Date(),
+  });
+
+  appAssert(enrollment, INTERNAL_SERVER_ERROR, "Failed to enroll in course");
+
+  //Tăng counter: usedCount += 1 để track số lần dùng
+  invite.usedCount += 1;
+  await invite.save();
+
+  return{
+    message: `Successfully joined the course "${(invite.courseId as any).title}".`,
+    enrollment,
+    alreadyEnrolled: false,
+  }
+
+}
+
+
+
+
