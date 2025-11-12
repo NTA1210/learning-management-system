@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { createCourseInviteHandler } from "@/controller/courseInvite.controller";
-import { authenticate, authorize } from "@/middleware";
+import { createCourseInviteHandler, joinCourseInviteHandler } from "@/controller/courseInvite.controller";
+import { authorize } from "@/middleware";
 import { Role } from "@/types";
 
 const courseInviteRoutes = Router();
@@ -16,6 +16,15 @@ courseInviteRoutes.post(
   "/",
   authorize(Role.TEACHER, Role.ADMIN),
   createCourseInviteHandler
+);
+/**
+ * POST /course-invites/join
+ * Student join khóa học bằng token
+ * Yêu cầu authenticate (phải login)
+ */
+courseInviteRoutes.post(
+  "/join",
+  joinCourseInviteHandler
 );
 
 export default courseInviteRoutes;

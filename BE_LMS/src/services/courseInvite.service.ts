@@ -28,7 +28,11 @@ export const createCourseInvite = async (
   data: TCreateCourseInvite,
   createdBy: string
 ) => {
-  const { courseId, expiresInDays, maxUses } = data;
+  const { courseId, expiresInDays, maxUses, invitedEmail } = data;
+
+  //ktra email tồn tại
+  const invitedUser = await UserModel.findOne({email: invitedEmail});
+  appAssert(invitedUser, NOT_FOUND, "User must register before joining");
 
   // Kiểm tra khóa học tồn tại
   const course = await CourseModel.findById(courseId);
@@ -65,6 +69,7 @@ export const createCourseInvite = async (
     tokenHash,
     courseId,
     createdBy,
+    invitedEmail,
     maxUses,
     expiresAt,
     isActive: true,
@@ -135,7 +140,12 @@ export const joinCourseByInvite = async (token: string, userId: string) => {
   const user = await UserModel.findById(userId);
   appAssert(user, NOT_FOUND, "User not found");
   appAssert(user.role === Role.STUDENT, BAD_REQUEST, "Only students can join courses via invite links");
-
+ 
+  //Ràng buộc email được gửi đến và email đăng nhập phải trùng nhau
+  appAssert(invite.invitedEmail === user.email,
+    FORBIDDEN,
+    `Invite was sent to ${invite.invitedEmail}, please use that email to join the course`
+  )
   //ktra student đã enroll chưa
   const existingEnrollment = await EnrollmentModel.findOne({
     courseId: invite.courseId._id,
@@ -169,6 +179,7 @@ export const joinCourseByInvite = async (token: string, userId: string) => {
     message: `Successfully joined the course "${(invite.courseId as any).title}".`,
     enrollment,
     alreadyEnrolled: false,
+    invitedEmail: invite.invitedEmail,
   }
 
 }
