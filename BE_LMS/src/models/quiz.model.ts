@@ -49,9 +49,17 @@ QuizSchema.methods.createSnapshot = async function () {
     correctOptions: q.correctOptions,
     points: q.points,
     explanation: q.explanation,
+    isExternal: false,
   }));
 
   await this.save();
+};
+
+// Method: Thêm snapshot questions (object)
+QuizSchema.methods.addSnapshotQuestions = async function (questions: any[]) {
+  await this.updateOne({
+    $push: { snapshotQuestions: { $each: questions } },
+  });
 };
 
 const QuizModel = mongoose.model<IQuiz>("Quiz", QuizSchema, "quizzes");
@@ -60,7 +68,7 @@ export default QuizModel;
 
 //Chạy mỗi phút kiểm tra quiz đã hết thời gian
 
-cron.schedule("0 * * * * *", async () => {
+cron.schedule("0 */5 * * * *", async () => {
   console.log("🚀 Running daily quiz cleanup task...");
   const quizzes = await QuizModel.updateMany(
     { endTime: { $lt: new Date() }, isCompleted: false },

@@ -191,3 +191,61 @@ export const gradeSubmission = async (
     { path: "gradedBy", select: "fullname email" },
   ]);
 };
+
+export const listAllGradesByStudent = async (studentId: string) => {
+  const student = await UserModel.findOne({ _id: studentId, role: Role.STUDENT });
+  appAssert(student, NOT_FOUND, "Student not found");
+
+  //lấy toàn bộ submission của sv
+  const submissions = await SubmissionModel.find({ studentId })
+    .populate({
+      path: "assignmentId",
+      select: "title dueDate courseId maxScore",
+      populate: { path: "courseId", select: "title code" },
+    })
+    .populate("gradedBy", "fullname email")
+    .sort({ gradedAt: -1, submittedAt: -1 });
+
+  if (!submissions.length) {
+    return {
+      total: 0,
+      average: null,
+      grades: [],
+    };
+  }
+
+  // tính đtb
+  // const gradedSubs = submissions.filter((s) => s.grade !== undefined);
+  // const average =
+  //   gradedSubs.length > 0
+  //     ? Number(
+  //         (
+  //           gradedSubs.reduce((sum, s) => sum + (s.grade ?? 0), 0) /
+  //           gradedSubs.length
+  //         ).toFixed(2)
+  //       )
+  //     : null;
+
+  //dữ liệu trả về
+  const grades = submissions.map((s) => {
+    const assignment = s.assignmentId as any;
+    return {
+      courseName: assignment?.courseId?.title || "Unknown course",
+      assignmentTitle: assignment?.title,
+      maxScore: assignment?.maxScore ?? 10,
+      grade: s.grade ?? null,
+      feedback: s.feedback ?? "",
+      status: s.status,
+      isLate: s.isLate,
+      submittedAt: s.submittedAt,
+      gradedAt: s.gradedAt,
+      teacher: s.gradedBy && (s.gradedBy as any).fullname ? (s.gradedBy as any).fullname : null,
+    };
+  });
+
+  return {
+    total: submissions.length,
+    // average,
+    grades,
+  };
+};

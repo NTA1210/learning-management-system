@@ -13,7 +13,7 @@ function handleZodError(res: Response, error: ZodError) {
   }));
 
   return res.error(BAD_REQUEST, {
-    message: error.message,
+    message: errors[0].message,
     code: AppErrorCode.ValidationError,
     errors,
   });
@@ -29,6 +29,13 @@ function handleAppError(res: Response, error: AppError) {
 function handleCastError(res: Response, error: mongoose.Error.CastError) {
   return res.error(BAD_REQUEST, {
     message: error.message,
+    code: AppErrorCode.ValidationError,
+  });
+}
+
+function handleJSONParseError(res: Response) {
+  return res.error(BAD_REQUEST, {
+    message: "Invalid JSON format",
     code: AppErrorCode.ValidationError,
   });
 }
@@ -50,6 +57,10 @@ const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
 
   if (error instanceof mongoose.Error.CastError) {
     return handleCastError(res, error);
+  }
+
+  if (error.type === "entity.parse.failed") {
+    return handleJSONParseError(res);
   }
 
   return res.error(INTERNAL_SERVER_ERROR, {

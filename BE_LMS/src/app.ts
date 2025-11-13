@@ -27,6 +27,7 @@ import {
   lessonMaterialRoutes,
   lessonProgressRoutes,
   courseRoutes,
+  courseInviteRoutes,
   enrollmentRoutes,
   quizQuestionRoutes,
   sessionRoutes,
@@ -38,11 +39,14 @@ import {
   specialistPublicRoutes,
   forumProtectedRoutes,
   forumPublicRoutes,
+  subjectRouter,
+  quizRoutes,
 } from "./routes";
 
 export const createApp = () => {
   const app = express();
 
+  app.use(customResponse);
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use(
@@ -52,7 +56,6 @@ export const createApp = () => {
     })
   );
   app.use(cookieParser());
-  app.use(customResponse);
 
   //example API----------------------------------
   app.get("/", (req, res) => {
@@ -81,17 +84,17 @@ export const createApp = () => {
   app.use("/lesson-progress", lessonProgressRoutes);
   app.use("/majors", majorPublicRoutes);
   app.use("/specialists", specialistPublicRoutes);
-  app.use("/forums", forumPublicRoutes);
-
   //protected routes
   app.use("/users", authenticate, userRoutes);
   app.use("/sessions", authenticate, authorize(Role.ADMIN), sessionRoutes);
   app.use("/enrollments", authenticate, enrollmentRoutes);
+  app.use("/course-invites", courseInviteRoutes);
   app.use("/quiz-questions", quizQuestionRoutes);
   app.use("/majors", authenticate, majorProtectedRoutes);
   app.use("/specialists", authenticate, specialistProtectedRoutes);
   app.use("/forums", authenticate, forumProtectedRoutes);
-
+  app.use("/subjects", authenticate, subjectRouter);
+  app.use("/quizzes", quizRoutes);
   app.use(errorHandler);
 
   return app;
