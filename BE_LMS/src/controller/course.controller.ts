@@ -15,6 +15,7 @@ import {
   restoreCourse,
   permanentDeleteCourse,
 } from "../services/course.service";
+import { parseFormData } from "../utils/parseFormData";
 
 /**
  * GET /courses - List all courses with filters
@@ -73,8 +74,11 @@ export const createCourseHandler = catchErrors(async (req, res) => {
   // Get logo file from multer (if uploaded)
   const logoFile = req.file;
 
+  // Parse form-data fields (arrays, objects are sent as JSON strings)
+  const parsedBody = parseFormData(req.body);
+
   // Validate request body
-  const data = createCourseSchema.parse(req.body);
+  const data = createCourseSchema.parse(parsedBody);
 
   // Get userId from request (set by authenticate middleware)
   const userId = (req as any).userId;
@@ -98,8 +102,11 @@ export const updateCourseHandler = catchErrors(async (req, res) => {
   // Validate course ID
   const courseId = courseIdSchema.parse(req.params.id);
 
+  // Parse form-data fields (arrays, objects are sent as JSON strings)
+  const parsedBody = parseFormData(req.body);
+
   // Validate request body
-  const data = updateCourseSchema.parse(req.body);
+  const data = updateCourseSchema.parse(parsedBody);
 
   // Get userId from request (set by authenticate middleware)
   const userId = (req as any).userId;

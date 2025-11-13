@@ -3,6 +3,7 @@ export { default as authRoutes } from "./auth.route";
 export { default as courseRoutes } from "./course.route";
 export { default as courseInviteRoutes } from "./courseInvite.route";
 export { default as enrollmentRoutes } from "./enrollment.route";
+export { default as feedbackRoutes } from "./feedback.route";
 export { default as sessionRoutes } from "./session.route";
 export { default as submissionRoutes } from "./submission.route";
 export { default as lessonRoutes } from "./lesson.route";
