@@ -5,7 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { httpClient } from "../utils/http";
-import { ArrowLeft, Download, FileText, Video, Presentation, Link as LinkIcon, File, Eye, X, Minimize2, Maximize2, GripVertical } from "lucide-react";
+import { ArrowLeft, Download, FileText, Video, Presentation, Link as LinkIcon, File, Eye, X, Minimize2, Maximize2 } from "lucide-react";
 
 interface Lesson {
   _id: string;
@@ -85,6 +85,15 @@ const LessonMaterialDetailPage: React.FC = () => {
   const [popupSize, setPopupSize] = useState({ width: 0, height: 0 });
   const [isResizing, setIsResizing] = useState(false);
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const [resizeMode, setResizeMode] = useState<"horizontal" | "vertical" | null>(null);
+
+  // >>> ADDED: refs & raf helpers for smooth resize
+  const popupRef = React.useRef<HTMLDivElement | null>(null);
+  const contentRef = React.useRef<HTMLDivElement | null>(null);
+  const sizeRef = React.useRef({ width: 0, height: 0 });
+  const rafRef = React.useRef<number | null>(null);
+  const resizingRef = React.useRef(false);
+  // <<< ADDED
 
   const showSwalError = async (message: string) => {
     try {
@@ -133,52 +142,114 @@ const LessonMaterialDetailPage: React.FC = () => {
   useEffect(() => {
     if (isViewerOpen && !viewerMinimized && popupSize.width === 0) {
       // Set default size (90% of viewport)
+      const w = window.innerWidth * 0.9;
+      const h = window.innerHeight * 0.9;
       setPopupSize({
-        width: window.innerWidth * 0.9,
-        height: window.innerHeight * 0.9,
+        width: w,
+        height: h,
       });
+      // >>> ADDED: keep a ref mirror for rAF sizing
+      sizeRef.current = { width: w, height: h };
+      // <<< ADDED
     }
   }, [isViewerOpen, viewerMinimized, popupSize.width]);
 
-  // Handle resize
+  // >>> REPLACED: Handle resize with rAF + direct DOM writes (no setState thrash)
   useEffect(() => {
-    if (!isResizing) {
+    if (!isResizing || !resizeMode) {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       return;
     }
 
-    // Disable text selection and set cursor during resize
-    document.body.style.cursor = 'nwse-resize';
+    document.body.style.cursor = resizeMode === "horizontal" ? 'ew-resize' : 'ns-resize';
     document.body.style.userSelect = 'none';
+    resizingRef.current = true;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    // Freeze heavy content while resizing (FIX: dùng opacity thay visibility để không "đen")
+    if (contentRef.current) {
+      contentRef.current.style.pointerEvents = 'none';
+      contentRef.current.style.willChange = 'opacity';
+      contentRef.current.style.transform = 'translateZ(0)';
+    }
+
+    const frameUpdate = (nextWidth?: number, nextHeight?: number) => {
+      if (!popupRef.current) return;
+      if (typeof nextWidth === 'number') popupRef.current.style.width = `${nextWidth}px`;
+      if (typeof nextHeight === 'number') popupRef.current.style.height = `${nextHeight}px`;
+    };
+
+    const onMove = (e: MouseEvent) => {
       e.preventDefault();
       const deltaX = e.clientX - resizeStart.x;
       const deltaY = e.clientY - resizeStart.y;
-      
-      const newWidth = Math.max(600, Math.min(window.innerWidth - 40, resizeStart.width + deltaX));
-      const newHeight = Math.max(400, Math.min(window.innerHeight - 40, resizeStart.height + deltaY));
-      
-      setPopupSize({ width: newWidth, height: newHeight });
+
+      const baseW = resizeStart.width || sizeRef.current.width || window.innerWidth * 0.9;
+      const baseH = resizeStart.height || sizeRef.current.height || window.innerHeight * 0.9;
+
+      let w = sizeRef.current.width || baseW;
+      let h = sizeRef.current.height || baseH;
+
+      if (resizeMode === "horizontal") {
+        w = Math.max(400, Math.min(window.innerWidth - 40, baseW + deltaX));
+      }
+      if (resizeMode === "vertical") {
+        h = Math.max(300, Math.min(window.innerHeight - 40, baseH + deltaY));
+      }
+
+      sizeRef.current = { width: w, height: h };
+
+      if (rafRef.current == null) {
+        rafRef.current = requestAnimationFrame(() => {
+          rafRef.current = null;
+          frameUpdate(
+            resizeMode === "horizontal" ? w : undefined,
+            resizeMode === "vertical" ? h : undefined
+          );
+        });
+      }
     };
 
-    const handleMouseUp = () => {
-      setIsResizing(false);
+    const onUp = () => {
+      resizingRef.current = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+
+      // Khôi phục lại sau khi thả chuột
+      if (contentRef.current) {
+        contentRef.current.style.pointerEvents = '';
+        contentRef.current.style.willChange = '';
+        contentRef.current.style.transform = '';
+      }
+
+      // Sync final size to React state once after resize ends
+      setPopupSize({ ...sizeRef.current });
+
+      setIsResizing(false);
+      setResizeMode(null);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
     };
-  }, [isResizing, resizeStart]);
+  }, [isResizing, resizeStart, resizeMode]);
+  // <<< REPLACED
 
   const fetchLesson = async () => {
     if (!lessonId) return;
@@ -359,10 +430,11 @@ const LessonMaterialDetailPage: React.FC = () => {
     }
   };
 
-  const handleResizeStart = (e: React.MouseEvent) => {
+  const handleResizeStart = (e: React.MouseEvent, mode: "horizontal" | "vertical") => {
     e.preventDefault();
     e.stopPropagation();
     setIsResizing(true);
+    setResizeMode(mode);
     setResizeStart({
       x: e.clientX,
       y: e.clientY,
@@ -386,7 +458,7 @@ const LessonMaterialDetailPage: React.FC = () => {
     // If still no URL at this point
     if (!material.signedUrl && !viewerObjectUrl) {
       return (
-        <div className="flex flex-col items-center justify-center h-full p-8" style={{ minHeight: '500px' }}>
+        <div className="flex flex-col items-center justify-center h-full p-8">
           <FileText size={64} style={{ color: darkMode ? '#9ca3af' : '#6b7280', marginBottom: '1rem' }} />
           <p style={{ color: darkMode ? '#d1d5db' : '#6b7280', marginBottom: '1rem' }}>
             No preview available for this material.
@@ -402,13 +474,9 @@ const LessonMaterialDetailPage: React.FC = () => {
       return (
         <iframe
           src={viewerObjectUrl || material.signedUrl!}
-          className="w-full border-0"
+          className="w-full h-full border-0"
           title={material.title || 'PDF Viewer'}
-          style={{ 
-            height: 'calc(100vh - 200px)',
-            minHeight: '600px',
-            width: '100%'
-          }}
+          style={{ backgroundColor: '#fff' }}
         />
       );
     }
@@ -416,15 +484,11 @@ const LessonMaterialDetailPage: React.FC = () => {
     // Images
     if (mimeType.startsWith('image/')) {
       return (
-        <div className="flex items-center justify-center p-4" style={{ minHeight: 'calc(100vh - 200px)' }}>
+        <div className="flex items-center justify-center p-4 h-full">
           <img
             src={viewerObjectUrl || material.signedUrl!}
             alt={material.title || 'Image'}
             className="max-w-full max-h-full object-contain"
-            style={{ 
-              maxHeight: 'calc(100vh - 200px)',
-              maxWidth: '100%'
-            }}
           />
         </div>
       );
@@ -433,15 +497,11 @@ const LessonMaterialDetailPage: React.FC = () => {
     // Videos
     if (mimeType.startsWith('video/')) {
       return (
-        <div className="flex items-center justify-center p-4" style={{ minHeight: 'calc(100vh - 200px)' }}>
+        <div className="flex items-center justify-center p-4 h-full">
           <video
             src={viewerObjectUrl || material.signedUrl!}
             controls
             className="max-w-full max-h-full"
-            style={{ 
-              maxHeight: 'calc(100vh - 200px)',
-              maxWidth: '100%'
-            }}
           >
             Your browser does not support the video tag.
           </video>
@@ -454,13 +514,9 @@ const LessonMaterialDetailPage: React.FC = () => {
       return (
         <iframe
           src={viewerObjectUrl || material.signedUrl!}
-          className="w-full border-0"
+          className="w-full h-full border-0"
           title={material.title || 'Text Viewer'}
-          style={{ 
-            height: 'calc(100vh - 200px)',
-            minHeight: '600px',
-            width: '100%'
-          }}
+          style={{ backgroundColor: '#fff' }}
         />
       );
     }
@@ -478,20 +534,16 @@ const LessonMaterialDetailPage: React.FC = () => {
       return (
         <iframe
           src={viewerUrl}
-          className="w-full border-0"
+          className="w-full h-full border-0"
           title={material.title || 'Document Viewer'}
-          style={{ 
-            height: 'calc(100vh - 200px)',
-            minHeight: '600px',
-            width: '100%'
-          }}
+          style={{ backgroundColor: '#fff' }}
         />
       );
     }
     
     // Default: try to embed or show download link
     return (
-      <div className="flex flex-col items-center justify-center p-8" style={{ minHeight: 'calc(100vh - 200px)' }}>
+      <div className="flex flex-col items-center justify-center p-8 h-full">
         <FileText size={64} style={{ color: darkMode ? '#9ca3af' : '#6b7280', marginBottom: '1rem' }} />
         <p 
           className="text-center mb-4"
@@ -836,6 +888,7 @@ const LessonMaterialDetailPage: React.FC = () => {
           }}
         >
           <div
+            ref={popupRef} /* ADDED */
             className="relative rounded-lg overflow-hidden flex flex-col"
             style={{
               backgroundColor: darkMode ? '#1f2937' : '#ffffff',
@@ -846,6 +899,8 @@ const LessonMaterialDetailPage: React.FC = () => {
               maxHeight: '95vh',
               minWidth: '600px',
               minHeight: '400px',
+              willChange: 'width, height',         /* ADDED */
+              contain: 'layout paint size',        /* ADDED */
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -916,7 +971,8 @@ const LessonMaterialDetailPage: React.FC = () => {
 
             {/* Modal Content */}
             <div 
-              className="flex-1 overflow-auto" 
+              ref={contentRef} /* ADDED */
+              className="flex-1 overflow-auto"
               style={{ 
                 minHeight: 0,
                 backgroundColor: darkMode ? '#111827' : '#f9fafb',
@@ -934,45 +990,38 @@ const LessonMaterialDetailPage: React.FC = () => {
               )}
             </div>
 
-            {/* Resize Handle */}
+            {/* Resize Handle - Horizontal (Right Edge) */}
             <div
-              onMouseDown={handleResizeStart}
-              className="absolute bottom-0 right-0 w-8 h-8 cursor-nwse-resize flex items-center justify-center group"
+              onMouseDown={(e) => handleResizeStart(e, "horizontal")}
+              className="absolute top-0 right-0 h-full w-3 cursor-ew-resize flex items-center justify-center"
               style={{
-                backgroundColor: darkMode ? 'rgba(75, 85, 99, 0.4)' : 'rgba(229, 231, 235, 0.6)',
-                borderTopLeftRadius: '8px',
-                transition: 'background-color 0.2s',
+                backgroundColor: 'transparent',
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = darkMode ? 'rgba(99, 102, 241, 0.4)' : 'rgba(99, 102, 241, 0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = darkMode ? 'rgba(75, 85, 99, 0.4)' : 'rgba(229, 231, 235, 0.6)';
-              }}
-              title="Drag to resize"
             >
-              <div className="flex flex-col gap-0.5">
-                <div className="flex gap-0.5">
-                  <div 
-                    className="w-1 h-1 rounded-full"
-                    style={{ backgroundColor: darkMode ? '#9ca3af' : '#6b7280' }}
-                  />
-                  <div 
-                    className="w-1 h-1 rounded-full"
-                    style={{ backgroundColor: darkMode ? '#9ca3af' : '#6b7280' }}
-                  />
-                </div>
-                <div className="flex gap-0.5">
-                  <div 
-                    className="w-1 h-1 rounded-full"
-                    style={{ backgroundColor: darkMode ? '#9ca3af' : '#6b7280' }}
-                  />
-                  <div 
-                    className="w-1 h-1 rounded-full"
-                    style={{ backgroundColor: darkMode ? '#9ca3af' : '#6b7280' }}
-                  />
-                </div>
-              </div>
+              <div
+                className="w-1 rounded-full"
+                style={{
+                  height: '60px',
+                  background: darkMode ? 'rgba(148, 163, 184, 0.6)' : 'rgba(71, 85, 105, 0.4)',
+                }}
+              />
+            </div>
+
+            {/* Resize Handle - Vertical (Bottom Edge) */}
+            <div
+              onMouseDown={(e) => handleResizeStart(e, "vertical")}
+              className="absolute bottom-0 left-0 w-full h-3 cursor-ns-resize flex items-center justify-center"
+              style={{
+                backgroundColor: 'transparent',
+              }}
+            >
+              <div
+                className="h-1 rounded-full"
+                style={{
+                  width: '60px',
+                  background: darkMode ? 'rgba(148, 163, 184, 0.6)' : 'rgba(71, 85, 105, 0.4)',
+                }}
+              />
             </div>
           </div>
         </div>
