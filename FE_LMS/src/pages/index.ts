@@ -16,3 +16,5 @@ export { default as CourseDetailPage } from "./CourseDetail";
 export { default as ListAllLessonsPage } from "./ListAllLessonsPage";
 export { default as AssignmentPage } from "./AssignmentPage";
 export { default as AssignmentDetailPage } from "./AssignmentDetailPage";
+export { default as QuizManagementPage } from "./QuizManagementPage";
+export { default as QuizCoursePage } from "./QuizCoursePage";
