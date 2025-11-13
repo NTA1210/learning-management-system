@@ -33,6 +33,8 @@ export const listCoursesHandler = catchErrors(async (req, res) => {
     page: query.page,
     limit: query.limit,
     search: query.search,
+    from: query.from,
+    to: query.to,
     subjectId: query.subjectId,
     teacherId: query.teacherId,
     isPublished: query.isPublished,

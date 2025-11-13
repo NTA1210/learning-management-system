@@ -16,6 +16,14 @@ export const listCoursesSchema = z.object({
       message: "Limit must be between 1 and 100",
     }),
   search: z.string().optional(),
+  from: z
+    .string()
+    .optional()
+    .transform((val) => (val ? new Date(val) : undefined)), // Date range start
+  to: z
+    .string()
+    .optional()
+    .transform((val) => (val ? new Date(val) : undefined)), // Date range end
   subjectId: z.string().optional(), // Filter by subject ID
   teacherId: z.string().optional(), // Filter by teacher ID
   isPublished: z

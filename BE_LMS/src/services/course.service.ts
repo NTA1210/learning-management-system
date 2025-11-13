@@ -63,6 +63,8 @@ export type ListCoursesParams = {
   page: number;
   limit: number;
   search?: string;
+  from?: Date; // Date range start for createdAt filtering
+  to?: Date; // Date range end for createdAt filtering
   subjectId?: string; // ✅ NEW: Filter by subject instead of specialist
   teacherId?: string;
   isPublished?: boolean;
@@ -88,6 +90,8 @@ export const listCourses = async ({
   page,
   limit,
   search,
+  from,
+  to,
   subjectId,
   teacherId,
   isPublished,
@@ -179,6 +183,13 @@ export const listCourses = async ({
   // Filter by teacher ID
   if (teacherId) {
     filter.teacherIds = teacherId;
+  }
+
+  // ✅ NEW: Filter by date range (createdAt)
+  if (from || to) {
+    filter.createdAt = {};
+    if (from) filter.createdAt.$gte = from;
+    if (to) filter.createdAt.$lte = to;
   }
 
     // Search by title or description (text search)
