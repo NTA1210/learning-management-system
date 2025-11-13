@@ -10,6 +10,19 @@ const objectIdSchema = z.string().regex(/^[0-9a-fA-F]{24}$/, {
   message: "Invalid ID format. Must be a valid MongoDB ObjectId",
 });
 
+const dateParamSchema = z
+  .union([
+    z
+      .string()
+      .refine(
+        (val) => !Number.isNaN(Date.parse(val)),
+        { message: "Invalid date format. Expected ISO string." }
+      )
+      .transform((val) => new Date(val)),
+    z.date(),
+  ])
+  .optional();
+
 // GET - Query enrollments (cho các query params)
 export const getEnrollmentsQuerySchema = z.object({
   status: z.enum(EnrollmentStatus).optional(),
@@ -23,6 +36,8 @@ export const getEnrollmentsQuerySchema = z.object({
     .string()
     .optional()
     .transform((val) => (val ? parseInt(val) : 10)),
+  from: dateParamSchema,
+  to: dateParamSchema,
 });
 
 // Validate ID trong URL params
