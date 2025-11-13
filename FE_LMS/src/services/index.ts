@@ -5,6 +5,7 @@ import { type LoginRequest, type RegisterRequest, type AuthResponse, type User }
 export * from './mock';
 export * from './courseService';
 export * from './enrollmentService';
+export * from './quizQuestionService';
 
 // storage keys
 const USER_STORAGE_KEY = 'lms:user';
