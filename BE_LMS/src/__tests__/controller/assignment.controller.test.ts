@@ -1,4 +1,3 @@
-// assignment.controller.test.ts
 import { Request, Response } from "express";
 import * as assignmentService from "@/services/assignment.service";
 import * as assignmentSchemas from "@/validators/assignment.schemas";
