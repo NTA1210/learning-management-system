@@ -20,10 +20,10 @@ quizQuestionRoutes.post("/import", upload.single("file"), importXMLFileHandler);
 
 quizQuestionRoutes.get("/export/:subjectId", exportXMLFileHandler);
 quizQuestionRoutes.get("/", getAllQuizQuestionsHandler);
-quizQuestionRoutes.post("/", upload.single("file"), createQuizQuestionHandler);
+quizQuestionRoutes.post("/", upload.array("files"), createQuizQuestionHandler);
 quizQuestionRoutes.put(
   "/:quizQuestionId",
-  upload.single("file"),
+  upload.array("files"),
   updateQuizQuestionByIdHandler
 );
 quizQuestionRoutes.delete("/:quizQuestionId", deleteQuizQuestionByIdHandler);

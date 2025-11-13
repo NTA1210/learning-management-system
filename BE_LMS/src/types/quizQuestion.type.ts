@@ -10,8 +10,7 @@ export enum QuizQuestionType {
 export default interface IQuizQuestion extends mongoose.Document {
   subjectId: mongoose.Types.ObjectId;
   text: string;
-  image?: string;
-  key?: string;
+  images?: string[];
   type: QuizQuestionType;
   options: string[]; // for MCQ
   correctOptions: any; // for auto-graded (index or array)
