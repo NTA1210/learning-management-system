@@ -318,10 +318,12 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
       req.files = undefined;
       req.file = undefined;
       await uploadLessonMaterialController(req as Request, res as Response, next);
-      expect(next).toHaveBeenCalled();
-      const error = (next as jest.Mock).mock.calls[0][0];
-      expect(error.message).toBe("No file uploaded");
-      expect(error.statusCode).toBe(400);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: "No file uploaded",
+      });
+      expect(next).not.toHaveBeenCalled();
     });
 
     it("handles validation errors", async () => {
@@ -371,16 +373,47 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
       expect(res.success).toHaveBeenCalled();
     });
 
+    it("success flow uses empty originalName fallback", async () => {
+      const id = new mongoose.Types.ObjectId().toString();
+      req.params = { id };
+      (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockReturnValue({ id });
+      (service.getLessonMaterialById as jest.Mock).mockResolvedValue({ hasAccess: true });
+      const downloadPayload = { 
+        _id: id,
+        key: "files/a.pdf",
+        lessonId: new mongoose.Types.ObjectId(),
+        title: "Test",
+        note: "Note",
+        mimeType: "application/pdf",
+        size: 100,
+        uploadedBy: new mongoose.Types.ObjectId(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      (service.getMaterialForDownload as jest.Mock).mockResolvedValue(downloadPayload);
+
+      await downloadLessonMaterialController(req as Request, res as Response, next);
+
+      expect(res.success).toHaveBeenCalledWith(200, expect.objectContaining({
+        data: expect.objectContaining({
+          signedUrl: expect.anything(),
+          originalName: undefined,
+        }),
+      }));
+    });
+
     it("returns 403 when user has no access", async () => {
       const id = new mongoose.Types.ObjectId().toString();
       req.params = { id };
       (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockReturnValue({ id });
       (service.getLessonMaterialById as jest.Mock).mockResolvedValue({ hasAccess: false });
       await downloadLessonMaterialController(req as Request, res as Response, next);
-      expect(next).toHaveBeenCalled();
-      const error = (next as jest.Mock).mock.calls[0][0];
-      expect(error.message).toBe("You don't have permission to download this material");
-      expect(error.statusCode).toBe(403);
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: "You don't have permission to download this material",
+      });
+      expect(next).not.toHaveBeenCalled();
     });
 
     it("returns 404 when material is manual (no file)", async () => {
@@ -394,10 +427,12 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
         originalName: null
       });
       await downloadLessonMaterialController(req as Request, res as Response, next);
-      expect(next).toHaveBeenCalled();
-      const error = (next as jest.Mock).mock.calls[0][0];
-      expect(error.message).toBe("This material does not have a file to download");
-      expect(error.statusCode).toBe(404);
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: "This material does not have a file to download",
+      });
+      expect(next).not.toHaveBeenCalled();
     });
 
     it("returns 404 when material has no key", async () => {
@@ -411,10 +446,12 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
         originalName: null
       });
       await downloadLessonMaterialController(req as Request, res as Response, next);
-      expect(next).toHaveBeenCalled();
-      const error = (next as jest.Mock).mock.calls[0][0];
-      expect(error.message).toBe("This material does not have a file to download");
-      expect(error.statusCode).toBe(404);
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({
+        success: false,
+        message: "This material does not have a file to download",
+      });
+      expect(next).not.toHaveBeenCalled();
     });
 
     it("handles validation errors", async () => {

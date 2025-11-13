@@ -1,29 +1,43 @@
 import z from "zod";
+import ListParams from "@/types/dto/listParams.dto";
+import { datePreprocess } from "./helpers/date.schema";
+import { listParamsSchema } from "./listParams.schema";
 
-export const listSubjectsSchema = z.object({
-  page: z
-    .string()
-    .optional()
-    .transform((val) => (val ? parseInt(val, 10) : 1))
-    .refine((val) => val > 0, { message: "Page must be greater than 0" }),
-  limit: z
-    .string()
-    .optional()
-    .transform((val) => (val ? parseInt(val, 10) : 10))
-    .refine((val) => val > 0 && val <= 100, {
-      message: "Limit must be between 1 and 100",
-    }),
-  search: z.string().optional(),
-  name: z.string().optional(),
-  slug: z.string().optional(),
-  code: z.string().optional(),
-  specialistId: z.string().optional(),
-  isActive: z.union([z.string(), z.boolean()]).optional(),
-  createdAt: z.date().optional(),
-  updatedAt: z.date().optional(),
-  sortBy: z.enum(["createdAt", "updatedAt", "name", "code"]).optional(),
-  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
-});
+type ListSubjectsFilters = ListParams & {
+  name?: string;
+  slug?: string;
+  code?: string;
+  specialistId?: string;
+  isActive?: string | boolean;
+  from?: Date;
+  to?: Date;
+};
+
+export const listSubjectsSchema = (listParamsSchema
+  .extend({
+    search: z.string().optional(),
+    name: z.string().optional(),
+    slug: z.string().optional(),
+    code: z.string().optional(),
+    specialistId: z.string().optional(),
+    isActive: z.union([z.string(), z.boolean()]).optional(),
+    createdAt: datePreprocess,
+    updatedAt: datePreprocess,
+    from: datePreprocess,
+    to: datePreprocess,
+  })
+  .refine(
+    (val) => {
+      if (val.from && val.to) {
+        return val.from.getTime() <= val.to.getTime();
+      }
+      return true;
+    },
+    {
+      message: "From date must be less than or equal to To date",
+      path: ["to"],
+    }
+  )) satisfies z.ZodType<ListSubjectsFilters>;
 
 export type ListSubjectsQuery = z.infer<typeof listSubjectsSchema>;
 

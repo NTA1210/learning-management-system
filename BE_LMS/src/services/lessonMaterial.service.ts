@@ -28,6 +28,7 @@ import { removeDirAndFiles } from "minio";
  */
 export const getLessonMaterials = async (query: any, userId?: string, userRole?: Role) => {
   const filter: any = {};
+  const { from, to } = query;
   
   // Basic filtering
   if (query.title) {
@@ -96,6 +97,12 @@ export const getLessonMaterials = async (query: any, userId?: string, userRole?:
 
   if (query.lessonId !== undefined) {
     filter.lessonId = new mongoose.Types.ObjectId(query.lessonId);
+  }
+
+  if (from || to) {
+    filter.createdAt = {};
+    if (from) filter.createdAt.$gte = from;
+    if (to) filter.createdAt.$lte = to;
   }
 
   // Search: Use regex search on title, note, and originalName instead of $text

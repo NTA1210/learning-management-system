@@ -280,7 +280,8 @@ describe("Submission Service Unit Tests", () => {
       mockedAssignmentModel.findById.mockResolvedValueOnce(fakeAssignment as any);
       mockedSubmissionModel.findOne.mockResolvedValueOnce(fakeSubmission as any);
 
-      const result = await gradeSubmission("a1", "s1", "g1", 8, "Good job");
+      const graderId = new mongoose.Types.ObjectId().toHexString();
+      const result = await gradeSubmission("a1", "s1", graderId, 8, "Good job");
 
       expect(fakeSubmission.save).toHaveBeenCalled();
       expect(fakeSubmission.populate).toHaveBeenCalled();

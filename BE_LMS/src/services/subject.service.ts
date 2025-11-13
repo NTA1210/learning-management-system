@@ -11,6 +11,8 @@ export interface ListSubjectParams extends ListParams {
   code?: string;
   specialistId?: string;
   isActive?: string | boolean;
+  from?: Date;
+  to?: Date;
 }
 
 /**
@@ -28,6 +30,8 @@ export const listSubjects = async ({
   code,
   specialistId,
   isActive,
+  from,
+  to,
   createdAt,
   updatedAt,
   sortBy = "createdAt",
@@ -52,7 +56,20 @@ export const listSubjects = async ({
     filter.specialistIds = new mongoose.Types.ObjectId(specialistId);
   }
 
-  if (createdAt) filter.createdAt = createdAt;
+  const createdAtFilter: Record<string, Date> = {};
+  if (from) createdAtFilter.$gte = from;
+  if (to) createdAtFilter.$lte = to;
+  if (createdAt && !from && !to) {
+    const startOfDay = new Date(createdAt);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(createdAt);
+    endOfDay.setHours(23, 59, 59, 999);
+    createdAtFilter.$gte = startOfDay;
+    createdAtFilter.$lte = endOfDay;
+  }
+  if (Object.keys(createdAtFilter).length > 0) {
+    filter.createdAt = createdAtFilter;
+  }
   if (updatedAt) filter.updatedAt = updatedAt;
 
   const skip = (page - 1) * limit;
