@@ -37,6 +37,12 @@ export const listAssignments = async ({
       { description: { $regex: search, $options: "i" } },
     ];
   }
+  // lọc theo cratedAt
+  if (dueAfter || dueBefore) {
+  filter.createdAt = {};
+  if (dueAfter) filter.createdAt.$gte = dueAfter;
+  if (dueBefore) filter.createdAt.$lte = dueBefore;
+}
 
   if (dueBefore) {
     filter.dueDate = { ...filter.dueDate, $lte: dueBefore };

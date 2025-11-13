@@ -133,8 +133,21 @@ export const getSubmissionStatus = async (
   };
 };
 //hàm bổ sung, ds bài nộp theo assignment cho GV
-export const listSubmissionsByAssignment = async (assignmentId: string) => {
-  return SubmissionModel.find({ assignmentId })
+export const listSubmissionsByAssignment = async (
+  assignmentId: string,
+  from?: Date,
+  to?: Date
+  ) => {
+  const filter: any = { assignmentId };
+  
+  if (from || to) {
+    filter.submittedAt = {};
+    if (from) filter.submittedAt.$gte = from;
+    if (to) filter.submittedAt.$lte = to;
+  }
+
+  
+  return SubmissionModel.find(filter)
     .populate("studentId", "fullname email")
     .sort({ submittedAt: -1 });
 };
@@ -192,12 +205,23 @@ export const gradeSubmission = async (
   ]);
 };
 
-export const listAllGradesByStudent = async (studentId: string) => {
+export const listAllGradesByStudent = async (
+  studentId: string,
+  from?: Date,
+  to?: Date
+  ) => {
   const student = await UserModel.findOne({ _id: studentId, role: Role.STUDENT });
   appAssert(student, NOT_FOUND, "Student not found");
 
+  const filter: any = { studentId };
+  if (from || to) {
+    filter.submittedAt = {};
+    if (from) filter.submittedAt.$gte = from;
+    if (to) filter.submittedAt.$lte = to;
+  }
+
   //lấy toàn bộ submission của sv
-  const submissions = await SubmissionModel.find({ studentId })
+  const submissions = await SubmissionModel.find(filter)
     .populate({
       path: "assignmentId",
       select: "title dueDate courseId maxScore",
