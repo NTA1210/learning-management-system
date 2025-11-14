@@ -7,6 +7,7 @@ import {
   deleteLessonMaterial,
   uploadLessonMaterial,
   getMaterialForDownload,
+  deleteFileOfMaterial,
 } from "../services/lessonMaterial.service";
 import { getSignedUrl } from "../utils/uploadFile";
 import { catchErrors } from "../utils/asyncHandler";
@@ -262,3 +263,26 @@ export const downloadLessonMaterialController = catchErrors(
     });
   }
 );
+export const deleteLessonMaterialFile = catchErrors(async (req, res) => {
+  const { id } = req.params; // id của material
+
+  // Validate material ID
+  const validatedParams = LessonMaterialByIdSchema.parse({ id });
+
+  // Lấy thông tin người dùng từ middleware xác thực
+  const userId = req.userId?.toString();
+  const userRole = req.role;
+
+  // Gọi service để xử lý logic xóa file của material
+  const result = await deleteFileOfMaterial(
+    validatedParams.id, // materialId
+    userId,
+    userRole
+  );
+
+  // Trả kết quả cho client
+  return res.success(OK, {
+    data: result,
+    message: "Deleted file successfully",
+  });
+});

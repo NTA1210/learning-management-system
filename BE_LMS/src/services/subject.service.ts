@@ -1,7 +1,7 @@
-import { SubjectModel, CourseModel } from "../models";
+import { SubjectModel, CourseModel, UserModel } from "../models";
 import appAssert from "../utils/appAssert";
-import { CONFLICT, NOT_FOUND } from "../constants/http";
-import { ISubject } from "@/types";
+import { CONFLICT, NOT_FOUND, FORBIDDEN } from "../constants/http";
+import { ISubject, Role } from "@/types";
 import { ListParams } from "@/types/dto";
 import mongoose from "mongoose";
 
@@ -11,6 +11,8 @@ export interface ListSubjectParams extends ListParams {
   code?: string;
   specialistId?: string;
   isActive?: string | boolean;
+  from?: Date;
+  to?: Date;
 }
 
 /**
@@ -28,6 +30,8 @@ export const listSubjects = async ({
   code,
   specialistId,
   isActive,
+  from,
+  to,
   createdAt,
   updatedAt,
   sortBy = "createdAt",
@@ -52,7 +56,20 @@ export const listSubjects = async ({
     filter.specialistIds = new mongoose.Types.ObjectId(specialistId);
   }
 
-  if (createdAt) filter.createdAt = createdAt;
+  const createdAtFilter: Record<string, Date> = {};
+  if (from) createdAtFilter.$gte = from;
+  if (to) createdAtFilter.$lte = to;
+  if (createdAt && !from && !to) {
+    const startOfDay = new Date(createdAt);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(createdAt);
+    endOfDay.setHours(23, 59, 59, 999);
+    createdAtFilter.$gte = startOfDay;
+    createdAtFilter.$lte = endOfDay;
+  }
+  if (Object.keys(createdAtFilter).length > 0) {
+    filter.createdAt = createdAtFilter;
+  }
   if (updatedAt) filter.updatedAt = updatedAt;
 
   const skip = (page - 1) * limit;
@@ -157,12 +174,84 @@ export const getRelatedSubjects = async (subjectId: string, limit = 10) => {
 
 
 /**
+ * Helper function: Kiểm tra quyền truy cập subject
+ * - Admin: có quyền truy cập tất cả
+ * - Teacher: chỉ có quyền truy cập các subject mà họ phụ trách (specialistIds trùng nhau)
+ */
+const checkSubjectPermission = async (
+  subject: any,
+  userId: string,
+  userRole: Role
+): Promise<void> => {
+  // Admin có quyền truy cập tất cả
+  if (userRole === Role.ADMIN) {
+    return;
+  }
+
+  // Nếu không phải teacher thì không có quyền
+  appAssert(userRole === Role.TEACHER, FORBIDDEN, "Only admin and teacher can access this resource");
+
+  // Lấy thông tin user để kiểm tra specialistIds
+  const user = await UserModel.findById(userId).lean();
+  appAssert(user, NOT_FOUND, "User not found");
+
+  const userSpecialistIds = (user.specialistIds || []).map((id: any) => id.toString());
+
+  // Nếu teacher không có specialistIds thì không có quyền
+  appAssert(
+    userSpecialistIds.length > 0,
+    FORBIDDEN,
+    "Teacher must be assigned to at least one specialist"
+  );
+
+  // Kiểm tra xem teacher có specialistIds trùng với subject không
+  const subjectSpecialistIds = (subject.specialistIds || []).map((id: any) => id.toString());
+
+  const hasAccess = userSpecialistIds.some((userSpecId: string) =>
+    subjectSpecialistIds.includes(userSpecId)
+  );
+
+  appAssert(
+    hasAccess,
+    FORBIDDEN,
+    "You can only manage subjects assigned to your specialists"
+  );
+};
+
+/**
  * Nghiệp vụ: Tạo mới Subject.
  * - Chặn trùng name/slug/code.
+ * - Kiểm tra quyền: Admin có thể tạo bất kỳ, Teacher chỉ có thể tạo subject với specialistIds mà họ phụ trách.
  */
 export const createSubject = async (
-  data: Omit<ISubject, keyof mongoose.Document<mongoose.Types.ObjectId>>
+  data: Omit<ISubject, keyof mongoose.Document<mongoose.Types.ObjectId>>,
+  userId: string,
+  userRole: Role
 ) => {
+  // Kiểm tra quyền: Teacher chỉ có thể tạo subject với specialistIds mà họ phụ trách
+  if (userRole === Role.TEACHER) {
+    const user = await UserModel.findById(userId).lean();
+    appAssert(user, NOT_FOUND, "User not found");
+    const userSpecialistIds = (user.specialistIds || []).map((id: any) => id.toString());
+    appAssert(
+      userSpecialistIds.length > 0,
+      FORBIDDEN,
+      "Teacher must be assigned to at least one specialist"
+    );
+
+    // Kiểm tra xem tất cả specialistIds trong data có thuộc về teacher không
+    const dataSpecialistIds = (data.specialistIds || []).map((id: any) => id.toString());
+    const allAssigned = dataSpecialistIds.every((specId: string) =>
+      userSpecialistIds.includes(specId)
+    );
+
+    appAssert(
+      allAssigned || dataSpecialistIds.length === 0,
+      FORBIDDEN,
+      "You can only create subjects with specialists you are assigned to"
+    );
+  }
+
   const existingByName = await SubjectModel.findOne({ name: data.name });
   appAssert(!existingByName, CONFLICT, "Subject with this name already exists");
 
@@ -182,13 +271,35 @@ export const createSubject = async (
 /**
  * Nghiệp vụ: Cập nhật Subject theo ID.
  * - Kiểm tra xung đột name/slug/code.
+ * - Kiểm tra quyền: Admin có thể cập nhật tất cả, Teacher chỉ có thể cập nhật subject mà họ phụ trách.
  */
 export const updateSubjectById = async (
   subjectId: string,
-  data: Partial<ISubject>
+  data: Partial<ISubject>,
+  userId: string,
+  userRole: Role
 ) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
+
+  // Kiểm tra quyền
+  await checkSubjectPermission(subject, userId, userRole);
+
+  // Nếu teacher cập nhật specialistIds, kiểm tra quyền
+  if (userRole === Role.TEACHER && data.specialistIds) {
+    const user = await UserModel.findById(userId).lean();
+    appAssert(user, NOT_FOUND, "User not found");
+    const userSpecialistIds = (user.specialistIds || []).map((id: any) => id.toString());
+    const dataSpecialistIds = (data.specialistIds || []).map((id: any) => id.toString());
+    const allAssigned = dataSpecialistIds.every((specId: string) =>
+      userSpecialistIds.includes(specId)
+    );
+    appAssert(
+      allAssigned || dataSpecialistIds.length === 0,
+      FORBIDDEN,
+      "You can only assign specialists you are assigned to"
+    );
+  }
 
   if (data.name && data.name !== subject.name) {
     const existingByName = await SubjectModel.findOne({ name: data.name });
@@ -213,13 +324,35 @@ export const updateSubjectById = async (
 /**
  * Nghiệp vụ: Cập nhật Subject theo slug.
  * - Kiểm tra xung đột name/slug/code.
+ * - Kiểm tra quyền: Admin có thể cập nhật tất cả, Teacher chỉ có thể cập nhật subject mà họ phụ trách.
  */
 export const updateSubjectBySlug = async (
   slug: string,
-  data: Partial<ISubject>
+  data: Partial<ISubject>,
+  userId: string,
+  userRole: Role
 ) => {
   const subject = await SubjectModel.findOne({ slug });
   appAssert(subject, NOT_FOUND, "Subject not found");
+
+  // Kiểm tra quyền
+  await checkSubjectPermission(subject, userId, userRole);
+
+  // Nếu teacher cập nhật specialistIds, kiểm tra quyền
+  if (userRole === Role.TEACHER && data.specialistIds) {
+    const user = await UserModel.findById(userId).lean();
+    appAssert(user, NOT_FOUND, "User not found");
+    const userSpecialistIds = (user.specialistIds || []).map((id: any) => id.toString());
+    const dataSpecialistIds = (data.specialistIds || []).map((id: any) => id.toString());
+    const allAssigned = dataSpecialistIds.every((specId: string) =>
+      userSpecialistIds.includes(specId)
+    );
+    appAssert(
+      allAssigned || dataSpecialistIds.length === 0,
+      FORBIDDEN,
+      "You can only assign specialists you are assigned to"
+    );
+  }
 
   if (data.name && data.name !== subject.name) {
     const existingByName = await SubjectModel.findOne({ name: data.name });
@@ -244,10 +377,14 @@ export const updateSubjectBySlug = async (
 /**
  * Nghiệp vụ: Xóa Subject theo ID.
  * - Chặn xóa nếu đang được Course sử dụng.
+ * - Kiểm tra quyền: Admin có thể xóa tất cả, Teacher chỉ có thể xóa subject mà họ phụ trách.
  */
-export const deleteSubjectById = async (subjectId: string) => {
+export const deleteSubjectById = async (subjectId: string, userId: string, userRole: Role) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
+
+  // Kiểm tra quyền
+  await checkSubjectPermission(subject, userId, userRole);
 
   const coursesUsing = await CourseModel.countDocuments({ subjectId });
   appAssert(
@@ -262,10 +399,14 @@ export const deleteSubjectById = async (subjectId: string) => {
 /**
  * Nghiệp vụ: Xóa Subject theo slug.
  * - Chặn xóa nếu đang được Course sử dụng.
+ * - Kiểm tra quyền: Admin có thể xóa tất cả, Teacher chỉ có thể xóa subject mà họ phụ trách.
  */
-export const deleteSubjectBySlug = async (slug: string) => {
+export const deleteSubjectBySlug = async (slug: string, userId: string, userRole: Role) => {
   const subject = await SubjectModel.findOne({ slug });
   appAssert(subject, NOT_FOUND, "Subject not found");
+
+  // Kiểm tra quyền
+  await checkSubjectPermission(subject, userId, userRole);
 
   const coursesUsing = await CourseModel.countDocuments({ subjectId: subject.id });
   appAssert(
@@ -279,10 +420,15 @@ export const deleteSubjectBySlug = async (slug: string) => {
 
 /**
  * Nghiệp vụ: Bật trạng thái hoạt động cho Subject.
+ * - Kiểm tra quyền: Admin có thể bật tất cả, Teacher chỉ có thể bật subject mà họ phụ trách.
  */
-export const activateSubjectById = async (subjectId: string) => {
+export const activateSubjectById = async (subjectId: string, userId: string, userRole: Role) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
+
+  // Kiểm tra quyền
+  await checkSubjectPermission(subject, userId, userRole);
+
   subject.isActive = true;
   subject.updatedAt = new Date();
   await subject.save();
@@ -291,10 +437,15 @@ export const activateSubjectById = async (subjectId: string) => {
 
 /**
  * Nghiệp vụ: Tắt trạng thái hoạt động cho Subject.
+ * - Kiểm tra quyền: Admin có thể tắt tất cả, Teacher chỉ có thể tắt subject mà họ phụ trách.
  */
-export const deactivateSubjectById = async (subjectId: string) => {
+export const deactivateSubjectById = async (subjectId: string, userId: string, userRole: Role) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
+
+  // Kiểm tra quyền
+  await checkSubjectPermission(subject, userId, userRole);
+
   subject.isActive = false;
   subject.updatedAt = new Date();
   await subject.save();
@@ -305,10 +456,15 @@ export const deactivateSubjectById = async (subjectId: string) => {
  * Nghiệp vụ: Thêm danh sách môn tiên quyết cho Subject.
  * - Bỏ qua các ID đã tồn tại.
  * - Chặn self-reference.
+ * - Kiểm tra quyền: Admin có thể thêm tất cả, Teacher chỉ có thể thêm cho subject mà họ phụ trách.
  */
-export const addPrerequisites = async (subjectId: string, prerequisiteIds: string[]) => {
+export const addPrerequisites = async (subjectId: string, prerequisiteIds: string[], userId: string, userRole: Role) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
+
+  // Kiểm tra quyền
+  await checkSubjectPermission(subject, userId, userRole);
+
   const toAdd = prerequisiteIds
     .filter((id) => id && id !== subjectId)
     .map((id) => new mongoose.Types.ObjectId(id));
@@ -323,10 +479,15 @@ export const addPrerequisites = async (subjectId: string, prerequisiteIds: strin
 
 /**
  * Nghiệp vụ: Gỡ một môn tiên quyết khỏi Subject.
+ * - Kiểm tra quyền: Admin có thể gỡ tất cả, Teacher chỉ có thể gỡ cho subject mà họ phụ trách.
  */
-export const removePrerequisite = async (subjectId: string, prerequisiteId: string) => {
+export const removePrerequisite = async (subjectId: string, prerequisiteId: string, userId: string, userRole: Role) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
+
+  // Kiểm tra quyền
+  await checkSubjectPermission(subject, userId, userRole);
+
   const target = new mongoose.Types.ObjectId(prerequisiteId);
   subject.prerequisites = (subject.prerequisites || []).filter((x: any) => !x.equals(target));
   subject.updatedAt = new Date();

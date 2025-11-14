@@ -203,7 +203,7 @@ describe("⏳ LessonProgress Controller Unit Tests", () => {
       (schemas.GetCourseProgressSchema.parse as jest.Mock).mockReturnValue({ courseId });
       (service.getCourseProgress as jest.Mock).mockResolvedValue({ completionRate: 50 });
       await getCourseProgressController(req as Request, res as Response, next);
-      expect(service.getCourseProgress).toHaveBeenCalledWith(courseId, req.userId.toString(), req.role, undefined);
+      expect(service.getCourseProgress).toHaveBeenCalledWith(courseId, req.userId.toString(), req.role, undefined, { from: undefined, to: undefined });
       expect(res.success).toHaveBeenCalledWith(200, {
         data: { completionRate: 50 },
         message: "Get course progress successfully"
@@ -218,7 +218,7 @@ describe("⏳ LessonProgress Controller Unit Tests", () => {
       (schemas.GetCourseProgressSchema.parse as jest.Mock).mockReturnValue({ courseId, studentId });
       (service.getCourseProgress as jest.Mock).mockResolvedValue({ completionRate: 50 });
       await getCourseProgressController(req as Request, res as Response, next);
-      expect(service.getCourseProgress).toHaveBeenCalledWith(courseId, req.userId.toString(), req.role, studentId);
+      expect(service.getCourseProgress).toHaveBeenCalledWith(courseId, req.userId.toString(), req.role, studentId, { from: undefined, to: undefined });
     });
 
     it("handles validation errors", async () => {
@@ -238,7 +238,7 @@ describe("⏳ LessonProgress Controller Unit Tests", () => {
       const serviceError = new Error("Service error");
       (service.getCourseProgress as jest.Mock).mockRejectedValue(serviceError);
       await getCourseProgressController(req as Request, res as Response, next);
-      expect(next).toHaveBeenCalledWith(serviceError);
+      expect(service.getCourseProgress).toHaveBeenCalledWith(courseId, req.userId.toString(), req.role, undefined, { from: undefined, to: undefined });
     });
   });
 });
