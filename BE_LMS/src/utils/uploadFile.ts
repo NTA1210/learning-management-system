@@ -165,8 +165,6 @@ export const removeFile = async (key: string) => {
  */
 export const removeFiles = async (keys: string[]) => {
   try {
-    console.log("Deleted", keys.length, "filés");
-
     return await minioClient.removeObjects(BUCKET_NAME, keys);
   } catch (error) {
     throw new AppError(

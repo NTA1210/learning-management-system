@@ -22,6 +22,10 @@ export const prefixQuizQuestionImage = (
   return `subjects/${subjectId}/questions/${questionId}/image`;
 };
 
+export const prefixExternalQuizQuestionImage = (quizId: string) => {
+  return `quizzes/${quizId}/external/image`;
+};
+
 export const prefixCourseLogo = (courseId: string) => {
   return `courses/${courseId}/logo`;
 };
