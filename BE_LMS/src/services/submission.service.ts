@@ -91,7 +91,7 @@ export const resubmitAssignment = async (
   const {key,originalName,mimeType,size} = await uploadFile(file,prefix);
 
   submission.originalName = originalName;
-  submission.mimeType = mimeType;
+  submission.mimeType= mimeType;
   submission.size = size;
   submission.key = key;
   submission.submittedAt = resubmittedAt;

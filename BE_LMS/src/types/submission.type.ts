@@ -13,7 +13,7 @@ export default interface ISubmission extends mongoose.Document {
   studentId: mongoose.Types.ObjectId;
   originalName: string;
   key: string;
-  mimeType?: string;
+  mimeType?: string|false;
   size: number;
   submittedAt: Date;
   grade?: number;
