@@ -1,6 +1,7 @@
 import { FeedbackModel, UserModel } from "@/models";
 import { Role } from "@/types";
 import { FeedbackType } from "@/types/feedback.type";
+import IFeedback from "@/types/feedback.type";
 import { BAD_REQUEST, FORBIDDEN, NOT_FOUND } from "@/constants/http";
 import appAssert from "@/utils/appAssert";
 import { uploadFile, removeFile } from "@/utils/uploadFile";
@@ -40,10 +41,10 @@ export const createFeedback = async (
   }
 
   // Create feedback without file first
-  const feedback = await FeedbackModel.create({
+  const feedback: IFeedback = await FeedbackModel.create({
     ...data,
     userId,
-  });
+  }) as IFeedback;
 
   // Upload file if provided
   if (file) {
@@ -56,7 +57,7 @@ export const createFeedback = async (
 
       // Update feedback with file info
       feedback.originalName = originalName;
-      feedback.mimeType = mimeType;
+      feedback.mimeType = mimeType ? mimeType : undefined;
       feedback.key = key;
       feedback.size = size;
       await feedback.save();
@@ -96,6 +97,8 @@ export const listFeedbacks = async (
     userId: filterUserId,
     minRating,
     maxRating,
+    from,
+    to,
     sortBy,
     sortOrder,
   } = filters;
@@ -124,6 +127,13 @@ export const listFeedbacks = async (
     query.rating = {};
     if (minRating) query.rating.$gte = minRating;
     if (maxRating) query.rating.$lte = maxRating;
+  }
+
+  // Filter by date range (validation handled by schema)
+  if (from || to) {
+    query.createdAt = {};
+    if (from) query.createdAt.$gte = from;
+    if (to) query.createdAt.$lte = to;
   }
 
   // Pagination

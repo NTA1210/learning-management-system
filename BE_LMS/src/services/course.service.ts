@@ -185,7 +185,7 @@ export const listCourses = async ({
     filter.teacherIds = teacherId;
   }
 
-  // ✅ NEW: Filter by date range (createdAt)
+  // ✅ Filter by date range (validation handled by schema)
   if (from || to) {
     filter.createdAt = {};
     if (from) filter.createdAt.$gte = from;

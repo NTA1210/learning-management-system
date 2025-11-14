@@ -1,70 +1,78 @@
 import z from "zod";
 import { CourseStatus } from "../types/course.type";
+import { datePreprocess } from "./helpers/date.schema";
 
 // Schema for listing courses with pagination and filters
-export const listCoursesSchema = z.object({
-  page: z
-    .string()
-    .optional()
-    .transform((val) => (val ? parseInt(val, 10) : 1))
-    .refine((val) => val > 0, { message: "Page must be greater than 0" }),
-  limit: z
-    .string()
-    .optional()
-    .transform((val) => (val ? parseInt(val, 10) : 10))
-    .refine((val) => val > 0 && val <= 100, {
-      message: "Limit must be between 1 and 100",
-    }),
-  search: z.string().optional(),
-  from: z
-    .string()
-    .optional()
-    .transform((val) => (val ? new Date(val) : undefined)), // Date range start
-  to: z
-    .string()
-    .optional()
-    .transform((val) => (val ? new Date(val) : undefined)), // Date range end
-  subjectId: z.string().optional(), // Filter by subject ID
-  teacherId: z.string().optional(), // Filter by teacher ID
-  isPublished: z
-    .string()
-    .optional()
-    .transform((val) => {
-      if (val === "true") return true;
-      if (val === "false") return false;
-      return undefined;
-    }),
-  status: z
-    .enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED])
-    .optional(), // Filter by status
-  // ✅ SOFT DELETE: Admin can view deleted courses
-  includeDeleted: z
-    .string()
-    .optional()
-    .transform((val) => {
-      if (val === "true") return true;
-      if (val === "false") return false;
-      return undefined;
-    }), // Admin only - show deleted courses
-  onlyDeleted: z
-    .string()
-    .optional()
-    .transform((val) => {
-      if (val === "true") return true;
-      return false;
-    }), // Admin only - show only deleted courses
-  sortBy: z
-    .enum([
-      "createdAt",
-      "title",
-      "updatedAt",
-      "startDate",
-      "endDate",
-      "deletedAt",
-    ])
-    .optional(),
-  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
-});
+export const listCoursesSchema = z
+  .object({
+    page: z
+      .string()
+      .optional()
+      .transform((val) => (val ? parseInt(val, 10) : 1))
+      .refine((val) => val > 0, { message: "Page must be greater than 0" }),
+    limit: z
+      .string()
+      .optional()
+      .transform((val) => (val ? parseInt(val, 10) : 10))
+      .refine((val) => val > 0 && val <= 100, {
+        message: "Limit must be between 1 and 100",
+      }),
+    search: z.string().optional(),
+    from: datePreprocess, // Date range start with validation
+    to: datePreprocess, // Date range end with validation
+    subjectId: z.string().optional(), // Filter by subject ID
+    teacherId: z.string().optional(), // Filter by teacher ID
+    isPublished: z
+      .string()
+      .optional()
+      .transform((val) => {
+        if (val === "true") return true;
+        if (val === "false") return false;
+        return undefined;
+      }),
+    status: z
+      .enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED])
+      .optional(), // Filter by status
+    // ✅ SOFT DELETE: Admin can view deleted courses
+    includeDeleted: z
+      .string()
+      .optional()
+      .transform((val) => {
+        if (val === "true") return true;
+        if (val === "false") return false;
+        return undefined;
+      }), // Admin only - show deleted courses
+    onlyDeleted: z
+      .string()
+      .optional()
+      .transform((val) => {
+        if (val === "true") return true;
+        return false;
+      }), // Admin only - show only deleted courses
+    sortBy: z
+      .enum([
+        "createdAt",
+        "title",
+        "updatedAt",
+        "startDate",
+        "endDate",
+        "deletedAt",
+      ])
+      .optional(),
+    sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
+  })
+  .refine(
+    (val) => {
+      if (val.from && val.to) {
+        return val.from.getTime() <= val.to.getTime();
+      }
+      return true;
+    },
+    {
+      message: "Start date must be before or equal to end date",
+      path: ["to"],
+    }
+  );
 
 export type ListCoursesQuery = z.infer<typeof listCoursesSchema>;
 
