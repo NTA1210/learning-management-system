@@ -6,6 +6,9 @@ import {
     listSubmissionsByAssignmentHandler,
     gradeSubmissionHandler,
     listAllGradesByStudentHandler,
+    getSubmissionStatsHandler,
+    getSubmissionReportHandler,
+    getCourseReportHandler,
 }from "../controller/submission.controller";
 import  authenticate  from "../middleware/authenticate";
 import { Role } from "@/types";
@@ -36,3 +39,7 @@ submissionRoutes.put("/:assignmentId/grade", authenticate , authorize(Role.ADMIN
 //sv xem toàn bộ điểm
 submissionRoutes.get("/my/grades", authenticate,listAllGradesByStudentHandler );
 export default submissionRoutes;
+//thống kê và báo cáo
+submissionRoutes.get("/:assignmentId/stats", authenticate, authorize(Role.ADMIN, Role.TEACHER), getSubmissionStatsHandler);
+submissionRoutes.get("/report/assignment", authenticate, authorize(Role.ADMIN, Role.TEACHER), getSubmissionReportHandler);
+submissionRoutes.get("/course/:courseId/report", authenticate, authorize(Role.ADMIN, Role.TEACHER), getCourseReportHandler);

@@ -7,9 +7,13 @@ import {
   listSubmissionsByAssignment,
   gradeSubmission,
   listAllGradesByStudent,
+  getSubmissionStats,
+  getSubmissionReportByAssignment,
+  getSubmissionReportByCourse,
 } from "../services/submission.service";
 import { submissionBodySchema, assignmentIdParamSchema, gradeSubmissionSchema } from "../validators/submission.schemas"; // Validate đầu vào
 import appAssert from "../utils/appAssert";
+import { SubmissionReportQuery } from "../types/submission.type";
  
 
 // Nộp bài (Submit)
@@ -107,5 +111,41 @@ export const listAllGradesByStudentHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     data: result,
     message: "All grades retrieved successfully",
+  });
+});
+
+//static and report
+export const getSubmissionStatsHandler = catchErrors(async (req, res) => {
+  const { assignmentId } = req.params;
+  appAssert(assignmentId, BAD_REQUEST, "Missing assignment ID");
+
+  const stats = await getSubmissionStats(assignmentId);
+  return res.success(OK, {
+    data: stats,
+    message: "Submission statistics retrieved successfully",
+  });
+});
+//submission report for a single assignment
+export const getSubmissionReportHandler = catchErrors(async (req, res) => {
+  const { assignmentId } = req.params;
+  const query: SubmissionReportQuery = req.query;
+  appAssert(assignmentId, BAD_REQUEST, "Missing assignment ID");
+
+  const report = await getSubmissionReportByAssignment(assignmentId, query);
+  return res.success(OK, {
+    data: report,
+    message: "Submission report retrieved successfully",
+  });
+});
+
+//report toan bo course
+export const getCourseReportHandler = catchErrors(async (req, res) => {
+  const { courseId } = req.params;
+  appAssert(courseId, BAD_REQUEST, "Missing course ID");
+
+  const report = await getSubmissionReportByCourse(courseId);
+  return res.success(OK, {
+    data: report,
+    message: "Course report retrieved successfully",
   });
 });

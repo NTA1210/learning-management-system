@@ -1,13 +1,17 @@
 import SubmissionModel from "../models/submission.model";
 import AssignmentModel from "../models/assignment.model";
+import EnrollmentModel from "../models/enrollment.model";
 import appAssert from "../utils/appAssert";
 import { NOT_FOUND, BAD_REQUEST } from "../constants/http";
 import mongoose from "mongoose";
-import { SubmissionStatus } from "../types/submission.type";
+import { SubmissionStatus,SubmissionStats,GradeDistribution,SubmissionReportQuery } from "../types/submission.type";
+import IAssignment from "../types/assignment.type";
 import { UserModel } from "@/models";
 import { Role } from "@/types";
 import { uploadFile } from "@/utils/uploadFile";
 import { prefixSubmission } from "@/utils/filePrefix";
+import { EnrollmentStatus } from "@/types/enrollment.type";
+
 
 //submit assign
 export const submitAssignment = async ({
@@ -91,7 +95,7 @@ export const resubmitAssignment = async (
   const {key,originalName,mimeType,size} = await uploadFile(file,prefix);
 
   submission.originalName = originalName;
-  submission.mimeType = mimeType;
+  submission.mimeType = (mimeType as any) as string | undefined;
   submission.size = size;
   submission.key = key;
   submission.submittedAt = resubmittedAt;
@@ -273,3 +277,88 @@ export const listAllGradesByStudent = async (
     grades,
   };
 };
+
+//static and report
+
+// 1. Get Submission Statistics
+export const getSubmissionStats = async (assignmentId: string) => {
+    const assignment = await AssignmentModel.findById(assignmentId).populate({ path: "courseId", select: "studentId" });
+    if (!assignment) throw new Error("Assignment not found");
+
+    const totalStudents = await EnrollmentModel.countDocuments({ 
+      courseId: assignment.courseId._id,
+      status: EnrollmentStatus.APPROVED
+    });
+
+    const submissions = await SubmissionModel.find({ assignmentId });
+
+    const submittedCount = submissions.length;
+    const onTime = submissions.filter((s) => s.status !== "overdue").length;
+    const late = submissions.filter((s) => s.status === "overdue").length;
+    const graded = submissions.filter((s) => s.grade !== undefined);
+    const averageGrade = graded.length > 0 ? graded.reduce((sum, s) => sum + (s.grade ?? 0), 0) / graded.length : null;
+    return {
+          totalStudents,
+          submissionRate: totalStudents ? (submittedCount / totalStudents) * 100 : 0,
+          onTimeRate: submittedCount ? (onTime / submittedCount) * 100 : 0,
+          averageGrade,
+        };
+};
+
+//grade Distribution
+export const getGradeDistribution = async (assignmentId: string) => {
+    const submissions = await SubmissionModel.find({ assignmentId, grade: { $ne: undefined } });
+    const ranges = [
+      { key: "0-2", min: 0, max: 2 },
+      { key: "2-4", min: 2, max: 4 },
+      { key: "4-6", min: 4, max: 6 },
+      { key: "6-8", min: 6, max: 8 },
+      { key: "8-10", min: 8, max: 10 },
+    ];
+
+    const total = submissions.length || 1;
+    return ranges.map((r) => {
+    const count = submissions.filter((s) => s.grade! >= r.min && s.grade! < r.max).length;
+        return {
+          range: r.key,
+          count,
+          percentage: (count / total) * 100,
+          };
+        });
+};
+
+export const getSubmissionReportByAssignment = async (
+    assignmentId: string,
+    query?: SubmissionReportQuery
+    ) => {
+    const stats = await getSubmissionStats(assignmentId);
+    const distribution = await getGradeDistribution(assignmentId);
+
+    const filter: any = { assignmentId };
+        if (query?.from || query?.to) {
+        filter.submittedAt = {};
+        if (query.from) filter.submittedAt.$gte = query.from;
+        if (query.to) filter.submittedAt.$lte = query.to;
+      }
+
+    const details = await SubmissionModel.find(filter)
+        .populate("studentId", "fullname email")
+        .populate("gradedBy", "fullname email")
+        .sort({ submittedAt: -1 });
+        return { stats, distribution, details };
+};
+
+// 4. Report by Course
+export const getSubmissionReportByCourse = async (courseId: string) => {
+    const assignments = await AssignmentModel.find({ courseId }) as IAssignment[];
+    const reports = [];
+
+    for (const a of assignments) {
+        const assignmentId = (a as any)._id.toString();
+        const stats = await getSubmissionStats(assignmentId);
+        const distribution = await getGradeDistribution(assignmentId);
+        reports.push({ assignment: a.title, stats, distribution });
+        }
+    return reports;
+};
+
