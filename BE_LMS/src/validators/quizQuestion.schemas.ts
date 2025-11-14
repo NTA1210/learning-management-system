@@ -40,7 +40,7 @@ export const listQuizQuestionSchema = listParamsSchema
 export interface ICreateQuizQuestionParams {
   subjectId: string;
   text: string;
-  image?: Express.Multer.File;
+  images?: Express.Multer.File[];
   type?: QuizQuestionType;
   options: string[];
   correctOptions: number[];
@@ -52,7 +52,7 @@ export const createQuizQuestionSchema = z
   .object({
     subjectId: subjectIdSchema,
     text: z.string().min(1, "Text is required"),
-    image: z.any().optional(),
+    images: z.array(z.any()).optional(),
     type: z.enum(QuizQuestionType).default(QuizQuestionType.MCQ),
     options: z.array(z.string()).min(2, "At least two options are required"),
     correctOptions: z
@@ -76,6 +76,7 @@ export const createQuizQuestionSchema = z
 export interface IUpdateQuizQuestionParams
   extends Partial<ICreateQuizQuestionParams> {
   quizQuestionId: string;
+  deletedKeys?: string[];
 }
 export const quizQuestionIdSchema = z
   .string()
@@ -85,6 +86,7 @@ export const updateQuizQuestionSchema = createQuizQuestionSchema
   .partial()
   .safeExtend({
     quizQuestionId: quizQuestionIdSchema,
+    deletedKeys: z.array(z.string()).optional(),
   });
 
 export const multiQuizQuestionIdSchema = z.array(quizQuestionIdSchema);

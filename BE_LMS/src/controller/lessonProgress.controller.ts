@@ -67,12 +67,20 @@ export const getCourseProgressController = catchErrors(async (req, res) => {
   const validated = GetCourseProgressSchema.parse({
     courseId: req.params.courseId,
     studentId: req.query.studentId,
+    from: req.query.from,
+    to: req.query.to,
   });
   
   const requesterId = req.userId?.toString();
   const requesterRole = req.role as Role;
 
-  const result = await getCourseProgress(validated.courseId, requesterId, requesterRole, validated.studentId);
+  const result = await getCourseProgress(
+    validated.courseId,
+    requesterId,
+    requesterRole,
+    validated.studentId,
+    { from: validated.from, to: validated.to }
+  );
   return res.success(OK, { 
     data: result, 
     message: "Get course progress successfully" 

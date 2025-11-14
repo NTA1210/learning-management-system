@@ -68,14 +68,14 @@ export default QuizModel;
 
 //Chạy mỗi phút kiểm tra quiz đã hết thời gian
 
-cron.schedule("0 */5 * * * *", async () => {
-  console.log("🚀 Running daily quiz cleanup task...");
-  const quizzes = await QuizModel.updateMany(
-    { endTime: { $lt: new Date() }, isCompleted: false },
-    { isCompleted: true }
-  );
+// cron.schedule("0 */5 * * * *", async () => {
+//   console.log("🚀 Running daily quiz cleanup task...");
+//   const quizzes = await QuizModel.updateMany(
+//     { endTime: { $lt: new Date() }, isCompleted: false },
+//     { isCompleted: true }
+//   );
 
-  if (quizzes.modifiedCount > 0) {
-    console.log(`✅ Updated ${quizzes.modifiedCount} completed quizzes.`);
-  }
-});
+//   if (quizzes.modifiedCount > 0) {
+//     console.log(`✅ Updated ${quizzes.modifiedCount} completed quizzes.`);
+//   }
+// });

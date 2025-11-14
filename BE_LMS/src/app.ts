@@ -29,6 +29,7 @@ import {
   courseRoutes,
   courseInviteRoutes,
   enrollmentRoutes,
+  feedbackRoutes,
   quizQuestionRoutes,
   sessionRoutes,
   submissionRoutes,
@@ -39,8 +40,7 @@ import {
   specialistPublicRoutes,
   forumProtectedRoutes,
   forumPublicRoutes,
-  subjectProtectedRoutes,
-  subjectPublicRoutes,
+  subjectRouter,
   quizRoutes,
 } from "./routes";
 
@@ -85,18 +85,17 @@ export const createApp = () => {
   app.use("/lesson-progress", lessonProgressRoutes);
   app.use("/majors", majorPublicRoutes);
   app.use("/specialists", specialistPublicRoutes);
-  app.use("/forums", forumPublicRoutes);
-  app.use("/subjects", subjectPublicRoutes);
   //protected routes
   app.use("/users", authenticate, userRoutes);
   app.use("/sessions", authenticate, authorize(Role.ADMIN), sessionRoutes);
   app.use("/enrollments", authenticate, enrollmentRoutes);
-  app.use("/course-invites",authenticate, courseInviteRoutes);
+  app.use("/feedbacks", feedbackRoutes);
+  app.use("/course-invites", courseInviteRoutes);
   app.use("/quiz-questions", quizQuestionRoutes);
   app.use("/majors", authenticate, majorProtectedRoutes);
   app.use("/specialists", authenticate, specialistProtectedRoutes);
   app.use("/forums", authenticate, forumProtectedRoutes);
-  app.use("/subjects", authenticate, subjectProtectedRoutes);
+  app.use("/subjects", authenticate,subjectRouter);
   app.use("/quizzes", quizRoutes);
   app.use(errorHandler);
 

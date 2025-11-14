@@ -21,3 +21,4 @@ export { default as SpecialistModel } from "./specialist.model";
 export { default as MajorModel } from "./major.model";
 export { default as QuizQuestionModel } from "./quizQuestion.model";
 export { default as SubjectModel } from "./subject.model";
+export { default as FeedbackModel } from "./feedback.model";

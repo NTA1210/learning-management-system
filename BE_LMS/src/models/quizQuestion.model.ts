@@ -10,8 +10,11 @@ export const QuizQuestionSchema = new mongoose.Schema<IQuizQuestion>(
       index: true,
     },
     text: { type: String, required: true },
-    image: { type: String },
-    key: { type: String },
+    images: {
+      type: [String],
+      default: [],
+    },
+
     type: {
       type: String,
       enum: QuizQuestionType,
