@@ -1,5 +1,4 @@
 import { Router } from "express";
-
 import {
   listAllLessons,
   getLessonByIdController,
@@ -8,46 +7,27 @@ import {
   deleteLesson,
   updateLesson,
 } from "../controller/lesson.controller";
-
-import authenticate from "@/middleware/authenticate";
+import authorize from "../middleware/authorize";
 import { Role } from "../types";
-import authorize from "@/middleware/authorize";
 
-const lessonRoutes = Router();
+const lessonRouter = Router();
 
-//prefix : /lesson
+// prefix: /lesson
 
-// GET /lesson/listAllLessons - List lessons with filters (auth required)
-lessonRoutes.get("/listAllLessons", authenticate, listAllLessons);
-// GET /lesson/byCourse/:courseId - Get lessons for a specific course (auth required)
-lessonRoutes.get(
-  "/byCourse/:courseId",
-  authenticate,
-  getLessonsByCourseController
-);
-// GET /lesson/getLessonById/:id - Get a lesson by id (auth required)
-lessonRoutes.get("/getLessonById/:id", authenticate, getLessonByIdController);
+// Protected routes (require authentication)
+// GET /lesson - List Lesson (search/lọc/phân trang)
+lessonRouter.get("/", listAllLessons);
+// GET /lesson/course/:courseId - Get lessons for a specific course
+lessonRouter.get("/course/:courseId", getLessonsByCourseController);
+// GET /lesson/id/:id - Chi tiết Lesson theo ID
+lessonRouter.get("/id/:id", getLessonByIdController);
 
-// POST /lesson/createLessons - Create a lesson (teacher/admin)
-lessonRoutes.post(
-  "/createLessons",
-  authenticate,
-  authorize(Role.TEACHER, Role.ADMIN),
-  createLesson
-);
-// PUT /lesson/updateLessons/:id - Update a lesson (teacher/admin)
-lessonRoutes.put(
-  "/updateLessons/:id",
-  authenticate,
-  authorize(Role.TEACHER, Role.ADMIN),
-  updateLesson
-);
-// DELETE /lesson/deleteLessons/:id - Delete a lesson (teacher/admin)
-lessonRoutes.delete(
-  "/deleteLessons/:id",
-  authenticate,
-  authorize(Role.TEACHER, Role.ADMIN),
-  deleteLesson
-);
+// Protected routes (require authentication + admin/teacher role)
+// POST /lesson - Tạo Lesson (Admin/Teacher only)
+lessonRouter.post("/", authorize(Role.TEACHER, Role.ADMIN), createLesson);
+// PATCH /lesson/id/:id - Cập nhật theo ID (Admin/Teacher only)
+lessonRouter.patch("/id/:id", authorize(Role.TEACHER, Role.ADMIN), updateLesson);
+// DELETE /lesson/id/:id - Xóa theo ID (Admin/Teacher only)
+lessonRouter.delete("/id/:id", authorize(Role.TEACHER, Role.ADMIN), deleteLesson);
 
-export default lessonRoutes;
+export default lessonRouter;

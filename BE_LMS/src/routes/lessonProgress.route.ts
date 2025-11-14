@@ -1,34 +1,32 @@
 import { Router } from "express";
-
 import {
   getLessonProgressController,
   addTimeForLessonController,
   completeLessonController,
   getCourseProgressController,
 } from "../controller/lessonProgress.controller";
-
 import authenticate from "@/middleware/authenticate";
 
-const lessonProgressRoutes = Router();
+const lessonProgressRouter = Router();
 
-//prefix : /lesson-progress
+// prefix: /lesson-progress
 
-// GET /lesson-progress/lesson/:lessonId - Lấy tiến độ 1 bài học (auth required)
+// Protected routes (require authentication)
+// GET /lesson-progress/lesson/:lessonId - Lấy tiến độ 1 bài học
 // Query params: ?studentId (optional, for teacher/admin to view specific student)
-lessonProgressRoutes.get("/lesson/:lessonId", authenticate, getLessonProgressController);
+lessonProgressRouter.get("/lesson/:lessonId", authenticate, getLessonProgressController);
+// GET /lesson-progress/course/:courseId - Lấy tiến độ toàn khóa
+// Query params: ?studentId (optional, for teacher/admin to view specific student)
+lessonProgressRouter.get("/course/:courseId", authenticate, getCourseProgressController);
 
-// PATCH /lesson-progress/lesson/:lessonId/time - Cộng dồn thời gian học cho 1 bài (auth required)
+// PATCH /lesson-progress/lesson/:lessonId/time - Cộng dồn thời gian học cho 1 bài
 // Body: { incSeconds: number }
-lessonProgressRoutes.patch("/lesson/:lessonId/time", authenticate, addTimeForLessonController);
+lessonProgressRouter.patch("/lesson/:lessonId/time", authenticate, addTimeForLessonController);
+// PATCH /lesson-progress/lesson/:lessonId/complete - Đánh dấu hoàn thành bài học
+lessonProgressRouter.patch("/lesson/:lessonId/complete", authenticate, completeLessonController);
 
-// PATCH /lesson-progress/lesson/:lessonId/complete - Đánh dấu hoàn thành bài học (auth required)
-lessonProgressRoutes.patch("/lesson/:lessonId/complete", authenticate, completeLessonController);
+export default lessonProgressRouter;
 
-// GET /lesson-progress/course/:courseId - Lấy tiến độ toàn khóa (auth required)
-// Query params: ?studentId (optional, for teacher/admin to view specific student)
-lessonProgressRoutes.get("/course/:courseId", authenticate, getCourseProgressController);
-
-export default lessonProgressRoutes;
 
 
 
