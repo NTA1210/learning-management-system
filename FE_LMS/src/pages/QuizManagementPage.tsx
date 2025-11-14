@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { FormEvent } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
-import { PlusCircle, X } from "lucide-react";
+import { PlusCircle, X, ImagePlus, CheckCircle, AlertCircle, Info } from "lucide-react";
 import { subjectService, type Subject } from "../services";
 import { useNavigate } from "react-router-dom";
 
@@ -25,7 +25,34 @@ export default function QuizManagementPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessNotification, setShowSuccessNotification] = useState(false);
   const quizUploadEndpoint = `${import.meta.env.VITE_BASE_API.replace(/\/$/, "")}/quiz-questions`;
+  // Refs for file inputs for each question
+  const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+
+  // Notification system
+  type NotificationType = "error" | "warning" | "success" | "info";
+  interface Notification {
+    id: string;
+    message: string;
+    type: NotificationType;
+  }
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  const showNotification = (message: string, type: NotificationType = "error") => {
+    const id = Date.now().toString();
+    const newNotification: Notification = { id, message, type };
+    setNotifications((prev) => [...prev, newNotification]);
+    
+    // Auto remove after 4 seconds
+    setTimeout(() => {
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    }, 4000);
+  };
+
+  const removeNotification = (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
 
 
 
@@ -90,15 +117,15 @@ export default function QuizManagementPage() {
   const handleNextStep = () => {
     if (currentStep === 1) {
       if (!selectedSubject) {
-        alert("Please select a subject first");
+        showNotification("Subject is required", "error");
         return;
       }
       if (!quizDetails.title.trim()) {
-        alert("Please enter quiz title");
+        showNotification("Quiz Title is required", "error");
         return;
       }
       if (!quizDetails.examCode.trim()) {
-        alert("Please enter exam code");
+        showNotification("Exam Code is required", "error");
         return;
       }
     }
@@ -153,18 +180,20 @@ export default function QuizManagementPage() {
     }
   };
 
-  const handleQuestionImageChange = (questionIndex: number, fileList: FileList | null) => {
+  const handleQuestionImageChange = (questionIndex: number, fileList: FileList | null, append: boolean = false) => {
     const files = fileList ? Array.from(fileList) : [];
     if (!files.length) {
-      setQuestions((prev) => {
-        const updated = [...prev];
-        updated[questionIndex] = {
-          ...updated[questionIndex],
-          imageFiles: [],
-          imagePreviews: [],
-        };
-        return updated;
-      });
+      if (!append) {
+        setQuestions((prev) => {
+          const updated = [...prev];
+          updated[questionIndex] = {
+            ...updated[questionIndex],
+            imageFiles: [],
+            imagePreviews: [],
+          };
+          return updated;
+        });
+      }
       return;
     }
 
@@ -180,10 +209,15 @@ export default function QuizManagementPage() {
     Promise.all(readers).then((previews) => {
       setQuestions((prev) => {
         const updated = [...prev];
+        const currentQuestion = updated[questionIndex];
         updated[questionIndex] = {
           ...updated[questionIndex],
-          imageFiles: files,
-          imagePreviews: previews.filter(Boolean),
+          imageFiles: append 
+            ? [...currentQuestion.imageFiles, ...files]
+            : files,
+          imagePreviews: append
+            ? [...currentQuestion.imagePreviews, ...previews.filter(Boolean)]
+            : previews.filter(Boolean),
         };
         return updated;
       });
@@ -206,7 +240,7 @@ export default function QuizManagementPage() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedSubject) {
-      alert("Please select a subject first");
+      showNotification("Subject is required", "error");
       return;
     }
 
@@ -216,15 +250,22 @@ export default function QuizManagementPage() {
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
       if (!q.text.trim()) {
-        alert(`Please enter question text for question ${i + 1}`);
+        showNotification(`Question Text is required for Question ${i + 1}`, "error");
         return;
       }
       if (q.options.some((opt) => !opt.trim())) {
-        alert(`Please fill all options for question ${i + 1}`);
+        showNotification(`All options (A, B, C, D) are required for Question ${i + 1}`, "error");
+        return;
+      }
+      // Check for duplicate options
+      const trimmedOptions = q.options.map(opt => opt.trim()).filter(opt => opt !== "");
+      const uniqueOptions = new Set(trimmedOptions);
+      if (uniqueOptions.size !== trimmedOptions.length) {
+        showNotification(`Question ${i + 1}: Options cannot be duplicate. Please enter different values.`, "error");
         return;
       }
       if (!q.correctOptions.includes(1)) {
-        alert(`Please select at least one correct answer for question ${i + 1}`);
+        showNotification(`Please select at least one correct answer for Question ${i + 1}`, "error");
         return;
       }
     }
@@ -270,7 +311,15 @@ export default function QuizManagementPage() {
 
         // Validate arrays
         if (normalizedOptions.length < 2) {
-          alert(`Question ${questions.indexOf(question) + 1}: At least 2 options are required`);
+          showNotification(`Question ${questions.indexOf(question) + 1}: At least 2 options are required`, "error");
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Check for duplicate options
+        const uniqueOptions = new Set(normalizedOptions);
+        if (uniqueOptions.size !== normalizedOptions.length) {
+          showNotification(`Question ${questions.indexOf(question) + 1}: Options cannot be duplicate. Please enter different values.`, "error");
           setIsSubmitting(false);
           return;
         }
@@ -283,7 +332,7 @@ export default function QuizManagementPage() {
         }
 
         if (!normalizedCorrectOptions.includes(1)) {
-          alert(`Question ${questions.indexOf(question) + 1}: At least one correct answer must be selected`);
+          showNotification(`Question ${questions.indexOf(question) + 1}: Please select at least one correct answer`, "error");
           setIsSubmitting(false);
           return;
         }
@@ -320,7 +369,8 @@ export default function QuizManagementPage() {
 
         console.log("Question created successfully:", result);
       }
-      alert("Quiz questions created successfully!");
+      // Show success notification
+      setShowSuccessNotification(true);
       // Reset form
       setShowCreateModal(false);
       setCurrentStep(1);
@@ -335,6 +385,10 @@ export default function QuizManagementPage() {
           imagePreviews: [],
         },
       ]);
+      // Auto hide notification after 3 seconds
+      setTimeout(() => {
+        setShowSuccessNotification(false);
+      }, 3000);
     } catch (error: unknown) {
       console.error("Error creating quiz questions:", error);
       let errorMessage = "Failed to create quiz questions";
@@ -351,7 +405,7 @@ export default function QuizManagementPage() {
         errorMessage = error.message;
       }
       
-      alert(errorMessage);
+      showNotification(errorMessage, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -360,7 +414,7 @@ export default function QuizManagementPage() {
   const handleCloseModal = () => {
     setShowCreateModal(false);
     setCurrentStep(1);
-    setSelectedCourse(null);
+
     setQuizDetails({ title: "", description: "", examCode: "" });
     setQuestions([
       {
@@ -505,7 +559,7 @@ export default function QuizManagementPage() {
                     </div>
                   </div>
 
-                  <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                  <form onSubmit={handleSubmit} noValidate className="p-6 space-y-6">
                     {currentStep === 1 && (
                       <div className="space-y-6">
                         <h3 className="text-lg font-semibold">Quiz Details</h3>
@@ -673,12 +727,13 @@ export default function QuizManagementPage() {
                               </label>
                               <textarea
                                 required
-                                value={question.text}
+                                value={question.text || ""}
                                 onChange={(e) => handleUpdateQuestion(qIndex, "text", e.target.value)}
-                                className="w-full px-4 py-2 rounded-lg resize-none"
+                                className="w-full px-4 py-2 rounded-lg resize-y"
                                 style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
                                 rows={3}
                                 placeholder="Enter question text"
+                                disabled={isSubmitting}
                               />
                             </div>
 
@@ -726,33 +781,57 @@ export default function QuizManagementPage() {
                                 Question Images
                               </label>
                               <input
+                                ref={(el) => {
+                                  fileInputRefs.current[qIndex] = el;
+                                }}
                                 type="file"
                                 multiple
                                 accept="image/*"
-                                onChange={(e) => handleQuestionImageChange(qIndex, e.target.files)}
+                                onChange={(e) => {
+                                  handleQuestionImageChange(qIndex, e.target.files, question.imagePreviews.length > 0);
+                                  // Reset input để có thể chọn lại file giống nhau
+                                  if (e.target) {
+                                    e.target.value = '';
+                                  }
+                                }}
                                 className="block w-full text-sm file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border file:border-gray-300 file:bg-transparent"
                               />
                               {question.imagePreviews.length > 0 && (
-                                <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-3">
-                                  {question.imagePreviews.map((src, imgIdx) => (
-                                    <div key={imgIdx} className="relative">
-                                      <img
-                                        src={src}
-                                        alt={`Question ${qIndex + 1} image ${imgIdx + 1}`}
-                                        className="w-full max-h-40 object-contain rounded-lg border"
-                                        style={{ borderColor: inputBorder, backgroundColor: darkMode ? 'rgba(15,23,42,0.4)' : '#fff' }}
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => handleRemoveImageAt(qIndex, imgIdx)}
-                                        className="absolute top-2 right-2 px-2 py-1 rounded-md text-xs font-semibold"
-                                        style={{ backgroundColor: darkMode ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.15)', color: '#ef4444' }}
-                                      >
-                                        Remove
-                                      </button>
-                                    </div>
-                                  ))}
-                                </div>
+                                <>
+                                  <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    {question.imagePreviews.map((src, imgIdx) => (
+                                      <div key={imgIdx} className="relative">
+                                        <img
+                                          src={src}
+                                          alt={`Question ${qIndex + 1} image ${imgIdx + 1}`}
+                                          className="w-full max-h-40 object-contain rounded-lg border"
+                                          style={{ borderColor: inputBorder, backgroundColor: darkMode ? 'rgba(15,23,42,0.4)' : '#fff' }}
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveImageAt(qIndex, imgIdx)}
+                                          className="absolute top-2 right-2 px-2 py-1 rounded-md text-xs font-semibold"
+                                          style={{ backgroundColor: darkMode ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.15)', color: '#ef4444' }}
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => fileInputRefs.current[qIndex]?.click()}
+                                    className="mt-3 px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-colors"
+                                    style={{
+                                      backgroundColor: darkMode ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.1)",
+                                      color: "#6366f1",
+                                      border: `2px dashed #6366f1`,
+                                    }}
+                                  >
+                                    <ImagePlus className="w-4 h-4" />
+                                    Chọn thêm ảnh
+                                  </button>
+                                </>
                               )}
                             </div>
                           </div>
@@ -803,6 +882,121 @@ export default function QuizManagementPage() {
           </div>
         </main>
       </div>
+
+      {/* Success Notification */}
+      {showSuccessNotification && (
+        <div
+          className="fixed top-20 right-4 z-[150] animate-slide-in-right"
+          style={{
+            animation: "slideInRight 0.3s ease-out",
+          }}
+        >
+          <div
+            className="flex items-center gap-3 px-6 py-4 rounded-xl shadow-lg min-w-[320px]"
+            style={{
+              backgroundColor: darkMode ? "rgba(16,185,129,0.95)" : "#10b981",
+              color: "#ffffff",
+            }}
+          >
+            <CheckCircle className="w-6 h-6 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold">Thành công!</p>
+              <p className="text-sm opacity-90">Đã tạo quiz questions thành công.</p>
+            </div>
+            <button
+              onClick={() => setShowSuccessNotification(false)}
+              className="ml-2 p-1 rounded-full hover:bg-white/20 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Notifications */}
+      <div className="fixed top-20 right-4 z-[200] space-y-2">
+        {notifications.map((notification) => {
+          const getNotificationStyles = () => {
+            switch (notification.type) {
+              case "error":
+                return {
+                  backgroundColor: darkMode ? "rgba(239,68,68,0.95)" : "#ef4444",
+                  color: "#ffffff",
+                };
+              case "warning":
+                return {
+                  backgroundColor: darkMode ? "rgba(245,158,11,0.95)" : "#f59e0b",
+                  color: "#ffffff",
+                };
+              case "success":
+                return {
+                  backgroundColor: darkMode ? "rgba(16,185,129,0.95)" : "#10b981",
+                  color: "#ffffff",
+                };
+              case "info":
+                return {
+                  backgroundColor: darkMode ? "rgba(59,130,246,0.95)" : "#3b82f6",
+                  color: "#ffffff",
+                };
+              default:
+                return {
+                  backgroundColor: darkMode ? "rgba(100,116,139,0.95)" : "#64748b",
+                  color: "#ffffff",
+                };
+            }
+          };
+
+          const getIcon = () => {
+            switch (notification.type) {
+              case "error":
+                return <AlertCircle className="w-5 h-5 flex-shrink-0" />;
+              case "warning":
+                return <AlertCircle className="w-5 h-5 flex-shrink-0" />;
+              case "success":
+                return <CheckCircle className="w-5 h-5 flex-shrink-0" />;
+              case "info":
+                return <Info className="w-5 h-5 flex-shrink-0" />;
+              default:
+                return <Info className="w-5 h-5 flex-shrink-0" />;
+            }
+          };
+
+          return (
+            <div
+              key={notification.id}
+              className="flex items-start gap-3 px-4 py-3 rounded-lg shadow-lg min-w-[320px] max-w-[400px] animate-slide-in-right"
+              style={{
+                ...getNotificationStyles(),
+                animation: "slideInRight 0.3s ease-out",
+              }}
+            >
+              {getIcon()}
+              <div className="flex-1">
+                <p className="text-sm font-medium break-words">{notification.message}</p>
+              </div>
+              <button
+                onClick={() => removeNotification(notification.id)}
+                className="ml-2 p-1 rounded-full hover:bg-white/20 transition-colors flex-shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <style>{`
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
 }
