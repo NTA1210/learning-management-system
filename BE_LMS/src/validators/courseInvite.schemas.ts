@@ -33,3 +33,14 @@ export const joinCourseInviteSchema = z.object({
 
 export type TJoinCourseInvite = z.infer<typeof joinCourseInviteSchema>;
 
+export const listCourseInvitesSchema = z.object({
+  courseId: z
+  .string()
+  .length(24, "Invalid Course Format")
+  .optional,
+  invitedEmail: z
+  .string()
+  .optional(),
+  isActive: z
+  // .enum([true, false]),
+})
