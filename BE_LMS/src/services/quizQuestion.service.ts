@@ -3,9 +3,13 @@ import { QuizModel, QuizQuestionModel, SubjectModel } from "@/models";
 import { ListParams } from "@/types/dto";
 import IQuizQuestion, { QuizQuestionType } from "@/types/quizQuestion.type";
 import appAssert from "@/utils/appAssert";
-import { prefixQuizQuestionImage } from "@/utils/filePrefix";
+import {
+  prefixExternalQuizQuestionImage,
+  prefixQuizQuestionImage,
+} from "@/utils/filePrefix";
 import {
   getKeyFromPublicUrl,
+  removeFile,
   removeFiles,
   uploadFiles,
 } from "@/utils/uploadFile";
@@ -13,6 +17,7 @@ import {
   ICreateQuizQuestionParams,
   IGetRandomQuestionsParams,
   IUpdateQuizQuestionParams,
+  TUploadImagesParams,
 } from "@/validators/quizQuestion.schemas";
 import mongoose, { FilterQuery, get } from "mongoose";
 import { parseStringPromise } from "xml2js";
@@ -255,16 +260,26 @@ export const getAllQuizQuestions = async ({
   let sortObj: any = { createdAt: sortDirection };
   if (search) sortObj = { score: { $meta: "textScore" } };
 
-  const [data, total] = await Promise.all([
+  const [rawData, total] = await Promise.all([
     QuizQuestionModel.find(query, projection)
       .sort(sortObj)
       .skip((_page - 1) * _limit)
-      .limit(_limit),
+      .limit(_limit)
+      .lean(),
     QuizQuestionModel.countDocuments(query),
   ]);
 
   const totalPages = Math.ceil(total / _limit);
-
+  const data = rawData.map((q) => {
+    return {
+      ...q,
+      images: q.images?.map((image) => ({ url: image, fromDB: true })),
+      isExternal: false,
+      isNew: false,
+      isDirty: false,
+      isDeleted: false,
+    };
+  });
   return {
     data, // mỗi document sẽ có thêm field "score" nếu search
     pagination: {
@@ -317,9 +332,10 @@ const handleImageUpload = async (
  * @throws BAD_REQUEST - If the question type is invalid.
  * @returns - True if the question type is valid, false otherwise.
  */
-const checkProperQuestionType = (
+export const checkProperQuestionType = (
   type: QuizQuestionType,
-  correctOptions: number[]
+  correctOptions: number[],
+  message?: string
 ) => {
   const trueOptions: number = correctOptions.filter((q) => q === 1).length;
 
@@ -328,14 +344,15 @@ const checkProperQuestionType = (
       return appAssert(
         trueOptions >= 1,
         BAD_REQUEST,
-        "Multiple choice questions must have at least one correct option"
+        message ||
+          "Multiple choice questions must have at least one correct option"
       );
 
     default:
       return appAssert(
         trueOptions === 1,
         BAD_REQUEST,
-        "This question type must have only one correct option"
+        message || "This question type must have only one correct option"
       );
   }
 };
@@ -583,16 +600,58 @@ export const getRandomQuestions = async ({
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
 
-  const questions = await QuizQuestionModel.aggregate([
+  const questions = await QuizQuestionModel.aggregate<IQuizQuestion>([
     { $match: { subjectId: subject._id } },
     { $sample: { size: count } },
   ]);
 
   const questionTypes = new Set(questions.map((q) => q.type));
 
+  const data = questions.map((q) => {
+    return {
+      ...q,
+      images: q.images?.map((image) => ({ url: image, fromDB: true })),
+      isExternal: false,
+      isNew: false,
+      isDirty: false,
+      isDeleted: false,
+    };
+  });
+
   return {
-    data: questions,
+    data,
     total: questions.length,
     questionTypes: Array.from(questionTypes),
   };
+};
+
+/**
+ * Upload images for quiz question.
+ * Only images are allowed to be uploaded.
+ * @param  quizId - ID of the quiz to upload images for.
+ * @param images - Express.Multer.File[] - Images to upload.
+ * @returns Promise<string[]> - An array of public URLs of the uploaded images.
+ */
+export const uploadImages = async ({ quizId, images }: TUploadImagesParams) => {
+  for (const file of images) {
+    appAssert(
+      file.mimetype.startsWith("image/"),
+      BAD_REQUEST,
+      "File must be an image"
+    );
+  }
+
+  const prefix = prefixExternalQuizQuestionImage(quizId);
+  const result = await uploadFiles(images, prefix);
+  return result.map((image) => image.publicUrl);
+};
+
+/**
+ * Delete images by their public URLs.
+ * @param  publicUrl - An array of public URLs of the images to delete.
+ * @returns  - A promise resolving to an object with a message property.
+ */
+export const deleteImage = async (publicUrl: string) => {
+  await removeFile(getKeyFromPublicUrl(publicUrl));
+  return true;
 };

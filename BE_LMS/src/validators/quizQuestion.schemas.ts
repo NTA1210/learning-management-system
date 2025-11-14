@@ -21,8 +21,8 @@ export const listQuizQuestionSchema = listParamsSchema
   .extend({
     subjectId: subjectIdSchema.optional(),
     type: z.enum(QuizQuestionType).optional(),
-    from: datePreprocess,
-    to: datePreprocess,
+    from: datePreprocess.optional(),
+    to: datePreprocess.optional(),
   })
   .refine(
     (val) => {
@@ -105,3 +105,12 @@ export const randomQuizQuestionSchema = z.object({
     return val;
   }, z.number().min(1, "Count must be at least 1").max(100, "Count must be at most 100").default(10).optional()),
 });
+
+export const uploadImagesSchema = z.object({
+  quizId: subjectIdSchema,
+  images: z.array(z.any()).min(1, "At least one image is required"),
+});
+
+export type TUploadImagesParams = z.infer<typeof uploadImagesSchema>;
+
+export const deleteImagesSchema = z.string().min(1, "Image URL is required");
