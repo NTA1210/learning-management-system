@@ -4,6 +4,7 @@ export { default as IAssignment } from "./assignment.type";
 export { default as IAttendance } from "./attendance.type";
 export { default as ICourse } from "./course.type";
 export { default as IEnrollment } from "./enrollment.type";
+export * from "./enrollment.type";
 export { default as IForum } from "./forum.type";
 export { default as IForumPost } from "./forumPost.type";
 export { default as IForumReply } from "./forumReply.type";

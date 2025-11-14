@@ -1,7 +1,7 @@
-import { CREATED } from "@/constants/http";
+import { CREATED, OK } from "@/constants/http";
 import { catchErrors } from "@/utils/asyncHandler";
-import { createCourseInviteSchema } from "@/validators/courseInvite.schemas";
-import { createCourseInvite } from "@/services/courseInvite.service";
+import { createCourseInviteSchema, joinCourseInviteSchema } from "@/validators/courseInvite.schemas";
+import { createCourseInvite, joinCourseByInvite } from "@/services/courseInvite.service";
 
 /**
  * POST /course-invites
@@ -10,7 +10,7 @@ import { createCourseInvite } from "@/services/courseInvite.service";
  */
 export const createCourseInviteHandler = catchErrors(async (req, res) => {
   const request = createCourseInviteSchema.parse(req.body);
-  const createdBy = req.userId!.toString();
+  const createdBy = req.userId!.toString(); 
 
   const result = await createCourseInvite(request, createdBy);
 
@@ -19,3 +19,14 @@ export const createCourseInviteHandler = catchErrors(async (req, res) => {
     message: "Invite link created successfully",
   });
 });
+
+export const joinCourseInviteHandler = catchErrors(async (req, res) => {
+  const request = joinCourseInviteSchema.parse(req.body);
+  const userId = req.userId!.toString();
+
+  const result = await joinCourseByInvite(request.token, userId);
+  return res.success(OK, {
+    data: result,
+    message: result.message,
+  });
+})

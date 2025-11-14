@@ -1,8 +1,12 @@
 import z from "zod";
-
+import {EMAIL_REGEX} from "@/constants/regex";
 // Schema để tạo invite link
 export const createCourseInviteSchema = z.object({
   courseId: z.string().length(24, "Invalid courseId format"),
+  invitedEmails: z
+  .array(z.string().regex(EMAIL_REGEX, "Invalid email format"))
+  .min(1, "At least one email is required")
+  .max(100, "Cannot invite more than 100 emails at once"),
   expiresInDays: z
     .number()
     .int()
@@ -19,4 +23,13 @@ export const createCourseInviteSchema = z.object({
 });
 
 export type TCreateCourseInvite = z.infer<typeof createCourseInviteSchema>;
+
+export const joinCourseInviteSchema = z.object({
+  token: z
+    .string()
+    .length(64, "Invalid invite token format")
+    .regex(/^[a-f0-9]{64}$/, "Invalid invite token format"),
+})
+
+export type TJoinCourseInvite = z.infer<typeof joinCourseInviteSchema>;
 
