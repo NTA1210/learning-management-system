@@ -109,6 +109,7 @@ export const updateLessonService = async (id: string, data: Partial<CreateLesson
  */
 export const getLessons = async (query: any, userId?: string, userRole?: Role) => {
   // Validate query parameters using schema
+  const { from, to } = query;
  
   const filter: any = {};
   
@@ -135,6 +136,12 @@ export const getLessons = async (query: any, userId?: string, userRole?: Role) =
   
   if (query.courseId) {
     filter.courseId = query.courseId;
+  }
+
+  if (from || to) {
+    filter.createdAt = {};
+    if (from) filter.createdAt.$gte = from;
+    if (to) filter.createdAt.$lte = to;
   }
 
   // Full-text search

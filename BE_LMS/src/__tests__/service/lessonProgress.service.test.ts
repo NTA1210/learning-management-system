@@ -196,6 +196,28 @@ describe("⏳ LessonProgress Service Unit Tests", () => {
       expect(res).toHaveProperty("completionRate");
     });
 
+    it("applies from/to filters to lessons and progress queries", async () => {
+      const fromDate = new Date("2024-04-01");
+      const toDate = new Date("2024-04-30");
+      const lessonFindMock = {
+        sort: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([{ _id: new mongoose.Types.ObjectId(), title: "Filtered", order: 1, durationMinutes: 1 }]) })
+      };
+      (CourseModel.findById as any).mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.course, teacherIds: [new mongoose.Types.ObjectId(ids.teacher)] }) });
+      (LessonModel.find as any).mockImplementation((filter: any) => {
+        expect(filter.createdAt.$gte).toEqual(fromDate);
+        expect(filter.createdAt.$lte).toEqual(toDate);
+        return lessonFindMock;
+      });
+      (LessonProgressModel.find as any).mockImplementation((filter: any) => {
+        expect(filter.createdAt.$gte).toEqual(fromDate);
+        expect(filter.createdAt.$lte).toEqual(toDate);
+        return { lean: jest.fn().mockResolvedValue([{ lessonId: new mongoose.Types.ObjectId(), isCompleted: false, timeSpentSeconds: 0 }]) };
+      });
+
+      const result = await getCourseProgress(ids.course.toString(), ids.admin, Role.ADMIN, ids.student, { from: fromDate, to: toDate });
+      expect(result.lessons).toHaveLength(1);
+    });
+
     it("throws error when course not found", async () => {
       (CourseModel.findById as any).mockReturnValue({ lean: jest.fn().mockResolvedValue(null) });
       await expect(getCourseProgress(ids.course.toString(), ids.admin, Role.ADMIN, ids.student)).rejects.toThrow("Course not found");

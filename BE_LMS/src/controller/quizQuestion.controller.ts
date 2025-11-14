@@ -84,11 +84,11 @@ export const getAllQuizQuestionsHandler = catchErrors(async (req, res) => {
 
 // POST /quiz-questions/ - Create a new question
 export const createQuizQuestionHandler = catchErrors(async (req, res) => {
-  const file = req.file;
+  const files = req.files;
   const input = createQuizQuestionSchema.parse(
     parseFormData({
       ...req.body,
-      image: file,
+      images: files,
     })
   );
   const data = await createQuizQuestion(input);
@@ -101,14 +101,15 @@ export const createQuizQuestionHandler = catchErrors(async (req, res) => {
 
 //PUT /quiz-questions/:quizQuestionId - Update a question
 export const updateQuizQuestionByIdHandler = catchErrors(async (req, res) => {
-  const file = req.file;
+  const files = req.files;
   const input = updateQuizQuestionSchema.parse(
     parseFormData({
       ...req.body,
-      image: file,
+      images: files,
       quizQuestionId: req.params.quizQuestionId,
     })
   );
+
   const data = await updateQuizQuestion(input);
 
   res.success(CREATED, {
