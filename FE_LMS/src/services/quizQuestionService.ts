@@ -2,7 +2,7 @@ import http from "../utils/http";
 
 export interface QuizQuestion {
   _id: string;
-  subjectId: string;
+  subjectId: string | { _id: string; code?: string; name?: string };
   text: string;
   image?: string;
   type: string;
@@ -49,15 +49,40 @@ export const quizQuestionService = {
 
     const queryString = params.toString();
     const url = `/quiz-questions${queryString ? `?${queryString}` : ""}`;
-    const response = await http.get<QuizQuestion[]>(url);
     
-    // Handle response format - response.data is the array, response.pagination is pagination info
-    const questions = Array.isArray(response.data) ? response.data : [];
-    const pagination = response.pagination || {
-      totalItems: 0,
-      currentPage: 1,
-      limit: 10,
-      totalPages: 0,
+    const baseUrl = import.meta.env.VITE_BASE_API || "";
+    console.log("QuizQuestionService: Base URL from env:", baseUrl);
+    console.log("QuizQuestionService: Full URL will be:", `${baseUrl}${url}`);
+    console.log("QuizQuestionService: Fetching from URL:", url);
+    console.log("QuizQuestionService: Filters:", filters);
+    
+    const response = await http.get<QuizQuestion[]>(url);
+    console.log("QuizQuestionService: Raw response:", response);
+    console.log("QuizQuestionService: Response type:", typeof response);
+    console.log("QuizQuestionService: Response.data type:", typeof response.data);
+    console.log("QuizQuestionService: Response.data is array?", Array.isArray(response.data));
+    
+    // Handle response format - có thể là response.data hoặc response trực tiếp
+    let questions: QuizQuestion[] = [];
+    
+    // Thử nhiều format response
+    if (Array.isArray(response.data)) {
+      questions = response.data;
+    } else if (Array.isArray(response)) {
+      questions = response;
+    } else if (response.data && Array.isArray(response.data.data)) {
+      questions = response.data.data;
+    } else if (response.data && Array.isArray(response.data)) {
+      questions = response.data;
+    }
+    
+    console.log("QuizQuestionService: Parsed questions:", questions);
+    
+    const pagination = response.meta?.pagination || response.pagination || {
+      totalItems: questions.length,
+      currentPage: filters?.page || 1,
+      limit: filters?.limit || 10,
+      totalPages: 1,
       hasNext: false,
       hasPrev: false,
     };

@@ -5,18 +5,8 @@ import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { PlusCircle, X } from "lucide-react";
-import { courseService } from "../services";
+import { subjectService, type Subject } from "../services";
 import { useNavigate } from "react-router-dom";
-
-type Course = {
-  _id: string;
-  title: string;
-  subjectId?: {
-    _id: string;
-    code: string;
-    name: string;
-  } | string;
-};
 
 type Question = {
   text: string;
@@ -31,9 +21,9 @@ export default function QuizManagementPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const quizUploadEndpoint = `${import.meta.env.VITE_BASE_API.replace(/\/$/, "")}/quiz-questions`;
 
@@ -57,25 +47,26 @@ export default function QuizManagementPage() {
     },
   ]);
 
-  // Fetch courses for /quiz
+  // Fetch subjects for /quiz - Sử dụng environment variable VITE_BASE_API
   useEffect(() => {
     (async () => {
       try {
-        const { courses: list } = await courseService.getAllCourses({ limit: 100 });
-        setCourses(list as Course[]);
-      } catch {
-        setCourses([]);
+        console.log("Fetching subjects from API...");
+        const result = await subjectService.getAllSubjects({ limit: 100 });
+        console.log("Subjects response:", result);
+        setSubjects(result.data || []);
+      } catch (error) {
+        console.error("Error fetching subjects:", error);
+        setSubjects([]);
       }
     })();
   }, []);
 
-  const handlePickCourse = (courseId: string) => {
-    navigate(`/quiz/${courseId}`);
+  const handlePickSubject = (subjectId: string) => {
+    navigate(`/quiz/${subjectId}`);
   };
 
-  const generateExamCode = (course: Course) => {
-    if (typeof course.subjectId !== "object" || !course.subjectId) return "";
-    const subject = course.subjectId;
+  const generateExamCode = (subject: Subject) => {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -85,11 +76,11 @@ export default function QuizManagementPage() {
     return `${subject.code}-${year}${month}${day}-${hours}${minutes}`;
   };
 
-  const handleSelectCourse = (course: Course) => {
-    setSelectedCourse(course);
-    // Auto-generate exam code if subject is available
-    if (typeof course.subjectId === "object" && course.subjectId && !quizDetails.examCode) {
-      const code = generateExamCode(course);
+  const handleSelectSubject = (subject: Subject) => {
+    setSelectedSubject(subject);
+    // Auto-generate exam code
+    if (!quizDetails.examCode) {
+      const code = generateExamCode(subject);
       if (code) {
         setQuizDetails((prev) => ({ ...prev, examCode: code }));
       }
@@ -98,8 +89,8 @@ export default function QuizManagementPage() {
 
   const handleNextStep = () => {
     if (currentStep === 1) {
-      if (!selectedCourse) {
-        alert("Please select a course first");
+      if (!selectedSubject) {
+        alert("Please select a subject first");
         return;
       }
       if (!quizDetails.title.trim()) {
@@ -214,12 +205,12 @@ export default function QuizManagementPage() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!selectedCourse || typeof selectedCourse.subjectId !== "object" || !selectedCourse.subjectId) {
-      alert("Please select a course first");
+    if (!selectedSubject) {
+      alert("Please select a subject first");
       return;
     }
 
-    const subjectId = typeof selectedCourse.subjectId === "object" ? selectedCourse.subjectId._id : selectedCourse.subjectId;
+    const subjectId = selectedSubject._id;
 
     // Validate questions
     for (let i = 0; i < questions.length; i++) {
@@ -333,7 +324,7 @@ export default function QuizManagementPage() {
       // Reset form
       setShowCreateModal(false);
       setCurrentStep(1);
-      setSelectedCourse(null);
+      setSelectedSubject(null);
       setQuizDetails({ title: "", description: "", examCode: "" });
       setQuestions([
         {
@@ -415,24 +406,24 @@ export default function QuizManagementPage() {
               </button>
             </header>
 
-            {/* Courses list */}
+            {/* Subjects list */}
             <section className="grid gap-6 lg:grid-cols-1">
               <div
                 className="rounded-2xl shadow-md p-6 space-y-4"
                 style={{ backgroundColor: cardBg, border: cardBorder }}
               >
-                <h2 className="text-xl font-semibold">Courses</h2>
-                {courses.length === 0 ? (
+                <h2 className="text-xl font-semibold">Subjects</h2>
+                {subjects.length === 0 ? (
                   <p className="text-sm" style={{ color: labelColor }}>
-                    Không có khoá học nào hoặc chưa tải được.
+                    Không có môn học nào hoặc chưa tải được.
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 gap-4">
-                    {courses.map((c) => {
+                    {subjects.map((subject) => {
                       return (
                         <div
-                          key={c._id}
-                          onClick={() => handlePickCourse(c._id)}
+                          key={subject._id}
+                          onClick={() => handlePickSubject(subject._id)}
                           className="cursor-pointer rounded-2xl px-6 py-5 transition-all"
                           style={{
                             backgroundColor: darkMode ? "rgba(15,23,42,0.6)" : "#ffffff",
@@ -443,7 +434,7 @@ export default function QuizManagementPage() {
                             className="text-xl font-semibold mb-2"
                             style={{ color: textColor }}
                           >
-                            {c.title}
+                            {subject.code} - {subject.name}
                           </h3>
                           <span
                             className="text-sm"
@@ -519,19 +510,18 @@ export default function QuizManagementPage() {
                       <div className="space-y-6">
                         <h3 className="text-lg font-semibold">Quiz Details</h3>
                         
-                        {/* Course Selection */}
+                        {/* Subject Selection */}
                         <div>
                           <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                            Course <span className="text-red-500">*</span>
+                            Subject <span className="text-red-500">*</span>
                           </label>
                           <div className="grid grid-cols-1 gap-3 max-h-48 overflow-y-auto">
-                            {courses.map((course) => {
-                              const isSelected = selectedCourse?._id === course._id;
-                              const subject = typeof course.subjectId === "object" ? course.subjectId : null;
+                            {subjects.map((subject) => {
+                              const isSelected = selectedSubject?._id === subject._id;
                               return (
                                 <div
-                                  key={course._id}
-                                  onClick={() => handleSelectCourse(course)}
+                                  key={subject._id}
+                                  onClick={() => handleSelectSubject(subject)}
                                   className="cursor-pointer rounded-lg px-4 py-3 transition-all"
                                   style={{
                                     backgroundColor: isSelected
@@ -546,10 +536,10 @@ export default function QuizManagementPage() {
                                       : `1px solid ${inputBorder}`,
                                   }}
                                 >
-                                  <div className="font-semibold">{course.title}</div>
-                                  {subject && (
+                                  <div className="font-semibold">{subject.code} - {subject.name}</div>
+                                  {subject.description && (
                                     <div className="text-xs mt-1" style={{ color: labelColor }}>
-                                      {subject.code} - {subject.name}
+                                      {subject.description}
                                     </div>
                                   )}
                                 </div>
@@ -589,16 +579,16 @@ export default function QuizManagementPage() {
                           />
                         </div>
 
-                        {/* Subject (auto-filled from course) */}
-                        {selectedCourse && typeof selectedCourse.subjectId === "object" && selectedCourse.subjectId && (
+                        {/* Selected Subject (read-only) */}
+                        {selectedSubject && (
                           <div>
                             <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                              Subject <span className="text-red-500">*</span>
+                              Selected Subject <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
                               disabled
-                              value={`${selectedCourse.subjectId.code} - ${selectedCourse.subjectId.name}`}
+                              value={`${selectedSubject.code} - ${selectedSubject.name}`}
                               className="w-full px-4 py-2 rounded-lg"
                               style={{
                                 backgroundColor: darkMode ? "rgba(15,23,42,0.4)" : "#f1f5f9",

@@ -4,11 +4,11 @@ import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
-import { courseService, quizQuestionService, type QuizQuestion } from "../services";
+import { subjectService, quizQuestionService, type QuizQuestion, type Subject } from "../services";
 import { ArrowLeft } from "lucide-react";
 
 export default function QuizCoursePage() {
-  const { courseId = "" } = useParams();
+  const { courseId = "" } = useParams(); // Thực ra là subjectId nhưng giữ tên route cũ
   const navigate = useNavigate();
   const { darkMode } = useTheme();
   const { user } = useAuth();
@@ -33,43 +33,88 @@ export default function QuizCoursePage() {
     return raw.startsWith("http") ? raw : (apiBase ? `${apiBase}/${raw.replace(/^\/+/, "")}` : raw);
   };
 
-  type CourseLike = { title?: string; name?: string; subjectId?: string | { _id: string } };
-
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         setLoading(true);
         setQuestionsLoading(true);
-        const course = await courseService.getCourseById(courseId);
-        if (mounted) {
-          const c = course as CourseLike;
-          setTitle(c?.title || c?.name || "Course");
+        
+        // courseId thực ra là subjectId từ route /quiz/:courseId
+        const subjectId = courseId;
+        
+        if (subjectId) {
+          let subjectTitle = "Subject";
           
-          // Get subjectId from course to fetch quiz questions
-          const subjectId = typeof c?.subjectId === "object" 
-            ? (c.subjectId as { _id: string })._id 
-            : (c?.subjectId as string | undefined);
-          
-          if (subjectId) {
-            try {
-              const { data } = await quizQuestionService.getAllQuizQuestions({
-                subjectId,
-                limit: 100, // Get all questions for this subject
-              });
-              if (mounted) {
-                setQuizQuestions(data);
-              }
-            } catch (error) {
-              console.error("Error fetching quiz questions:", error);
-              if (mounted) {
-                setQuizQuestions([]);
-              }
+          // Try to fetch subject info (optional - if fails, still fetch questions)
+          try {
+            console.log("QuizCoursePage: Fetching subject with ID:", subjectId);
+            const subject = await subjectService.getSubjectById(subjectId);
+            console.log("QuizCoursePage: Subject loaded:", subject);
+            
+            if (mounted && subject) {
+              subjectTitle = `${subject.code} - ${subject.name}`;
+              setTitle(subjectTitle);
+            }
+          } catch (subjectError) {
+            console.warn("QuizCoursePage: Could not fetch subject info, will still try to fetch questions:", subjectError);
+            if (mounted) {
+              setTitle(`Subject ID: ${subjectId}`);
             }
           }
+          
+          // Fetch quiz questions using API {{base_url}}/quiz-questions (get all, then filter by subjectId)
+          try {
+            console.log("QuizCoursePage: Fetching all quiz questions for subjectId:", subjectId);
+            const baseUrl = import.meta.env.VITE_BASE_API || "";
+            console.log("QuizCoursePage: Base URL:", baseUrl);
+            
+            // Call API without filters to get all questions
+            const result = await quizQuestionService.getAllQuizQuestions({
+              limit: 1000, // Get all questions
+            });
+            
+            console.log("QuizCoursePage: All quiz questions result:", result);
+            console.log("QuizCoursePage: Total questions:", result.data?.length || 0);
+            
+            // Filter by subjectId on client side
+            const filteredQuestions = (result.data || []).filter(
+              (q) => q.subjectId === subjectId || (typeof q.subjectId === "object" && q.subjectId._id === subjectId)
+            );
+            
+            console.log("QuizCoursePage: Filtered questions for subjectId:", filteredQuestions.length);
+            
+            if (mounted) {
+              setQuizQuestions(filteredQuestions);
+              console.log("QuizCoursePage: Set quiz questions:", filteredQuestions.length);
+              
+              // Update title if we have questions but no subject info
+              if (filteredQuestions.length > 0 && subjectTitle === "Subject") {
+                setTitle(`Quiz Questions (${filteredQuestions.length} questions)`);
+              }
+            }
+          } catch (questionsError) {
+            console.error("QuizCoursePage: Error fetching quiz questions:", questionsError);
+            if (questionsError && typeof questionsError === "object" && "message" in questionsError) {
+              console.error("QuizCoursePage: Error message:", (questionsError as { message: string }).message);
+            }
+            if (mounted) {
+              setQuizQuestions([]);
+            }
+          }
+        } else {
+          console.warn("QuizCoursePage: No subjectId provided");
+          if (mounted) {
+            setTitle("Subject");
+            setQuizQuestions([]);
+          }
         }
-      } catch {
-        if (mounted) setTitle("Course");
+      } catch (error) {
+        console.error("Error:", error);
+        if (mounted) {
+          setTitle("Subject");
+          setQuizQuestions([]);
+        }
       } finally {
         if (mounted) {
           setLoading(false);
@@ -110,12 +155,12 @@ export default function QuizCoursePage() {
                   }}
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  Back to courses
+                  Back to subjects
                 </button>
                 <h1 className="text-3xl font-bold">{loading ? "Loading..." : title}</h1>
               </div>
               <p className="text-sm" style={{ color: labelColor }}>
-                Quiz questions for this course
+                Quiz questions for this subject
               </p>
             </header>
 
@@ -126,7 +171,7 @@ export default function QuizCoursePage() {
                 </div>
               ) : quizQuestions.length === 0 ? (
                 <div className="text-center py-8 rounded-2xl" style={{ backgroundColor: cardBg, border: cardBorder }}>
-                  <p style={{ color: labelColor }}>No quiz questions found for this course.</p>
+                  <p style={{ color: labelColor }}>No quiz questions found for this subject.</p>
                 </div>
               ) : (
                 quizQuestions.map((q) => {
