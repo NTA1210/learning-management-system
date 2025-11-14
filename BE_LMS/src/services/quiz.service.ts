@@ -104,6 +104,15 @@ export const createQuiz = async (
  *
  */
 
+/**
+ * Update a quiz.
+ * @param  { quizId, courseId, title, description, startTime, endTime, shuffleQuestions, snapshotQuestions }
+ * @throws  If quiz not found
+ * @throws  If quiz is already completed
+ * @throws  If snapshot questions already added
+ * @throws  If no questions provided
+ * @returns  Updated quiz
+ */
 export const updateQuiz = async ({
   quizId,
   courseId,
