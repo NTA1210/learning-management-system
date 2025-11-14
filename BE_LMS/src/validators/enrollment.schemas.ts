@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { datePreprocess } from "./helpers/date.schema";
 import {
   EnrollmentStatus,
   EnrollmentRole,
@@ -10,35 +11,35 @@ const objectIdSchema = z.string().regex(/^[0-9a-fA-F]{24}$/, {
   message: "Invalid ID format. Must be a valid MongoDB ObjectId",
 });
 
-const dateParamSchema = z
-  .union([
-    z
-      .string()
-      .refine(
-        (val) => !Number.isNaN(Date.parse(val)),
-        { message: "Invalid date format. Expected ISO string." }
-      )
-      .transform((val) => new Date(val)),
-    z.date(),
-  ])
-  .optional();
-
 // GET - Query enrollments (cho các query params)
-export const getEnrollmentsQuerySchema = z.object({
-  status: z.enum(EnrollmentStatus).optional(),
-  courseId: z.string().optional(),
-  studentId: z.string().optional(),
-  page: z
-    .string()
-    .optional()
-    .transform((val) => (val ? parseInt(val) : 1)),
-  limit: z
-    .string()
-    .optional()
-    .transform((val) => (val ? parseInt(val) : 10)),
-  from: dateParamSchema,
-  to: dateParamSchema,
-});
+export const getEnrollmentsQuerySchema = z
+  .object({
+    status: z.enum(EnrollmentStatus).optional(),
+    courseId: z.string().optional(),
+    studentId: z.string().optional(),
+    page: z
+      .string()
+      .optional()
+      .transform((val) => (val ? parseInt(val) : 1)),
+    limit: z
+      .string()
+      .optional()
+      .transform((val) => (val ? parseInt(val) : 10)),
+    from: datePreprocess,
+    to: datePreprocess,
+  })
+  .refine(
+    (val) => {
+      if (val.from && val.to) {
+        return val.from.getTime() <= val.to.getTime();
+      }
+      return true;
+    },
+    {
+      message: "From date must be less than or equal to To date",
+      path: ["to"],
+    }
+  );
 
 // Validate ID trong URL params
 export const enrollmentIdSchema = z.object({
