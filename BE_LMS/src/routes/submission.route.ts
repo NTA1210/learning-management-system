@@ -38,8 +38,9 @@ submissionRoutes.get("/:assignmentId/all", authenticate,authorize(Role.ADMIN,Rol
 submissionRoutes.put("/:assignmentId/grade", authenticate , authorize(Role.ADMIN, Role.TEACHER),gradeSubmissionHandler);
 //sv xem toàn bộ điểm
 submissionRoutes.get("/my/grades", authenticate,listAllGradesByStudentHandler );
-export default submissionRoutes;
 //thống kê và báo cáo
 submissionRoutes.get("/:assignmentId/stats", authenticate, authorize(Role.ADMIN, Role.TEACHER), getSubmissionStatsHandler);
-submissionRoutes.get("/report/assignment", authenticate, authorize(Role.ADMIN, Role.TEACHER), getSubmissionReportHandler);
+submissionRoutes.get("/:assignmentId/report", authenticate, authorize(Role.ADMIN, Role.TEACHER), getSubmissionReportHandler);
 submissionRoutes.get("/course/:courseId/report", authenticate, authorize(Role.ADMIN, Role.TEACHER), getCourseReportHandler);
+
+export default submissionRoutes;
