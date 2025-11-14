@@ -14,6 +14,7 @@ import { TCreateCourseInvite } from "@/validators/courseInvite.schemas";
 /**
  * Yêu cầu nghiệp vụ:
  * - Teacher/Admin tạo link mời tham gia khóa học
+ * - Cho phép invite cả email chưa đăng ký (student sẽ đăng ký/đăng nhập sau khi nhận link)
  * - Dùng crypto.randomBytes để tạo token ngẫu nhiên (64 ký tự hex)
  * - Hash token bằng SHA256 trước khi lưu vào DB (bảo mật)
  * - Link có thời hạn và giới hạn số lần dùng (optional)
@@ -28,11 +29,7 @@ export const createCourseInvite = async (
   data: TCreateCourseInvite,
   createdBy: string
 ) => {
-  const { courseId, expiresInDays, maxUses, invitedEmail } = data;
-
-  //ktra email tồn tại
-  const invitedUser = await UserModel.findOne({email: invitedEmail});
-  appAssert(invitedUser, NOT_FOUND, "User must register before joining");
+  const { courseId, expiresInDays, maxUses, invitedEmails } = data;
 
   // Kiểm tra khóa học tồn tại
   const course = await CourseModel.findById(courseId);
@@ -52,6 +49,33 @@ export const createCourseInvite = async (
       "Only course teachers or admin can create invite links"
     );
   }
+  //Check duplicate email, chuẩn hóa lower-case
+  const uniqueEmails = Array.from(new Set(invitedEmails.map(email => email.toLowerCase())));
+
+  // Tính thời gian hết hạn
+  const expiresAt = new Date(
+    Date.now() + expiresInDays * 24 * 60 * 60 * 1000
+  );
+
+  //Duyệt qua từng email và xử lý song song
+  const results = await Promise.all(
+    uniqueEmails.map(async (email) => {
+
+  // Kiểm tra xem mail đã có invite active chưa
+  const existing = await CourseInviteModel.findOne({
+    courseId,
+    invitedEmail: email,
+    isActive: true,
+    expiresAt: { $gt: new Date() },
+  })
+
+  if (existing) {
+    return {
+      email,
+      skip: true,
+      reason: "Existing active invite found",
+    }
+  }
 
   // Tạo token ngẫu nhiên 32 bytes = 64 ký tự hex
   const token = crypto.randomBytes(32).toString("hex");
@@ -59,21 +83,18 @@ export const createCourseInvite = async (
   // Hash token bằng SHA256 để lưu vào DB
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
-  // Tính thời gian hết hạn
-  const expiresAt = new Date(
-    Date.now() + expiresInDays * 24 * 60 * 60 * 1000
-  );
 
   // Tạo invite record
   const invite = await CourseInviteModel.create({
     tokenHash,
     courseId,
     createdBy,
-    invitedEmail,
+    invitedEmail: email,
     maxUses,
     expiresAt,
     isActive: true,
   });
+
 // kiểm tra tạo invite trong db thành công chưa
   appAssert(invite, INTERNAL_SERVER_ERROR, "Failed to create invite link");
 
@@ -81,24 +102,34 @@ export const createCourseInvite = async (
   const inviteLink = `${APP_ORIGIN}/courses/join?token=${token}`;
 
   return {
-    invite: {
-      _id: invite._id,
-      courseId: invite.courseId,
-      maxUses: invite.maxUses,
-      usedCount: invite.usedCount,
-      expiresAt: invite.expiresAt,
-      isActive: invite.isActive,
-      createdAt: invite.createdAt,
-    },
-    inviteLink,
-  };
+      email,
+      invite: {
+        _id: invite._id,
+        courseId: invite.courseId,
+        maxUses: invite.maxUses,
+        usedCount: invite.usedCount,
+        expiresAt: invite.expiresAt,
+        isActive: invite.isActive,
+        createdAt: invite.createdAt,
+      },
+      inviteLink,
+    };
+  }));
+
+  return {
+    courseId,
+    invitedCount: results.length,
+    invites: results
+  }
 };
 
 /**
  * Yêu cầu nghiệp vụ:
  * - Student click vào link mời để tham gia khóa học
+ * - Student phải đã đăng nhập (nếu chưa đăng nhập → FE redirect đến trang đăng nhập)
  * - Hash token từ query string và tìm trong DB
  * - Kiểm tra link còn hợp lệ (chưa hết hạn, chưa vượt giới hạn, đang active)
+ * - Kiểm tra email đăng nhập phải trùng với email được invite
  * - Kiểm tra student chưa enroll vào khóa học
  * - Tự động tạo enrollment cho student
  * - Tăng usedCount

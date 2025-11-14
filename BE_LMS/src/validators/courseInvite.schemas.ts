@@ -3,9 +3,10 @@ import {EMAIL_REGEX} from "@/constants/regex";
 // Schema để tạo invite link
 export const createCourseInviteSchema = z.object({
   courseId: z.string().length(24, "Invalid courseId format"),
-  invitedEmail: z
-  .string()
-  .regex(EMAIL_REGEX, "Invalid email format"),
+  invitedEmails: z
+  .array(z.string().regex(EMAIL_REGEX, "Invalid email format"))
+  .min(1, "At least one email is required")
+  .max(100, "Cannot invite more than 100 emails at once"),
   expiresInDays: z
     .number()
     .int()
