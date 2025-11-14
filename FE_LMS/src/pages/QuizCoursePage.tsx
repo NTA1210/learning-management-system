@@ -16,6 +16,24 @@ export default function QuizCoursePage() {
   const [loading, setLoading] = useState(true);
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [questionsLoading, setQuestionsLoading] = useState(true);
+  const apiBase = (import.meta.env.VITE_BASE_API || "").replace(/\/$/, "");
+
+  const resolveImageSrc = (q: QuizQuestion): string | undefined => {
+    const obj = q as unknown as Record<string, unknown>;
+    const fileObj = (obj["file"] as Record<string, unknown> | undefined);
+    const candidates: unknown[] = [
+      obj["image"],
+      obj["imageUrl"],
+      obj["fileUrl"],
+      fileObj?.["url"],
+      obj["url"],
+    ];
+    const raw = candidates.find((v): v is string => typeof v === "string");
+    if (!raw) return undefined;
+    return raw.startsWith("http") ? raw : (apiBase ? `${apiBase}/${raw.replace(/^\/+/, "")}` : raw);
+  };
+
+  type CourseLike = { title?: string; name?: string; subjectId?: string | { _id: string } };
 
   useEffect(() => {
     let mounted = true;
@@ -25,12 +43,13 @@ export default function QuizCoursePage() {
         setQuestionsLoading(true);
         const course = await courseService.getCourseById(courseId);
         if (mounted) {
-          setTitle((course as any)?.title || (course as any)?.name || "Course");
+          const c = course as CourseLike;
+          setTitle(c?.title || c?.name || "Course");
           
           // Get subjectId from course to fetch quiz questions
-          const subjectId = typeof (course as any)?.subjectId === "object" 
-            ? (course as any).subjectId._id 
-            : (course as any)?.subjectId;
+          const subjectId = typeof c?.subjectId === "object" 
+            ? (c.subjectId as { _id: string })._id 
+            : (c?.subjectId as string | undefined);
           
           if (subjectId) {
             try {
@@ -110,13 +129,25 @@ export default function QuizCoursePage() {
                   <p style={{ color: labelColor }}>No quiz questions found for this course.</p>
                 </div>
               ) : (
-                quizQuestions.map((q) => (
+                quizQuestions.map((q) => {
+                  const imageSrc = resolveImageSrc(q);
+                  return (
                   <div
                     key={q._id}
                     className="rounded-2xl p-5"
                     style={{ backgroundColor: cardBg, border: cardBorder }}
                   >
-                    <p className="font-semibold mb-3">{q.text}</p>
+                    <p className="font-semibold mb-3 break-words">{q.text}</p>
+                    {imageSrc && (
+                      <div className="mt-3">
+                        <img
+                          src={imageSrc}
+                          alt="Quiz question"
+                          className="w-full max-h-64 object-contain rounded-xl border"
+                          style={{ borderColor: darkMode ? "rgba(148,163,184,0.3)" : "#e2e8f0", backgroundColor: darkMode ? "rgba(15,23,42,0.5)" : "#fff" }}
+                        />
+                      </div>
+                    )}
                     {q.options && q.options.length > 0 && (
                       <ul className="text-sm space-y-2">
                         {q.options.map((option, idx) => {
@@ -124,7 +155,7 @@ export default function QuizCoursePage() {
                           return (
                             <li key={idx} className="flex items-center gap-2">
                               <span className="font-mono mr-2">{String.fromCharCode(65 + idx)}.</span>
-                              <span>{option}</span>
+                              <span className="break-words">{option}</span>
                               {isCorrect && (
                                 <span className="text-green-500 text-xs font-semibold">✓ Correct</span>
                               )}
@@ -148,7 +179,7 @@ export default function QuizCoursePage() {
                       </div>
                     )}
                   </div>
-                ))
+                )})
               )}
             </section>
           </div>

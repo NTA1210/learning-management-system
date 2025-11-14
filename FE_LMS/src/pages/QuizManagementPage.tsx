@@ -7,7 +7,6 @@ import Sidebar from "../components/Sidebar.tsx";
 import { PlusCircle, X } from "lucide-react";
 import { courseService } from "../services";
 import { useNavigate } from "react-router-dom";
-import { httpClient } from "../utils/http";
 
 type Course = {
   _id: string;
@@ -23,9 +22,8 @@ type Question = {
   text: string;
   options: string[];
   correctOptions: number[];
-  difficulty: string;
-  category: string;
-  explanation: string;
+  imageFiles: File[];
+  imagePreviews: string[];
 };
 
 export default function QuizManagementPage() {
@@ -37,6 +35,9 @@ export default function QuizManagementPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const quizUploadEndpoint = `${import.meta.env.VITE_BASE_API.replace(/\/$/, "")}/quiz-questions`;
+
+
 
   // Step 1: Quiz Details
   const [quizDetails, setQuizDetails] = useState({
@@ -51,9 +52,8 @@ export default function QuizManagementPage() {
       text: "",
       options: ["", "", "", ""],
       correctOptions: [0, 0, 0, 0],
-      difficulty: "easy",
-      category: "",
-      explanation: "",
+      imageFiles: [],
+      imagePreviews: [],
     },
   ]);
 
@@ -125,9 +125,8 @@ export default function QuizManagementPage() {
         text: "",
         options: ["", "", "", ""],
         correctOptions: [0, 0, 0, 0],
-        difficulty: "easy",
-        category: "",
-        explanation: "",
+        imageFiles: [],
+        imagePreviews: [],
       },
     ]);
   };
@@ -161,6 +160,56 @@ export default function QuizManagementPage() {
     if (questions.length > 1) {
       setQuestions(questions.filter((_, i) => i !== index));
     }
+  };
+
+  const handleQuestionImageChange = (questionIndex: number, fileList: FileList | null) => {
+    const files = fileList ? Array.from(fileList) : [];
+    if (!files.length) {
+      setQuestions((prev) => {
+        const updated = [...prev];
+        updated[questionIndex] = {
+          ...updated[questionIndex],
+          imageFiles: [],
+          imagePreviews: [],
+        };
+        return updated;
+      });
+      return;
+    }
+
+    const readers = files.map(
+      (file) =>
+        new Promise<string>((resolve) => {
+          const r = new FileReader();
+          r.onloadend = () => resolve(typeof r.result === "string" ? r.result : "");
+          r.readAsDataURL(file);
+        })
+    );
+
+    Promise.all(readers).then((previews) => {
+      setQuestions((prev) => {
+        const updated = [...prev];
+        updated[questionIndex] = {
+          ...updated[questionIndex],
+          imageFiles: files,
+          imagePreviews: previews.filter(Boolean),
+        };
+        return updated;
+      });
+    });
+  };
+
+  const handleRemoveImageAt = (questionIndex: number, imgIndex: number) => {
+    setQuestions((prev) => {
+      const updated = [...prev];
+      const q = updated[questionIndex];
+      updated[questionIndex] = {
+        ...q,
+        imageFiles: q.imageFiles.filter((_, i) => i !== imgIndex),
+        imagePreviews: q.imagePreviews.filter((_, i) => i !== imgIndex),
+      };
+      return updated;
+    });
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -248,21 +297,37 @@ export default function QuizManagementPage() {
           return;
         }
 
-        const payload = {
-          subjectId,
-          text: question.text.trim(),
-          options: normalizedOptions,
-          correctOptions: normalizedCorrectOptions,
-          explanation: question.explanation?.trim() || undefined,
-          type: "mcq" as const,
-        };
-        
-        console.log("Creating question with payload:", payload);
-        console.log("Options type:", Array.isArray(payload.options) ? "array" : typeof payload.options);
-        console.log("CorrectOptions type:", Array.isArray(payload.correctOptions) ? "array" : typeof payload.correctOptions);
-        
-        const response = await httpClient.post("/quiz-questions", payload);
-        console.log("Question created successfully:", response);
+        const formData = new FormData();
+        formData.append("subjectId", subjectId);
+        formData.append("text", question.text.trim());
+        formData.append("options", JSON.stringify(normalizedOptions));
+        formData.append("correctOptions", JSON.stringify(normalizedCorrectOptions));
+        formData.append("type", "mcq");
+        // Removed explanation
+        if (question.imageFiles && question.imageFiles.length > 0) {
+          for (const f of question.imageFiles) {
+            formData.append("files", f);
+          }
+        }
+
+        console.log("Uploading quiz question with image to:", quizUploadEndpoint);
+
+        const response = await fetch(quizUploadEndpoint, {
+          method: "POST",
+          body: formData,
+        });
+
+        const result = await response.json().catch(() => null);
+
+        if (!response.ok || (result && result.success === false)) {
+          const message =
+            (result && (result.message || result.error?.message)) ||
+            response.statusText ||
+            "Failed to create quiz question";
+          throw new Error(message);
+        }
+
+        console.log("Question created successfully:", result);
       }
       alert("Quiz questions created successfully!");
       // Reset form
@@ -275,9 +340,8 @@ export default function QuizManagementPage() {
           text: "",
           options: ["", "", "", ""],
           correctOptions: [0, 0, 0, 0],
-          difficulty: "easy",
-          category: "",
-          explanation: "",
+          imageFiles: [],
+          imagePreviews: [],
         },
       ]);
     } catch (error: unknown) {
@@ -292,6 +356,8 @@ export default function QuizManagementPage() {
         
         // Log full error for debugging
         console.error("Full error response:", axiosError.response?.data);
+      } else if (error instanceof Error && error.message) {
+        errorMessage = error.message;
       }
       
       alert(errorMessage);
@@ -310,9 +376,8 @@ export default function QuizManagementPage() {
         text: "",
         options: ["", "", "", ""],
         correctOptions: [0, 0, 0, 0],
-        difficulty: "easy",
-        category: "",
-        explanation: "",
+        imageFiles: [],
+        imagePreviews: [],
       },
     ]);
   };
@@ -396,7 +461,7 @@ export default function QuizManagementPage() {
             </section>
 
             {showCreateModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+              <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
                 <div
                   className="absolute inset-0 bg-black/50"
                   onClick={handleCloseModal}
@@ -661,51 +726,44 @@ export default function QuizManagementPage() {
                               ))}
                             </div>
 
-                            {/* Difficulty and Category */}
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                                  Difficulty
-                                </label>
-                                <select
-                                  value={question.difficulty}
-                                  onChange={(e) => handleUpdateQuestion(qIndex, "difficulty", e.target.value)}
-                                  className="w-full px-4 py-2 rounded-lg"
-                                  style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
-                                >
-                                  <option value="easy">Easy</option>
-                                  <option value="medium">Medium</option>
-                                  <option value="hard">Hard</option>
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                                  Category
-                                </label>
-                                <input
-                                  type="text"
-                                  value={question.category}
-                                  onChange={(e) => handleUpdateQuestion(qIndex, "category", e.target.value)}
-                                  className="w-full px-4 py-2 rounded-lg"
-                                  style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
-                                  placeholder="e.g. Algorithm"
-                                />
-                              </div>
-                            </div>
+                            {/* Removed Difficulty and Category */}
 
-                            {/* Explanation */}
+                            {/* Removed Explanation */}
+
+                            {/* Image Upload (multiple) */}
                             <div>
                               <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                                Explanation
+                                Question Images
                               </label>
                               <input
-                                type="text"
-                                value={question.explanation}
-                                onChange={(e) => handleUpdateQuestion(qIndex, "explanation", e.target.value)}
-                                className="w-full px-4 py-2 rounded-lg"
-                                style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
-                                placeholder="Explanation for the answer"
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                onChange={(e) => handleQuestionImageChange(qIndex, e.target.files)}
+                                className="block w-full text-sm file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border file:border-gray-300 file:bg-transparent"
                               />
+                              {question.imagePreviews.length > 0 && (
+                                <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-3">
+                                  {question.imagePreviews.map((src, imgIdx) => (
+                                    <div key={imgIdx} className="relative">
+                                      <img
+                                        src={src}
+                                        alt={`Question ${qIndex + 1} image ${imgIdx + 1}`}
+                                        className="w-full max-h-40 object-contain rounded-lg border"
+                                        style={{ borderColor: inputBorder, backgroundColor: darkMode ? 'rgba(15,23,42,0.4)' : '#fff' }}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveImageAt(qIndex, imgIdx)}
+                                        className="absolute top-2 right-2 px-2 py-1 rounded-md text-xs font-semibold"
+                                        style={{ backgroundColor: darkMode ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.15)', color: '#ef4444' }}
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                         ))}
