@@ -1,7 +1,7 @@
 import { CREATED, OK } from "@/constants/http";
 import { catchErrors } from "@/utils/asyncHandler";
-import { createCourseInviteSchema, joinCourseInviteSchema } from "@/validators/courseInvite.schemas";
-import { createCourseInvite, joinCourseByInvite } from "@/services/courseInvite.service";
+import { courseInviteIdSchema, createCourseInviteSchema, updateCourseInviteSchema, joinCourseInviteSchema } from "@/validators/courseInvite.schemas";
+import { createCourseInvite, joinCourseByInvite, updateCourseInvite } from "@/services/courseInvite.service";
 
 /**
  * POST /course-invites
@@ -55,5 +55,23 @@ export const listCourseInvitesHandler = catchErrors(async (req, res) => {
     data: result.invites,
     pagination: result.pagination,
     message: "Course invites retrieved successfully",
+  });
+});
+
+/**
+ * PATCH /course-invites/:id
+ * Cập nhật thông tin invite link
+ * Chỉ Teacher/Admin
+ */
+export const updateCourseInviteHandler = catchErrors(async (req, res) => {
+  const { id } = courseInviteIdSchema.parse(req.params);
+  const request = updateCourseInviteSchema.parse(req.body);
+  const updatedBy = req.userId!.toString();
+
+  const result = await updateCourseInvite(id, request, updatedBy);
+
+  return res.success(OK, {
+    data: result,
+    message: "Course invite updated successfully",
   });
 });

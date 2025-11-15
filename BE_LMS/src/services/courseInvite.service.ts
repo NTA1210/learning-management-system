@@ -9,7 +9,7 @@ import { CourseInviteModel, CourseModel, UserModel, EnrollmentModel } from "@/mo
 import { Role, EnrollmentStatus, EnrollmentMethod} from "@/types";
 import appAssert from "@/utils/appAssert";
 import { APP_ORIGIN } from "@/constants/env";
-import { TCreateCourseInvite, TListCourseInvite } from "@/validators/courseInvite.schemas";
+import { TCreateCourseInvite, TListCourseInvite, TUpdateCourseInvite, TCourseInviteId } from "@/validators/courseInvite.schemas";
 import ICourseInvite from "@/types/courseInvite.type";
 import { FilterQuery } from "mongoose";
 
@@ -305,5 +305,111 @@ export const listCourseInvites = async (
       hasNext: skip + results.length < total,
       hasPrev: page > 1,
     },
+  };
+};
+
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Teacher/Admin cập nhật thông tin invite link (isActive, expiresAt, maxUses)
+ * - Chỉ teacher của khóa học hoặc admin mới được cập nhật invite
+ * - Nếu cập nhật expiresInDays → tính lại expiresAt dựa trên ngày hiện tại
+ * - Nếu cập nhật maxUses → phải >= usedCount hiện tại (không được giảm xuống dưới số lần đã dùng)
+ * - Nếu cập nhật isActive = false → vô hiệu hóa invite, không thể dùng nữa
+ * 
+ * Input: inviteId (string), data (TUpdateCourseInvite), updatedBy (userId)
+ * Output: invite record đã được cập nhật
+ */
+export const updateCourseInvite = async (
+  inviteId: string,
+  data: TUpdateCourseInvite,
+  updatedBy: string
+) => {
+  // Tìm invite trong DB
+  const invite = await CourseInviteModel.findById(inviteId).populate(
+    "courseId",
+    "title teacherIds"
+  );
+  appAssert(invite, NOT_FOUND, "Course invite not found");
+
+  // Kiểm tra quyền: chỉ teacher của khóa học hoặc admin mới cập nhật được
+  const user = await UserModel.findById(updatedBy);
+  appAssert(user, NOT_FOUND, "User not found");
+
+  if (user.role !== Role.ADMIN) {
+    const course = invite.courseId as any;
+    const isTeacherOfCourse = course.teacherIds.some(
+      (teacherId: any) => teacherId.toString() === updatedBy
+    );
+    appAssert(
+      isTeacherOfCourse,
+      FORBIDDEN,
+      "Only course teachers or admin can update invite links"
+    );
+  }
+  
+  //Validate khi enable invite
+  if (data.isActive === true) {
+    // Nếu không update expiresInDays, check expiresAt hiện tại
+    const effectiveExpiresAt = data.expiresInDays
+      ? new Date(Date.now() + data.expiresInDays * 24 * 60 * 60 * 1000)
+      : invite.expiresAt;
+
+    // Check expire
+    if (effectiveExpiresAt && new Date() > effectiveExpiresAt) {
+      appAssert(
+        false,
+        BAD_REQUEST,
+        "Cannot enable expired invite. Please update expiresInDays first."
+      );
+    }
+
+    // Check maxUses
+    const effectiveMaxUses = data.maxUses !== undefined ? data.maxUses : invite.maxUses;
+    if (effectiveMaxUses && invite.usedCount >= effectiveMaxUses) {
+      appAssert(
+        false,
+        BAD_REQUEST,
+        "Cannot enable invite that has reached max uses. Please increase maxUses first."
+      );
+    }
+  }
+
+  // Cập nhật isActive nếu có
+  if (data.isActive !== undefined) {
+    invite.isActive = data.isActive;
+  }
+
+  // Cập nhật expiresAt nếu có expiresInDays
+  if (data.expiresInDays !== undefined) {
+    invite.expiresAt = new Date(
+      Date.now() + data.expiresInDays * 24 * 60 * 60 * 1000
+    );
+  }
+
+  // Cập nhật maxUses nếu có
+  if (data.maxUses !== undefined) {
+    // Kiểm tra maxUses không được nhỏ hơn usedCount hiện tại
+    appAssert(
+      data.maxUses === null || data.maxUses >= invite.usedCount,
+      BAD_REQUEST,
+      `maxUses cannot be less than current usedCount (${invite.usedCount})`
+    );
+    invite.maxUses = data.maxUses;
+  }
+
+  // Lưu thay đổi
+  const updatedInvite = await invite.save();
+  appAssert(updatedInvite, INTERNAL_SERVER_ERROR, "Failed to update invite link");
+
+  return {
+    id: updatedInvite._id,
+    courseId: updatedInvite.courseId,
+    invitedEmail: updatedInvite.invitedEmail,
+    maxUses: updatedInvite.maxUses,
+    usedCount: updatedInvite.usedCount,
+    expiresAt: updatedInvite.expiresAt,
+    isActive: updatedInvite.isActive,
+    createdAt: updatedInvite.createdAt,
+    updatedAt: updatedInvite.updatedAt,
   };
 };
