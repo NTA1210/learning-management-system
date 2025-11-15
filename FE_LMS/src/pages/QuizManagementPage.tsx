@@ -1,31 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { FormEvent } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
-import { PlusCircle, X } from "lucide-react";
-import { courseService } from "../services";
+import { PlusCircle, X, ImagePlus, CheckCircle, AlertCircle, Info } from "lucide-react";
+import { subjectService, type Subject } from "../services";
 import { useNavigate } from "react-router-dom";
-import { httpClient } from "../utils/http";
-
-type Course = {
-  _id: string;
-  title: string;
-  subjectId?: {
-    _id: string;
-    code: string;
-    name: string;
-  } | string;
-};
 
 type Question = {
   text: string;
   options: string[];
   correctOptions: number[];
-  difficulty: string;
-  category: string;
-  explanation: string;
+  imageFiles: File[];
+  imagePreviews: string[];
 };
 
 export default function QuizManagementPage() {
@@ -33,10 +21,40 @@ export default function QuizManagementPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessNotification, setShowSuccessNotification] = useState(false);
+  const quizUploadEndpoint = `${import.meta.env.VITE_BASE_API.replace(/\/$/, "")}/quiz-questions`;
+  // Refs for file inputs for each question
+  const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+
+  // Notification system
+  type NotificationType = "error" | "warning" | "success" | "info";
+  interface Notification {
+    id: string;
+    message: string;
+    type: NotificationType;
+  }
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  const showNotification = (message: string, type: NotificationType = "error") => {
+    const id = Date.now().toString();
+    const newNotification: Notification = { id, message, type };
+    setNotifications((prev) => [...prev, newNotification]);
+    
+    // Auto remove after 4 seconds
+    setTimeout(() => {
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+    }, 4000);
+  };
+
+  const removeNotification = (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+
 
   // Step 1: Quiz Details
   const [quizDetails, setQuizDetails] = useState({
@@ -51,31 +69,31 @@ export default function QuizManagementPage() {
       text: "",
       options: ["", "", "", ""],
       correctOptions: [0, 0, 0, 0],
-      difficulty: "easy",
-      category: "",
-      explanation: "",
+      imageFiles: [],
+      imagePreviews: [],
     },
   ]);
 
-  // Fetch courses for /quiz
+  // Fetch subjects for /quiz - Sử dụng environment variable VITE_BASE_API
   useEffect(() => {
     (async () => {
       try {
-        const { courses: list } = await courseService.getAllCourses({ limit: 100 });
-        setCourses(list as Course[]);
-      } catch {
-        setCourses([]);
+        console.log("Fetching subjects from API...");
+        const result = await subjectService.getAllSubjects({ limit: 100 });
+        console.log("Subjects response:", result);
+        setSubjects(result.data || []);
+      } catch (error) {
+        console.error("Error fetching subjects:", error);
+        setSubjects([]);
       }
     })();
   }, []);
 
-  const handlePickCourse = (courseId: string) => {
-    navigate(`/quiz/${courseId}`);
+  const handlePickSubject = (subjectId: string) => {
+    navigate(`/quiz/${subjectId}`);
   };
 
-  const generateExamCode = (course: Course) => {
-    if (typeof course.subjectId !== "object" || !course.subjectId) return "";
-    const subject = course.subjectId;
+  const generateExamCode = (subject: Subject) => {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -85,11 +103,11 @@ export default function QuizManagementPage() {
     return `${subject.code}-${year}${month}${day}-${hours}${minutes}`;
   };
 
-  const handleSelectCourse = (course: Course) => {
-    setSelectedCourse(course);
-    // Auto-generate exam code if subject is available
-    if (typeof course.subjectId === "object" && course.subjectId && !quizDetails.examCode) {
-      const code = generateExamCode(course);
+  const handleSelectSubject = (subject: Subject) => {
+    setSelectedSubject(subject);
+    // Auto-generate exam code
+    if (!quizDetails.examCode) {
+      const code = generateExamCode(subject);
       if (code) {
         setQuizDetails((prev) => ({ ...prev, examCode: code }));
       }
@@ -98,16 +116,16 @@ export default function QuizManagementPage() {
 
   const handleNextStep = () => {
     if (currentStep === 1) {
-      if (!selectedCourse) {
-        alert("Please select a course first");
+      if (!selectedSubject) {
+        showNotification("Subject is required", "error");
         return;
       }
       if (!quizDetails.title.trim()) {
-        alert("Please enter quiz title");
+        showNotification("Quiz Title is required", "error");
         return;
       }
       if (!quizDetails.examCode.trim()) {
-        alert("Please enter exam code");
+        showNotification("Exam Code is required", "error");
         return;
       }
     }
@@ -125,9 +143,8 @@ export default function QuizManagementPage() {
         text: "",
         options: ["", "", "", ""],
         correctOptions: [0, 0, 0, 0],
-        difficulty: "easy",
-        category: "",
-        explanation: "",
+        imageFiles: [],
+        imagePreviews: [],
       },
     ]);
   };
@@ -163,28 +180,92 @@ export default function QuizManagementPage() {
     }
   };
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!selectedCourse || typeof selectedCourse.subjectId !== "object" || !selectedCourse.subjectId) {
-      alert("Please select a course first");
+  const handleQuestionImageChange = (questionIndex: number, fileList: FileList | null, append: boolean = false) => {
+    const files = fileList ? Array.from(fileList) : [];
+    if (!files.length) {
+      if (!append) {
+        setQuestions((prev) => {
+          const updated = [...prev];
+          updated[questionIndex] = {
+            ...updated[questionIndex],
+            imageFiles: [],
+            imagePreviews: [],
+          };
+          return updated;
+        });
+      }
       return;
     }
 
-    const subjectId = typeof selectedCourse.subjectId === "object" ? selectedCourse.subjectId._id : selectedCourse.subjectId;
+    const readers = files.map(
+      (file) =>
+        new Promise<string>((resolve) => {
+          const r = new FileReader();
+          r.onloadend = () => resolve(typeof r.result === "string" ? r.result : "");
+          r.readAsDataURL(file);
+        })
+    );
+
+    Promise.all(readers).then((previews) => {
+      setQuestions((prev) => {
+        const updated = [...prev];
+        const currentQuestion = updated[questionIndex];
+        updated[questionIndex] = {
+          ...updated[questionIndex],
+          imageFiles: append 
+            ? [...currentQuestion.imageFiles, ...files]
+            : files,
+          imagePreviews: append
+            ? [...currentQuestion.imagePreviews, ...previews.filter(Boolean)]
+            : previews.filter(Boolean),
+        };
+        return updated;
+      });
+    });
+  };
+
+  const handleRemoveImageAt = (questionIndex: number, imgIndex: number) => {
+    setQuestions((prev) => {
+      const updated = [...prev];
+      const q = updated[questionIndex];
+      updated[questionIndex] = {
+        ...q,
+        imageFiles: q.imageFiles.filter((_, i) => i !== imgIndex),
+        imagePreviews: q.imagePreviews.filter((_, i) => i !== imgIndex),
+      };
+      return updated;
+    });
+  };
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedSubject) {
+      showNotification("Subject is required", "error");
+      return;
+    }
+
+    const subjectId = selectedSubject._id;
 
     // Validate questions
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
       if (!q.text.trim()) {
-        alert(`Please enter question text for question ${i + 1}`);
+        showNotification(`Question Text is required for Question ${i + 1}`, "error");
         return;
       }
       if (q.options.some((opt) => !opt.trim())) {
-        alert(`Please fill all options for question ${i + 1}`);
+        showNotification(`All options (A, B, C, D) are required for Question ${i + 1}`, "error");
+        return;
+      }
+      // Check for duplicate options
+      const trimmedOptions = q.options.map(opt => opt.trim()).filter(opt => opt !== "");
+      const uniqueOptions = new Set(trimmedOptions);
+      if (uniqueOptions.size !== trimmedOptions.length) {
+        showNotification(`Question ${i + 1}: Options cannot be duplicate. Please enter different values.`, "error");
         return;
       }
       if (!q.correctOptions.includes(1)) {
-        alert(`Please select at least one correct answer for question ${i + 1}`);
+        showNotification(`Please select at least one correct answer for Question ${i + 1}`, "error");
         return;
       }
     }
@@ -230,7 +311,15 @@ export default function QuizManagementPage() {
 
         // Validate arrays
         if (normalizedOptions.length < 2) {
-          alert(`Question ${questions.indexOf(question) + 1}: At least 2 options are required`);
+          showNotification(`Question ${questions.indexOf(question) + 1}: At least 2 options are required`, "error");
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Check for duplicate options
+        const uniqueOptions = new Set(normalizedOptions);
+        if (uniqueOptions.size !== normalizedOptions.length) {
+          showNotification(`Question ${questions.indexOf(question) + 1}: Options cannot be duplicate. Please enter different values.`, "error");
           setIsSubmitting(false);
           return;
         }
@@ -243,43 +332,63 @@ export default function QuizManagementPage() {
         }
 
         if (!normalizedCorrectOptions.includes(1)) {
-          alert(`Question ${questions.indexOf(question) + 1}: At least one correct answer must be selected`);
+          showNotification(`Question ${questions.indexOf(question) + 1}: Please select at least one correct answer`, "error");
           setIsSubmitting(false);
           return;
         }
 
-        const payload = {
-          subjectId,
-          text: question.text.trim(),
-          options: normalizedOptions,
-          correctOptions: normalizedCorrectOptions,
-          explanation: question.explanation?.trim() || undefined,
-          type: "mcq" as const,
-        };
-        
-        console.log("Creating question with payload:", payload);
-        console.log("Options type:", Array.isArray(payload.options) ? "array" : typeof payload.options);
-        console.log("CorrectOptions type:", Array.isArray(payload.correctOptions) ? "array" : typeof payload.correctOptions);
-        
-        const response = await httpClient.post("/quiz-questions", payload);
-        console.log("Question created successfully:", response);
+        const formData = new FormData();
+        formData.append("subjectId", subjectId);
+        formData.append("text", question.text.trim());
+        formData.append("options", JSON.stringify(normalizedOptions));
+        formData.append("correctOptions", JSON.stringify(normalizedCorrectOptions));
+        formData.append("type", "mcq");
+        // Removed explanation
+        if (question.imageFiles && question.imageFiles.length > 0) {
+          for (const f of question.imageFiles) {
+            formData.append("files", f);
+          }
+        }
+
+        console.log("Uploading quiz question with image to:", quizUploadEndpoint);
+
+        const response = await fetch(quizUploadEndpoint, {
+          method: "POST",
+          body: formData,
+        });
+
+        const result = await response.json().catch(() => null);
+
+        if (!response.ok || (result && result.success === false)) {
+          const message =
+            (result && (result.message || result.error?.message)) ||
+            response.statusText ||
+            "Failed to create quiz question";
+          throw new Error(message);
+        }
+
+        console.log("Question created successfully:", result);
       }
-      alert("Quiz questions created successfully!");
+      // Show success notification
+      setShowSuccessNotification(true);
       // Reset form
       setShowCreateModal(false);
       setCurrentStep(1);
-      setSelectedCourse(null);
+      setSelectedSubject(null);
       setQuizDetails({ title: "", description: "", examCode: "" });
       setQuestions([
         {
           text: "",
           options: ["", "", "", ""],
           correctOptions: [0, 0, 0, 0],
-          difficulty: "easy",
-          category: "",
-          explanation: "",
+          imageFiles: [],
+          imagePreviews: [],
         },
       ]);
+      // Auto hide notification after 3 seconds
+      setTimeout(() => {
+        setShowSuccessNotification(false);
+      }, 3000);
     } catch (error: unknown) {
       console.error("Error creating quiz questions:", error);
       let errorMessage = "Failed to create quiz questions";
@@ -292,9 +401,11 @@ export default function QuizManagementPage() {
         
         // Log full error for debugging
         console.error("Full error response:", axiosError.response?.data);
+      } else if (error instanceof Error && error.message) {
+        errorMessage = error.message;
       }
       
-      alert(errorMessage);
+      showNotification(errorMessage, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -303,16 +414,15 @@ export default function QuizManagementPage() {
   const handleCloseModal = () => {
     setShowCreateModal(false);
     setCurrentStep(1);
-    setSelectedCourse(null);
+
     setQuizDetails({ title: "", description: "", examCode: "" });
     setQuestions([
       {
         text: "",
         options: ["", "", "", ""],
         correctOptions: [0, 0, 0, 0],
-        difficulty: "easy",
-        category: "",
-        explanation: "",
+        imageFiles: [],
+        imagePreviews: [],
       },
     ]);
   };
@@ -350,24 +460,24 @@ export default function QuizManagementPage() {
               </button>
             </header>
 
-            {/* Courses list */}
+            {/* Subjects list */}
             <section className="grid gap-6 lg:grid-cols-1">
               <div
                 className="rounded-2xl shadow-md p-6 space-y-4"
                 style={{ backgroundColor: cardBg, border: cardBorder }}
               >
-                <h2 className="text-xl font-semibold">Courses</h2>
-                {courses.length === 0 ? (
+                <h2 className="text-xl font-semibold">Subjects</h2>
+                {subjects.length === 0 ? (
                   <p className="text-sm" style={{ color: labelColor }}>
-                    Không có khoá học nào hoặc chưa tải được.
+                    Không có môn học nào hoặc chưa tải được.
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 gap-4">
-                    {courses.map((c) => {
+                    {subjects.map((subject) => {
                       return (
                         <div
-                          key={c._id}
-                          onClick={() => handlePickCourse(c._id)}
+                          key={subject._id}
+                          onClick={() => handlePickSubject(subject._id)}
                           className="cursor-pointer rounded-2xl px-6 py-5 transition-all"
                           style={{
                             backgroundColor: darkMode ? "rgba(15,23,42,0.6)" : "#ffffff",
@@ -378,7 +488,7 @@ export default function QuizManagementPage() {
                             className="text-xl font-semibold mb-2"
                             style={{ color: textColor }}
                           >
-                            {c.title}
+                            {subject.code} - {subject.name}
                           </h3>
                           <span
                             className="text-sm"
@@ -396,7 +506,7 @@ export default function QuizManagementPage() {
             </section>
 
             {showCreateModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+              <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
                 <div
                   className="absolute inset-0 bg-black/50"
                   onClick={handleCloseModal}
@@ -449,24 +559,23 @@ export default function QuizManagementPage() {
                     </div>
                   </div>
 
-                  <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                  <form onSubmit={handleSubmit} noValidate className="p-6 space-y-6">
                     {currentStep === 1 && (
                       <div className="space-y-6">
                         <h3 className="text-lg font-semibold">Quiz Details</h3>
                         
-                        {/* Course Selection */}
+                        {/* Subject Selection */}
                         <div>
                           <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                            Course <span className="text-red-500">*</span>
+                            Subject <span className="text-red-500">*</span>
                           </label>
                           <div className="grid grid-cols-1 gap-3 max-h-48 overflow-y-auto">
-                            {courses.map((course) => {
-                              const isSelected = selectedCourse?._id === course._id;
-                              const subject = typeof course.subjectId === "object" ? course.subjectId : null;
+                            {subjects.map((subject) => {
+                              const isSelected = selectedSubject?._id === subject._id;
                               return (
                                 <div
-                                  key={course._id}
-                                  onClick={() => handleSelectCourse(course)}
+                                  key={subject._id}
+                                  onClick={() => handleSelectSubject(subject)}
                                   className="cursor-pointer rounded-lg px-4 py-3 transition-all"
                                   style={{
                                     backgroundColor: isSelected
@@ -481,10 +590,10 @@ export default function QuizManagementPage() {
                                       : `1px solid ${inputBorder}`,
                                   }}
                                 >
-                                  <div className="font-semibold">{course.title}</div>
-                                  {subject && (
+                                  <div className="font-semibold">{subject.code} - {subject.name}</div>
+                                  {subject.description && (
                                     <div className="text-xs mt-1" style={{ color: labelColor }}>
-                                      {subject.code} - {subject.name}
+                                      {subject.description}
                                     </div>
                                   )}
                                 </div>
@@ -524,16 +633,16 @@ export default function QuizManagementPage() {
                           />
                         </div>
 
-                        {/* Subject (auto-filled from course) */}
-                        {selectedCourse && typeof selectedCourse.subjectId === "object" && selectedCourse.subjectId && (
+                        {/* Selected Subject (read-only) */}
+                        {selectedSubject && (
                           <div>
                             <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                              Subject <span className="text-red-500">*</span>
+                              Selected Subject <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
                               disabled
-                              value={`${selectedCourse.subjectId.code} - ${selectedCourse.subjectId.name}`}
+                              value={`${selectedSubject.code} - ${selectedSubject.name}`}
                               className="w-full px-4 py-2 rounded-lg"
                               style={{
                                 backgroundColor: darkMode ? "rgba(15,23,42,0.4)" : "#f1f5f9",
@@ -618,12 +727,13 @@ export default function QuizManagementPage() {
                               </label>
                               <textarea
                                 required
-                                value={question.text}
+                                value={question.text || ""}
                                 onChange={(e) => handleUpdateQuestion(qIndex, "text", e.target.value)}
-                                className="w-full px-4 py-2 rounded-lg resize-none"
+                                className="w-full px-4 py-2 rounded-lg resize-y"
                                 style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
                                 rows={3}
                                 placeholder="Enter question text"
+                                disabled={isSubmitting}
                               />
                             </div>
 
@@ -661,51 +771,68 @@ export default function QuizManagementPage() {
                               ))}
                             </div>
 
-                            {/* Difficulty and Category */}
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                                  Difficulty
-                                </label>
-                                <select
-                                  value={question.difficulty}
-                                  onChange={(e) => handleUpdateQuestion(qIndex, "difficulty", e.target.value)}
-                                  className="w-full px-4 py-2 rounded-lg"
-                                  style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
-                                >
-                                  <option value="easy">Easy</option>
-                                  <option value="medium">Medium</option>
-                                  <option value="hard">Hard</option>
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                                  Category
-                                </label>
-                                <input
-                                  type="text"
-                                  value={question.category}
-                                  onChange={(e) => handleUpdateQuestion(qIndex, "category", e.target.value)}
-                                  className="w-full px-4 py-2 rounded-lg"
-                                  style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
-                                  placeholder="e.g. Algorithm"
-                                />
-                              </div>
-                            </div>
+                            {/* Removed Difficulty and Category */}
 
-                            {/* Explanation */}
+                            {/* Removed Explanation */}
+
+                            {/* Image Upload (multiple) */}
                             <div>
                               <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                                Explanation
+                                Question Images
                               </label>
                               <input
-                                type="text"
-                                value={question.explanation}
-                                onChange={(e) => handleUpdateQuestion(qIndex, "explanation", e.target.value)}
-                                className="w-full px-4 py-2 rounded-lg"
-                                style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
-                                placeholder="Explanation for the answer"
+                                ref={(el) => {
+                                  fileInputRefs.current[qIndex] = el;
+                                }}
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                onChange={(e) => {
+                                  handleQuestionImageChange(qIndex, e.target.files, question.imagePreviews.length > 0);
+                                  // Reset input để có thể chọn lại file giống nhau
+                                  if (e.target) {
+                                    e.target.value = '';
+                                  }
+                                }}
+                                className="block w-full text-sm file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border file:border-gray-300 file:bg-transparent"
                               />
+                              {question.imagePreviews.length > 0 && (
+                                <>
+                                  <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    {question.imagePreviews.map((src, imgIdx) => (
+                                      <div key={imgIdx} className="relative">
+                                        <img
+                                          src={src}
+                                          alt={`Question ${qIndex + 1} image ${imgIdx + 1}`}
+                                          className="w-full max-h-40 object-contain rounded-lg border"
+                                          style={{ borderColor: inputBorder, backgroundColor: darkMode ? 'rgba(15,23,42,0.4)' : '#fff' }}
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveImageAt(qIndex, imgIdx)}
+                                          className="absolute top-2 right-2 px-2 py-1 rounded-md text-xs font-semibold"
+                                          style={{ backgroundColor: darkMode ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.15)', color: '#ef4444' }}
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => fileInputRefs.current[qIndex]?.click()}
+                                    className="mt-3 px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-colors"
+                                    style={{
+                                      backgroundColor: darkMode ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.1)",
+                                      color: "#6366f1",
+                                      border: `2px dashed #6366f1`,
+                                    }}
+                                  >
+                                    <ImagePlus className="w-4 h-4" />
+                                    Chọn thêm ảnh
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -755,6 +882,121 @@ export default function QuizManagementPage() {
           </div>
         </main>
       </div>
+
+      {/* Success Notification */}
+      {showSuccessNotification && (
+        <div
+          className="fixed top-20 right-4 z-[150] animate-slide-in-right"
+          style={{
+            animation: "slideInRight 0.3s ease-out",
+          }}
+        >
+          <div
+            className="flex items-center gap-3 px-6 py-4 rounded-xl shadow-lg min-w-[320px]"
+            style={{
+              backgroundColor: darkMode ? "rgba(16,185,129,0.95)" : "#10b981",
+              color: "#ffffff",
+            }}
+          >
+            <CheckCircle className="w-6 h-6 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold">Thành công!</p>
+              <p className="text-sm opacity-90">Đã tạo quiz questions thành công.</p>
+            </div>
+            <button
+              onClick={() => setShowSuccessNotification(false)}
+              className="ml-2 p-1 rounded-full hover:bg-white/20 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Notifications */}
+      <div className="fixed top-20 right-4 z-[200] space-y-2">
+        {notifications.map((notification) => {
+          const getNotificationStyles = () => {
+            switch (notification.type) {
+              case "error":
+                return {
+                  backgroundColor: darkMode ? "rgba(239,68,68,0.95)" : "#ef4444",
+                  color: "#ffffff",
+                };
+              case "warning":
+                return {
+                  backgroundColor: darkMode ? "rgba(245,158,11,0.95)" : "#f59e0b",
+                  color: "#ffffff",
+                };
+              case "success":
+                return {
+                  backgroundColor: darkMode ? "rgba(16,185,129,0.95)" : "#10b981",
+                  color: "#ffffff",
+                };
+              case "info":
+                return {
+                  backgroundColor: darkMode ? "rgba(59,130,246,0.95)" : "#3b82f6",
+                  color: "#ffffff",
+                };
+              default:
+                return {
+                  backgroundColor: darkMode ? "rgba(100,116,139,0.95)" : "#64748b",
+                  color: "#ffffff",
+                };
+            }
+          };
+
+          const getIcon = () => {
+            switch (notification.type) {
+              case "error":
+                return <AlertCircle className="w-5 h-5 flex-shrink-0" />;
+              case "warning":
+                return <AlertCircle className="w-5 h-5 flex-shrink-0" />;
+              case "success":
+                return <CheckCircle className="w-5 h-5 flex-shrink-0" />;
+              case "info":
+                return <Info className="w-5 h-5 flex-shrink-0" />;
+              default:
+                return <Info className="w-5 h-5 flex-shrink-0" />;
+            }
+          };
+
+          return (
+            <div
+              key={notification.id}
+              className="flex items-start gap-3 px-4 py-3 rounded-lg shadow-lg min-w-[320px] max-w-[400px] animate-slide-in-right"
+              style={{
+                ...getNotificationStyles(),
+                animation: "slideInRight 0.3s ease-out",
+              }}
+            >
+              {getIcon()}
+              <div className="flex-1">
+                <p className="text-sm font-medium break-words">{notification.message}</p>
+              </div>
+              <button
+                onClick={() => removeNotification(notification.id)}
+                className="ml-2 p-1 rounded-full hover:bg-white/20 transition-colors flex-shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <style>{`
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `}</style>
     </div>
   );
 }

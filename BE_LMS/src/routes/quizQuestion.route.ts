@@ -1,6 +1,7 @@
 import upload from "@/config/multer";
 import {
   createQuizQuestionHandler,
+  deleteImageHandler,
   deleteMultiQuizQuestionByIdHandler,
   deleteQuizQuestionByIdHandler,
   exportXMLFileHandler,
@@ -8,6 +9,7 @@ import {
   getRandomQuestionsHandler,
   importXMLFileHandler,
   updateQuizQuestionByIdHandler,
+  uploadImagesHandler,
 } from "@/controller/quizQuestion.controller";
 import { authorize } from "@/middleware";
 import { Role } from "@/types";
@@ -26,8 +28,10 @@ quizQuestionRoutes.put(
   upload.array("files"),
   updateQuizQuestionByIdHandler
 );
+quizQuestionRoutes.delete("/image", deleteImageHandler);
 quizQuestionRoutes.delete("/:quizQuestionId", deleteQuizQuestionByIdHandler);
 quizQuestionRoutes.delete("/", deleteMultiQuizQuestionByIdHandler);
 quizQuestionRoutes.get("/random", getRandomQuestionsHandler);
+quizQuestionRoutes.post("/images", upload.array("files"), uploadImagesHandler);
 
 export default quizQuestionRoutes;

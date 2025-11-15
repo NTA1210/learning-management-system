@@ -4,7 +4,8 @@ import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { httpClient } from "../utils/http";
-import { getQuizzesByCourseId, myCourses, type Quiz } from "../services/mock";
+import { myCourses } from "../services/mock";
+import { quizQuestionService, courseService, type QuizQuestion } from "../services";
 import { Clock, FileText, Calendar, CheckCircle, XCircle } from "lucide-react";
 
 interface Course {
@@ -12,6 +13,7 @@ interface Course {
   title: string;
   code?: string;
   description?: string;
+  subjectId?: string | { _id: string; code?: string; name?: string };
 }
 
 interface Enrollment {
@@ -33,6 +35,19 @@ interface ApiResponse {
   };
 }
 
+interface Quiz {
+  _id: string;
+  title: string;
+  description: string;
+  totalQuestions: number;
+  duration: number;
+  maxScore: number;
+  dueDate?: string;
+  startDate?: string;
+  status: string;
+  subjectId?: string;
+}
+
 const QuizPage: React.FC = () => {
   const { darkMode } = useTheme();
   const { user } = useAuth();
@@ -49,13 +64,79 @@ const QuizPage: React.FC = () => {
 
   useEffect(() => {
     if (selectedCourseId) {
-      // Load quizzes for selected course (using mock data for now)
-      const courseQuizzes = getQuizzesByCourseId(selectedCourseId);
-      setQuizzes(courseQuizzes);
+      fetchQuizzesForCourse(selectedCourseId);
     } else {
       setQuizzes([]);
     }
   }, [selectedCourseId]);
+
+  const fetchQuizzesForCourse = async (courseId: string) => {
+    try {
+      console.log("QuizPage: Fetching quizzes for courseId:", courseId);
+      
+      // Get course info to get subjectId
+      const courseData = await courseService.getCourseById(courseId);
+      console.log("QuizPage: Course loaded:", courseData);
+      
+      // Cast to Course interface with subjectId
+      const course = courseData as Course & { subjectId?: string | { _id: string; code?: string; name?: string } };
+      
+      // Get subjectId from course
+      const subjectId = typeof course.subjectId === "object" && course.subjectId 
+        ? course.subjectId._id 
+        : typeof course.subjectId === "string" 
+        ? course.subjectId 
+        : null;
+      
+      if (!subjectId) {
+        console.warn("QuizPage: No subjectId found for course:", courseId);
+        setQuizzes([]);
+        return;
+      }
+      
+      console.log("QuizPage: Fetching quiz questions for subjectId:", subjectId);
+      
+      // Fetch all quiz questions for this subject
+      const result = await quizQuestionService.getAllQuizQuestions({
+        limit: 1000,
+      });
+      
+      console.log("QuizPage: All quiz questions:", result);
+      
+      // Filter questions by subjectId
+      const subjectQuestions = (result.data || []).filter((q: QuizQuestion) => {
+        const qSubjectId = typeof q.subjectId === "object" ? q.subjectId._id : q.subjectId;
+        return qSubjectId === subjectId;
+      });
+      
+      console.log("QuizPage: Filtered questions for subject:", subjectQuestions.length);
+      
+      // Group questions and create Quiz objects
+      // For now, create one Quiz per subject with all questions
+      if (subjectQuestions.length > 0) {
+        const totalPoints = subjectQuestions.reduce((sum, q) => sum + (q.points || 0), 0);
+        const estimatedDuration = Math.ceil(subjectQuestions.length * 2); // 2 minutes per question
+        
+        const quiz: Quiz = {
+          _id: `quiz-${subjectId}`,
+          title: `${course.title} - Quiz`,
+          description: `Quiz containing ${subjectQuestions.length} questions`,
+          totalQuestions: subjectQuestions.length,
+          duration: estimatedDuration,
+          maxScore: totalPoints,
+          status: "published",
+          subjectId: subjectId,
+        };
+        
+        setQuizzes([quiz]);
+      } else {
+        setQuizzes([]);
+      }
+    } catch (error) {
+      console.error("QuizPage: Error fetching quizzes:", error);
+      setQuizzes([]);
+    }
+  };
 
   const fetchMyEnrollments = async () => {
     setLoading(true);

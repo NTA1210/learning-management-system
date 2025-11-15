@@ -1,5 +1,5 @@
 import { isDateInFuture } from "@/utils/date";
-import z from "zod";
+import z, { ZodError } from "zod";
 
 export const datePreprocess = z
   .preprocess((val) => {
@@ -8,7 +8,7 @@ export const datePreprocess = z
       if (!isNaN(date.getTime())) return date; // valid date
     }
     return undefined;
-  }, z.date().optional())
+  }, z.date())
   .refine(
     (val) => {
       if (!val) return true;

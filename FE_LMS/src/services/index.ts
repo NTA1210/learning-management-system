@@ -6,6 +6,7 @@ export * from './mock';
 export * from './courseService';
 export * from './enrollmentService';
 export * from './quizQuestionService';
+export * from './subjectService';
 
 // storage keys
 const USER_STORAGE_KEY = 'lms:user';
