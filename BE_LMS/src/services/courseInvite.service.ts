@@ -308,16 +308,22 @@ export const listCourseInvites = async (
   };
 };
 
-/**
- * Yêu cầu nghiệp vụ:
- * - Teacher/Admin cập nhật thông tin invite link (isActive, expiresAt, maxUses)
- * - Chỉ teacher của khóa học hoặc admin mới được cập nhật invite
- * - Nếu cập nhật expiresInDays → tính lại expiresAt dựa trên ngày hiện tại
- * - Nếu cập nhật maxUses → phải >= usedCount hiện tại (không được giảm xuống dưới số lần đã dùng)
- * - Nếu cập nhật isActive = false → vô hiệu hóa invite, không thể dùng nữa
+/** 
+ * Yêu cầu nghiệp vụ: Cập nhật thông tin invite link
  * 
- * Input: inviteId (string), data (TUpdateCourseInvite), updatedBy (userId)
- * Output: invite record đã được cập nhật
+ * Authorization:
+ * - Chỉ teacher của khóa học hoặc admin mới được cập nhật
+ * 
+ * Business Rules:
+ * 1. expiresInDays: Tính lại expiresAt = now + expiresInDays (days)
+ * 2. maxUses: Phải >= usedCount hiện tại, cho phép null (unlimited)
+ * 3. isActive = false: Vô hiệu hóa invite
+ * 4. isActive = true: Kích hoạt invite nếu thỏa mãn:
+ *    - Chưa hết hạn (expiresAt > now) OR đang update expiresInDays
+ *    - Chưa hết lượt (usedCount < maxUses) OR đang update maxUses
+ * 
+ * Input: inviteId, data { isActive?, expiresInDays?, maxUses? }, updatedBy
+ * Output: Updated invite record
  */
 export const updateCourseInvite = async (
   inviteId: string,
