@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createCourseInviteHandler, joinCourseInviteHandler } from "@/controller/courseInvite.controller";
+import { createCourseInviteHandler, joinCourseInviteHandler, listCourseInvitesHandler } from "@/controller/courseInvite.controller";
 import { authorize } from "@/middleware";
 import { Role } from "@/types";
 
@@ -28,3 +28,14 @@ courseInviteRoutes.post(
 );
 
 export default courseInviteRoutes;
+
+/**
+ * GET /course-invites
+ * Lấy danh sách các lời mời tham gia khóa học
+ * Chỉ Teacher/Admin
+ */
+courseInviteRoutes.get(
+  "/",
+  authorize(Role.TEACHER, Role.ADMIN),
+  listCourseInvitesHandler
+);

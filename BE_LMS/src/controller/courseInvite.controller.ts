@@ -20,6 +20,11 @@ export const createCourseInviteHandler = catchErrors(async (req, res) => {
   });
 });
 
+/**
+ * GET /course-invites
+ * Lấy danh sách các lời mời tham gia khóa học
+ * Chỉ Teacher/Admin
+ */
 export const joinCourseInviteHandler = catchErrors(async (req, res) => {
   const request = joinCourseInviteSchema.parse(req.body);
   const userId = req.userId!.toString();
@@ -30,3 +35,25 @@ export const joinCourseInviteHandler = catchErrors(async (req, res) => {
     message: result.message,
   });
 })
+
+/**
+ * GET /course-invites
+ * Lấy danh sách các lời mời tham gia khóa học
+ * Chỉ Teacher/Admin
+ */
+import { listCourseInvitesSchema } from "@/validators/courseInvite.schemas";
+import { listCourseInvites } from "@/services/courseInvite.service";
+
+export const listCourseInvitesHandler = catchErrors(async (req, res) => {
+  const query = listCourseInvitesSchema.parse(req.query);
+  const viewerId = req.userId!.toString();
+  const viewerRole = req.role!;
+
+  const result = await listCourseInvites(query, viewerId, viewerRole);
+
+  return res.success(OK, {
+    data: result.invites,
+    pagination: result.pagination,
+    message: "Course invites retrieved successfully",
+  });
+});
