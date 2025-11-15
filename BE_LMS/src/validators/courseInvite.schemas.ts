@@ -1,5 +1,6 @@
 import z from "zod";
 import {EMAIL_REGEX} from "@/constants/regex";
+import { datePreprocess } from "./helpers/date.schema";
 // Schema để tạo invite link
 export const createCourseInviteSchema = z.object({
   courseId: z.string().length(24, "Invalid courseId format"),
@@ -37,10 +38,37 @@ export const listCourseInvitesSchema = z.object({
   courseId: z
   .string()
   .length(24, "Invalid Course Format")
-  .optional,
+  .optional(),
   invitedEmail: z
   .string()
   .optional(),
   isActive: z
-  // .enum([true, false]),
+  .enum(["true", "false"])
+  .transform((val) => val === "true")
+  .optional(),
+  page: z 
+  .coerce.number()
+  .int().min(1)
+  .default(1),
+  limit: z
+  .coerce.number()
+  .int()
+  .min(1)
+  .max(100)
+  .default(10),
+  from: datePreprocess,
+  to: datePreprocess,
 })
+.refine(
+  (val) => {
+    if (val.from && val.to) {
+      return val.from.getTime() <= val.to.getTime();
+    }
+    return true;
+  },
+  {
+    message: "From date must be less than or equal to To date",
+    path: ["to"],
+  }
+)
+export type TListCourseInvite = z.infer<typeof listCourseInvitesSchema>;

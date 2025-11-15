@@ -9,7 +9,9 @@ import { CourseInviteModel, CourseModel, UserModel, EnrollmentModel } from "@/mo
 import { Role, EnrollmentStatus, EnrollmentMethod} from "@/types";
 import appAssert from "@/utils/appAssert";
 import { APP_ORIGIN } from "@/constants/env";
-import { TCreateCourseInvite } from "@/validators/courseInvite.schemas";
+import { TCreateCourseInvite, TListCourseInvite } from "@/validators/courseInvite.schemas";
+import ICourseInvite from "@/types/courseInvite.type";
+import { FilterQuery } from "mongoose";
 
 /**
  * Yêu cầu nghiệp vụ:
@@ -212,9 +214,96 @@ export const joinCourseByInvite = async (token: string, userId: string) => {
     alreadyEnrolled: false,
     invitedEmail: invite.invitedEmail,
   }
-
 }
 
+  /**
+   * Yêu cầu nghiệp vụ:
+   * - Lấy danh sách các lời mời tham gia khóa học (course invites) dựa trên filter đầu vào.
+   * - Chỉ cho phép giáo viên (instructor), trợ giảng (teaching assistant) hoặc admin của khóa học xem danh sách này.
+   * - Hỗ trợ filter theo: courseId, invitedEmail, isActive, phân trang (page, limit).
+   * - Nếu là admin site/ hệ thống thì được phép query tất cả lời mời.
+   * - Nếu là giáo viên/trợ giảng thì chỉ query được lời mời của các khóa học do mình quản lý (ít nhất là instructor/course admin).
+   * 
+   * Input:
+   *   - query: object chứa các filter (courseId?, invitedEmail?, isActive?, page, limit)
+   *   - viewerId: id người dùng thực hiện (string)
+   *   - viewerRole: vai trò của người dùng thực hiện (Role)
+   * Output:
+   *   - Trả về danh sách course invites cùng pagination info
+   * Trường hợp đặc biệt:
+   *   - Nếu không có quyền truy cập → trả lỗi FORBIDDEN
+   */
 
+export const listCourseInvites = async (
+  query: TListCourseInvite,
+  viewerId: string,
+  viewerRole: Role,
+) => {
+  const { courseId, invitedEmail, isActive, page, limit, from, to } = query;
+// Build filter query
+  const filter: FilterQuery<ICourseInvite> = {};
+  // Filter by courseId
+  if(courseId) {
+    filter.courseId = courseId;
+  }
+  // Filter by invitedEmail
+  if(invitedEmail) {
+    filter.invitedEmail = { $regex: invitedEmail, $options: "i" };
+  }
+  // Filter by isActive
+  if(isActive !== undefined) {
+    filter.isActive = isActive;
+  }
+  // Filter by date range
+  if (from || to) {
+    filter.createdAt = {};
+    if (from) filter.createdAt.$gte = from;
+    if (to) filter.createdAt.$lte = to;
+  }
+  // Teacher chỉ xem được invite thuộc các khóa học họ dạy
+  if (viewerRole === Role.TEACHER) {
+    const teacherCourses = await CourseModel.find({ teacherIds: viewerId }).select("_id"); //lấy id của khóa học họ dạy(1)
+    const allowedCourseIds = teacherCourses.map((course) => course._id); //lấy ra list id của khóa học họ dạy(all)
+    // nếu courseId được cung cấp, chỉ xem invite của khóa học đó
+    // nếu không, xem tất cả invites của khóa học họ dạy
+    filter.courseId = courseId
+      ? courseId
+      : { $in: allowedCourseIds };
+  }
+  // Calculate pagination
+  const skip = (page - 1) * limit;
+  // 
+  const [invites, total] = await Promise.all([
+    CourseInviteModel.find(filter)
+      .populate("courseId", "title isPublished")
+      .populate("createdBy", "username email")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    CourseInviteModel.countDocuments(filter),
+  ]);
 
+  const results = invites.map((invite) => ({
+    id: invite._id,
+    course: invite.courseId,
+    invitedEmail: invite.invitedEmail,
+    maxUses: invite.maxUses,
+    usedCount: invite.usedCount,
+    expiresAt: invite.expiresAt,
+    isActive: invite.isActive,
+    createdAt: invite.createdAt,
+    createdBy: invite.createdBy,
+  }));
 
+  return {
+    invites: results,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasNext: skip + results.length < total,
+      hasPrev: page > 1,
+    },
+  };
+};
