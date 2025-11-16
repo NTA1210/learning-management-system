@@ -86,6 +86,8 @@ export const getStudentEnrollments = async (filters: {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+      hasNext: skip + enrollments.length < total,
+      hasPrev: page > 1,
     },
   };
 };
@@ -151,6 +153,8 @@ export const getCourseEnrollments = async (filters: {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+      hasNext: skip + enrollments.length < total,
+      hasPrev: page > 1,
     },
   };
 };
@@ -214,6 +218,8 @@ export const getAllEnrollments = async (filters: {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+      hasNext: skip + enrollments.length < total,
+      hasPrev: page > 1,
     },
   };
 };
