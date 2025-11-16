@@ -20,6 +20,12 @@ const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
       required: true,
       index: true,
     },
+    classId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Class",
+      required: true,
+      index: true,
+    },
     status: {
       type: String,
       enum: [
@@ -65,9 +71,14 @@ const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
 );
 
 //indexes
+// One student can only enroll in one class per course (not multiple classes of same course)
 EnrollmentSchema.index({ studentId: 1, courseId: 1 }, { unique: true });
+// But they enroll in a specific class
+EnrollmentSchema.index({ studentId: 1, classId: 1 }, { unique: true });
 EnrollmentSchema.index({ studentId: 1, courseId: 1, status: 1 });
 EnrollmentSchema.index({ studentId: 1, status: 1 });
+// Find all enrollments for a specific class
+EnrollmentSchema.index({ classId: 1, status: 1 });
 
 const EnrollmentModel = mongoose.model<IEnrollment>(
   "Enrollment",
