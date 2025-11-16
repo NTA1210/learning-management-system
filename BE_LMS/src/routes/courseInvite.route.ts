@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createCourseInviteHandler, joinCourseInviteHandler, listCourseInvitesHandler } from "@/controller/courseInvite.controller";
+import { createCourseInviteHandler, joinCourseInviteHandler, listCourseInvitesHandler, updateCourseInviteHandler } from "@/controller/courseInvite.controller";
 import { authorize } from "@/middleware";
 import { Role } from "@/types";
 
@@ -38,4 +38,15 @@ courseInviteRoutes.get(
   "/",
   authorize(Role.TEACHER, Role.ADMIN),
   listCourseInvitesHandler
+);
+
+/**
+ * PATCH /course-invites/:id
+ * Cập nhật thông tin invite link
+ * Chỉ Teacher/Admin
+ */
+courseInviteRoutes.patch(
+  "/:id",
+  authorize(Role.TEACHER, Role.ADMIN),
+  updateCourseInviteHandler 
 );

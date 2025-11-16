@@ -72,3 +72,34 @@ export const listCourseInvitesSchema = z.object({
   }
 )
 export type TListCourseInvite = z.infer<typeof listCourseInvitesSchema>;
+
+// Schema để cập nhật invite link
+export const updateCourseInviteSchema = z.object({
+  isActive: z
+    .union([
+      z.boolean(),
+      z.string().transform((val) => val === "true" || val === "1"),
+    ])
+    .optional(),
+  expiresInDays: z
+    .number()
+    .int()
+    .min(1, "Expires must be at least 1 day")
+    .max(365, "Expires cannot exceed 365 days")
+    .optional(),
+  maxUses: z
+    .number()
+    .int()
+    .min(1, "Max uses must be at least 1")
+    .nullable()
+    .optional(),
+});
+
+export type TUpdateCourseInvite = z.infer<typeof updateCourseInviteSchema>;
+
+// Schema để validate inviteId trong params
+export const courseInviteIdSchema = z.object({
+  id: z.string().length(24, "Invalid invite ID format"),
+});
+
+export type TCourseInviteId = z.infer<typeof courseInviteIdSchema>;
