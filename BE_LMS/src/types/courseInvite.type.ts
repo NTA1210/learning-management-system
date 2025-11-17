@@ -10,6 +10,10 @@ export default interface ICourseInvite
   usedCount: number;
   expiresAt: Date;
   isActive: boolean; // Có thể disable link mà không cần xóa
+  // Soft delete fields
+  isDeleted: boolean; // Đánh dấu xóa vĩnh viễn (không thể enable lại)
+  deletedAt: Date | null;
+  deletedBy: mongoose.Types.ObjectId | null; // User xóa invite
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import mongoose from "mongoose";
 import {
   BAD_REQUEST,
   FORBIDDEN,
@@ -154,6 +155,13 @@ export const joinCourseByInvite = async (token: string, userId: string) => {
 
   appAssert(invite, NOT_FOUND, "Invalid or expired invite link");
 
+  //Check deleted, chặn sử dụng link đã xóa
+  appAssert(
+    !invite.isDeleted,
+    BAD_REQUEST,
+    "This invite link has been deleted"
+  );
+
   //ktra active === true
   appAssert(invite.isActive, BAD_REQUEST, "This invite link is no longer active");
 
@@ -241,7 +249,9 @@ export const listCourseInvites = async (
 ) => {
   const { courseId, invitedEmail, isActive, page, limit, from, to } = query;
 // Build filter query
-  const filter: FilterQuery<ICourseInvite> = {};
+  const filter: FilterQuery<ICourseInvite> = {
+    isDeleted: false, //Mặc định ẩn invite đã xóa
+  };
   // Filter by courseId
   if(courseId) {
     filter.courseId = courseId;
@@ -337,6 +347,13 @@ export const updateCourseInvite = async (
   );
   appAssert(invite, NOT_FOUND, "Course invite not found");
 
+  //CRITICAL: Không cho phép update invite đã xóa
+  appAssert(
+    !invite.isDeleted,
+    BAD_REQUEST,
+    "Cannot update deleted invite. Please create a new one."
+  );
+
   // Kiểm tra quyền: chỉ teacher của khóa học hoặc admin mới cập nhật được
   const user = await UserModel.findById(updatedBy);
   appAssert(user, NOT_FOUND, "User not found");
@@ -417,5 +434,75 @@ export const updateCourseInvite = async (
     isActive: updatedInvite.isActive,
     createdAt: updatedInvite.createdAt,
     updatedAt: updatedInvite.updatedAt,
+  };
+};
+
+/**
+ * Yêu cầu nghiệp vụ: Xóa invite link vĩnh viễn
+ * 
+ * Khác biệt với PATCH disable:
+ * - PATCH disable: Tạm ngưng, có thể enable lại bất cứ lúc nào
+ * - DELETE: Xóa vĩnh viễn, KHÔNG THỂ enable lại, ẩn khỏi danh sách
+ * 
+ * Business Rules:
+ * 1. Chỉ teacher của course hoặc admin mới được xóa
+ * 2. Invite đã xóa (isDeleted=true) không thể:
+ *    - Enable lại (kể cả PATCH)
+ *    - Sử dụng token để join course
+ *    - Hiển thị trong list (mặc định)
+ * 3. Invite đã xóa vẫn:
+ *    - Tồn tại trong DB (soft delete)
+ *    - Giữ history và statistics (usedCount, invitedEmails)
+ *    - Có thể xem qua query đặc biệt (với param includeDeleted=true)
+ * 4. Có thể xóa invite ở bất kỳ trạng thái nào (active/inactive)
+ * 
+ * Input: inviteId, userId
+ * Output: Success message
+ */
+export const deleteCourseInvite = async (
+  inviteId: string,
+  userId: string
+) => {
+  // 1. Tìm invite
+  const invite = await CourseInviteModel.findById(inviteId).populate(
+    "courseId",
+    "title teacherIds"
+  );
+  appAssert(invite, NOT_FOUND, "Course invite not found");
+
+  // 2. Kiểm tra quyền (same as PATCH)
+  const user = await UserModel.findById(userId);
+  appAssert(user, NOT_FOUND, "User not found");
+
+  if (user.role !== Role.ADMIN) {
+    const course = invite.courseId as any;
+    const isTeacherOfCourse = course.teacherIds.some(
+      (teacherId: any) => teacherId.toString() === userId
+    );
+    appAssert(
+      isTeacherOfCourse,
+      FORBIDDEN,
+      "Only course teachers or admin can delete invite links"
+    );
+  }
+
+  // 3. Kiểm tra đã xóa chưa (idempotent - không throw error)
+  if (invite.isDeleted) {
+    return {
+      message: "Invite already deleted",
+      deletedAt: invite.deletedAt,
+    };
+  }
+         
+  // 4. Soft delete - đánh dấu xóa
+  invite.isDeleted = true;
+  invite.isActive = false; // Auto disable khi xóa
+  invite.deletedAt = new Date();
+  invite.deletedBy = new mongoose.Types.ObjectId(userId);
+  await invite.save();
+
+  return {
+    message: "Invite deleted successfully",
+    deletedAt: invite.deletedAt,
   };
 };

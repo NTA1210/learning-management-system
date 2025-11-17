@@ -1,7 +1,7 @@
 import { CREATED, OK } from "@/constants/http";
 import { catchErrors } from "@/utils/asyncHandler";
 import { courseInviteIdSchema, createCourseInviteSchema, updateCourseInviteSchema, joinCourseInviteSchema } from "@/validators/courseInvite.schemas";
-import { createCourseInvite, joinCourseByInvite, updateCourseInvite } from "@/services/courseInvite.service";
+import { createCourseInvite, joinCourseByInvite, updateCourseInvite, deleteCourseInvite } from "@/services/courseInvite.service";
 
 /**
  * POST /course-invites
@@ -73,5 +73,22 @@ export const updateCourseInviteHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     data: result,
     message: "Course invite updated successfully",
+  });
+});
+
+/**
+ * DELETE /course-invites/:id
+ * Xóa invite link vĩnh viễn (soft delete)
+ * Chỉ Teacher/Admin
+ */
+export const deleteCourseInviteHandler = catchErrors(async (req, res) => {
+  const { id } = courseInviteIdSchema.parse(req.params);
+  const userId = req.userId!.toString();
+
+  const result = await deleteCourseInvite(id, userId);
+
+  return res.success(OK, {
+    data: result,
+    message: result.message,
   });
 });
