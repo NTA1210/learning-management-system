@@ -10,22 +10,22 @@ import authenticate from "@/middleware/authenticate";
 import authorize from "@/middleware/authorize";
 import { Role } from "../types";
 
-const lessonRouter = Router();
+const lessonRoutes = Router();
 
 // prefix: /lesson
 
 // Protected routes (require authentication)
 // GET /lesson - List Lesson (search/lọc/phân trang)
-lessonRouter.get("/", authenticate, listAllLessons);
+lessonRoutes.get("/", authenticate, listAllLessons);
 // GET /lesson/id/:id - Chi tiết Lesson theo ID
-lessonRouter.get("/:id", authenticate, getLessonByIdController);
+lessonRoutes.get("/:id", authenticate, getLessonByIdController);
 
 // Protected routes (require authentication + admin/teacher role)
 // POST /lesson - Tạo Lesson (Admin/Teacher only)
-lessonRouter.post("/", authenticate, authorize(Role.TEACHER, Role.ADMIN), createLesson);
+lessonRoutes.post("/", authenticate, authorize(Role.TEACHER, Role.ADMIN), createLesson);
 // PUT /lesson/id/:id - Cập nhật theo ID (Admin/Teacher only)
-lessonRouter.put("/:id", authenticate, authorize(Role.TEACHER, Role.ADMIN), updateLesson);
+lessonRoutes.put("/:id", authenticate, authorize(Role.TEACHER, Role.ADMIN), updateLesson);
 // DELETE /lesson/id/:id - Xóa theo ID (Admin/Teacher only)
-lessonRouter.delete("/:id", authenticate, authorize(Role.TEACHER, Role.ADMIN), deleteLesson);
+lessonRoutes.delete("/:id", authenticate, authorize(Role.TEACHER, Role.ADMIN), deleteLesson);
 
-export default lessonRouter;
+export default lessonRoutes;
