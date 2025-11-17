@@ -23,7 +23,7 @@ const lessonMaterialRouters = Router();
 // GET /lesson-material - List Lesson Material (search/lọc/phân trang)
 lessonMaterialRouters.get("/", authenticate, listAllLessonMaterialsController);
 // GET /lesson-material/lesson/:lessonId - Lấy theo lessonId
-lessonMaterialRouters.get("/lesson/:lessonId", authenticate, getLessonMaterialsByLessonController);
+lessonMaterialRouters.get("/lessons/:lessonId", authenticate, getLessonMaterialsByLessonController);
 // GET /lesson-material/id/:id - Chi tiết Lesson Material theo ID
 lessonMaterialRouters.get("/:id", authenticate, getLessonMaterialByIdController);
 // GET /lesson-material/id/:id/download - Chuẩn bị tải xuống

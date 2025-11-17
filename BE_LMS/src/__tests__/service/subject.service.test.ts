@@ -884,6 +884,19 @@ describe("📖 Subject Service Unit Tests", () => {
         deleteSubjectBySlug("test-subject", teacherId, Role.TEACHER)
       ).rejects.toThrow("Teacher must be assigned to at least one specialist");
     });
+
+    it("should throw error when courses reference subject slug", async () => {
+      const teacherId = new mongoose.Types.ObjectId().toString();
+      (SubjectModel.findOne as jest.Mock).mockResolvedValue(subject);
+      (UserModel.findById as jest.Mock).mockReturnValue(
+        mockUserLean({ specialistIds: subject.specialistIds })
+      );
+      (CourseModel.countDocuments as jest.Mock).mockResolvedValue(2);
+
+      await expect(
+        deleteSubjectBySlug(subject.slug, teacherId, Role.TEACHER)
+      ).rejects.toThrow("Cannot delete subject. 2 courses are using this subject.");
+    });
   });
 
   describe("activateSubjectById", () => {
@@ -1164,6 +1177,21 @@ describe("📖 Subject Service Unit Tests", () => {
 
       expect(result).toBeDefined();
       expect(Array.isArray(result)).toBe(true);
+    });
+
+    it("should build regex filter when query provided", async () => {
+      const mockQuery = {
+        select: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([]),
+      };
+      (SubjectModel.find as jest.Mock).mockImplementation((filter: any) => {
+        expect(filter.$or).toBeDefined();
+        expect(filter.$or).toHaveLength(3);
+        return mockQuery;
+      });
+
+      await searchSubjectsAutocomplete("math", 5);
     });
   });
 

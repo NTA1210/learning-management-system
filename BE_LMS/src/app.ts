@@ -79,8 +79,8 @@ export const createApp = () => {
   app.use("/courses", courseRoutes);
   app.use("/assignments", assignmentRoutes);
   app.use("/submissions", submissionRoutes);
-  app.use("/lesson", lessonRoutes);
-  app.use("/lesson-material", lessonMaterialRoutes);
+  app.use("/lessons", lessonRoutes);
+  app.use("/lesson-materials", lessonMaterialRoutes);
   app.use("/lesson-progress", lessonProgressRoutes);
   app.use("/majors", majorPublicRoutes);
   app.use("/specialists", specialistPublicRoutes);

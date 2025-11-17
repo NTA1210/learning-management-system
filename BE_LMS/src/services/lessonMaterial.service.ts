@@ -26,7 +26,7 @@ import { removeDirAndFiles } from "minio";
  * - TEACHER: xem tài liệu mình upload hoặc thuộc course mình dạy.
  * - ADMIN: xem tất cả.
  */
-export const getLessonMaterials = async (query: any, userId?: string, userRole?: Role) => {
+export const getLessonMaterials = async (query: any, userId: mongoose.Types.ObjectId, userRole?: Role) => {
   const filter: any = {};
   const { from, to } = query;
   
@@ -214,7 +214,7 @@ export const getLessonMaterials = async (query: any, userId?: string, userRole?:
       accessReason = 'admin';
     } else if (userRole === Role.TEACHER) {
       // Check if teacher uploaded this material or is instructor of the lesson's course
-      const isUploader = material.uploadedBy && material.uploadedBy._id.toString() === userId;
+      const isUploader = material.uploadedBy && material.uploadedBy._id === userId;
       const lesson = await LessonModel.findById(material.lessonId).populate('courseId', 'teacherIds');
       const isInstructor = lesson && (lesson.courseId as any).teacherIds.includes(new mongoose.Types.ObjectId(userId));
       
@@ -241,7 +241,7 @@ export const getLessonMaterials = async (query: any, userId?: string, userRole?:
     // Skip manual materials (key starts with 'manual-materials/') as they don't have files in MinIO
     let signedUrl = undefined;
     if (hasAccess && material.key && !material.key.startsWith('manual-materials/')) {
-      signedUrl = await getSignedUrl(material.key, 24 * 60 * 60, material.originalName || '');
+      signedUrl = await getSignedUrl(material.key, material.originalName || '');
     }
 
     return {
@@ -272,7 +272,7 @@ export const getLessonMaterials = async (query: any, userId?: string, userRole?:
  * - TEACHER: nếu là giảng viên course thì xem tất cả, nếu không chỉ xem tài liệu do mình upload.
  * - ADMIN: xem tất cả.
  */
-export const getLessonMaterialsByLesson = async (lessonId: string, userId?: string, userRole?: Role) => {
+export const getLessonMaterialsByLesson = async (lessonId: string, userId: mongoose.Types.ObjectId, userRole?: Role) => {
   // Validate lessonId
   if (!mongoose.Types.ObjectId.isValid(lessonId)) {
     appAssert(false, NOT_FOUND, "Invalid lesson ID format");
@@ -304,7 +304,7 @@ export const getLessonMaterialsByLesson = async (lessonId: string, userId?: stri
     const materialsWithUrls = await Promise.all(materials.map(async (material) => {
       let signedUrl = undefined;
       if (material.key) {
-        signedUrl = await getSignedUrl(material.key, 24 * 60 * 60, material.originalName || '');
+        signedUrl = await getSignedUrl(material.key, material.originalName || '');
       }
       return {
         ...material,
@@ -331,7 +331,7 @@ export const getLessonMaterialsByLesson = async (lessonId: string, userId?: stri
       const materialsWithUrls = await Promise.all(materials.map(async (material) => {
         let signedUrl = undefined;
         if (material.key) {
-          signedUrl = await getSignedUrl(material.key, 24 * 60 * 60, material.originalName || '');
+          signedUrl = await getSignedUrl(material.key, material.originalName || '');
         }
         return {
           ...material,
@@ -356,7 +356,7 @@ export const getLessonMaterialsByLesson = async (lessonId: string, userId?: stri
       const materialsWithUrls = await Promise.all(materials.map(async (material) => {
         let signedUrl = undefined;
         if (material.key) {
-          signedUrl = await getSignedUrl(material.key, 24 * 60 * 60, material.originalName || '');
+          signedUrl = await getSignedUrl(material.key, material.originalName || '');
         }
         return {
           ...material,
@@ -380,7 +380,7 @@ export const getLessonMaterialsByLesson = async (lessonId: string, userId?: stri
     const materialsWithUrls = await Promise.all(materials.map(async (material) => {
       let signedUrl = undefined;
       if (material.key) {
-        signedUrl = await getSignedUrl(material.key, 24 * 60 * 60, material.originalName || '');
+        signedUrl = await getSignedUrl(material.key,material.originalName || '');
       }
       return {
         ...material,
@@ -404,7 +404,7 @@ export const getLessonMaterialsByLesson = async (lessonId: string, userId?: stri
  * - STUDENT: chỉ xem nếu đã ghi danh course.
  * - ADMIN: xem tất cả.
  */
-export const getLessonMaterialById = async (id: string, userId?: string, userRole?: Role) => {
+export const getLessonMaterialById = async (id: string, userId:mongoose.Types.ObjectId, userRole?: Role) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     appAssert(false, NOT_FOUND, "Invalid material ID format");
   }
@@ -425,7 +425,7 @@ export const getLessonMaterialById = async (id: string, userId?: string, userRol
     accessReason = 'admin';
   } else if (userRole === Role.TEACHER) {
     // Check if teacher uploaded this material or is instructor of the lesson's course
-    const isUploader = material.uploadedBy && material.uploadedBy._id.toString() === userId;
+    const isUploader = material.uploadedBy && material.uploadedBy._id === userId;
     const lesson = await LessonModel.findById(material.lessonId).populate('courseId', 'teacherIds');
     const isInstructor = lesson && (lesson.courseId as any).teacherIds.includes(new mongoose.Types.ObjectId(userId));
     
@@ -463,7 +463,7 @@ export const getLessonMaterialById = async (id: string, userId?: string, userRol
   // Skip manual materials (key starts with 'manual-materials/') as they don't have files in MinIO
   let signedUrl = undefined;
   if (material.key && !material.key.startsWith('manual-materials/')) {
-    signedUrl = await getSignedUrl(material.key, 24 * 60 * 60, material.originalName || '');
+    signedUrl = await getSignedUrl(material.key, material.originalName || '');
   }
 
   return {
@@ -481,7 +481,7 @@ export const getLessonMaterialById = async (id: string, userId?: string, userRol
  * - TEACHER phải là giảng viên của course chứa lesson.
  * - Tiêu đề không trùng trong cùng một lesson.
  */
-export const createLessonMaterial = async (data: CreateLessonMaterialParams, userId: string, userRole: Role) => {
+export const createLessonMaterial = async (data: CreateLessonMaterialParams, userId:mongoose.Types.ObjectId, userRole: Role) => {
   // Validate lesson exists
   const lesson = await LessonModel.findById(data.lessonId).populate('courseId', 'teacherIds');
   appAssert(lesson, NOT_FOUND, "Lesson not found");
@@ -544,7 +544,7 @@ export const createLessonMaterial = async (data: CreateLessonMaterialParams, use
  * - TEACHER: phải là người upload hoặc giảng viên course của lesson.
  * - Nếu đổi title, phải không trùng trong cùng lesson.
  */
-export const updateLessonMaterial = async (id: string, data: Partial<CreateLessonMaterialParams>, userId: string, userRole: Role) => {
+export const updateLessonMaterial = async (id: string, data: Partial<CreateLessonMaterialParams>, userId:mongoose.Types.ObjectId, userRole: Role) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     appAssert(false, NOT_FOUND, "Invalid material ID format");
   }
@@ -557,7 +557,7 @@ export const updateLessonMaterial = async (id: string, data: Partial<CreateLesso
     appAssert(false, FORBIDDEN, "Students cannot update lesson materials");
   } else if (userRole === Role.TEACHER) {
     // Check if teacher uploaded this material or is instructor of the lesson's course
-    const isUploader = material.uploadedBy && material.uploadedBy.toString() === userId;
+    const isUploader = material.uploadedBy && material.uploadedBy=== userId;
     const lesson = await LessonModel.findById(material.lessonId).populate('courseId', 'teacherIds');
     const isInstructor = lesson && (lesson.courseId as any).teacherIds.includes(new mongoose.Types.ObjectId(userId));
     
@@ -600,7 +600,7 @@ export const updateLessonMaterial = async (id: string, data: Partial<CreateLesso
  * - STUDENT không được phép.
  * - TEACHER: phải là người upload hoặc giảng viên course của lesson.
  */
-export const deleteLessonMaterial = async (id: string, userId: string, userRole: Role) => {
+export const deleteLessonMaterial = async (id: string, userId: mongoose.Types.ObjectId, userRole: Role) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     appAssert(false, NOT_FOUND, "Invalid material ID format");
   }
@@ -613,7 +613,7 @@ export const deleteLessonMaterial = async (id: string, userId: string, userRole:
     appAssert(false, FORBIDDEN, "Students cannot delete lesson materials");
   } else if (userRole === Role.TEACHER) {
     // Check if teacher uploaded this material or is instructor of the lesson's course
-    const isUploader = material.uploadedBy && material.uploadedBy.toString() === userId;
+    const isUploader = material.uploadedBy && material.uploadedBy=== userId;
     const lesson = await LessonModel.findById(material.lessonId).populate('courseId', 'teacherIds');
     const isInstructor = lesson && (lesson.courseId as any).teacherIds.includes(new mongoose.Types.ObjectId(userId));
     
@@ -635,7 +635,7 @@ export const deleteLessonMaterial = async (id: string, userId: string, userRole:
 export const uploadLessonMaterial = async (
   data: any, 
   file: Express.Multer.File | Express.Multer.File[] | undefined, 
-  userId: string, 
+  userId: mongoose.Types.ObjectId, 
   userRole: Role
 ) => {
   // Data is already validated in controller, no need to parse again
@@ -779,7 +779,7 @@ export const getMaterialForDownload = async (id: string) => {
  */
 export const deleteFileOfMaterial = async (
   materialId: string,
-  userId: string,
+  userId: mongoose.Types.ObjectId,
   userRole: Role
 ) => {
   // ✅ Validate material ID
@@ -809,9 +809,9 @@ export const deleteFileOfMaterial = async (
     appAssert(false, FORBIDDEN, "Students cannot delete lesson material files");
   } else if (userRole === Role.TEACHER) {
     // Check if teacher uploaded this material or is instructor of the lesson's course
-    const isUploader = material.uploadedBy && material.uploadedBy.toString() === userId;
+    const isUploader = material.uploadedBy && material.uploadedBy === userId;
     const isInstructor = lesson && (lesson.courseId as any).teacherIds.some(
-      (t: mongoose.Types.ObjectId) => t.toString() === userId
+      (t: mongoose.Types.ObjectId) => t=== userId
     );
     appAssert(
       isUploader || isInstructor,

@@ -14,16 +14,16 @@ const lessonProgressRouters = Router();
 // Protected routes (require authentication)
 // GET /lesson-progress/lesson/:lessonId - Lấy tiến độ 1 bài học
 // Query params: ?studentId (optional, for teacher/admin to view specific student)
-lessonProgressRouters.get("/lesson/:lessonId", authenticate, getLessonProgressController);
+lessonProgressRouters.get("/lessons/:lessonId", authenticate, getLessonProgressController);
 // GET /lesson-progress/course/:courseId - Lấy tiến độ toàn khóa
 // Query params: ?studentId (optional, for teacher/admin to view specific student)
-lessonProgressRouters.get("/course/:courseId", authenticate, getCourseProgressController);
+lessonProgressRouters.get("/courses/:courseId", authenticate, getCourseProgressController);
 
 // PATCH /lesson-progress/lesson/:lessonId/time - Cộng dồn thời gian học cho 1 bài
 // Body: { incSeconds: number }
-lessonProgressRouters.patch("/lesson/:lessonId/time", authenticate, addTimeForLessonController);
+lessonProgressRouters.patch("/lessons/:lessonId/time", authenticate, addTimeForLessonController);
 // PATCH /lesson-progress/lesson/:lessonId/complete - Đánh dấu hoàn thành bài học
-lessonProgressRouters.patch("/lesson/:lessonId/complete", authenticate, completeLessonController);
+lessonProgressRouters.patch("/lessons/:lessonId/complete", authenticate, completeLessonController);
 
 export default lessonProgressRouters;
 

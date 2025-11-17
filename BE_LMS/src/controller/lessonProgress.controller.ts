@@ -17,7 +17,7 @@ export const getLessonProgressController = catchErrors(async (req, res) => {
     studentId: req.query.studentId,
   });
   
-  const requesterId = req.userId?.toString();
+  const requesterId = req.userId;
   const requesterRole = req.role as Role;
 
   const result = await getLessonProgress(validated.lessonId, requesterId, requesterRole, validated.studentId);
@@ -38,7 +38,7 @@ export const addTimeForLessonController = catchErrors(async (req, res) => {
   
   const validatedBody = AddTimeForLessonBodySchema.parse(req.body);
   
-  const requesterId = req.userId?.toString();
+  const requesterId = req.userId;
   const requesterRole = req.role as Role;
 
   const result = await addTimeForLesson(validatedParams.lessonId, validatedBody.incSeconds, requesterId, requesterRole);
@@ -52,7 +52,7 @@ export const addTimeForLessonController = catchErrors(async (req, res) => {
 export const completeLessonController = catchErrors(async (req, res) => {
   const validatedParams = LessonIdParamSchema.parse({ lessonId: req.params.lessonId });
   
-  const requesterId = req.userId?.toString();
+  const requesterId = req.userId;
   const requesterRole = req.role as Role;
 
   const result = await completeLesson(validatedParams.lessonId, requesterId, requesterRole);
@@ -71,7 +71,7 @@ export const getCourseProgressController = catchErrors(async (req, res) => {
     to: req.query.to,
   });
   
-  const requesterId = req.userId?.toString();
+  const requesterId = req.userId;
   const requesterRole = req.role as Role;
 
   const result = await getCourseProgress(
