@@ -1,4 +1,5 @@
 import { FeedbackModel, UserModel } from "@/models";
+import { Types } from "mongoose";
 import { Role } from "@/types";
 import { FeedbackType } from "@/types/feedback.type";
 import IFeedback from "@/types/feedback.type";
@@ -22,7 +23,7 @@ const getFeedbackFilePrefix = (feedbackId: string) => {
  */
 export const createFeedback = async (
   data: CreateFeedbackInput,
-  userId: string,
+  userId: Types.ObjectId,
   file?: Express.Multer.File
 ) => {
   // Validate user exists
@@ -86,7 +87,7 @@ export const createFeedback = async (
  */
 export const listFeedbacks = async (
   filters: ListFeedbacksInput,
-  userId: string,
+  userId: Types.ObjectId,
   userRole: Role
 ) => {
   const {
@@ -175,7 +176,7 @@ export const listFeedbacks = async (
  */
 export const getFeedbackById = async (
   feedbackId: string,
-  userId: string,
+  userId: Types.ObjectId,
   userRole: Role
 ) => {
   const feedback = await FeedbackModel.findById(feedbackId)
@@ -188,7 +189,7 @@ export const getFeedbackById = async (
   // Access control
   if (userRole !== Role.ADMIN) {
     appAssert(
-      feedback.userId._id.toString() === userId,
+      feedback.userId._id.equals(userId),
       FORBIDDEN,
       "You can only view your own feedbacks"
     );
@@ -201,7 +202,7 @@ export const getFeedbackById = async (
  * Get user's own feedbacks
  */
 export const getMyFeedbacks = async (
-  userId: string,
+  userId: Types.ObjectId,
   page: number = 1,
   limit: number = 10
 ) => {
@@ -237,7 +238,7 @@ export const getMyFeedbacks = async (
  */
 export const getFeedbacksByTarget = async (
   targetId: string,
-  userId: string,
+  userId: Types.ObjectId,
   userRole: Role,
   page: number = 1,
   limit: number = 10
@@ -288,7 +289,7 @@ export const getFeedbacksByTarget = async (
  */
 export const deleteFeedback = async (
   feedbackId: string,
-  userId: string,
+  userId: Types.ObjectId,
   userRole: Role
 ) => {
   const feedback = await FeedbackModel.findById(feedbackId);
@@ -297,7 +298,7 @@ export const deleteFeedback = async (
   // Access control
   if (userRole !== Role.ADMIN) {
     appAssert(
-      feedback.userId.toString() === userId,
+      (feedback.userId as Types.ObjectId).equals(userId),
       FORBIDDEN,
       "You can only delete your own feedbacks"
     );
