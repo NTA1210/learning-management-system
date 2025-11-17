@@ -1,4 +1,5 @@
 import { NOT_FOUND, BAD_REQUEST, FORBIDDEN } from "../constants/http";
+import { Types } from "mongoose";
 import NotificationModel from "../models/notification.model";
 import EnrollmentModel from "../models/enrollment.model";
 import CourseModel from "../models/course.model";
@@ -19,7 +20,7 @@ import {
  */
 export const createNotification = async (
   data: CreateNotificationInput,
-  senderId: string
+  senderId: Types.ObjectId
 ) => {
   const { title, message, recipientType, recipientUser, recipientCourse } =
     data;
@@ -116,7 +117,7 @@ export const createNotification = async (
  * Supports pagination and filtering by read status and date range
  */
 export const getNotifications = async (
-  userId: string,
+  userId: Types.ObjectId,
   query: ListNotificationsQuery
 ) => {
   const { page = 1, limit = 10, isRead, from, to } = query;
@@ -170,14 +171,14 @@ export const getNotifications = async (
  */
 export const markNotificationAsRead = async (
   notificationId: string,
-  userId: string
+  userId: Types.ObjectId
 ) => {
   const notification = await NotificationModel.findById(notificationId);
   appAssert(notification, NOT_FOUND, "Notification not found");
 
   // Check if user owns this notification
   appAssert(
-    notification.recipientUser?.toString() === userId,
+    notification.recipientUser?.equals(userId),
     FORBIDDEN,
     "You can only mark your own notifications as read"
   );
@@ -194,7 +195,7 @@ export const markNotificationAsRead = async (
  */
 export const markNotificationsAsRead = async (
   notificationIds: string[],
-  userId: string
+  userId: Types.ObjectId
 ) => {
   const notifications = await NotificationModel.find({
     _id: { $in: notificationIds },
@@ -227,7 +228,7 @@ export const markNotificationsAsRead = async (
 /**
  * Mark all notifications as read for the current user
  */
-export const markAllNotificationsAsRead = async (userId: string) => {
+export const markAllNotificationsAsRead = async (userId: Types.ObjectId) => {
   const result = await NotificationModel.updateMany(
     {
       recipientUser: userId,
@@ -252,14 +253,14 @@ export const markAllNotificationsAsRead = async (userId: string) => {
  */
 export const deleteNotification = async (
   notificationId: string,
-  userId: string
+  userId: Types.ObjectId
 ) => {
   const notification = await NotificationModel.findById(notificationId);
   appAssert(notification, NOT_FOUND, "Notification not found");
 
   // Check if user owns this notification
   appAssert(
-    notification.recipientUser?.toString() === userId,
+    notification.recipientUser?.equals(userId),
     FORBIDDEN,
     "You can only delete your own notifications"
   );
@@ -271,7 +272,7 @@ export const deleteNotification = async (
 /**
  * Get unread notification count for the current user
  */
-export const getUnreadNotificationCount = async (userId: string) => {
+export const getUnreadNotificationCount = async (userId: Types.ObjectId) => {
   const count = await NotificationModel.countDocuments({
     recipientUser: userId,
     isRead: false,
