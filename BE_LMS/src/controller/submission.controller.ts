@@ -55,7 +55,7 @@ export const resubmitAssignmentHandler = catchErrors(async (req, res) => {
 
 // Xem trạng thái bài nộp
 export const getSubmissionStatusHandler = catchErrors(async (req, res) => {
-  const studentId = req.userId?.toString();
+  const studentId = req.userId;
   appAssert(studentId, BAD_REQUEST, "Missing user ID");
 
   const { assignmentId } = assignmentIdParamSchema.parse(req.params);
@@ -82,7 +82,7 @@ export const listSubmissionsByAssignmentHandler = catchErrors(
 
 // Chấm điểm bài nộp (Teacher/Admin)
 export const gradeSubmissionHandler = catchErrors(async (req, res) => {
-  const graderId = req.userId?.toString();
+  const graderId = req.userId;
   appAssert(graderId, BAD_REQUEST, "Missing user ID");
 
   const { assignmentId } = assignmentIdParamSchema.parse(req.params);
@@ -104,7 +104,7 @@ export const gradeSubmissionHandler = catchErrors(async (req, res) => {
 
 //grade submussionid
 export const gradeSubmissionByIdHandler = catchErrors(async (req, res) => {
-  const graderId = req.userId?.toString();
+  const graderId = req.userId;
   appAssert(graderId, BAD_REQUEST, 'Missing user ID');
 
   const { submissionId } = req.params as { submissionId?: string };
@@ -123,7 +123,7 @@ export const gradeSubmissionByIdHandler = catchErrors(async (req, res) => {
 
 
 export const listAllGradesByStudentHandler = catchErrors(async (req, res) => {
-  const studentId = req.userId?.toString();
+  const studentId = req.userId;
   appAssert(studentId, BAD_REQUEST, "Missing user ID");
 
   const result = await listAllGradesByStudent(studentId);

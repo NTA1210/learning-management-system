@@ -19,7 +19,7 @@ export const submitAssignment = async ({
   assignmentId,
   file,
 }: {
-  studentId: string;
+  studentId: string | mongoose.Types.ObjectId;
   assignmentId: string;
   file: Express.Multer.File;
 }) => {
@@ -48,7 +48,7 @@ export const submitAssignment = async ({
     return existing;
   }
 
-  const prefix = prefixSubmission(assignment.courseId.toString(), assignmentId, studentId);
+  const prefix = prefixSubmission(assignment.courseId, assignmentId, studentId);
   const { key, originalName, mimeType, size } = await uploadFile(file, prefix);
 
   const submission = await SubmissionModel.create({
@@ -71,7 +71,7 @@ export const resubmitAssignment = async (
   studentId,
   assignmentId,
   file
- }:{ studentId: string,
+ }:{ studentId: string | mongoose.Types.ObjectId,
   assignmentId: string,
   file:Express.Multer.File}
 ) => {
@@ -91,7 +91,7 @@ export const resubmitAssignment = async (
 
   // const resubmittedAt = new Date();
   // const isLate = assignment.dueDate && resubmittedAt > assignment.dueDate;
-  const prefix = prefixSubmission(assignment.courseId.toString(),assignmentId,studentId);
+  const prefix = prefixSubmission(assignment.courseId, assignmentId, studentId);
   const {key,originalName,mimeType,size} = await uploadFile(file,prefix);
 
   submission.originalName = originalName;
@@ -107,7 +107,7 @@ export const resubmitAssignment = async (
 
  //xem status bài nộp
 export const getSubmissionStatus = async (
-  studentId: string,
+  studentId: string | mongoose.Types.ObjectId,
   assignmentId: string
 ) => {
 
@@ -159,8 +159,8 @@ export const listSubmissionsByAssignment = async (
 //grade
 export const gradeSubmission = async (
   assignmentId: string,
-  studentId: string,
-  graderId: string,
+  studentId: string | mongoose.Types.ObjectId,
+  graderId: string | mongoose.Types.ObjectId,
   grade: number,
   feedback?: string
 ) => {
@@ -212,7 +212,7 @@ export const gradeSubmission = async (
 // grade by submission id 
 export const gradeSubmissionById = async (
   submissionId: string,
-  graderId: string,
+  graderId: string | mongoose.Types.ObjectId,
   grade: number,
   feedback?: string
 ) => {
@@ -251,7 +251,7 @@ export const gradeSubmissionById = async (
 };
 
 export const listAllGradesByStudent = async (
-  studentId: string,
+  studentId: string | mongoose.Types.ObjectId,
   from?: Date,
   to?: Date
   ) => {
@@ -395,7 +395,7 @@ export const getSubmissionReportByCourse = async (courseId: string) => {
     const reports = [];
 
     for (const a of assignments) {
-        const assignmentId = (a as any)._id.toString();
+        const assignmentId = (a as any)._id && (a as any)._id.toHexString ? (a as any)._id.toHexString() : String((a as any)._id);
         const stats = await getSubmissionStats(assignmentId);
         const distribution = await getGradeDistribution(assignmentId);
         reports.push({ assignment: a.title, stats, distribution });

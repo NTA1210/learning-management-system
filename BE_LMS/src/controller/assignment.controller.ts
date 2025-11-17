@@ -27,7 +27,7 @@
       dueAfter: query.dueAfter,
       sortBy: query.sortBy,
       sortOrder: query.sortOrder,
-      userId: req.userId?.toString(),
+      userId: req.userId,
       userRole: req.role,
     });
 
@@ -42,7 +42,7 @@
     const assignmentId = assignmentIdSchema.parse(req.params.id);
     const assignment = await getAssignmentById(
       assignmentId,
-      req.userId?.toString(),
+      req.userId,
       req.role
     );
 
@@ -57,7 +57,7 @@
     const { courseId } = req.params as { courseId?: string };
     appAssert(courseId && courseId.length === 24, BAD_REQUEST, "Missing or invalid course ID");
 
-    const userId = req.userId?.toString();
+    const userId = req.userId;
     const userRole = req.role;
     appAssert(userId, BAD_REQUEST, "Missing user ID");
 
