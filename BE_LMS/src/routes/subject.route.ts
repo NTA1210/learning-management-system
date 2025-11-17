@@ -31,7 +31,7 @@ subjectRoutes.get("/", listSubjectsHandler);
 // GET /subjects/id/:id - Chi tiết Subject theo ID
 subjectRoutes.get("/:id", getSubjectByIdHandler);
 // GET /subjects/:slug - Chi tiết Subject theo slug
-subjectRoutes.get("/:slug",  getSubjectBySlugHandler);
+subjectRoutes.get("/slug/:slug",  getSubjectBySlugHandler);
 // GET /subjects/id/:id/prerequisites - Danh sách môn tiên quyết
 subjectRoutes.get("/:id/prerequisites",  listPrerequisitesHandler);
 // GET /subjects/autocomplete/search - Autocomplete theo name/code/slug
@@ -45,11 +45,11 @@ subjectRoutes.get("/:id/related", relatedSubjectsHandler);
 // POST /subjects - Tạo Subject (Admin/Teacher only)
 subjectRoutes.post("/",  authorize(Role.ADMIN, Role.TEACHER), createSubjectHandler);
 // PATCH /subjects/:slug - Cập nhật theo slug (Admin/Teacher only)
-subjectRoutes.patch("/:slug", authorize(Role.ADMIN, Role.TEACHER), updateSubjectBySlugHandler);
+subjectRoutes.patch("/slug/:slug", authorize(Role.ADMIN, Role.TEACHER), updateSubjectBySlugHandler);
 // PATCH /subjects/id/:id - Cập nhật theo ID (Admin/Teacher only)
 subjectRoutes.patch("/:id",  authorize(Role.ADMIN, Role.TEACHER), updateSubjectByIdHandler);
 // DELETE /subjects/:slug - Xóa theo slug (Admin/Teacher only)
-subjectRoutes.delete("/:slug",  authorize(Role.ADMIN, Role.TEACHER), deleteSubjectBySlugHandler);
+subjectRoutes.delete("/slug/:slug",  authorize(Role.ADMIN, Role.TEACHER), deleteSubjectBySlugHandler);
 // DELETE /subjects/id/:id - Xóa theo ID (Admin/Teacher only)
 subjectRoutes.delete("/:id",  authorize(Role.ADMIN, Role.TEACHER), deleteSubjectByIdHandler);
 // PATCH /subjects/id/:id/activate - Bật isActive (Admin/Teacher only)
