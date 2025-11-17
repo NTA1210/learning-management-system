@@ -54,7 +54,7 @@ export const createApp = () => {
       origin: APP_ORIGIN,
       credentials: true,
     })
-  );
+  );   
   app.use(cookieParser());
 
   //example API----------------------------------

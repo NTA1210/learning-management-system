@@ -32,8 +32,8 @@ export const LessonQuerySchema = (listParamsSchema.extend({
     courseId: z.string().optional(),
     createdAt: datePreprocess,
     updatedAt: datePreprocess,
-    from: datePreprocess,
-    to: datePreprocess,
+    from: datePreprocess.optional(),
+    to: datePreprocess.optional(),
 }).refine(
     (val) => {
         if (val.from && val.to) {

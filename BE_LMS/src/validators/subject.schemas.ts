@@ -23,8 +23,8 @@ export const listSubjectsSchema = (listParamsSchema
     isActive: z.union([z.string(), z.boolean()]).optional(),
     createdAt: datePreprocess,
     updatedAt: datePreprocess,
-    from: datePreprocess,
-    to: datePreprocess,
+    from: datePreprocess.optional(),
+    to: datePreprocess.optional(),
   })
   .refine(
     (val) => {
