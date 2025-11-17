@@ -101,3 +101,5 @@ export const updateQuizSchema = z
   );
 
 export type UpdateQuiz = z.infer<typeof updateQuizSchema>;
+
+export const quizIdSchema = z.string().length(24, "Invalid quiz ID");

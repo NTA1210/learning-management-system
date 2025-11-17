@@ -27,7 +27,7 @@ export const createQuiz = async (
     // questionIds,
     snapshotQuestions,
   }: CreateQuiz,
-  userId: string
+  userId: mongoose.Types.ObjectId
 ): Promise<IQuiz> => {
   const course = await CourseModel.findById(courseId);
   appAssert(course, NOT_FOUND, "Course not found");
@@ -62,47 +62,6 @@ export const createQuiz = async (
 
   return quiz;
 };
-
-/**
- * Add snapshot questions to a quiz.
- * @throws  If quiz not found
- * @throws  If quiz is already completed
- * @throws  If snapshot questions already added
- * @throws  If no questions provided
- */
-// export const addSnapshotQuestions = async ({
-//   quizId,
-//   questions,
-// }: UpdateQuiz) => {
-//   const quiz = await QuizModel.findById(quizId);
-//   appAssert(quiz, NOT_FOUND, "Quiz not found");
-
-//   appAssert(
-//     !quiz.isCompleted,
-//     BAD_REQUEST,
-//     "Cannot add snapshot questions to a completed quiz"
-//   );
-
-//   appAssert(
-//     questions && questions.length > 0,
-//     BAD_REQUEST,
-//     "At least one question must be provided"
-//   );
-
-//   for (const question of questions) {
-//     checkProperQuestionType(question.type, question.correctOptions);
-//   }
-
-//   if (questions) {
-//     await quiz.addSnapshotQuestions(questions);
-//   }
-
-//   return quiz;
-// };
-
-/**
- *
- */
 
 /**
  * Update a quiz.
@@ -214,5 +173,28 @@ export const updateQuiz = async ({
   quiz.shuffleQuestions = shuffleQuestions ?? quiz.shuffleQuestions;
 
   await quiz.save();
+  return quiz;
+};
+
+export const deleteQuiz = async ({
+  quizId,
+  userId,
+}: {
+  quizId: string;
+  userId: mongoose.Types.ObjectId;
+}) => {
+  const quiz = await QuizModel.findById(quizId);
+  appAssert(quiz, NOT_FOUND, "Quiz not found");
+
+  const isOnGoing =
+    quiz.startTime.getTime() <= Date.now() &&
+    quiz.endTime.getTime() >= Date.now();
+
+  appAssert(isOnGoing, BAD_REQUEST, "Cannot delete a quiz that is on going");
+
+  quiz.deletedAt = new Date();
+  quiz.deletedBy = userId;
+  await quiz.save();
+
   return quiz;
 };
