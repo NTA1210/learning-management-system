@@ -56,8 +56,8 @@ export const listCourseInvitesSchema = z.object({
   .min(1)
   .max(100)
   .default(10),
-  from: datePreprocess,
-  to: datePreprocess,
+  from: datePreprocess.optional(),
+  to: datePreprocess.optional(),
 })
 .refine(
   (val) => {
