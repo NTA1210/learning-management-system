@@ -14,4 +14,4 @@ export * from "./major.route";
 export * from "./specialist.route";
 export * from "./forum.route";
 export { default as quizRoutes } from "./quiz.route";
-export { default as subjectRouters } from "./subject.route";
+export { default as subjectRoutes } from "./subject.route";
