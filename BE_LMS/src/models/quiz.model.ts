@@ -1,9 +1,8 @@
 import mongoose from "mongoose";
 import { IQuiz, SnapshotQuestion } from "../types";
-import QuizQuestionModel from "./quizQuestion.model";
 import cron from "node-cron";
-import { getKeyFromPublicUrl, removeFiles } from "@/utils/uploadFile";
 import { QuizQuestionType } from "@/types/quizQuestion.type";
+import crypto from "crypto";
 
 export type TImage = {
   url: string;
@@ -55,7 +54,8 @@ const QuizSchema = new mongoose.Schema<IQuiz>(
       default: [],
     },
     isPublished: { type: Boolean, default: false },
-    isCompleted: { type: Boolean, default: false },
+    deletedAt: { type: Date },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }
@@ -64,119 +64,34 @@ const QuizSchema = new mongoose.Schema<IQuiz>(
 //Indexes
 QuizSchema.index({ courseId: 1, isPublished: 1, createdAt: -1 });
 QuizSchema.index({ courseId: 1, title: 1 });
-// QuizSchema.index({ isCompleted: 1, questionIds: 1 });
 
-// 1️⃣ Create snapshot
-// QuizSchema.methods.createSnapshot = async function () {
-//   const questions = await QuizQuestionModel.find({
-//     _id: { $in: this.questionIds },
-//   });
+//Methods
 
-//   const snapshotQuestions: SnapshotQuestion[] = questions.map((q) => ({
-//     id: q.id,
-//     text: q.text,
-//     type: q.type,
-//     options: q.options,
-//     correctOptions: q.correctOptions,
-//     images: q.images?.map((image) => ({ url: image, fromDB: true })),
-//     points: q.points,
-//     explanation: q.explanation,
-//     isNew: false,
-//     isDeleted: false,
-//     isDirty: false,
-//     isExternal: false,
-//   }));
+QuizSchema.methods.generateHashPassword = function (length: number = 8) {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  // Bỏ ký tự dễ nhầm: 0 O I l 1
 
-//   this.snapshotQuestions = [...snapshotQuestions, ...this.snapshotQuestions];
+  const bytes = crypto.randomBytes(length);
+  let pass = "";
 
-//   return await this.save();
-// };
+  for (let i = 0; i < length; i++) {
+    pass += chars[bytes[i] % chars.length];
+  }
+  return pass;
+};
 
-// 2️⃣ Add snapshot questions
-// QuizSchema.methods.addSnapshotQuestions = async function (
-//   questions: SnapshotQuestion[]
-// ) {
-//   this.snapshotQuestions.push(...questions);
-//   await this.save();
-// };
+QuizSchema.methods.compareHashPassword = function (pass: string) {
+  return this.hashPassword === pass;
+};
 
-// // 3️⃣ Update snapshot questions
-// QuizSchema.methods.updateSnapshotQuestions = async function (diff: {
-//   updated: Partial<SnapshotQuestion>[];
-//   added: SnapshotQuestion[];
-//   deleted: SnapshotQuestion[];
-// }) {
-//   let deletedImages: string[] = [];
-//   const map = new Map();
-//   this.snapshotQuestions.forEach((q: SnapshotQuestion, i: number) =>
-//     map.set(q.id, i)
-//   );
+//hooks
 
-//   // 1️⃣ Update existing questions
-//   for (const q of diff.updated) {
-//     const index = map.get(q.id);
-//     if (index === -1) continue;
-
-//     const oldQuestion = this.snapshotQuestions[index];
-//     const oldImages = oldQuestion.images || [];
-//     const newImages = q.images || [];
-
-//     // Merge các field khác
-//     this.snapshotQuestions[index] = {
-//       ...oldQuestion,
-//       ...q,
-//     };
-
-//     // Merge ảnh: giữ ảnh DB, add ảnh mới FE
-//     const mergedImages = [...newImages];
-//     this.snapshotQuestions[index].images = mergedImages;
-
-//     // Xóa file vật lý: chỉ ảnh FE cũ bị remove
-//     if (oldQuestion.isNew) {
-//       deletedImages.push(
-//         ...oldImages
-//           .filter(
-//             (img: TImage) =>
-//               !mergedImages.some((newImg) => newImg.url === img.url) &&
-//               !img.fromDB
-//           )
-//           .map((img: TImage) => getKeyFromPublicUrl(img.url))
-//       );
-//     }
-//   }
-
-//   // 2️⃣ Add new questions (FE mới)
-//   this.snapshotQuestions.push(...diff.added);
-
-//   // 3️⃣ Delete questions
-//   const deletedQuestions = diff.deleted;
-//   this.snapshotQuestions = this.snapshotQuestions.filter(
-//     (sq: SnapshotQuestion) => !deletedQuestions.some((d) => d.id === sq.id)
-//   );
-
-//   // Xóa file vật lý của ảnh FE trong câu mới bị deleted
-//   deletedImages.push(
-//     ...deletedQuestions
-//       .filter((q) => q.isNew)
-//       .flatMap(
-//         (q) =>
-//           q.images
-//             ?.filter((img) => !img.fromDB)
-//             .map((img) => getKeyFromPublicUrl(img.url)) || []
-//       )
-//   );
-
-//   // 3️⃣ Remove questions
-//   this.questionIds = this.questionIds.filter(
-//     (id: mongoose.Types.ObjectId) =>
-//       !deletedQuestions.some((q) => q.id === id.toString())
-//   );
-
-//   console.log("File deleted: ", deletedImages.length);
-
-//   // 4️⃣ Remove files + save quiz
-//   await Promise.all([removeFiles(deletedImages), this.save()]);
-// };
+QuizSchema.pre("save", function (next) {
+  if (!this.hashPassword) {
+    this.hashPassword = this.generateHashPassword();
+  }
+  next();
+});
 
 const QuizModel = mongoose.model<IQuiz>("Quiz", QuizSchema, "quizzes");
 

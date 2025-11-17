@@ -643,7 +643,12 @@ export const uploadImages = async ({ quizId, images }: TUploadImagesParams) => {
 
   const prefix = prefixExternalQuizQuestionImage(quizId);
   const result = await uploadFiles(images, prefix);
-  return result.map((image) => image.publicUrl);
+  return result.map((image) => {
+    return {
+      url: image.publicUrl,
+      fromDB: false,
+    };
+  });
 };
 
 /**

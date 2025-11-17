@@ -1,5 +1,5 @@
 import { isDateInFuture } from "@/utils/date";
-import z, { ZodError } from "zod";
+import z from "zod";
 
 export const datePreprocess = z
   .preprocess((val) => {
