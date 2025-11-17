@@ -39,7 +39,7 @@ import {
   specialistPublicRoutes,
   forumProtectedRoutes,
   forumPublicRoutes,
-  subjectRouter,
+  subjectRouters,
   quizRoutes,
 } from "./routes";
 
@@ -93,7 +93,7 @@ export const createApp = () => {
   app.use("/majors", authenticate, majorProtectedRoutes);
   app.use("/specialists", authenticate, specialistProtectedRoutes);
   app.use("/forums", authenticate, forumProtectedRoutes);
-  app.use("/subjects", authenticate,subjectRouter);
+  app.use("/subjects", authenticate,subjectRouters);
   app.use("/quizzes", quizRoutes);
   app.use(errorHandler);
 
