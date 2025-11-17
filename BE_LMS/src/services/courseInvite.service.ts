@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import mongoose from "mongoose";
 import {
   BAD_REQUEST,
   FORBIDDEN,
@@ -7,12 +6,12 @@ import {
   NOT_FOUND,
 } from "@/constants/http";
 import { CourseInviteModel, CourseModel, UserModel, EnrollmentModel } from "@/models";
-import { Role, EnrollmentStatus, EnrollmentMethod} from "@/types";
+import { Role, EnrollmentStatus, EnrollmentMethod, ICourse } from "@/types";
 import appAssert from "@/utils/appAssert";
 import { APP_ORIGIN } from "@/constants/env";
-import { TCreateCourseInvite, TListCourseInvite, TUpdateCourseInvite, TCourseInviteId } from "@/validators/courseInvite.schemas";
+import { TCreateCourseInvite, TListCourseInvite, TUpdateCourseInvite } from "@/validators/courseInvite.schemas";
 import ICourseInvite from "@/types/courseInvite.type";
-import { FilterQuery } from "mongoose";
+import { FilterQuery, Types } from "mongoose";
 
 /**
  * Yêu cầu nghiệp vụ:
@@ -30,7 +29,7 @@ import { FilterQuery } from "mongoose";
  */
 export const createCourseInvite = async (
   data: TCreateCourseInvite,
-  createdBy: string
+  createdBy: Types.ObjectId
 ) => {
   const { courseId, expiresInDays, maxUses, invitedEmails } = data;
 
@@ -43,8 +42,8 @@ export const createCourseInvite = async (
   appAssert(user, NOT_FOUND, "User not found");
 
   if (user.role !== Role.ADMIN) {
-    const isTeacherOfCourse = course.teacherIds.some(
-      (teacherId) => teacherId.toString() === createdBy
+    const isTeacherOfCourse = course.teacherIds.some((teacherId) =>
+      teacherId.equals(createdBy)
     );
     appAssert(
       isTeacherOfCourse,
@@ -142,7 +141,7 @@ export const createCourseInvite = async (
  * Output: enrollment record
  */
 
-export const joinCourseByInvite = async (token: string, userId: string) => {
+export const joinCourseByInvite = async (token: string, userId: Types.ObjectId) => {
   //Hash token bằng SHA256 để tìm trong DB
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex")
 
@@ -245,7 +244,7 @@ export const joinCourseByInvite = async (token: string, userId: string) => {
 
 export const listCourseInvites = async (
   query: TListCourseInvite,
-  viewerId: string,
+  viewerId: Types.ObjectId,
   viewerRole: Role,
 ) => {
   const { courseId, invitedEmail, isActive, page, limit, from, to } = query;
@@ -339,7 +338,7 @@ export const listCourseInvites = async (
 export const updateCourseInvite = async (
   inviteId: string,
   data: TUpdateCourseInvite,
-  updatedBy: string
+  updatedBy: Types.ObjectId
 ) => {
   // Tìm invite trong DB
   const invite = await CourseInviteModel.findById(inviteId).populate(
@@ -360,9 +359,9 @@ export const updateCourseInvite = async (
   appAssert(user, NOT_FOUND, "User not found");
 
   if (user.role !== Role.ADMIN) {
-    const course = invite.courseId as any;
-    const isTeacherOfCourse = course.teacherIds.some(
-      (teacherId: any) => teacherId.toString() === updatedBy
+    const course = invite.courseId as unknown as ICourse;
+    const isTeacherOfCourse = course.teacherIds.some((teacherId) =>
+      teacherId.equals(updatedBy)
     );
     appAssert(
       isTeacherOfCourse,
@@ -462,7 +461,7 @@ export const updateCourseInvite = async (
  */
 export const deleteCourseInvite = async (
   inviteId: string,
-  userId: string
+  userId: Types.ObjectId
 ) => {
   // 1. Tìm invite
   const invite = await CourseInviteModel.findById(inviteId).populate(
@@ -476,9 +475,9 @@ export const deleteCourseInvite = async (
   appAssert(user, NOT_FOUND, "User not found");
 
   if (user.role !== Role.ADMIN) {
-    const course = invite.courseId as any;
-    const isTeacherOfCourse = course.teacherIds.some(
-      (teacherId: any) => teacherId.toString() === userId
+    const course = invite.courseId as unknown as ICourse;
+    const isTeacherOfCourse = course.teacherIds.some((teacherId) =>
+      teacherId.equals(userId)
     );
     appAssert(
       isTeacherOfCourse,
