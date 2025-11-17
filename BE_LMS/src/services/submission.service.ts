@@ -209,6 +209,47 @@ export const gradeSubmission = async (
   ]);
 };
 
+// grade by submission id 
+export const gradeSubmissionById = async (
+  submissionId: string,
+  graderId: string,
+  grade: number,
+  feedback?: string
+) => {
+  const submission = await SubmissionModel.findById(submissionId).populate({ path: 'assignmentId', select: 'maxScore' });
+  appAssert(submission, NOT_FOUND, 'Submission not found');
+
+  const assignment: any = submission.assignmentId;
+  const maxScore = assignment?.maxScore ?? 10;
+  appAssert(
+    grade >= 0 && grade <= maxScore,
+    BAD_REQUEST,
+    `Grade must be between 0 and ${maxScore}`
+  );
+
+  submission.grade = grade;
+  submission.feedback = feedback;
+  submission.gradedBy = new mongoose.Types.ObjectId(graderId);
+  submission.gradedAt = new Date();
+  submission.status = SubmissionStatus.GRADED;
+
+  if (!submission.gradeHistory) submission.gradeHistory = [];
+  submission.gradeHistory.push({
+    grade,
+    feedback: feedback || '',
+    gradedBy: new mongoose.Types.ObjectId(graderId),
+    gradedAt: new Date(),
+  });
+
+  await submission.save();
+
+  return await submission.populate([
+    { path: 'studentId', select: 'fullname email' },
+    { path: 'gradedBy', select: 'fullname email' },
+    { path: 'assignmentId', select: 'title maxScore' },
+  ]);
+};
+
 export const listAllGradesByStudent = async (
   studentId: string,
   from?: Date,
@@ -299,8 +340,8 @@ export const getSubmissionStats = async (assignmentId: string) => {
     const averageGrade = graded.length > 0 ? graded.reduce((sum, s) => sum + (s.grade ?? 0), 0) / graded.length : null;
     return {
           totalStudents,
-          submissionRate: totalStudents ? (submittedCount / totalStudents) * 100 : 0,
-          onTimeRate: submittedCount ? (onTime / submittedCount) * 100 : 0,
+          submissionRate: `${totalStudents ? ((submittedCount / totalStudents) * 100).toFixed(2) : 0}%`,
+          onTimeRate: `${submittedCount ? ((onTime / submittedCount) * 100).toFixed(2) : 0}%`,
           averageGrade,
         };
 };
@@ -322,7 +363,7 @@ export const getGradeDistribution = async (assignmentId: string) => {
         return {
           range: r.key,
           count,
-          percentage: (count / total) * 100,
+          percentage: `${((count / total) * 100).toFixed(2)}%`,
           };
         });
 };

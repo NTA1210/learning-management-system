@@ -6,6 +6,7 @@ import {
   getSubmissionStatus,
   listSubmissionsByAssignment,
   gradeSubmission,
+  gradeSubmissionById,
   listAllGradesByStudent,
   getSubmissionStats,
   getSubmissionReportByAssignment,
@@ -98,6 +99,25 @@ export const gradeSubmissionHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     data: result,
     message: "Submission graded successfully",
+  });
+});
+
+//grade submussionid
+export const gradeSubmissionByIdHandler = catchErrors(async (req, res) => {
+  const graderId = req.userId?.toString();
+  appAssert(graderId, BAD_REQUEST, 'Missing user ID');
+
+  const { submissionId } = req.params as { submissionId?: string };
+  appAssert(submissionId && submissionId.length === 24, BAD_REQUEST, 'Missing or invalid submission ID');
+
+  const { grade, feedback } = req.body as { grade?: number; feedback?: string };
+  appAssert(typeof grade === 'number', BAD_REQUEST, 'Missing grade');
+
+  const result = await gradeSubmissionById(submissionId, graderId, grade, feedback);
+
+  return res.success(OK, {
+    data: result,
+    message: 'Submission graded successfully',
   });
 });
 

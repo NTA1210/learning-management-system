@@ -5,6 +5,7 @@ import {
     getSubmissionStatusHandler,
     listSubmissionsByAssignmentHandler,
     gradeSubmissionHandler,
+    gradeSubmissionByIdHandler,
     listAllGradesByStudentHandler,
     getSubmissionStatsHandler,
     getSubmissionReportHandler,
@@ -36,6 +37,8 @@ submissionRoutes.get("/:assignmentId/all", authenticate,authorize(Role.ADMIN,Rol
 
 //GV chấm điểm bài nộp
 submissionRoutes.put("/:assignmentId/grade", authenticate , authorize(Role.ADMIN, Role.TEACHER),gradeSubmissionHandler);
+//gv chấm điểm theo submissionId 
+submissionRoutes.put("/by-submission/:submissionId/grade", authenticate, authorize(Role.ADMIN, Role.TEACHER), gradeSubmissionByIdHandler);
 //sv xem toàn bộ điểm
 submissionRoutes.get("/my/grades", authenticate,listAllGradesByStudentHandler );
 //thống kê và báo cáo
