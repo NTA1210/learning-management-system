@@ -70,6 +70,7 @@ export const createCourseInvite = async (
     invitedEmail: email,
     isActive: true,
     expiresAt: { $gt: new Date() },
+    deletedAt: null //chỉ check deletedAt
   })
 
   if (existing) {
@@ -157,7 +158,7 @@ export const joinCourseByInvite = async (token: string, userId: string) => {
 
   //Check deleted, chặn sử dụng link đã xóa
   appAssert(
-    !invite.isDeleted,
+    !invite.deletedAt,
     BAD_REQUEST,
     "This invite link has been deleted"
   );
@@ -250,7 +251,7 @@ export const listCourseInvites = async (
   const { courseId, invitedEmail, isActive, page, limit, from, to } = query;
 // Build filter query
   const filter: FilterQuery<ICourseInvite> = {
-    isDeleted: false, //Mặc định ẩn invite đã xóa
+    deletedAt: null, //Mặc định ẩn invite đã xóa
   };
   // Filter by courseId
   if(courseId) {
@@ -349,7 +350,7 @@ export const updateCourseInvite = async (
 
   //CRITICAL: Không cho phép update invite đã xóa
   appAssert(
-    !invite.isDeleted,
+    !invite.deletedAt,
     BAD_REQUEST,
     "Cannot update deleted invite. Please create a new one."
   );
@@ -487,7 +488,7 @@ export const deleteCourseInvite = async (
   }
 
   // 3. Kiểm tra đã xóa chưa (idempotent - không throw error)
-  if (invite.isDeleted) {
+  if (invite.deletedAt) {
     return {
       message: "Invite already deleted",
       deletedAt: invite.deletedAt,
@@ -495,10 +496,8 @@ export const deleteCourseInvite = async (
   }
          
   // 4. Soft delete - đánh dấu xóa
-  invite.isDeleted = true;
-  invite.isActive = false; // Auto disable khi xóa
   invite.deletedAt = new Date();
-  invite.deletedBy = new mongoose.Types.ObjectId(userId);
+  invite.isActive = false; 
   await invite.save();
 
   return {

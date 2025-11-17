@@ -47,19 +47,10 @@ const CourseInviteSchema = new mongoose.Schema<ICourseInvite>(
       index: true,
     },
     // Soft delete fields
-    isDeleted: {
-      type: Boolean,
-      default: false,
-      index: true, // For filtering
-    },
     deletedAt: {
       type: Date,
       default: null,
-    },
-    deletedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      default: null,
+      index: true, // For filtering deleted invites
     },
   },
   {
@@ -71,7 +62,7 @@ const CourseInviteSchema = new mongoose.Schema<ICourseInvite>(
 CourseInviteSchema.index({ tokenHash: 1 }, { unique: true });
 CourseInviteSchema.index({ courseId: 1, isActive: 1 });
 CourseInviteSchema.index({ expiresAt: 1, isActive: 1 });
-CourseInviteSchema.index({ isDeleted: 1, courseId: 1 });
+CourseInviteSchema.index({ deletedAt: 1, courseId: 1 });
 
 const CourseInviteModel = mongoose.model<ICourseInvite>(
   "CourseInvite",
