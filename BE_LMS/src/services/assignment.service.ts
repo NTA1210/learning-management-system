@@ -16,7 +16,7 @@ export type ListAssignmentsParams = {
   dueAfter?: Date;
   sortBy?: string;
   sortOrder?: string;
-  userId?: string | mongoose.Types.ObjectId;
+  userId?: mongoose.Types.ObjectId;
   userRole?: string;
 };
 
@@ -123,7 +123,7 @@ export const listAssignments = async ({
   };
 };
 
-export const getAssignmentById = async (assignmentId: string, userId?: string | mongoose.Types.ObjectId, userRole?: string) => {
+export const getAssignmentById = async (assignmentId: string, userId?: mongoose.Types.ObjectId, userRole?: string) => {
   const assignment = await AssignmentModel.findById(assignmentId)
     .populate("courseId", "title code")
     .populate("createdBy", "username email fullname")
@@ -145,7 +145,7 @@ export const getAssignmentById = async (assignmentId: string, userId?: string | 
   return assignment;
 };
 
-export const createAssignment = async (data: any, userId?: string | mongoose.Types.ObjectId, userRole?: string) => {
+export const createAssignment = async (data: any, userId?: mongoose.Types.ObjectId, userRole?: string) => {
   // Verify course exists
   const course = await CourseModel.findById(data.courseId);
   appAssert(course, NOT_FOUND, "Course not found");

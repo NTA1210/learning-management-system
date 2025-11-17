@@ -19,7 +19,7 @@ export const submitAssignment = async ({
   assignmentId,
   file,
 }: {
-  studentId: string | mongoose.Types.ObjectId;
+  studentId: mongoose.Types.ObjectId;
   assignmentId: string;
   file: Express.Multer.File;
 }) => {
@@ -71,7 +71,7 @@ export const resubmitAssignment = async (
   studentId,
   assignmentId,
   file
- }:{ studentId: string | mongoose.Types.ObjectId,
+ }:{ studentId: mongoose.Types.ObjectId,
   assignmentId: string,
   file:Express.Multer.File}
 ) => {
@@ -107,7 +107,7 @@ export const resubmitAssignment = async (
 
  //xem status bài nộp
 export const getSubmissionStatus = async (
-  studentId: string | mongoose.Types.ObjectId,
+  studentId: mongoose.Types.ObjectId,
   assignmentId: string
 ) => {
 
@@ -150,7 +150,6 @@ export const listSubmissionsByAssignment = async (
     if (to) filter.submittedAt.$lte = to;
   }
 
-  
   return SubmissionModel.find(filter)
     .populate("studentId", "fullname email")
     .sort({ submittedAt: -1 });
@@ -159,8 +158,8 @@ export const listSubmissionsByAssignment = async (
 //grade
 export const gradeSubmission = async (
   assignmentId: string,
-  studentId: string | mongoose.Types.ObjectId,
-  graderId: string | mongoose.Types.ObjectId,
+  studentId: mongoose.Types.ObjectId,
+  graderId: mongoose.Types.ObjectId,
   grade: number,
   feedback?: string
 ) => {
@@ -185,7 +184,7 @@ export const gradeSubmission = async (
   //Cập nhật thông tin chấm điểm
   submission.grade = grade;
   submission.feedback = feedback;
-  submission.gradedBy = new mongoose.Types.ObjectId(graderId);
+  submission.gradedBy = graderId;
   submission.gradedAt = new Date();
   submission.status = SubmissionStatus.GRADED;
 
@@ -196,7 +195,7 @@ export const gradeSubmission = async (
   submission.gradeHistory.push({
     grade,
     feedback: feedback || "",
-    gradedBy: new mongoose.Types.ObjectId(graderId),
+    gradedBy: graderId,
     gradedAt: new Date(),
   });
 
@@ -212,7 +211,7 @@ export const gradeSubmission = async (
 // grade by submission id 
 export const gradeSubmissionById = async (
   submissionId: string,
-  graderId: string | mongoose.Types.ObjectId,
+  graderId: mongoose.Types.ObjectId,
   grade: number,
   feedback?: string
 ) => {
@@ -229,7 +228,7 @@ export const gradeSubmissionById = async (
 
   submission.grade = grade;
   submission.feedback = feedback;
-  submission.gradedBy = new mongoose.Types.ObjectId(graderId);
+  submission.gradedBy = graderId;
   submission.gradedAt = new Date();
   submission.status = SubmissionStatus.GRADED;
 
@@ -237,7 +236,7 @@ export const gradeSubmissionById = async (
   submission.gradeHistory.push({
     grade,
     feedback: feedback || '',
-    gradedBy: new mongoose.Types.ObjectId(graderId),
+    gradedBy: graderId,
     gradedAt: new Date(),
   });
 
@@ -251,7 +250,7 @@ export const gradeSubmissionById = async (
 };
 
 export const listAllGradesByStudent = async (
-  studentId: string | mongoose.Types.ObjectId,
+  studentId: mongoose.Types.ObjectId,
   from?: Date,
   to?: Date
   ) => {
