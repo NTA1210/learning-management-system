@@ -5,7 +5,8 @@ import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { httpClient } from "../utils/http";
-import { Search, Calendar, User, Award, Clock } from "lucide-react";
+import { Search, Calendar, User, Award, Clock, Trash } from "lucide-react";
+import { courseService } from "../services";
 
 interface Course {
   _id: string;
@@ -58,11 +59,38 @@ const AssignmentPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageLimit, setPageLimit] = useState(25);
   const [totalAssignments, setTotalAssignments] = useState(0);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
+  const [availableCourses, setAvailableCourses] = useState<{ _id: string; title: string }[]>([]);
+  const [formData, setFormData] = useState({
+    courseId: "",
+    title: "",
+    description: "",
+    maxScore: 100,
+    dueDate: "",
+    allowLate: false,
+  });
 
   useEffect(() => {
     fetchAssignments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, pageLimit, sortOption]);
+
+  useEffect(() => {
+    if (showCreateModal || showEditModal) {
+      fetchCourses();
+    }
+  }, [showCreateModal, showEditModal]);
+
+  const fetchCourses = async () => {
+    try {
+      const result = await courseService.getAllCourses({ page: 1, limit: 100 });
+      setAvailableCourses(result.courses.map(c => ({ _id: c._id, title: c.title })));
+    } catch (err) {
+      console.error("Error fetching courses:", err);
+    }
+  };
 
   const changePageLimit = (limit: number) => {
     setPageLimit(limit);
@@ -165,6 +193,157 @@ const AssignmentPage: React.FC = () => {
     }
   };
 
+  const showSwalError = async (message: string) => {
+    try {
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: message,
+        confirmButtonColor: darkMode ? "#4c1d95" : "#4f46e5",
+        background: darkMode ? "#1f2937" : "#ffffff",
+        color: darkMode ? "#ffffff" : "#1e293b",
+      });
+    } catch (err) {
+      console.error("Error loading SweetAlert2:", err);
+      alert(message); // Fallback to alert if swal fails to load
+    }
+  };
+
+  const showSwalConfirm = async (message: string): Promise<boolean> => {
+    try {
+      const Swal = (await import("sweetalert2")).default;
+      const result = await Swal.fire({
+        icon: "warning",
+        title: "Confirm",
+        text: message,
+        showCancelButton: true,
+        confirmButtonColor: darkMode ? "#dc2626" : "#ef4444",
+        cancelButtonColor: darkMode ? "#4b5563" : "#6b7280",
+        confirmButtonText: "Yes",
+        cancelButtonText: "No",
+        background: darkMode ? "#1f2937" : "#ffffff",
+        color: darkMode ? "#ffffff" : "#1e293b",
+      });
+      return result.isConfirmed;
+    } catch (err) {
+      console.error("Error loading SweetAlert2:", err);
+      return confirm(message); // Fallback to confirm if swal fails to load
+    }
+  };
+
+  const isAdmin = user?.role === 'admin';
+  const isTeacher = user?.role === 'teacher';
+  const canCreate = isAdmin || isTeacher;
+
+  const handleCreate = () => {
+    setFormData({
+      courseId: "",
+      title: "",
+      description: "",
+      maxScore: 100,
+      dueDate: "",
+      allowLate: false,
+    });
+    setShowCreateModal(true);
+  };
+
+  const handleEdit = (assignment: Assignment) => {
+    setEditingAssignment(assignment);
+    let formattedDueDate = "";
+    if (assignment.dueDate) {
+      const date = new Date(assignment.dueDate);
+      // Format as YYYY-MM-DDTHH:mm for datetime-local input
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      formattedDueDate = `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+    setFormData({
+      courseId: assignment.courseId._id,
+      title: assignment.title,
+      description: assignment.description || "",
+      maxScore: assignment.maxScore,
+      dueDate: formattedDueDate,
+      allowLate: assignment.allowLate || false,
+    });
+    setShowEditModal(true);
+  };
+
+  const handleDelete = async (assignmentId: string) => {
+    const confirmed = await showSwalConfirm("Are you sure you want to delete this assignment?");
+    if (!confirmed) return;
+    
+    try {
+      await httpClient.delete(`/assignments/${assignmentId}`, {
+        withCredentials: true,
+      });
+      await fetchAssignments();
+    } catch (err) {
+      console.error("Error deleting assignment:", err);
+      await showSwalError("Failed to delete assignment");
+    }
+  };
+
+  const handleCreateAssignment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await httpClient.post("/assignments", formData, {
+        withCredentials: true,
+      });
+      setShowCreateModal(false);
+      setFormData({
+        courseId: "",
+        title: "",
+        description: "",
+        maxScore: 100,
+        dueDate: "",
+        allowLate: false,
+      });
+      await fetchAssignments();
+    } catch (err) {
+      console.error("Error creating assignment:", err);
+      let errorMessage = "Failed to create assignment";
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { data?: { message?: string } }; message?: string };
+        errorMessage = axiosError.response?.data?.message || axiosError.message || errorMessage;
+      }
+      await showSwalError(errorMessage);
+    }
+  };
+
+  const handleUpdateAssignment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAssignment) return;
+    
+    try {
+      await httpClient.put(`/assignments/${editingAssignment._id}`, formData, {
+        withCredentials: true,
+      });
+      setShowEditModal(false);
+      setEditingAssignment(null);
+      setFormData({
+        courseId: "",
+        title: "",
+        description: "",
+        maxScore: 100,
+        dueDate: "",
+        allowLate: false,
+      });
+      await fetchAssignments();
+    } catch (err) {
+      console.error("Error updating assignment:", err);
+      let errorMessage = "Failed to update assignment";
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { data?: { message?: string } }; message?: string };
+        errorMessage = axiosError.response?.data?.message || axiosError.message || errorMessage;
+      }
+      await showSwalError(errorMessage);
+    }
+  };
+
   return (
     <div
       className="flex h-screen overflow-hidden relative"
@@ -263,6 +442,8 @@ const AssignmentPage: React.FC = () => {
                   </svg>
                 </span>
               </div>
+              
+
 
               {/* Pagination Controls */}
               <div className="flex items-center gap-3 mr-3 flex-wrap">
@@ -327,6 +508,24 @@ const AssignmentPage: React.FC = () => {
                   }}
                 >&#x203A;</button>
               </div>
+
+              {canCreate && (
+                <button
+                  onClick={handleCreate}
+                  className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg"
+                  style={{ 
+                    backgroundColor: darkMode ? '#059669' : '#10b981'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = darkMode ? '#047857' : '#059669';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = darkMode ? '#059669' : '#10b981';
+                  }}
+                >
+                  + Create Assignment
+                </button>
+              )}
             </div>
 
             {/* Error Message */}
@@ -365,14 +564,16 @@ const AssignmentPage: React.FC = () => {
                     return (
                       <div
                         key={assignment._id}
-                        onClick={() => navigate(`/assignments/${assignment._id}`)}
-                        className="rounded-lg shadow-md overflow-hidden transition-all duration-200 hover:shadow-lg cursor-pointer flex flex-col"
+                        className="rounded-lg shadow-md overflow-hidden transition-all duration-200 hover:shadow-lg flex flex-col"
                         style={{
                           backgroundColor: darkMode ? "rgba(31, 41, 55, 0.8)" : "rgba(255, 255, 255, 0.9)",
                           border: darkMode ? "1px solid rgba(75, 85, 99, 0.3)" : "1px solid rgba(229, 231, 235, 0.5)",
                         }}
                       >
-                        <div className="p-6 flex flex-col flex-1">
+                        <div 
+                          className="p-6 flex flex-col flex-1 cursor-pointer"
+                          onClick={() => navigate(`/assignments/${assignment._id}`)}
+                        >
                           {/* Course Badge */}
                           <div className="mb-3">
                             <span
@@ -453,6 +654,48 @@ const AssignmentPage: React.FC = () => {
                             )}
                           </div>
                         </div>
+
+                        {/* Action Buttons */}
+                        {canCreate && (
+                          <div className="flex space-x-2 p-4 pt-0 border-t" style={{ borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "rgba(229, 231, 235, 0.5)" }} onClick={(e) => e.stopPropagation()}>
+                            <button
+                              className="flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md"
+                              style={{
+                                backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff',
+                                color: darkMode ? '#a5b4fc' : '#4f46e5'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = darkMode ? 'rgba(99, 102, 241, 0.3)' : '#e0e7ff';
+                                e.currentTarget.style.transform = 'scale(1.05)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff';
+                                e.currentTarget.style.transform = 'scale(1)';
+                              }}
+                              onClick={() => handleEdit(assignment)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md flex items-center gap-2"
+                              style={{
+                                backgroundColor: darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2',
+                                color: darkMode ? '#fca5a5' : '#dc2626'
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = darkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca';
+                                e.currentTarget.style.transform = 'scale(1.05)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2';
+                                e.currentTarget.style.transform = 'scale(1)';
+                              }}
+                              onClick={() => handleDelete(assignment._id)}
+                            >
+                              <Trash size={16} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -462,6 +705,331 @@ const AssignmentPage: React.FC = () => {
           </div>
         </main>
       </div>
+
+      {/* Create Assignment Modal */}
+      {showCreateModal && (
+        <div 
+          className="fixed inset-0 z-[9999] p-4 flex items-center justify-center transition-all duration-300 bg-black/40"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowCreateModal(false);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl"
+            style={{ backgroundColor: darkMode ? '#0b132b' : '#ffffff', border: '1px solid rgba(255,255,255,0.08)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid #eee' }}>
+              <h3 className="text-xl font-semibold" style={{ color: darkMode ? '#ffffff' : '#111827' }}>
+                Create Assignment
+              </h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="px-3 py-1 rounded-lg text-sm"
+                style={{ backgroundColor: darkMode ? '#1f2937' : '#f3f4f6', color: darkMode ? '#e5e7eb' : '#111827' }}
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateAssignment} className="px-6 py-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Course *
+                  </label>
+                  <select
+                    value={formData.courseId}
+                    onChange={e => setFormData({ ...formData, courseId: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    required
+                  >
+                    <option value="">Select a course</option>
+                    {availableCourses.map(course => (
+                      <option key={course._id} value={course._id}>{course.title}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={e => setFormData({ ...formData, title: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="Assignment Title"
+                    required
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Description
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border h-24"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="Assignment description..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Max Score
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={formData.maxScore}
+                    onChange={e => setFormData({ ...formData, maxScore: Number(e.target.value) })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Due Date
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={formData.dueDate}
+                    onChange={e => setFormData({ ...formData, dueDate: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={formData.allowLate}
+                      onChange={e => setFormData({ ...formData, allowLate: e.target.checked })}
+                    />
+                    <span style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>Allow late submissions</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 px-1">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 rounded-lg"
+                  style={{ backgroundColor: darkMode ? '#1f2937' : '#e5e7eb', color: darkMode ? '#e5e7eb' : '#111827' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-lg text-white font-medium transition-all duration-200"
+                  style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#5b21b6' : '#4338ca';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#4c1d95' : '#4f46e5';
+                  }}
+                >
+                  Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Assignment Modal */}
+      {showEditModal && editingAssignment && (
+        <div 
+          className="fixed inset-0 z-[9999] p-4 flex items-center justify-center transition-all duration-300 bg-black/40"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowEditModal(false);
+              setEditingAssignment(null);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl"
+            style={{ backgroundColor: darkMode ? '#0b132b' : '#ffffff', border: '1px solid rgba(255,255,255,0.08)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid #eee' }}>
+              <h3 className="text-xl font-semibold" style={{ color: darkMode ? '#ffffff' : '#111827' }}>
+                Edit Assignment
+              </h3>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingAssignment(null);
+                }}
+                className="px-3 py-1 rounded-lg text-sm"
+                style={{ backgroundColor: darkMode ? '#1f2937' : '#f3f4f6', color: darkMode ? '#e5e7eb' : '#111827' }}
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateAssignment} className="px-6 py-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Course *
+                  </label>
+                  <select
+                    value={formData.courseId}
+                    onChange={e => setFormData({ ...formData, courseId: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    required
+                  >
+                    <option value="">Select a course</option>
+                    {availableCourses.map(course => (
+                      <option key={course._id} value={course._id}>{course.title}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={e => setFormData({ ...formData, title: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="Assignment Title"
+                    required
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Description
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border h-24"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="Assignment description..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Max Score
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={formData.maxScore}
+                    onChange={e => setFormData({ ...formData, maxScore: Number(e.target.value) })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="100"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Due Date
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={formData.dueDate}
+                    onChange={e => setFormData({ ...formData, dueDate: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={formData.allowLate}
+                      onChange={e => setFormData({ ...formData, allowLate: e.target.checked })}
+                    />
+                    <span style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>Allow late submissions</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 px-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingAssignment(null);
+                  }}
+                  className="px-4 py-2 rounded-lg"
+                  style={{ backgroundColor: darkMode ? '#1f2937' : '#e5e7eb', color: darkMode ? '#e5e7eb' : '#111827' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-lg text-white font-medium transition-all duration-200"
+                  style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#5b21b6' : '#4338ca';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#4c1d95' : '#4f46e5';
+                  }}
+                >
+                  Update
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
