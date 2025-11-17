@@ -7,6 +7,7 @@ export enum FeedbackType {
 }
 
 export default interface IFeedback extends mongoose.Document {
+  _id: mongoose.Types.ObjectId;
   type: FeedbackType;
   title: string;
   description: string;

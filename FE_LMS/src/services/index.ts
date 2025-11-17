@@ -1,11 +1,12 @@
 //do business like API call, auth service, ...
 import http, { httpClient } from "../utils/http";
 
-import { type LoginRequest, type RegisterRequest, type AuthResponse, type User } from "../types/auth";
+import { type LoginRequest, type RegisterRequest, type AuthResponse, type RefreshAuthResponse, type User } from "../types/auth";
 export * from './mock';
 export * from './courseService';
 export * from './enrollmentService';
 export * from './quizQuestionService';
+export * from './subjectService';
 
 // storage keys
 const USER_STORAGE_KEY = 'lms:user';
@@ -77,9 +78,9 @@ export const authService = {
     return response.data;
   },
 
-  refreshToken: async (): Promise<AuthResponse> => {
-    const response = await http.get<AuthResponse>("/auth/refresh");
-    return response.data;
+  refreshToken: async (): Promise<RefreshAuthResponse> => {
+    const response = await http.get<RefreshAuthResponse>("/auth/refresh");
+    return response;
   },
 
   sendPasswordReset: async (email: string): Promise<AuthResponse> => {

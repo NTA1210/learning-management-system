@@ -43,33 +43,33 @@ export const getLessonMaterials = async (
     // Filter by type: need to match mimeType, originalName, or title pattern
   if (query.type) {
     const typePatterns: Record<string, any> = {
-      'pdf': {
+      pdf: {
         $or: [
           { mimeType: { $regex: 'pdf', $options: 'i' } },
         ]
       },
-      'video': {
+      video: {
         $or: [
           { mimeType: { $regex: 'video', $options: 'i' } },
           { mimeType: { $regex: 'mp4|avi|mov|wmv|flv|webm', $options: 'i' } },
         ]
       },
-      'ppt': {
+      ppt: {
         $or: [
           { mimeType: { $regex: 'powerpoint|presentation|ms-powerpoint', $options: 'i' } },
         ]
       },
-      'link': {
+      link: {
         $or: [
           { mimeType: { $regex: 'link|url', $options: 'i' } },
         ]
       }
     };
-    
+
     if (typePatterns[query.type]) {
       filter.$and = filter.$and || [];
       filter.$and.push(typePatterns[query.type]);
-    } else if (query.type === 'other') {
+    } else if (query.type === "other") {
       // For 'other', match files that don't match any known type
       filter.$nor = [
         { mimeType: { $regex: 'pdf|video|powerpoint|presentation|link|url', $options: 'i' } },

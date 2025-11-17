@@ -27,6 +27,12 @@ export interface ApiResponse<T = unknown> {
 // ===============================
 // 3️⃣ Interceptors
 // ===============================
+
+// Extend AxiosRequestConfig to track retry flag
+interface ExtendedAxiosRequestConfig extends AxiosRequestConfig {
+  _retry?: boolean;
+}
+
 httpClient.interceptors.request.use(
   (config) => {
     // Debug: Check if cookies will be sent
@@ -43,7 +49,37 @@ httpClient.interceptors.request.use(
 
 httpClient.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(error)
+  async (error: AxiosError) => {
+    const originalConfig = error.config as ExtendedAxiosRequestConfig | undefined;
+    const status = error.response?.status;
+
+    if (
+      status === 401 &&
+      originalConfig &&
+      !originalConfig._retry &&
+      originalConfig.url !== "/auth/refresh"
+    ) {
+      originalConfig._retry = true;
+      try {
+        await httpClient.get("/auth/refresh", { withCredentials: true });
+        return httpClient.request(originalConfig);
+      } catch (refreshError) {
+        try {
+          localStorage.removeItem("isAuthenticated");
+          localStorage.removeItem("userData");
+          localStorage.removeItem("lms:user");
+        } catch {
+          // ignore storage errors
+        }
+        if (typeof window !== "undefined") {
+          window.location.href = "/login";
+        }
+        return Promise.reject(refreshError);
+      }
+    }
+
+    return Promise.reject(error);
+  }
 );
 
 // ===============================
