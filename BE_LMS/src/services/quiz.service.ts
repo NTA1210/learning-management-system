@@ -1,8 +1,8 @@
-import { BAD_REQUEST, NOT_FOUND } from "@/constants/http";
+import { BAD_REQUEST, FORBIDDEN, NOT_FOUND } from "@/constants/http";
 import { CourseModel, QuizModel } from "@/models";
-import { IQuiz } from "@/types";
+import { IQuiz, Role } from "@/types";
 import appAssert from "@/utils/appAssert";
-import { CreateQuiz, UpdateQuiz } from "@/validators/quiz.schemas";
+import { CreateQuiz, GetQuizzes, UpdateQuiz } from "@/validators/quiz.schemas";
 import { checkProperQuestionType } from "./quizQuestion.service";
 import { TImage } from "@/models/quiz.model";
 import { getKeyFromPublicUrl, removeFiles } from "@/utils/uploadFile";
@@ -176,6 +176,15 @@ export const updateQuiz = async ({
   return quiz;
 };
 
+/**
+ * Delete a quiz.
+ * @param  params - Parameters to delete a quiz.
+ * @param  params.quizId - ID of the quiz to delete.
+ * @param  params.userId - ID of the user who is deleting the quiz.
+ * @throws  If the quiz is not found.
+ * @throws  If the quiz is on going.
+ * @returns  The deleted quiz.
+ */
 export const deleteQuiz = async ({
   quizId,
   userId,
@@ -197,4 +206,81 @@ export const deleteQuiz = async ({
   await quiz.save();
 
   return quiz;
+};
+
+/**
+ * Get quizzes based on the provided parameters.
+ * @param input - Parameters to get quizzes.
+ * @param role - Role of the user.
+ * @param userId - ID of the user, required for students.
+ * @returns A list of quizzes filtered based on the provided parameters.
+ * @throws If the course is not found.
+ * @throws If the user is not a teacher of the course.
+ * @throws If courseId is not provided for students.
+ */
+export const getQuizzes = async (
+  input: GetQuizzes,
+  role: string,
+  userId?: mongoose.Types.ObjectId
+) => {
+  const { courseId, isPublished, isCompleted, isDeleted } = input;
+  const filter: any = {};
+  if (courseId) {
+    const course = await CourseModel.findById(courseId);
+    appAssert(course, NOT_FOUND, "Course not found");
+
+    if (role === Role.TEACHER) {
+      const isTeacherOfCourse = course.teacherIds.some((teacherId) =>
+        teacherId.equals(userId)
+      );
+      appAssert(
+        isTeacherOfCourse,
+        FORBIDDEN,
+        "You are not a teacher of this course"
+      );
+    }
+
+    filter.courseId = courseId;
+
+    if (role === Role.STUDENT) {
+      filter.isPublished = true;
+      filter.deletedAt = { $exists: false };
+    } else {
+      if (isPublished !== undefined) {
+        filter.isPublished = isPublished;
+      }
+      if (isDeleted !== undefined) {
+        if (isDeleted) {
+          filter.deletedAt = { $exists: true };
+        } else {
+          filter.deletedAt = { $exists: false };
+        }
+      }
+      if (isCompleted !== undefined) {
+        filter.endTime = isCompleted
+          ? { $lte: new Date() }
+          : { $gt: new Date() };
+      }
+    }
+  } else {
+    if (role === Role.STUDENT) {
+      appAssert(userId, FORBIDDEN, "courseId is required");
+    }
+  }
+
+  const quizzes = await QuizModel.find(filter).sort({ createdAt: -1 }).lean();
+
+  for (let quiz of quizzes) {
+    if (quiz.endTime.getTime() < Date.now()) {
+      (quiz as any).isCompleted = true;
+    } else {
+      (quiz as any).isCompleted = false;
+    }
+
+    if (quiz.deletedAt) {
+      (quiz as any).isDeleted = true;
+    }
+  }
+
+  return quizzes;
 };

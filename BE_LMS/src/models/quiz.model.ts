@@ -46,9 +46,6 @@ const QuizSchema = new mongoose.Schema<IQuiz>(
     endTime: { type: Date, required: true },
     shuffleQuestions: { type: Boolean, default: false },
     hashPassword: { type: String },
-    // questionIds: [
-    //   { type: mongoose.Schema.Types.ObjectId, ref: "QuizQuestion" },
-    // ],
     snapshotQuestions: {
       type: [SnapshotQuestionSchema],
       default: [],

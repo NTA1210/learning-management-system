@@ -1,10 +1,16 @@
 import { CREATED, OK } from "@/constants/http";
-import { createQuiz, deleteQuiz, updateQuiz } from "@/services/quiz.service";
+import {
+  createQuiz,
+  deleteQuiz,
+  getQuizzes,
+  updateQuiz,
+} from "@/services/quiz.service";
 import { catchErrors } from "@/utils/asyncHandler";
 import {
   updateQuizSchema,
   createQuizSchema,
   quizIdSchema,
+  getQuizzesSchema,
 } from "@/validators/quiz.schemas";
 
 // POST /quizzes - Create a new quiz
@@ -44,4 +50,12 @@ export const deleteQuizHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     message: "Quiz deleted successfully",
   });
+});
+
+// GET /quizzes - Get all quizzes
+export const getQuizzesHandler = catchErrors(async (req, res) => {
+  const role = req.role;
+  const userId = req.userId;
+  const input = getQuizzesSchema.parse(req.query);
+  await getQuizzes(input, role, userId);
 });
