@@ -242,10 +242,12 @@ export const getFeedbacksByTarget = async (
   page: number = 1,
   limit: number = 10
 ) => {
-  // Access control: only admin or the target user can view
-  if (userRole !== Role.ADMIN && targetId !== userId) {
-    appAssert(false, FORBIDDEN, "You can only view feedbacks about yourself");
-  }
+  // Access control: only admin can view feedbacks about a specific target
+  appAssert(
+    userRole === Role.ADMIN,
+    FORBIDDEN,
+    "Only administrators can view all feedbacks"
+  );
 
   const skip = (page - 1) * limit;
 

@@ -11,6 +11,7 @@ export { default as lessonMaterialRoutes } from "./lessonMaterial.route";
 export { default as lessonProgressRoutes } from "./lessonProgress.route";
 export { default as userRoutes } from "./user.route";
 export { default as quizQuestionRoutes } from "./quizQuestion.route";
+export { default as notificationRoutes } from "./notification.route";
 export * from "./major.route";
 export * from "./specialist.route";
 export * from "./forum.route";

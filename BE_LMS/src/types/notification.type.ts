@@ -1,10 +1,6 @@
 import mongoose from "mongoose";
 
-export const enum NotificationType {
-  USER = "user",
-  COURSE = "course",
-  SYSTEM = "system",
-}
+export type NotificationRecipientType = "user" | "course" | "all";
 
 export default interface INotification extends mongoose.Document {
   title: string;
@@ -12,8 +8,9 @@ export default interface INotification extends mongoose.Document {
   sender?: mongoose.Types.ObjectId;
   recipientUser?: mongoose.Types.ObjectId; // single user
   recipientCourse?: mongoose.Types.ObjectId; // broadcast to course members
-  recipientType?: NotificationType;
+  recipientType?: NotificationRecipientType;
   isRead?: boolean;
   readAt?: Date;
   createdAt?: Date;
+  markRead(): Promise<INotification>;
 }
