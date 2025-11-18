@@ -62,6 +62,7 @@ function formatUserResponse(user: any, viewerRole: Role) {
   const base = {
     _id: user._id,
     fullname: user.fullname,
+    username: user.username,
     avatar_url: user.avatar_url,
     bio: user.bio,
     role: user.role,
