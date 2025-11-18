@@ -55,7 +55,7 @@ export const createApp = () => {
       origin: APP_ORIGIN,
       credentials: true,
     })
-  );   
+  );
   app.use(cookieParser());
 
   //example API----------------------------------
@@ -95,7 +95,7 @@ export const createApp = () => {
   app.use("/majors", authenticate, majorProtectedRoutes);
   app.use("/specialists", authenticate, specialistProtectedRoutes);
   app.use("/forums", authenticate, forumProtectedRoutes);
-  app.use("/subjects", authenticate,subjectRoutes);
+  app.use("/subjects", authenticate, subjectRoutes);
   app.use("/quizzes", quizRoutes);
   app.use(errorHandler);
 
