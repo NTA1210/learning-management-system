@@ -18,8 +18,8 @@ export const listCoursesSchema = z
         message: "Limit must be between 1 and 100",
       }),
     search: z.string().optional(),
-    from: datePreprocess, // Date range start with validation
-    to: datePreprocess, // Date range end with validation
+    from: datePreprocess.optional(), // Date range start with validation
+    to: datePreprocess.optional(), // Date range end with validation
     subjectId: z.string().optional(), // Filter by subject ID
     teacherId: z.string().optional(), // Filter by teacher ID
     isPublished: z

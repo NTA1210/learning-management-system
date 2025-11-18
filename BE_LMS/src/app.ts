@@ -42,6 +42,7 @@ import {
   forumPublicRoutes,
   subjectRoutes,
   quizRoutes,
+  notificationRoutes,
 } from "./routes";
 
 export const createApp = () => {
@@ -97,6 +98,7 @@ export const createApp = () => {
   app.use("/forums", authenticate, forumProtectedRoutes);
   app.use("/subjects", authenticate, subjectRoutes);
   app.use("/quizzes", quizRoutes);
+  app.use("/notifications", authenticate, notificationRoutes);
   app.use(errorHandler);
 
   return app;
