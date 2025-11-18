@@ -2,6 +2,7 @@ import http from "../utils/http";
 import type {
   NotificationItem,
   NotificationListResponse,
+  CreateNotificationPayload,
 } from "../types/notification";
 
 const buildQuery = (params: Record<string, string | number | undefined>) => {
@@ -42,6 +43,11 @@ const markAllNotificationsAsRead = async () => {
   await http.put(`/notifications/read-all`);
 };
 
+const createNotification = async (data: CreateNotificationPayload) => {
+  const response = await http.post<NotificationItem>("/notifications", data);
+  return response.data;
+};
+
 const deleteNotification = async (notificationId: string) => {
   await http.del(`/notifications/${notificationId}`);
 };
@@ -55,6 +61,7 @@ export const notificationService = {
   markNotificationAsRead,
   markNotificationsAsRead,
   markAllNotificationsAsRead,
+  createNotification,
   deleteNotification,
   deleteNotifications,
 };
