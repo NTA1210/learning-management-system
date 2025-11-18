@@ -86,7 +86,10 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
     };
     importedQuestions.push(newQuestion);
   }
+
+  await QuizQuestionModel.deleteMany({ subjectId });
   const quizzes = await QuizQuestionModel.insertMany(importedQuestions);
+
   return {
     data: quizzes,
     total: importedQuestions.length,
