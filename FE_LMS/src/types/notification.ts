@@ -6,13 +6,15 @@ export interface NotificationSender {
   fullName?: string;
 }
 
+export type RecipientType = "all" | "user" | "course";
+
 export interface NotificationItem {
   _id: string;
   title: string;
   message: string;
   sender?: NotificationSender;
   recipientUser?: string;
-  recipientType: "all" | "user" | "course";
+  recipientType: RecipientType;
   isRead: boolean;
   createdAt: string;
   updatedAt: string;
@@ -39,5 +41,13 @@ export interface NotificationListResponse {
   data: NotificationItem[];
   pagination: NotificationPagination;
   meta?: NotificationMeta;
+}
+
+export interface CreateNotificationPayload {
+  title: string;
+  message: string;
+  recipientType: RecipientType;
+  recipientUser?: string;
+  recipientCourse?: string;
 }
 
