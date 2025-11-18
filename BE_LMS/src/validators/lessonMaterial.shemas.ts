@@ -24,10 +24,10 @@ export const LessonMaterialQuerySchema = (listParamsSchema
     size: z.coerce.number().int().positive().optional(),
     uploadedBy: z.string().optional(),
     lessonId: z.string().min(1).optional(),
-    createdAt: datePreprocess,
-    updatedAt: datePreprocess,
-    from: datePreprocess,
-    to: datePreprocess,
+    createdAt: datePreprocess.optional(),
+    updatedAt: datePreprocess.optional(),
+    from: datePreprocess.optional(),
+    to: datePreprocess.optional(),
   })
   .refine(
     (val) => {

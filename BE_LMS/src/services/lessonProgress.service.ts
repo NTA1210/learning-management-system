@@ -24,7 +24,7 @@ function calcProgressPercent(durationMinutes?: number | null, timeSpentSeconds?:
  */
 export const getLessonProgress = async (
   lessonId: string,
-  requesterId: string,
+  requesterId: mongoose.Types.ObjectId,
   requesterRole: Role,
   studentId?: string
 ) => {
@@ -69,7 +69,7 @@ export const getLessonProgress = async (
 export const addTimeForLesson = async (
   lessonId: string,
   incSeconds: number,
-  requesterId: string,
+  requesterId: mongoose.Types.ObjectId,
   requesterRole: Role
 ) => {
   appAssert(mongoose.Types.ObjectId.isValid(lessonId), NOT_FOUND, "Invalid lesson ID");
@@ -117,7 +117,7 @@ export const addTimeForLesson = async (
  */
 export const completeLesson = async (
   lessonId: string,
-  requesterId: string,
+  requesterId: mongoose.Types.ObjectId,
   requesterRole: Role
 ) => {
   appAssert(mongoose.Types.ObjectId.isValid(lessonId), NOT_FOUND, "Invalid lesson ID");
@@ -158,7 +158,7 @@ export const completeLesson = async (
  */
 export const getCourseProgress = async (
   courseId: string,
-  requesterId: string,
+  requesterId: mongoose.Types.ObjectId,
   requesterRole: Role,
   studentId?: string,
   options?: { from?: Date; to?: Date }
