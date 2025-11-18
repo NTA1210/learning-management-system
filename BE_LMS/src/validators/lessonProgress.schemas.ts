@@ -36,8 +36,8 @@ export const LessonIdParamSchema = z.object({
 export const GetCourseProgressSchema = z.object({
   courseId: z.string().min(1, "Course ID is required"),
   studentId: z.string().optional(), // Optional query param for teacher/admin
-  from: datePreprocess,
-  to: datePreprocess,
+  from: datePreprocess.optional(),
+  to: datePreprocess.optional(),
 }).refine(
   (val) => {
     if (val.from && val.to) {

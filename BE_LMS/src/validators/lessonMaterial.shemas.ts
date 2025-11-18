@@ -26,8 +26,8 @@ export const LessonMaterialQuerySchema = (listParamsSchema
     lessonId: z.string().min(1).optional(),
     createdAt: datePreprocess,
     updatedAt: datePreprocess,
-    from: datePreprocess,
-    to: datePreprocess,
+    from: datePreprocess.optional(),
+    to: datePreprocess.optional(),
   })
   .refine(
     (val) => {
