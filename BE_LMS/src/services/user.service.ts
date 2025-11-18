@@ -8,7 +8,7 @@ export const getAllUsers = async (
   request: TGetAllUsersFilter,
   viewerRole: Role
 ) => {
-  const { role, email, username, page = 1, limit = 10 } = request;
+  const { role, email, username, status, page = 1, limit = 10 } = request;
 
   // 3️⃣ Pagination
   const skip = (page - 1) * limit;
@@ -17,6 +17,7 @@ export const getAllUsers = async (
 
   if (viewerRole === Role.ADMIN) {
     if (role) query.role = role; // admin có thể lọc role cụ thể
+    if (status) query.status = status; // admin có thể lọc status cụ thể
   } else {
     if (viewerRole === Role.TEACHER) {
       query.role = Role.STUDENT; // teacher chỉ được xem student

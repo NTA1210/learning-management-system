@@ -3,7 +3,6 @@ import { NOT_FOUND, OK } from "../constants/http";
 import UserModel from "../models/user.model";
 import appAssert from "../utils/appAssert";
 import { catchErrors } from "../utils/asyncHandler";
-import { courseIdSchema } from "@/validators";
 import { getAllUsers } from "@/services/user.service";
 
 // GET /users/:courseId - Get all users for a specific course
