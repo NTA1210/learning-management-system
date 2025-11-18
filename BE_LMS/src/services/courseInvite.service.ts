@@ -438,26 +438,26 @@ export const updateCourseInvite = async (
 };
 
 /**
- * Yêu cầu nghiệp vụ: Xóa invite link vĩnh viễn
- * 
- * Khác biệt với PATCH disable:
- * - PATCH disable: Tạm ngưng, có thể enable lại bất cứ lúc nào
- * - DELETE: Xóa vĩnh viễn, KHÔNG THỂ enable lại, ẩn khỏi danh sách
+ * Xóa vĩnh viễn invite link (soft delete)
  * 
  * Business Rules:
- * 1. Chỉ teacher của course hoặc admin mới được xóa
- * 2. Invite đã xóa (isDeleted=true) không thể:
- *    - Enable lại (kể cả PATCH)
- *    - Sử dụng token để join course
- *    - Hiển thị trong list (mặc định)
- * 3. Invite đã xóa vẫn:
- *    - Tồn tại trong DB (soft delete)
- *    - Giữ history và statistics (usedCount, invitedEmails)
- *    - Có thể xem qua query đặc biệt (với param includeDeleted=true)
- * 4. Có thể xóa invite ở bất kỳ trạng thái nào (active/inactive)
+ * 1. Permission:
+ *    - Chỉ teacher của course hoặc admin mới được xóa
  * 
- * Input: inviteId, userId
- * Output: Success message
+ * 2. Sau khi xóa (deletedAt != null), invite KHÔNG THỂ:
+ *    - Enable lại (bất kỳ cách nào)
+ *    - Sử dụng token để join course
+ *    - Hiển thị trong danh sách mặc định
+ * 
+ * 3. Data retention (soft delete):
+ *    - Vẫn tồn tại trong DB
+ *    - Giữ nguyên history: usedCount, invitedEmails, createdAt, ...
+ *    - Có thể query với param includeDeleted=true (nếu cần audit)
+ * 
+ * 4. Side effects:
+ *    - Auto set isActive=false khi xóa
+ *    - Ghi lại deletedAt timestamp
+ *    - Idempotent: Gọi lại không throw error
  */
 export const deleteCourseInvite = async (
   inviteId: string,
