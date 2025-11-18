@@ -1,6 +1,7 @@
 import {
   createQuizHandler,
   deleteQuizHandler,
+  getQuizzesHandler,
   updateQuizHandler,
 } from "@/controller/quiz.controller";
 import { authenticate } from "@/middleware";
@@ -12,5 +13,6 @@ const quizRoutes = Router();
 quizRoutes.post("/", authenticate, createQuizHandler);
 quizRoutes.put("/:quizId", updateQuizHandler);
 quizRoutes.delete("/:quizId", deleteQuizHandler);
+quizRoutes.get("/", getQuizzesHandler);
 
 export default quizRoutes;
