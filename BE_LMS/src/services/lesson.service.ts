@@ -29,7 +29,7 @@ export type CreateLessonParams = {
  * - ADMIN được phép tạo ở mọi course; TEACHER chỉ được tạo ở course mình dạy.
  * - Trả về bài học kèm thông tin course cơ bản.
  */
-export const createLessonService = async (data: CreateLessonParams, userId: string, userRole?: Role) => {
+export const createLessonService = async (data: CreateLessonParams, userId:mongoose.Types.ObjectId, userRole?: Role) => {
   // Check if lesson with same title exists in the same course
   const existingLesson = await LessonModel.exists({ title: data.title, courseId: data.courseId });
   appAssert(!existingLesson, CONFLICT, "Lesson already exists");
@@ -57,7 +57,7 @@ export const createLessonService = async (data: CreateLessonParams, userId: stri
  * - Chỉ ADMIN hoặc giảng viên của course chứa bài học mới được xóa.
  * - Trả về bản ghi bài học đã xóa.
  */
-export const deleteLessonService = async (id: string, userId: string, userRole: Role) => {
+export const deleteLessonService = async (id: string, userId: mongoose.Types.ObjectId, userRole: Role) => {
   const lesson = await LessonModel.findById(id);
   appAssert(lesson, NOT_FOUND, "Lesson not found");
 
@@ -79,7 +79,7 @@ export const deleteLessonService = async (id: string, userId: string, userRole: 
  * - Chỉ ADMIN hoặc giảng viên của course chứa bài học mới được cập nhật.
  * - Không thay đổi logic phân quyền hiện có.
  */
-export const updateLessonService = async (id: string, data: Partial<CreateLessonParams>, userId: string, userRole: Role) => {
+export const updateLessonService = async (id: string, data: Partial<CreateLessonParams>, userId: mongoose.Types.ObjectId, userRole: Role) => {
   const lesson = await LessonModel.findById(id);
   appAssert(lesson, NOT_FOUND, "Lesson not found");
 
@@ -107,12 +107,12 @@ export const updateLessonService = async (id: string, data: Partial<CreateLesson
  * - ADMIN thấy tất cả.
  * - Hỗ trợ full-text search theo title, content.
  */
-export const getLessons = async (query: any, userId?: string, userRole?: Role) => {
+export const getLessons = async (query: any, userId:mongoose.Types.ObjectId , userRole?: Role) => {
   // Validate query parameters using schema
   const { from, to } = query;
  
   const filter: any = {};
-  
+
   // Basic filters
   if (query.title) {
     filter.title = { $regex: query.title, $options: 'i' }; 
@@ -133,8 +133,33 @@ export const getLessons = async (query: any, userId?: string, userRole?: Role) =
   if (query.publishedAt) {
     filter.publishedAt = query.publishedAt;
   }
-  
+
   if (query.courseId) {
+    // Khi filter theo courseId, cần validate format và đảm bảo course tồn tại
+    appAssert(
+      mongoose.Types.ObjectId.isValid(query.courseId),
+      NOT_FOUND,
+      "Invalid course ID format"
+    );
+
+    const course = await CourseModel.findById(query.courseId);
+    appAssert(course, NOT_FOUND, "Course not found");
+
+    // Với STUDENT và TEACHER: bắt buộc phải thuộc course này mới được phép tìm kiếm theo courseId
+    if (userRole === Role.STUDENT) {
+      const enrollment = await EnrollmentModel.findOne({
+        studentId: userId,
+        courseId: query.courseId,
+        status: "approved",
+      });
+      appAssert(enrollment, FORBIDDEN, "Not enrolled in this course");
+    } else if (userRole === Role.TEACHER) {
+      const isInstructor = (course as any).teacherIds.includes(
+        new mongoose.Types.ObjectId(userId)
+      );
+      appAssert(isInstructor, FORBIDDEN, "Not instructor of this course");
+    }
+
     filter.courseId = query.courseId;
   }
 
@@ -271,102 +296,10 @@ export const getLessons = async (query: any, userId?: string, userRole?: Role) =
 };
 
 /**
- * Yêu cầu nghiệp vụ: Lấy danh sách bài học theo course.
- * - STUDENT: chỉ nhận bài đã publish của course.
- * - TEACHER: nếu là giảng viên của course sẽ thấy tất cả; nếu không chỉ thấy bài đã publish.
- * - ADMIN: thấy tất cả.
- */
-export const getLessonsByCourse = async (courseId: string, userId?: string, userRole?: Role) => {
-  // Validate courseId
-  if (!mongoose.Types.ObjectId.isValid(courseId)) {
-    appAssert(false, NOT_FOUND, "Invalid course ID format");
-  }
-
-  // Check if course exists
-  const course = await CourseModel.findById(courseId);
-  appAssert(course, NOT_FOUND, "Course not found");
-  
-  // Access control based on user role
-  if (userRole === Role.STUDENT) {
-    // Students must be enrolled in the course
-    // const enrollment = await EnrollmentModel.findOne({
-    //   studentId: userId,
-    //   courseId: courseId,
-    //   status: 'active'
-    // });
-    // appAssert(enrollment, FORBIDDEN, "Not enrolled in this course");
-    
-    // Students can only see published lessons
-    const lessons = await LessonModel.find({ 
-      courseId, 
-      publishedAt: { $exists: true, $ne: null } 
-    })
-    .populate('courseId', 'title description')
-    .sort({ order: 1 })
-    .lean();
-    
-    return lessons.map(lesson => ({
-      ...lesson,
-      hasAccess: true,
-      accessReason: 'enrolled'
-    }));
-    
-  } else if (userRole === Role.TEACHER) {
-    // Check if teacher is instructor of the course
-    const isInstructor = (course as any).teacherIds.includes(new mongoose.Types.ObjectId(userId));
-    
-    if (isInstructor) {
-      // Instructors can see all lessons (published and unpublished)
-      const lessons = await LessonModel.find({ courseId })
-        .populate('courseId', 'title description')
-        .sort({ order: 1 })
-        .lean();
-        
-      return lessons.map(lesson => ({
-        ...lesson,
-        hasAccess: true,
-        accessReason: 'instructor'
-      }));
-    } else {
-      // Non-instructor teachers can only see published lessons
-      const lessons = await LessonModel.find({ 
-        courseId, 
-        publishedAt: { $exists: true, $ne: null } 
-      })
-      .populate('courseId', 'title description')
-      .sort({ order: 1 })
-      .lean();
-      
-      return lessons.map(lesson => ({
-        ...lesson,
-        hasAccess: true,
-        accessReason: 'published'
-      }));
-    }
-    
-  } else if (userRole === Role.ADMIN) {
-    // Admins can see all lessons
-    const lessons = await LessonModel.find({ courseId })
-      .populate('courseId', 'title description')
-      .sort({ order: 1 })
-      .lean();
-      
-    return lessons.map(lesson => ({
-      ...lesson,
-      hasAccess: true,
-      accessReason: 'admin'
-    }));
-  }
-  
-  // If no user role or invalid role, return empty array
-  return [];
-};
-
-/**
  * Yêu cầu nghiệp vụ: Lấy chi tiết một bài học theo id.
  * - Tôn trọng phân quyền như trên; nếu không có quyền thì ẩn content và trả kèm lý do.
  */
-export const getLessonById = async (id: string, userId?: string, userRole?: Role) => {
+export const getLessonById = async (id: string, userId:mongoose.Types.ObjectId, userRole?: Role) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     appAssert(false, NOT_FOUND, "Invalid lesson ID format");
   }

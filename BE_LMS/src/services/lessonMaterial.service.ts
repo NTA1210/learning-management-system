@@ -29,7 +29,7 @@ import { removeDirAndFiles } from "minio";
  */
 export const getLessonMaterials = async (
   query: any,
-  userId?: string,
+  userId: mongoose.Types.ObjectId,
   userRole?: Role
 ) => {
   const filter: any = {};
@@ -40,62 +40,30 @@ export const getLessonMaterials = async (
     filter.title = { $regex: query.title, $options: "i" };
   }
 
-  // Filter by type: need to match mimeType, originalName, or title pattern
+    // Filter by type: need to match mimeType, originalName, or title pattern
   if (query.type) {
     const typePatterns: Record<string, any> = {
       pdf: {
         $or: [
-          { mimeType: { $regex: "pdf", $options: "i" } },
-          { originalName: { $regex: "\\.pdf$", $options: "i" } },
-          { title: { $regex: "\\bpdf\\b|\\.pdf\\b", $options: "i" } },
-          { key: { $regex: "\\.pdf$", $options: "i" } },
-        ],
+          { mimeType: { $regex: 'pdf', $options: 'i' } },
+        ]
       },
       video: {
         $or: [
-          { mimeType: { $regex: "video", $options: "i" } },
-          { mimeType: { $regex: "mp4|avi|mov|wmv|flv|webm", $options: "i" } },
-          {
-            originalName: {
-              $regex: "\\.(mp4|avi|mov|wmv|flv|webm)$",
-              $options: "i",
-            },
-          },
-          {
-            title: {
-              $regex: "\\b(video|mp4|avi|mov|wmv|flv|webm)\\b",
-              $options: "i",
-            },
-          },
-          { key: { $regex: "\\.(mp4|avi|mov|wmv|flv|webm)$", $options: "i" } },
-        ],
+          { mimeType: { $regex: 'video', $options: 'i' } },
+          { mimeType: { $regex: 'mp4|avi|mov|wmv|flv|webm', $options: 'i' } },
+        ]
       },
       ppt: {
         $or: [
-          {
-            mimeType: {
-              $regex: "powerpoint|presentation|ms-powerpoint",
-              $options: "i",
-            },
-          },
-          { originalName: { $regex: "\\.(ppt|pptx)$", $options: "i" } },
-          {
-            title: {
-              $regex: "\\b(powerpoint|ppt|pptx|presentation)\\b",
-              $options: "i",
-            },
-          },
-          { key: { $regex: "\\.(ppt|pptx)$", $options: "i" } },
-        ],
+          { mimeType: { $regex: 'powerpoint|presentation|ms-powerpoint', $options: 'i' } },
+        ]
       },
       link: {
         $or: [
-          { mimeType: { $regex: "link|url", $options: "i" } },
-          { originalName: { $regex: "\\.(url|link)$", $options: "i" } },
-          { title: { $regex: "\\b(link|url)\\b", $options: "i" } },
-          { key: { $regex: "^https?://", $options: "i" } },
-        ],
-      },
+          { mimeType: { $regex: 'link|url', $options: 'i' } },
+        ]
+      }
     };
 
     if (typePatterns[query.type]) {
@@ -104,30 +72,7 @@ export const getLessonMaterials = async (
     } else if (query.type === "other") {
       // For 'other', match files that don't match any known type
       filter.$nor = [
-        {
-          mimeType: {
-            $regex: "pdf|video|powerpoint|presentation|link|url",
-            $options: "i",
-          },
-        },
-        {
-          originalName: {
-            $regex: "\\.(pdf|mp4|avi|mov|ppt|pptx|url|link)$",
-            $options: "i",
-          },
-        },
-        {
-          title: {
-            $regex: "\\b(pdf|video|powerpoint|ppt|pptx|link|url)\\b",
-            $options: "i",
-          },
-        },
-        {
-          key: {
-            $regex: "\\.(pdf|mp4|avi|mov|ppt|pptx|url|link)$",
-            $options: "i",
-          },
-        },
+        { mimeType: { $regex: 'pdf|video|powerpoint|presentation|link|url', $options: 'i' } },
       ];
     }
   }
@@ -263,7 +208,7 @@ export const getLessonMaterials = async (
       } else if (userRole === Role.TEACHER) {
         // Check if teacher uploaded this material or is instructor of the lesson's course
         const isUploader =
-          material.uploadedBy && material.uploadedBy._id.toString() === userId;
+          material.uploadedBy && material.uploadedBy._id === userId;
         const lesson = await LessonModel.findById(material.lessonId).populate(
           "courseId",
           "teacherIds"
@@ -306,7 +251,6 @@ export const getLessonMaterials = async (
       ) {
         signedUrl = await getSignedUrl(
           material.key,
-          24 * 60 * 60,
           material.originalName || ""
         );
       }
@@ -342,7 +286,7 @@ export const getLessonMaterials = async (
  */
 export const getLessonMaterialsByLesson = async (
   lessonId: string,
-  userId?: string,
+  userId: mongoose.Types.ObjectId,
   userRole?: Role
 ) => {
   // Validate lessonId
@@ -382,7 +326,6 @@ export const getLessonMaterialsByLesson = async (
         if (material.key) {
           signedUrl = await getSignedUrl(
             material.key,
-            24 * 60 * 60,
             material.originalName || ""
           );
         }
@@ -416,7 +359,6 @@ export const getLessonMaterialsByLesson = async (
           if (material.key) {
             signedUrl = await getSignedUrl(
               material.key,
-              24 * 60 * 60,
               material.originalName || ""
             );
           }
@@ -447,7 +389,6 @@ export const getLessonMaterialsByLesson = async (
           if (material.key) {
             signedUrl = await getSignedUrl(
               material.key,
-              24 * 60 * 60,
               material.originalName || ""
             );
           }
@@ -476,7 +417,6 @@ export const getLessonMaterialsByLesson = async (
         if (material.key) {
           signedUrl = await getSignedUrl(
             material.key,
-            24 * 60 * 60,
             material.originalName || ""
           );
         }
@@ -505,7 +445,7 @@ export const getLessonMaterialsByLesson = async (
  */
 export const getLessonMaterialById = async (
   id: string,
-  userId?: string,
+  userId: mongoose.Types.ObjectId,
   userRole?: Role
 ) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -529,7 +469,7 @@ export const getLessonMaterialById = async (
   } else if (userRole === Role.TEACHER) {
     // Check if teacher uploaded this material or is instructor of the lesson's course
     const isUploader =
-      material.uploadedBy && material.uploadedBy._id.toString() === userId;
+      material.uploadedBy && material.uploadedBy._id === userId;
     const lesson = await LessonModel.findById(material.lessonId).populate(
       "courseId",
       "teacherIds"
@@ -579,7 +519,6 @@ export const getLessonMaterialById = async (
   if (material.key && !material.key.startsWith("manual-materials/")) {
     signedUrl = await getSignedUrl(
       material.key,
-      24 * 60 * 60,
       material.originalName || ""
     );
   }
@@ -601,7 +540,7 @@ export const getLessonMaterialById = async (
  */
 export const createLessonMaterial = async (
   data: CreateLessonMaterialParams,
-  userId: string,
+  userId: mongoose.Types.ObjectId,
   userRole: Role
 ) => {
   // Validate lesson exists
@@ -688,7 +627,7 @@ export const createLessonMaterial = async (
 export const updateLessonMaterial = async (
   id: string,
   data: Partial<CreateLessonMaterialParams>,
-  userId: string,
+  userId: mongoose.Types.ObjectId,
   userRole: Role
 ) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -704,7 +643,7 @@ export const updateLessonMaterial = async (
   } else if (userRole === Role.TEACHER) {
     // Check if teacher uploaded this material or is instructor of the lesson's course
     const isUploader =
-      material.uploadedBy && material.uploadedBy.toString() === userId;
+      material.uploadedBy && material.uploadedBy === userId;
     const lesson = await LessonModel.findById(material.lessonId).populate(
       "courseId",
       "teacherIds"
@@ -765,7 +704,7 @@ export const updateLessonMaterial = async (
  */
 export const deleteLessonMaterial = async (
   id: string,
-  userId: string,
+  userId: mongoose.Types.ObjectId,
   userRole: Role
 ) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -781,7 +720,7 @@ export const deleteLessonMaterial = async (
   } else if (userRole === Role.TEACHER) {
     // Check if teacher uploaded this material or is instructor of the lesson's course
     const isUploader =
-      material.uploadedBy && material.uploadedBy.toString() === userId;
+      material.uploadedBy && material.uploadedBy === userId;
     const lesson = await LessonModel.findById(material.lessonId).populate(
       "courseId",
       "teacherIds"
@@ -814,7 +753,7 @@ export const deleteLessonMaterial = async (
 export const uploadLessonMaterial = async (
   data: any,
   file: Express.Multer.File | Express.Multer.File[] | undefined,
-  userId: string,
+  userId: mongoose.Types.ObjectId,
   userRole: Role
 ) => {
   // Data is already validated in controller, no need to parse again
@@ -977,7 +916,7 @@ export const getMaterialForDownload = async (id: string) => {
  */
 export const deleteFileOfMaterial = async (
   materialId: string,
-  userId: string,
+  userId: mongoose.Types.ObjectId,
   userRole: Role
 ) => {
   // ✅ Validate material ID
@@ -1012,11 +951,11 @@ export const deleteFileOfMaterial = async (
   } else if (userRole === Role.TEACHER) {
     // Check if teacher uploaded this material or is instructor of the lesson's course
     const isUploader =
-      material.uploadedBy && material.uploadedBy.toString() === userId;
+      material.uploadedBy && material.uploadedBy === userId;
     const isInstructor =
       lesson &&
       (lesson.courseId as any).teacherIds.some(
-        (t: mongoose.Types.ObjectId) => t.toString() === userId
+        (t: mongoose.Types.ObjectId) => t === userId
       );
     appAssert(
       isUploader || isInstructor,
