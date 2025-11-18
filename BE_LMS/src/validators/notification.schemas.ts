@@ -51,8 +51,8 @@ export const listNotificationsSchema = z
         if (val === "false") return false;
         return undefined;
       }),
-    from: datePreprocess,
-    to: datePreprocess,
+    from: datePreprocess.optional(),
+    to: datePreprocess.optional(),
   })
   .refine(
     (val) => {
