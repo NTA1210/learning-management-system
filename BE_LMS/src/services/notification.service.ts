@@ -7,6 +7,7 @@ import UserModel from "../models/user.model";
 import appAssert from "../utils/appAssert";
 import { EnrollmentStatus } from "../types/enrollment.type";
 import { UserStatus } from "../types/user.type";
+import { Role } from "../types";
 import {
   CreateNotificationInput,
   ListNotificationsQuery,
@@ -20,10 +21,61 @@ import {
  */
 export const createNotification = async (
   data: CreateNotificationInput,
-  senderId: Types.ObjectId
+  senderId: Types.ObjectId,
+  senderRole: Role
 ) => {
   const { title, message, recipientType, recipientUser, recipientCourse } =
     data;
+
+  // Extra role-based guards (controller already blocks unauth roles)
+  if (senderRole === Role.TEACHER) {
+    appAssert(
+      recipientType !== "all",
+      FORBIDDEN,
+      "Teachers cannot send notifications to all users"
+    );
+
+    // Fetch teacher's active courses up front for later checks
+    const teacherCourses = await CourseModel.find({
+      teacherIds: senderId,
+    }).select("_id");
+
+    const teacherCourseIds = teacherCourses.map((course) =>
+      (course._id as Types.ObjectId).toString()
+    );
+    const teacherCourseObjectIds = teacherCourseIds.map(
+      (id) => new Types.ObjectId(id)
+    );
+
+    appAssert(
+      teacherCourseIds.length > 0,
+      FORBIDDEN,
+      "You are not assigned to any courses"
+    );
+
+    if (recipientType === "course" && recipientCourse) {
+      const ownsCourse = teacherCourseIds.includes(recipientCourse);
+      appAssert(
+        ownsCourse,
+        FORBIDDEN,
+        "You can only send notifications to courses you teach"
+      );
+    }
+
+    if (recipientType === "user" && recipientUser) {
+      const enrollment = await EnrollmentModel.exists({
+        studentId: recipientUser,
+        status: EnrollmentStatus.APPROVED,
+        courseId: { $in: teacherCourseObjectIds },
+      });
+
+      appAssert(
+        enrollment,
+        FORBIDDEN,
+        "You can only message students enrolled in your courses"
+      );
+    }
+  }
 
   // Validate recipient exists
   if (recipientType === "user" && recipientUser) {

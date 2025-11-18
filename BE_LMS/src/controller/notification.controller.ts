@@ -34,7 +34,7 @@ export const createNotificationHandler = catchErrors(async (req, res) => {
     });
   }
 
-  const result = await createNotification(data, senderId);
+  const result = await createNotification(data, senderId, req.role!);
 
   return res.success(CREATED, {
     data: result,
