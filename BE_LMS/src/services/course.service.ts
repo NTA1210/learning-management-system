@@ -4,6 +4,7 @@ import CourseModel from "../models/course.model";
 import SpecialistModel from "../models/specialist.model";
 import UserModel from "../models/user.model";
 import EnrollmentModel from "../models/enrollment.model";
+import { Types } from "mongoose";
 import SubjectModel from "../models/subject.model";
 import appAssert from "../utils/appAssert";
 import { NOT_FOUND, BAD_REQUEST, FORBIDDEN } from "../constants/http";
@@ -269,7 +270,7 @@ export const getCourseById = async (courseId: string) => {
  */
 export const createCourse = async (
   data: CreateCourseInput,
-  userId: string,
+  userId: Types.ObjectId,
   logoFile?: Express.Multer.File
 ) => {
   // ❌ FIX: Validate teacherIds array
@@ -462,7 +463,7 @@ export const createCourse = async (
 export const updateCourse = async (
     courseId: string,
     data: UpdateCourseInput,
-    userId: string,
+    userId: Types.ObjectId,
     logoFile?: Express.Multer.File
 ) => {
   // ❌ FIX: Validate courseId format
@@ -491,7 +492,7 @@ export const updateCourse = async (
     appAssert(user, NOT_FOUND, "User not found");
 
   const isTeacherOfCourse = course.teacherIds.some(
-    (teacherId) => teacherId.toString() === userId
+    (teacherId) => teacherId.equals(userId)
   );
 
   const isAdmin = user.role === Role.ADMIN;
@@ -780,7 +781,7 @@ export const deleteCourse = async (courseId: string, userId: string) => {
     appAssert(user, NOT_FOUND, "User not found");
 
   const isTeacherOfCourse = course.teacherIds.some(
-    (teacherId) => teacherId.toString() === userId
+    (teacherId) => teacherId.equals(userId)
   );
   const isAdmin = user.role === Role.ADMIN;
 
