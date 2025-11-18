@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTheme } from "../hooks/useTheme";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { quizQuestionService, type QuizQuestion } from "../services";
 
 export default function QuizCoursePage() {
@@ -13,6 +13,7 @@ export default function QuizCoursePage() {
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("Quiz Questions");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   // Track current image index for each question
   const [currentImageIndices, setCurrentImageIndices] = useState<Record<string, number>>({});
 
@@ -84,6 +85,7 @@ export default function QuizCoursePage() {
         // Fetch all quiz questions and filter by subjectId on client side
         const result = await quizQuestionService.getAllQuizQuestions({
           limit: 1000, // Get all questions
+          option: "subjectId", // Populate subjectId
         });
 
         console.log("QuizCoursePage: All quiz questions result:", result);
@@ -119,6 +121,70 @@ export default function QuizCoursePage() {
     };
   }, [courseId]);
 
+  const showSwalConfirm = async (message: string): Promise<boolean> => {
+    const Swal = (await import("sweetalert2")).default;
+    const result = await Swal.fire({
+      title: "Xác nhận",
+      text: message,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Xóa",
+      cancelButtonText: "Hủy",
+      reverseButtons: true,
+    });
+    return result.isConfirmed;
+  };
+
+  const showSwalError = async (message: string) => {
+    const Swal = (await import("sweetalert2")).default;
+    await Swal.fire({
+      icon: "error",
+      title: "Thất bại",
+      text: message,
+      confirmButtonText: "Đóng",
+    });
+  };
+
+  const showSwalSuccess = async (message: string) => {
+    const Swal = (await import("sweetalert2")).default;
+    await Swal.fire({
+      icon: "success",
+      title: "Thành công",
+      text: message,
+      timer: 1500,
+      showConfirmButton: false,
+    });
+  };
+
+  const handleDeleteQuestion = async (questionId: string) => {
+    const confirmed = await showSwalConfirm("Bạn có chắc chắn muốn xóa câu hỏi này?");
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingId(questionId);
+      // Get question from current state to pass to delete function
+      const question = quizQuestions.find((q) => q._id === questionId);
+      await quizQuestionService.deleteQuizQuestion(questionId, question);
+      
+      // Remove question from state
+      setQuizQuestions((prev) => {
+        const updated = prev.filter((q) => q._id !== questionId);
+        setTitle(`Quiz Questions (${updated.length} questions)`);
+        return updated;
+      });
+      await showSwalSuccess("Đã xóa câu hỏi thành công.");
+    } catch (error) {
+      console.error("Error deleting question:", error);
+      await showSwalError("Có lỗi xảy ra khi xóa câu hỏi. Vui lòng thử lại.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const textColor = darkMode ? "#e2e8f0" : "#1e293b";
   const bgColor = darkMode ? "#0f172a" : "#f8fafc";
   const cardBg = darkMode ? "rgba(15,23,42,0.6)" : "#ffffff";
@@ -135,16 +201,6 @@ export default function QuizCoursePage() {
               <h1 className="text-3xl font-bold" style={{ color: textColor }}>
                 {title}
               </h1>
-              <button
-                onClick={() => navigate(-1)}
-                className="px-4 py-2 rounded-lg font-semibold transition-colors"
-                style={{
-                  backgroundColor: darkMode ? "rgba(99,102,241,0.2)" : "#6366f1",
-                  color: darkMode ? "#a5b4fc" : "#ffffff",
-                }}
-              >
-                Quay lại
-              </button>
             </div>
 
             {loading ? (
@@ -157,6 +213,18 @@ export default function QuizCoursePage() {
               </div>
             ) : (
               <div className="space-y-6">
+                <div className="mb-4">
+                  <button
+                    onClick={() => navigate(-1)}
+                    className="px-4 py-2 rounded-lg font-semibold transition-colors"
+                    style={{
+                      backgroundColor: darkMode ? "rgba(99,102,241,0.2)" : "#6366f1",
+                      color: darkMode ? "#a5b4fc" : "#ffffff",
+                    }}
+                  >
+                    Quay lại
+                  </button>
+                </div>
                 {quizQuestions.map((question, index) => {
                   const images = resolveImageSrc(question);
                   return (
@@ -169,12 +237,28 @@ export default function QuizCoursePage() {
                       }}
                     >
                       <div className="mb-4">
-                        <h3
-                          className="text-xl font-semibold mb-2 break-words"
-                          style={{ color: textColor }}
-                        >
-                          Câu {index + 1}: {question.text}
-                        </h3>
+                        <div className="flex items-start justify-between mb-2">
+                          <h3
+                            className="text-xl font-semibold break-words flex-1"
+                            style={{ color: textColor }}
+                          >
+                            Câu {index + 1}: {question.text}
+                          </h3>
+                          <button
+                            onClick={() => handleDeleteQuestion(question._id)}
+                            disabled={deletingId === question._id}
+                            className="ml-4 p-2 rounded-lg transition-colors flex-shrink-0"
+                            style={{
+                              backgroundColor: darkMode ? "rgba(239, 68, 68, 0.2)" : "#fee2e2",
+                              color: darkMode ? "#fca5a5" : "#dc2626",
+                              opacity: deletingId === question._id ? 0.5 : 1,
+                              cursor: deletingId === question._id ? "not-allowed" : "pointer",
+                            }}
+                            title="Xóa câu hỏi"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
                         {images.length > 0 && (() => {
                           const currentIndex = currentImageIndices[question._id] || 0;
                           const currentImage = images[currentIndex];
@@ -258,7 +342,14 @@ export default function QuizCoursePage() {
                             Lựa chọn:
                           </p>
                           {question.options.map((option, optIndex) => {
-                            const isCorrect = question.correctOptions?.includes(optIndex);
+                            const correctOptions = question.correctOptions || [];
+                            const isBinaryCorrect =
+                              correctOptions.length === question.options?.length &&
+                              correctOptions.every((val) => val === 0 || val === 1);
+                            const isCorrect = isBinaryCorrect
+                              ? correctOptions[optIndex] === 1
+                              : correctOptions.includes(optIndex);
+
                             return (
                               <div
                                 key={optIndex}
