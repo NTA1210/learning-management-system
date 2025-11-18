@@ -14,6 +14,8 @@ import {
   markAllNotificationsAsRead,
   deleteNotification,
   getUnreadNotificationCount,
+  undoDeleteNotification,
+  hardDeleteNotification,
 } from "../services/notification.service";
 import { Role } from "../types";
 
@@ -126,6 +128,36 @@ export const deleteNotificationHandler = catchErrors(async (req, res) => {
   const userId = req.userId!;
 
   const result = await deleteNotification(notificationId, userId);
+
+  return res.success(OK, {
+    data: result,
+    message: result.message,
+  });
+});
+
+/**
+ * PUT /notifications/:id/undo-delete - Undo delete a notification
+ */
+export const undoDeleteNotificationHandler = catchErrors(async (req, res) => {
+  const notificationId = notificationIdSchema.parse(req.params.id);
+  const userId = req.userId!;
+
+  const result = await undoDeleteNotification(notificationId, userId);
+
+  return res.success(OK, {
+    data: result,
+    message: result.message,
+  });
+});
+
+/**
+ * DELETE /notifications/:id/hard - Permanently delete a notification
+ */
+export const hardDeleteNotificationHandler = catchErrors(async (req, res) => {
+  const notificationId = notificationIdSchema.parse(req.params.id);
+  const userId = req.userId!;
+
+  const result = await hardDeleteNotification(notificationId, userId);
 
   return res.success(OK, {
     data: result,

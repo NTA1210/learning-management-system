@@ -12,5 +12,8 @@ export default interface INotification extends mongoose.Document {
   isRead?: boolean;
   readAt?: Date;
   createdAt?: Date;
+  // Soft delete flags
+  isDeleted?: boolean;
+  deletedAt?: Date;
   markRead(): Promise<INotification>;
 }

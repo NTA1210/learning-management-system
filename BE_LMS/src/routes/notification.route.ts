@@ -7,6 +7,8 @@ import {
   markNotificationsAsReadHandler,
   markAllNotificationsAsReadHandler,
   deleteNotificationHandler,
+  undoDeleteNotificationHandler,
+  hardDeleteNotificationHandler,
 } from "../controller/notification.controller";
 import authorize from "../middleware/authorize";
 import { Role } from "../types";
@@ -36,6 +38,12 @@ notificationRoutes.put("/read", markNotificationsAsReadHandler);
 
 // PUT /notifications/read-all - Mark all notifications as read
 notificationRoutes.put("/read-all", markAllNotificationsAsReadHandler);
+
+// PUT /notifications/:id/undo-delete - Undo delete a notification
+notificationRoutes.put("/:id/undo-delete", undoDeleteNotificationHandler);
+
+// DELETE /notifications/:id/hard - Hard delete a notification
+notificationRoutes.delete("/:id/hard", hardDeleteNotificationHandler);
 
 // DELETE /notifications/:id - Delete a notification
 notificationRoutes.delete("/:id", deleteNotificationHandler);

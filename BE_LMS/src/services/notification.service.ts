@@ -177,6 +177,8 @@ export const getNotifications = async (
 
   const filter: any = {
     recipientUser: userId,
+    // Only fetch non-deleted notifications
+    isDeleted: false,
   };
 
   if (isRead !== undefined) {
@@ -225,15 +227,12 @@ export const markNotificationAsRead = async (
   notificationId: string,
   userId: Types.ObjectId
 ) => {
-  const notification = await NotificationModel.findById(notificationId);
+  const notification = await NotificationModel.findOne({
+    _id: notificationId,
+    recipientUser: userId,
+    isDeleted: false,
+  });
   appAssert(notification, NOT_FOUND, "Notification not found");
-
-  // Check if user owns this notification
-  appAssert(
-    notification.recipientUser?.equals(userId),
-    FORBIDDEN,
-    "You can only mark your own notifications as read"
-  );
 
   notification.isRead = true;
   notification.readAt = new Date();
@@ -252,6 +251,7 @@ export const markNotificationsAsRead = async (
   const notifications = await NotificationModel.find({
     _id: { $in: notificationIds },
     recipientUser: userId,
+    isDeleted: false,
   });
 
   appAssert(
@@ -262,7 +262,7 @@ export const markNotificationsAsRead = async (
 
   const now = new Date();
   await NotificationModel.updateMany(
-    { _id: { $in: notificationIds }, recipientUser: userId },
+    { _id: { $in: notificationIds }, recipientUser: userId, isDeleted: false },
     {
       $set: {
         isRead: true,
@@ -285,6 +285,7 @@ export const markAllNotificationsAsRead = async (userId: Types.ObjectId) => {
     {
       recipientUser: userId,
       isRead: false,
+      isDeleted: false,
     },
     {
       $set: {
@@ -307,18 +308,47 @@ export const deleteNotification = async (
   notificationId: string,
   userId: Types.ObjectId
 ) => {
-  const notification = await NotificationModel.findById(notificationId);
+  const notification = await NotificationModel.findOne({
+    _id: notificationId,
+    recipientUser: userId,
+    isDeleted: false,
+  });
+
   appAssert(notification, NOT_FOUND, "Notification not found");
 
-  // Check if user owns this notification
-  appAssert(
-    notification.recipientUser?.equals(userId),
-    FORBIDDEN,
-    "You can only delete your own notifications"
-  );
+  notification.isDeleted = true;
+  notification.deletedAt = new Date();
+  await notification.save();
 
-  await NotificationModel.findByIdAndDelete(notificationId);
-  return { message: "Notification deleted successfully" };
+  return {
+    deleted: true,
+    message: "Notification deleted successfully",
+  };
+};
+
+/**
+ * Hard delete a notification (cannot be undone)
+ */
+export const hardDeleteNotification = async (
+  notificationId: string,
+  userId: Types.ObjectId
+) => {
+  const notification = await NotificationModel.findOne({
+    _id: notificationId,
+    recipientUser: userId,
+  });
+
+  appAssert(notification, NOT_FOUND, "Notification not found");
+
+  await NotificationModel.deleteOne({
+    _id: notificationId,
+    recipientUser: userId,
+  });
+
+  return {
+    deleted: true,
+    message: "Notification permanently deleted",
+  };
 };
 
 /**
@@ -328,8 +358,50 @@ export const getUnreadNotificationCount = async (userId: Types.ObjectId) => {
   const count = await NotificationModel.countDocuments({
     recipientUser: userId,
     isRead: false,
+    isDeleted: false,
   });
 
   return { count };
+};
+
+/**
+ * Undo soft delete for a notification
+ */
+export const undoDeleteNotification = async (
+  notificationId: string,
+  userId: Types.ObjectId
+) => {
+  const notification = await NotificationModel.findOne({
+    _id: notificationId,
+    recipientUser: userId,
+    isDeleted: true,
+  });
+
+  appAssert(
+    notification,
+    NOT_FOUND,
+    "Notification not found or not deleted"
+  );
+
+  // Optional: limit undo time window (e.g. 5 minutes)
+  const MAX_UNDO_MS = 5 * 60 * 1000;
+  if (notification.deletedAt) {
+    const diff = Date.now() - notification.deletedAt.getTime();
+    appAssert(
+      diff <= MAX_UNDO_MS,
+      BAD_REQUEST,
+      "Undo period has expired"
+    );
+  }
+
+  notification.isDeleted = false;
+  notification.deletedAt = undefined;
+  await notification.save();
+
+  return {
+    restored: true,
+    notification,
+    message: "Notification restored successfully",
+  };
 };
 
