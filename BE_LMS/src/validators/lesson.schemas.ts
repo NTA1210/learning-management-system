@@ -30,8 +30,8 @@ export const LessonQuerySchema = (listParamsSchema.extend({
     durationMinutes: z.coerce.number().optional(),
     publishedAt: z.coerce.date().optional(),
     courseId: z.string().optional(),
-    createdAt: datePreprocess,
-    updatedAt: datePreprocess,
+    createdAt: datePreprocess.optional(),
+    updatedAt: datePreprocess.optional(),
     from: datePreprocess.optional(),
     to: datePreprocess.optional(),
 }).refine(
