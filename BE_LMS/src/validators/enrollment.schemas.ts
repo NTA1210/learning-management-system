@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { datePreprocess } from "./helpers/date.schema";
 import {
   EnrollmentStatus,
   EnrollmentRole,
@@ -11,19 +12,34 @@ const objectIdSchema = z.string().regex(/^[0-9a-fA-F]{24}$/, {
 });
 
 // GET - Query enrollments (cho các query params)
-export const getEnrollmentsQuerySchema = z.object({
-  status: z.enum(EnrollmentStatus).optional(),
-  courseId: z.string().optional(),
-  studentId: z.string().optional(),
-  page: z
-    .string()
-    .optional()
-    .transform((val) => (val ? parseInt(val) : 1)),
-  limit: z
-    .string()
-    .optional()
-    .transform((val) => (val ? parseInt(val) : 10)),
-});
+export const getEnrollmentsQuerySchema = z
+  .object({
+    status: z.enum(EnrollmentStatus).optional(),
+    courseId: z.string().optional(),
+    studentId: z.string().optional(),
+    page: z
+      .string()
+      .optional()
+      .transform((val) => (val ? parseInt(val) : 1)),
+    limit: z
+      .string()
+      .optional()
+      .transform((val) => (val ? parseInt(val) : 10)),
+    from: datePreprocess,
+    to: datePreprocess,
+  })
+  .refine(
+    (val) => {
+      if (val.from && val.to) {
+        return val.from.getTime() <= val.to.getTime();
+      }
+      return true;
+    },
+    {
+      message: "From date must be less than or equal to To date",
+      path: ["to"],
+    }
+  );
 
 // Validate ID trong URL params
 export const enrollmentIdSchema = z.object({

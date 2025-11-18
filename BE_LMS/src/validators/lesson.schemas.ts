@@ -1,4 +1,7 @@
 import z from "zod";
+import ListParams from "@/types/dto/listParams.dto";
+import { listParamsSchema } from "./listParams.schema";
+import { datePreprocess } from "./helpers/date.schema";
 
 export const CreateLessonSchema = z.object({
     title: z.string().min(1).max(255),
@@ -9,17 +12,40 @@ export const CreateLessonSchema = z.object({
     publishedAt: z.coerce.date().optional(),
 });
 
-export const LessonQuerySchema = z.object({
+type LessonQueryFilters = ListParams & {
+    title?: string;
+    content?: string;
+    order?: number;
+    durationMinutes?: number;
+    publishedAt?: Date;
+    courseId?: string;
+    from?: Date;
+    to?: Date;
+};
+
+export const LessonQuerySchema = (listParamsSchema.extend({
     title: z.string().optional(),
     content: z.string().optional(),
     order: z.coerce.number().optional(),
     durationMinutes: z.coerce.number().optional(),
     publishedAt: z.coerce.date().optional(),
     courseId: z.string().optional(),
-    search: z.string().optional(), // For full-text search
-    page: z.coerce.number().min(1).default(1),
-    limit: z.coerce.number().min(1).max(100).default(10),
-});
+    createdAt: datePreprocess,
+    updatedAt: datePreprocess,
+    from: datePreprocess,
+    to: datePreprocess,
+}).refine(
+    (val) => {
+        if (val.from && val.to) {
+            return val.from.getTime() <= val.to.getTime();
+        }
+        return true;
+    },
+    {
+        message: "From date must be less than or equal to To date",
+        path: ["to"],
+    }
+)) satisfies z.ZodType<LessonQueryFilters>;
 
 export const LessonByIdSchema = z.object({
     id: z.string().min(1, "ID is required"),

@@ -3,9 +3,11 @@ import Sidebar from "../components/Sidebar";
 import ModelViewer from "../components/ModelViewer";
 import { useTheme } from "../hooks/useTheme";
 import { useEffect, useState } from "react";
+import { useAuth } from "../hooks/useAuth";
 
 const AboutUs = () => {
   const { darkMode } = useTheme();
+  const { user } = useAuth();
   const [modelSize, setModelSize] = useState(450);
   useEffect(() => {
     const updateSize = () => {
@@ -133,7 +135,7 @@ const AboutUs = () => {
       }}
     >
       <Navbar />
-      <Sidebar role="admin" />
+      <Sidebar role={(user?.role as "admin" | "teacher" | "student") || "student"} />
       <div className="flex flex-col flex-1 w-0 overflow-hidden">
         <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 mt-16 sm:pl-24 md:pl-28">
           <div className="max-w-6xl mx-auto px-4 py-2 relative">

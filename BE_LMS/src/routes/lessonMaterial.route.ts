@@ -9,6 +9,7 @@ import {
   deleteLessonMaterialController,
   downloadLessonMaterialController,
   uploadLessonMaterialController,
+  deleteLessonMaterialFile,
 } from "../controller/lessonMaterial.controller";
 
 import authenticate from "@/middleware/authenticate";
@@ -76,6 +77,6 @@ lessonMaterialRoutes.delete(
   deleteLessonMaterialController
 );
 //DELTE /lesson-material/deleteFileOfMaterial/:id - Xóa file tài liệu (teacher/admin)
-// lessonMaterialRoutes.delete("/deleteFileOfMaterial/:id", authenticate, authorize(Role.TEACHER, Role.ADMIN), deleteLessonMaterialFile);
+lessonMaterialRoutes.delete("/deleteFileOfMaterial/:id", authenticate, authorize(Role.TEACHER, Role.ADMIN), deleteLessonMaterialFile);
 
 export default lessonMaterialRoutes;

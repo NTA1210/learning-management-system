@@ -483,6 +483,28 @@ describe("📚 Lesson Service Unit Tests", () => {
         expect.objectContaining({ $text: { $search: "test" } })
       );
     });
+
+    it("should apply createdAt range filters", async () => {
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([lesson]),
+      };
+      (LessonModel.find as jest.Mock).mockImplementation((filter: any) => {
+        expect(filter.createdAt.$gte).toEqual(fromDate);
+        expect(filter.createdAt.$lte).toEqual(toDate);
+        return mockQuery;
+      });
+      (LessonModel.countDocuments as jest.Mock).mockResolvedValue(1);
+
+      const fromDate = new Date("2024-02-01");
+      const toDate = new Date("2024-02-28");
+      const result = await getLessons({ page: 1, limit: 10, from: fromDate, to: toDate }, adminUser._id.toString(), Role.ADMIN);
+
+      expect(result.lessons).toHaveLength(1);
+    });
   });
 
   describe("getLessonsByCourse", () => {

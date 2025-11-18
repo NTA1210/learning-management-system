@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { useTheme } from "../hooks/useTheme";
+import { useAuth } from "../hooks/useAuth";
 
 type FeedbackCategory = "bug" | "feature" | "content" | "uiux" | "other";
 
@@ -24,6 +25,7 @@ const categories: { value: FeedbackCategory; label: string }[] = [
 
 export default function Feedback() {
 	const { darkMode } = useTheme();
+	const { user } = useAuth();
 	const [submitting, setSubmitting] = useState(false);
 	const [success, setSuccess] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
@@ -77,7 +79,7 @@ export default function Feedback() {
 			}}
 		>
 			<Navbar />
-			<Sidebar role="student" />
+			<Sidebar role={(user?.role as "admin" | "teacher" | "student") || "student"} />
 
 			<main className="flex-1 overflow-y-auto pt-24 px-6 sm:px-10">
 				<style>

@@ -108,6 +108,14 @@ export const getPublicUrl = (key: string) =>
   `https://${MINIO_ENDPOINT}/${BUCKET_NAME}/${key}`;
 
 /**
+ *
+ * @param publicUrl
+ * @returns
+ */
+export const getKeyFromPublicUrl = (publicUrl: string) =>
+  publicUrl.replace(`https://${MINIO_ENDPOINT}/${BUCKET_NAME}/`, "");
+
+/**
  * method to get signed url
  * @param key
  * @param expiresIn
@@ -155,9 +163,9 @@ export const removeFile = async (key: string) => {
  * @param keys
  * @returns
  */
-export const removeFiles = async (key: string[]) => {
+export const removeFiles = async (keys: string[]) => {
   try {
-    return await minioClient.removeObjects(BUCKET_NAME, key);
+    return await minioClient.removeObjects(BUCKET_NAME, keys);
   } catch (error) {
     throw new AppError(
       `Remove files error ${(error as Error).message}`,

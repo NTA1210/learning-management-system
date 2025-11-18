@@ -3,14 +3,23 @@ import { QuizModel, QuizQuestionModel, SubjectModel } from "@/models";
 import { ListParams } from "@/types/dto";
 import IQuizQuestion, { QuizQuestionType } from "@/types/quizQuestion.type";
 import appAssert from "@/utils/appAssert";
-import { prefixQuizQuestionImage } from "@/utils/filePrefix";
-import { removeFile, removeFiles, uploadFile } from "@/utils/uploadFile";
+import {
+  prefixExternalQuizQuestionImage,
+  prefixQuizQuestionImage,
+} from "@/utils/filePrefix";
+import {
+  getKeyFromPublicUrl,
+  removeFile,
+  removeFiles,
+  uploadFiles,
+} from "@/utils/uploadFile";
 import {
   ICreateQuizQuestionParams,
   IGetRandomQuestionsParams,
   IUpdateQuizQuestionParams,
+  TUploadImagesParams,
 } from "@/validators/quizQuestion.schemas";
-import mongoose, { FilterQuery } from "mongoose";
+import mongoose, { FilterQuery, get } from "mongoose";
 import { parseStringPromise } from "xml2js";
 import { create } from "xmlbuilder";
 
@@ -251,16 +260,26 @@ export const getAllQuizQuestions = async ({
   let sortObj: any = { createdAt: sortDirection };
   if (search) sortObj = { score: { $meta: "textScore" } };
 
-  const [data, total] = await Promise.all([
+  const [rawData, total] = await Promise.all([
     QuizQuestionModel.find(query, projection)
       .sort(sortObj)
       .skip((_page - 1) * _limit)
-      .limit(_limit),
+      .limit(_limit)
+      .lean(),
     QuizQuestionModel.countDocuments(query),
   ]);
 
   const totalPages = Math.ceil(total / _limit);
-
+  const data = rawData.map((q) => {
+    return {
+      ...q,
+      images: q.images?.map((image) => ({ url: image, fromDB: true })),
+      isExternal: false,
+      isNew: false,
+      isDirty: false,
+      isDeleted: false,
+    };
+  });
   return {
     data, // mỗi document sẽ có thêm field "score" nếu search
     pagination: {
@@ -274,18 +293,68 @@ export const getAllQuizQuestions = async ({
   };
 };
 
+/**
+ * Handle image upload for quiz question.
+ * If deletedKeys is provided, it will remove the corresponding files.
+ * Then it will upload the new files and return the public URLs.
+ * @param files - Files to upload.
+ * @param subjectId - Subject ID for the quiz question.
+ * @param quizQuestionId - Quiz question ID for the files.
+ * @param deletedKeys - Optional array of file keys to delete.
+ * @returns An array of public URLs of the uploaded files.
+ */
 const handleImageUpload = async (
-  file: Express.Multer.File,
+  files: Express.Multer.File[],
   subjectId: string,
   quizQuestionId: string,
-  oldKey?: string
+  deletedKeys?: string[]
 ) => {
-  if (oldKey) await removeFile(oldKey);
-  const prefix = prefixQuizQuestionImage(subjectId, quizQuestionId);
-  const result = await uploadFile(file, prefix);
-  console.log("TYPE UPLOAD : ", typeof result.key);
+  for (const file of files) {
+    appAssert(
+      file.mimetype.startsWith("image/"),
+      BAD_REQUEST,
+      "File must be an image"
+    );
+  }
 
-  return result;
+  if (deletedKeys && deletedKeys.length > 0)
+    await removeFiles(deletedKeys.map((key) => getKeyFromPublicUrl(key)));
+  const prefix = prefixQuizQuestionImage(subjectId, quizQuestionId);
+  const result = await uploadFiles(files, prefix);
+
+  return result.map((image) => image.publicUrl);
+};
+
+/**
+ * Checks if a quiz question has a proper type.
+ * @param type - Type of the quiz question.
+ * @param correctOptions - Correct option indices of the quiz question.
+ * @throws BAD_REQUEST - If the question type is invalid.
+ * @returns - True if the question type is valid, false otherwise.
+ */
+export const checkProperQuestionType = (
+  type: QuizQuestionType,
+  correctOptions: number[],
+  message?: string
+) => {
+  const trueOptions: number = correctOptions.filter((q) => q === 1).length;
+
+  switch (type) {
+    case QuizQuestionType.MULTIPLE_CHOICE:
+      return appAssert(
+        trueOptions >= 1,
+        BAD_REQUEST,
+        message ||
+          "Multiple choice questions must have at least one correct option"
+      );
+
+    default:
+      return appAssert(
+        trueOptions === 1,
+        BAD_REQUEST,
+        message || "This question type must have only one correct option"
+      );
+  }
 };
 
 /**
@@ -293,7 +362,7 @@ const handleImageUpload = async (
  *
  * @param  subjectId - Subject ID
  * @param  text - Question text
- * @param  Express.Multer.File image - Question image
+ * @param  Express.Multer.File[] images - Question image
  * @param  type - Question type
  * @param  options - Question options
  * @param  correctOptions - Correct option indices
@@ -304,7 +373,7 @@ const handleImageUpload = async (
 export const createQuizQuestion = async ({
   subjectId,
   text,
-  image,
+  images,
   type,
   options,
   correctOptions,
@@ -313,6 +382,12 @@ export const createQuizQuestion = async ({
 }: ICreateQuizQuestionParams) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
+
+  //check questions type
+  checkProperQuestionType(
+    type || QuizQuestionType.MULTIPLE_CHOICE,
+    correctOptions
+  );
 
   // 1️⃣ Tạo question trước
   const newQuizQuestion = await QuizQuestionModel.create({
@@ -326,19 +401,18 @@ export const createQuizQuestion = async ({
   });
 
   // 2️⃣ Nếu có ảnh, upload và cập nhật sau
-  if (image) {
+  if (images && images.length > 0) {
     try {
-      const { publicUrl, key } = await handleImageUpload(
-        image,
+      const imageFiles = await handleImageUpload(
+        images,
         subjectId,
         newQuizQuestion.id
       );
+
       await QuizQuestionModel.findByIdAndUpdate(newQuizQuestion._id, {
-        image: publicUrl,
-        key,
+        images: imageFiles,
       });
-      newQuizQuestion.image = publicUrl;
-      newQuizQuestion.key = key;
+      newQuizQuestion.images = imageFiles;
     } catch (error) {
       await QuizQuestionModel.findByIdAndDelete(newQuizQuestion._id);
       throw error;
@@ -367,72 +441,73 @@ export const updateQuizQuestion = async ({
   quizQuestionId,
   subjectId,
   text,
-  image,
+  images,
   type,
   options,
   correctOptions,
   points = 1,
   explanation,
+  deletedKeys,
 }: IUpdateQuizQuestionParams) => {
-  const quizQuestion = await QuizQuestionModel.findById(quizQuestionId).lean();
+  // 1️⃣ Lấy quiz question
+  const quizQuestion = await QuizQuestionModel.findById(quizQuestionId);
   appAssert(quizQuestion, NOT_FOUND, "Question not found");
 
+  // 2️⃣ Kiểm tra subject nếu có
   if (subjectId) {
     const subject = await SubjectModel.findById(subjectId);
     appAssert(subject, NOT_FOUND, "Subject not found");
   }
 
-  // 1️⃣ Kiem tra options va correctOptions khi update có trùng length khong
-  let optionsLength = quizQuestion.options.length;
-  let correctOptionsLength = quizQuestion.correctOptions.length;
-
-  if (options) {
-    optionsLength = options.length;
-  }
-
-  if (correctOptions) {
-    correctOptionsLength = correctOptions.length;
-  }
-
-  const optionsErrorMessage =
-    options && correctOptions
-      ? "Options and correct options must have the same length"
-      : options
-      ? `Options must have the length of ${correctOptionsLength}`
-      : `Correct options must have the length of ${optionsLength}`;
-
-  appAssert(
-    optionsLength === correctOptionsLength,
-    BAD_REQUEST,
-    optionsErrorMessage
+  //check questions type
+  checkProperQuestionType(
+    type || quizQuestion.type,
+    correctOptions || quizQuestion.correctOptions
   );
 
-  let publicUrl = quizQuestion.image;
-  let key = quizQuestion.key;
-  // 2️⃣ Nếu có ảnh, upload và cập nhật sau 1
-  if (image) {
-    const result = await handleImageUpload(
-      image,
-      subjectId?.toString() || quizQuestion.subjectId.toString(),
-      quizQuestionId,
-      key
+  // 3️⃣ Validate options & correctOptions
+  const finalOptions = options ?? quizQuestion.options;
+  const finalCorrectOptions = correctOptions ?? quizQuestion.correctOptions;
+
+  appAssert(
+    finalOptions.length === finalCorrectOptions.length,
+    BAD_REQUEST,
+    "Options and correct options must have the same length"
+  );
+
+  // 4️⃣ Xử lý ảnh: loại bỏ deletedKeys
+  let imagesRemaining = quizQuestion.images || [];
+  if (deletedKeys && deletedKeys.length > 0) {
+    imagesRemaining = imagesRemaining.filter(
+      (img) => !deletedKeys.includes(img)
     );
-    publicUrl = result.publicUrl;
-    key = result.key;
   }
 
+  // 5️⃣ Upload ảnh mới nếu có
+  if (images && images.length > 0) {
+    const uploaded = await handleImageUpload(
+      images,
+      subjectId?.toString() || quizQuestion.subjectId.toString(),
+      quizQuestionId,
+      deletedKeys
+    );
+
+    // ✅ Cập nhật mảng ảnh
+    imagesRemaining = imagesRemaining.concat(uploaded);
+  }
+
+  // 6️⃣ Update quiz question
   const updatedQuizQuestion = await QuizQuestionModel.findByIdAndUpdate(
     quizQuestionId,
     {
       subjectId: subjectId || quizQuestion.subjectId,
       text,
       type,
-      options,
-      correctOptions,
+      options: finalOptions,
+      correctOptions: finalCorrectOptions,
       points,
       explanation,
-      image: publicUrl,
-      key,
+      images: imagesRemaining,
     },
     { new: true }
   );
@@ -454,7 +529,7 @@ export const deleteQuizQuestion = async (quizQuestionId: string) => {
 
   const isInActiveQuiz = await QuizModel.exists({
     isCompleted: false,
-    questionIds: { $in: [new mongoose.Types.ObjectId(quizQuestionId)] }, // ✅ dùng $in cho rõ
+    questionIds: { $in: [new mongoose.Types.ObjectId(quizQuestionId)] },
   });
 
   appAssert(
@@ -464,8 +539,9 @@ export const deleteQuizQuestion = async (quizQuestionId: string) => {
   );
 
   await QuizQuestionModel.findByIdAndDelete(quizQuestionId);
-  if (question.image) {
-    if (question.key) await removeFile(question.key);
+  if (question.images && question.images.length > 0) {
+    const keys = question.images.map((image) => getKeyFromPublicUrl(image));
+    await removeFiles(keys);
   }
 
   return question;
@@ -506,7 +582,11 @@ export const deleteMultipleQuizQuestions = async (ids: string[]) => {
   // Xóa thật (hoặc soft delete)
   await QuizQuestionModel.deleteMany({ _id: { $in: ids } });
 
-  const fileKeys: string[] = questions.flatMap((q) => (q.key ? [q.key] : []));
+  const fileKeys: string[] = questions.flatMap((q) =>
+    q.images && q.images.length > 0
+      ? [...q.images.map((i) => getKeyFromPublicUrl(i))]
+      : []
+  );
 
   await removeFiles(fileKeys);
 
@@ -520,16 +600,63 @@ export const getRandomQuestions = async ({
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
 
-  const questions = await QuizQuestionModel.aggregate([
+  const questions = await QuizQuestionModel.aggregate<IQuizQuestion>([
     { $match: { subjectId: subject._id } },
     { $sample: { size: count } },
   ]);
 
   const questionTypes = new Set(questions.map((q) => q.type));
 
+  const data = questions.map((q) => {
+    return {
+      ...q,
+      images: q.images?.map((image) => ({ url: image, fromDB: true })),
+      isExternal: false,
+      isNew: false,
+      isDirty: false,
+      isDeleted: false,
+    };
+  });
+
   return {
-    data: questions,
+    data,
     total: questions.length,
     questionTypes: Array.from(questionTypes),
   };
+};
+
+/**
+ * Upload images for quiz question.
+ * Only images are allowed to be uploaded.
+ * @param  quizId - ID of the quiz to upload images for.
+ * @param images - Express.Multer.File[] - Images to upload.
+ * @returns Promise<string[]> - An array of public URLs of the uploaded images.
+ */
+export const uploadImages = async ({ quizId, images }: TUploadImagesParams) => {
+  for (const file of images) {
+    appAssert(
+      file.mimetype.startsWith("image/"),
+      BAD_REQUEST,
+      "File must be an image"
+    );
+  }
+
+  const prefix = prefixExternalQuizQuestionImage(quizId);
+  const result = await uploadFiles(images, prefix);
+  return result.map((image) => {
+    return {
+      url: image.publicUrl,
+      fromDB: false,
+    };
+  });
+};
+
+/**
+ * Delete images by their public URLs.
+ * @param  publicUrl - An array of public URLs of the images to delete.
+ * @returns  - A promise resolving to an object with a message property.
+ */
+export const deleteImage = async (publicUrl: string) => {
+  await removeFile(getKeyFromPublicUrl(publicUrl));
+  return true;
 };

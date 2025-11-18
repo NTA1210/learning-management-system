@@ -1,4 +1,5 @@
 import z from "zod";
+import { datePreprocess } from "./helpers/date.schema";
 
 // Schema for getting lesson progress
 export const GetLessonProgressSchema = z.object({
@@ -35,7 +36,20 @@ export const LessonIdParamSchema = z.object({
 export const GetCourseProgressSchema = z.object({
   courseId: z.string().min(1, "Course ID is required"),
   studentId: z.string().optional(), // Optional query param for teacher/admin
-});
+  from: datePreprocess,
+  to: datePreprocess,
+}).refine(
+  (val) => {
+    if (val.from && val.to) {
+      return val.from.getTime() <= val.to.getTime();
+    }
+    return true;
+  },
+  {
+    message: "From date must be less than or equal to To date",
+    path: ["to"],
+  }
+);
 
 // Export types
 export type GetLessonProgressParams = z.infer<typeof GetLessonProgressSchema>;

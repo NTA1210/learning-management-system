@@ -21,8 +21,8 @@ export const listQuizQuestionSchema = listParamsSchema
   .extend({
     subjectId: subjectIdSchema.optional(),
     type: z.enum(QuizQuestionType).optional(),
-    from: datePreprocess,
-    to: datePreprocess,
+    from: datePreprocess.optional(),
+    to: datePreprocess.optional(),
   })
   .refine(
     (val) => {
@@ -40,7 +40,7 @@ export const listQuizQuestionSchema = listParamsSchema
 export interface ICreateQuizQuestionParams {
   subjectId: string;
   text: string;
-  image?: Express.Multer.File;
+  images?: Express.Multer.File[];
   type?: QuizQuestionType;
   options: string[];
   correctOptions: number[];
@@ -52,7 +52,7 @@ export const createQuizQuestionSchema = z
   .object({
     subjectId: subjectIdSchema,
     text: z.string().min(1, "Text is required"),
-    image: z.any().optional(),
+    images: z.array(z.any()).optional(),
     type: z.enum(QuizQuestionType).default(QuizQuestionType.MCQ),
     options: z.array(z.string()).min(2, "At least two options are required"),
     correctOptions: z
@@ -76,6 +76,7 @@ export const createQuizQuestionSchema = z
 export interface IUpdateQuizQuestionParams
   extends Partial<ICreateQuizQuestionParams> {
   quizQuestionId: string;
+  deletedKeys?: string[];
 }
 export const quizQuestionIdSchema = z
   .string()
@@ -85,6 +86,7 @@ export const updateQuizQuestionSchema = createQuizQuestionSchema
   .partial()
   .safeExtend({
     quizQuestionId: quizQuestionIdSchema,
+    deletedKeys: z.array(z.string()).optional(),
   });
 
 export const multiQuizQuestionIdSchema = z.array(quizQuestionIdSchema);
@@ -103,3 +105,12 @@ export const randomQuizQuestionSchema = z.object({
     return val;
   }, z.number().min(1, "Count must be at least 1").max(100, "Count must be at most 100").default(10).optional()),
 });
+
+export const uploadImagesSchema = z.object({
+  quizId: subjectIdSchema,
+  images: z.array(z.any()).min(1, "At least one image is required"),
+});
+
+export type TUploadImagesParams = z.infer<typeof uploadImagesSchema>;
+
+export const deleteImagesSchema = z.string().min(1, "Image URL is required");

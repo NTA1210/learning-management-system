@@ -1,7 +1,7 @@
 import { CREATED, NOT_FOUND, OK } from "@/constants/http";
-import { QuizQuestionModel } from "@/models";
 import {
   createQuizQuestion,
+  deleteImage,
   deleteMultipleQuizQuestions,
   deleteQuizQuestion,
   exportXMLFile,
@@ -9,13 +9,14 @@ import {
   getRandomQuestions,
   importXMLFile,
   updateQuizQuestion,
+  uploadImages,
 } from "@/services/quizQuestion.service";
-import IQuizQuestion from "@/types/quizQuestion.type";
 import appAssert from "@/utils/appAssert";
 import { catchErrors } from "@/utils/asyncHandler";
 import { parseFormData } from "@/utils/parseFormData";
 import {
   createQuizQuestionSchema,
+  deleteImagesSchema,
   importQuizQuestionParamsSchema,
   listQuizQuestionSchema,
   multiQuizQuestionIdSchema,
@@ -23,6 +24,7 @@ import {
   randomQuizQuestionSchema,
   subjectIdSchema,
   updateQuizQuestionSchema,
+  uploadImagesSchema,
 } from "@/validators/quizQuestion.schemas";
 
 // POST /quiz-questions/import - Import questions from XML file
@@ -84,11 +86,11 @@ export const getAllQuizQuestionsHandler = catchErrors(async (req, res) => {
 
 // POST /quiz-questions/ - Create a new question
 export const createQuizQuestionHandler = catchErrors(async (req, res) => {
-  const file = req.file;
+  const files = req.files;
   const input = createQuizQuestionSchema.parse(
     parseFormData({
       ...req.body,
-      image: file,
+      images: files,
     })
   );
   const data = await createQuizQuestion(input);
@@ -101,14 +103,15 @@ export const createQuizQuestionHandler = catchErrors(async (req, res) => {
 
 //PUT /quiz-questions/:quizQuestionId - Update a question
 export const updateQuizQuestionByIdHandler = catchErrors(async (req, res) => {
-  const file = req.file;
+  const files = req.files;
   const input = updateQuizQuestionSchema.parse(
     parseFormData({
       ...req.body,
-      image: file,
+      images: files,
       quizQuestionId: req.params.quizQuestionId,
     })
   );
+
   const data = await updateQuizQuestion(input);
 
   res.success(CREATED, {
@@ -150,5 +153,33 @@ export const getRandomQuestionsHandler = catchErrors(async (req, res) => {
     total,
     questionTypes,
     message: "Questions retrieved successfully",
+  });
+});
+
+// POST /images - Upload images
+export const uploadImagesHandler = catchErrors(async (req, res) => {
+  const files = req.files;
+
+  const input = uploadImagesSchema.parse(
+    parseFormData({
+      ...req.body,
+      images: files,
+    })
+  );
+
+  const data = await uploadImages(input);
+  return res.success(OK, {
+    data,
+    message: "Images uploaded successfully",
+  });
+});
+
+//DELETE /images - Delete multiple questions
+export const deleteImageHandler = catchErrors(async (req, res) => {
+  const input = deleteImagesSchema.parse(req.query.url);
+  await deleteImage(input);
+
+  return res.success(OK, {
+    message: "Image deleted successfully",
   });
 });

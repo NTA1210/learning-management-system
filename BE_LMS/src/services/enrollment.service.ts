@@ -34,6 +34,7 @@ export const getEnrollmentById = async (enrollmentId: string) => {
  * Yêu cầu nghiệp vụ:
  * - Lấy danh sách tất cả enrollment của một student cụ thể
  * - Có thể filter theo status (pending, approved, rejected, cancelled, dropped, completed)
+ * - Hỗ trợ filter theo khoảng thời gian tạo (from, to)
  * - Hỗ trợ phân trang (page, limit)
  * - Sắp xếp theo thời gian tạo mới nhất (createdAt desc)
  * - Populate thông tin course (title, code, description, category, teachers, isPublished)
@@ -53,13 +54,20 @@ export const getStudentEnrollments = async (filters: {
   status?: string;
   page?: number;
   limit?: number;
+  from?: Date;
+  to?: Date;
 }) => {
-  const { studentId, status, page = 1, limit = 10 } = filters;
+  const { studentId, status, page = 1, limit = 10, from, to } = filters;
   const skip = (page - 1) * limit;
 
   const query: any = { studentId };
   if (status) {
     query.status = status;
+  }
+  if (from || to) {
+    query.createdAt = {};
+    if (from) query.createdAt.$gte = from;
+    if (to) query.createdAt.$lte = to;
   }
 
   const [enrollments, total] = await Promise.all([
@@ -78,6 +86,8 @@ export const getStudentEnrollments = async (filters: {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+      hasNext: skip + enrollments.length < total,
+      hasPrev: page > 1,
     },
   };
 };
@@ -87,6 +97,7 @@ export const getStudentEnrollments = async (filters: {
  * - Lấy danh sách tất cả enrollment của một khóa học cụ thể
  * - Kiểm tra course tồn tại trước → nếu không tồn tại trả lỗi NOT_FOUND
  * - Có thể filter theo status
+ * - Hỗ trợ filter theo khoảng thời gian tạo (from, to)
  * - Hỗ trợ phân trang (page, limit)
  * - Sắp xếp theo thời gian tạo mới nhất (createdAt desc)
  * - Populate thông tin student (username, email, fullname, avatar_url)
@@ -106,8 +117,10 @@ export const getCourseEnrollments = async (filters: {
   status?: string;
   page?: number;
   limit?: number;
+  from?: Date;
+  to?: Date;
 }) => {
-  const { courseId, status, page = 1, limit = 10 } = filters;
+  const { courseId, status, page = 1, limit = 10, from, to } = filters;
   const skip = (page - 1) * limit;
 
   // Check if course exists
@@ -117,6 +130,11 @@ export const getCourseEnrollments = async (filters: {
   const query: any = { courseId };
   if (status) {
     query.status = status;
+  }
+  if (from || to) {
+    query.createdAt = {};
+    if (from) query.createdAt.$gte = from;
+    if (to) query.createdAt.$lte = to;
   }
 
   const [enrollments, total] = await Promise.all([
@@ -135,6 +153,8 @@ export const getCourseEnrollments = async (filters: {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+      hasNext: skip + enrollments.length < total,
+      hasPrev: page > 1,
     },
   };
 };
@@ -143,6 +163,7 @@ export const getCourseEnrollments = async (filters: {
  * Yêu cầu nghiệp vụ:
  * - Lấy toàn bộ danh sách enrollment trong hệ thống (dành cho admin)
  * - Hỗ trợ filter đa điều kiện: status, courseId, studentId
+ * - Hỗ trợ filter theo khoảng thời gian tạo (from, to)
  * - Hỗ trợ phân trang (page, limit)
  * - Sắp xếp theo thời gian tạo mới nhất (createdAt desc)
  * - Populate cả thông tin student và course
@@ -164,14 +185,21 @@ export const getAllEnrollments = async (filters: {
   studentId?: string;
   page?: number;
   limit?: number;
+  from?: Date;
+  to?: Date;
 }) => {
-  const { status, courseId, studentId, page = 1, limit = 10 } = filters;
+  const { status, courseId, studentId, page = 1, limit = 10, from, to } = filters;
   const skip = (page - 1) * limit;
 
   const query: any = {};
   if (status) query.status = status;
   if (courseId) query.courseId = courseId;
   if (studentId) query.studentId = studentId;
+  if (from || to) {
+    query.createdAt = {};
+    if (from) query.createdAt.$gte = from;
+    if (to) query.createdAt.$lte = to;
+  }
 
   const [enrollments, total] = await Promise.all([
     EnrollmentModel.find(query)
@@ -190,6 +218,8 @@ export const getAllEnrollments = async (filters: {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+      hasNext: skip + enrollments.length < total,
+      hasPrev: page > 1,
     },
   };
 };
