@@ -8,11 +8,21 @@ export const prefixLessonMaterial = (
 };
 
 export const prefixSubmission = (
-  courseId: string,
-  assignmentId: string,
-  studentId: string
+  courseId: string | import("mongoose").Types.ObjectId,
+  assignmentId: string | import("mongoose").Types.ObjectId,
+  studentId: string | import("mongoose").Types.ObjectId
 ) => {
-  return `courses/${courseId}/assignments/${assignmentId}/submissions/${studentId}`;
+  const cId = (courseId && (courseId as any).toHexString)
+    ? (courseId as any).toHexString()
+    : (courseId as string);
+  const aId = (assignmentId && (assignmentId as any).toHexString)
+    ? (assignmentId as any).toHexString()
+    : (assignmentId as string);
+  const sId = (studentId && (studentId as any).toHexString)
+    ? (studentId as any).toHexString()
+    : (studentId as string);
+
+  return `courses/${cId}/assignments/${aId}/submissions/${sId}`;
 };
 
 export const prefixQuizQuestionImage = (
