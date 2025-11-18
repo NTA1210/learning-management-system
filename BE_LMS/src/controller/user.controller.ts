@@ -9,14 +9,14 @@ import { getAllUsers } from "@/services/user.service";
 // GET /users/:courseId - Get all users for a specific course
 export const getUserForCourseHandler = catchErrors(async (req, res) => {
   const request = listAllUsersSchema.parse(req.query);
-  const courseId = courseIdSchema.parse(req.params.courseId);
+  const role = req.role;
 
-  const data = await getAllUsers(courseId, request, req.role);
+  const { data, pagination } = await getAllUsers(request, role);
 
   return res.success(OK, {
-    data: data.users,
+    data,
     message: "Users retrieved successfully",
-    pagination: data.pagination,
+    pagination,
   });
 });
 

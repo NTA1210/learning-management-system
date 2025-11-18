@@ -17,9 +17,14 @@ export const getAllUsers = async (
 
   if (viewerRole === Role.ADMIN) {
     if (role) query.role = role; // admin có thể lọc role cụ thể
-  }
-  if (viewerRole === Role.TEACHER) {
-    query.role = Role.STUDENT; // teacher chỉ được xem student
+  } else {
+    if (viewerRole === Role.TEACHER) {
+      query.role = Role.STUDENT; // teacher chỉ được xem student
+    }
+    if (viewerRole === Role.STUDENT) {
+      query.role = Role.TEACHER;
+    }
+    query.status = UserStatus.ACTIVE; // không phải admin chỉ xem user active
   }
 
   if (email) query.email = { $regex: email, $options: "i" };
@@ -59,7 +64,6 @@ function formatUserResponse(user: any, viewerRole: Role) {
     avatar_url: user.avatar_url,
     bio: user.bio,
     role: user.role,
-    isEnrolled: user.isEnrolled ?? false,
   };
 
   if (viewerRole === Role.TEACHER) {
