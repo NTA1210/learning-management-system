@@ -29,13 +29,6 @@ export const createNotificationHandler = catchErrors(async (req, res) => {
   const data = createNotificationSchema.parse(req.body);
   const senderId = req.userId!;
 
-  // Only admin can send to "all"
-  if (data.recipientType === "all" && req.role !== Role.ADMIN) {
-    return res.status(403).json({
-      error: "Only admins can send notifications to all users",
-    });
-  }
-
   const result = await createNotification(data, senderId, req.role!);
 
   return res.success(CREATED, {

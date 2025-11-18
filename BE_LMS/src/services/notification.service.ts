@@ -27,14 +27,16 @@ export const createNotification = async (
   const { title, message, recipientType, recipientUser, recipientCourse } =
     data;
 
-  // Extra role-based guards (controller already blocks unauth roles)
-  if (senderRole === Role.TEACHER) {
+  // Role-based guards
+  if (recipientType === "all") {
     appAssert(
-      recipientType !== "all",
+      senderRole === Role.ADMIN,
       FORBIDDEN,
-      "Teachers cannot send notifications to all users"
+      "Only admins can send notifications to all users"
     );
+  }
 
+  if (senderRole === Role.TEACHER) {
     // Fetch teacher's active courses up front for later checks
     const teacherCourses = await CourseModel.find({
       teacherIds: senderId,
