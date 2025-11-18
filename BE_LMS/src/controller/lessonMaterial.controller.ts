@@ -29,7 +29,7 @@ export const listAllLessonMaterialsController = catchErrors(
     const queryParams = LessonMaterialQuerySchema.parse(req.query);
 
     // Get user info from authentication middleware
-    const userId = req.userId?.toString();
+    const userId = req.userId;
     const userRole = req.role;
 
     const result = await getLessonMaterials(queryParams, userId, userRole);
@@ -50,7 +50,7 @@ export const getLessonMaterialsByLessonController = catchErrors(
     const validatedParams = LessonMaterialsByLessonSchema.parse({ lessonId });
 
     // Get user info from authentication middleware
-    const userId = req.userId?.toString();
+    const userId = req.userId;
     const userRole = req.role;
 
     const materials = await getLessonMaterialsByLesson(
@@ -73,7 +73,7 @@ export const getLessonMaterialByIdController = catchErrors(async (req, res) => {
   const validatedParams = LessonMaterialByIdSchema.parse({ id });
 
   // Get user info from authentication middleware
-  const userId = req.userId?.toString();
+  const userId = req.userId;
   const userRole = req.role;
 
   const material = await getLessonMaterialById(
@@ -93,7 +93,7 @@ export const createLessonMaterialController = catchErrors(async (req, res) => {
   const data = CreateLessonMaterialSchema.parse(req.body);
 
   // Get user info from authentication middleware
-  const userId = req.userId?.toString();
+  const userId = req.userId;
   const userRole = req.role;
 
   const material = await createLessonMaterial(data, userId, userRole);
@@ -111,7 +111,7 @@ export const updateLessonMaterialController = catchErrors(async (req, res) => {
   const data = UpdateLessonMaterialSchema.parse(req.body);
 
   // Get user info from authentication middleware
-  const userId = req.userId?.toString();
+  const userId = req.userId;
   const userRole = req.role;
 
   const result = await updateLessonMaterial(
@@ -133,7 +133,7 @@ export const deleteLessonMaterialController = catchErrors(async (req, res) => {
   const validatedParams = LessonMaterialByIdSchema.parse({ id });
 
   // Get user info from authentication middleware
-  const userId = req.userId?.toString();
+  const userId = req.userId;
   const userRole = req.role;
 
   const material = await deleteLessonMaterial(
@@ -178,7 +178,7 @@ export const uploadLessonMaterialController = catchErrors(
     });
 
     // Get user info from authentication middleware
-    const userId = req.userId?.toString();
+    const userId = req.userId;
     const userRole = req.role;
 
     const material = await uploadLessonMaterial(
@@ -204,7 +204,7 @@ export const downloadLessonMaterialController = catchErrors(
     const validatedParams = LessonMaterialByIdSchema.parse({ id });
 
     // Get user info from authentication middleware
-    const userId = req.userId?.toString();
+    const userId = req.userId;
     const userRole = req.role;
 
     // First check if user has access to the material
@@ -236,8 +236,7 @@ export const downloadLessonMaterialController = catchErrors(
     }
 
     const signedUrl = await getSignedUrl(
-      downloadMaterial.key,
-      24 * 60 * 60, // 24 hours expiration
+      downloadMaterial.key, // 24 hours expiration
       downloadMaterial.originalName || ""
     );
 
@@ -270,7 +269,7 @@ export const deleteLessonMaterialFile = catchErrors(async (req, res) => {
   const validatedParams = LessonMaterialByIdSchema.parse({ id });
 
   // Lấy thông tin người dùng từ middleware xác thực
-  const userId = req.userId?.toString();
+  const userId = req.userId;
   const userRole = req.role;
 
   // Gọi service để xử lý logic xóa file của material

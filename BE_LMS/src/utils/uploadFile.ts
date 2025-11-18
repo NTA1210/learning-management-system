@@ -123,8 +123,8 @@ export const getKeyFromPublicUrl = (publicUrl: string) =>
  */
 export const getSignedUrl = (
   key: string,
+  filename: string,
   expiresIn = 24 * 60 * 60,
-  filename: string
 ) => {
   try {
     return minioClient.presignedGetObject(BUCKET_NAME, key, expiresIn, {

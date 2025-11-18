@@ -90,7 +90,7 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
     (schemas.LessonMaterialsByLessonSchema.parse as jest.Mock).mockReturnValue({ lessonId });
     (service.getLessonMaterialsByLesson as jest.Mock).mockResolvedValue([{ _id: "m1" }]);
     await getLessonMaterialsByLessonController(req as Request, res as Response, next);
-      expect(service.getLessonMaterialsByLesson).toHaveBeenCalledWith(lessonId, req.userId.toString(), req.role);
+      expect(service.getLessonMaterialsByLesson).toHaveBeenCalledWith(lessonId, req.userId, req.role);
       expect(res.success).toHaveBeenCalledWith(200, {
         data: [{ _id: "m1" }],
         message: "Get lesson materials by lesson successfully"
@@ -125,7 +125,7 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
     (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockReturnValue({ id });
     (service.getLessonMaterialById as jest.Mock).mockResolvedValue({ _id: id });
     await getLessonMaterialByIdController(req as Request, res as Response, next);
-    expect(service.getLessonMaterialById).toHaveBeenCalledWith(id, req.userId.toString(), req.role);
+    expect(service.getLessonMaterialById).toHaveBeenCalledWith(id, req.userId, req.role);
       expect(res.success).toHaveBeenCalledWith(200, {
         data: { _id: id },
         message: "Get lesson material by id successfully"
@@ -160,7 +160,7 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
     (schemas.CreateLessonMaterialSchema.parse as jest.Mock).mockReturnValue(data);
     (service.createLessonMaterial as jest.Mock).mockResolvedValue({ _id: "1", ...data });
     await createLessonMaterialController(req as Request, res as Response, next);
-      expect(service.createLessonMaterial).toHaveBeenCalledWith(data, req.userId.toString(), req.role);
+      expect(service.createLessonMaterial).toHaveBeenCalledWith(data, req.userId, req.role);
       expect(res.success).toHaveBeenCalledWith(200, {
         data: { _id: "1", ...data },
         message: "Create lesson material successfully"
@@ -197,7 +197,7 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
     (schemas.UpdateLessonMaterialSchema.parse as jest.Mock).mockReturnValue({ title: "New" });
     (service.updateLessonMaterial as jest.Mock).mockResolvedValue({ _id: id, title: "New" });
     await updateLessonMaterialController(req as Request, res as Response, next);
-      expect(service.updateLessonMaterial).toHaveBeenCalledWith(id, { title: "New" }, req.userId.toString(), req.role);
+      expect(service.updateLessonMaterial).toHaveBeenCalledWith(id, { title: "New" }, req.userId, req.role);
       expect(res.success).toHaveBeenCalledWith(200, {
         data: { _id: id, title: "New" },
         message: "Update lesson material successfully"
@@ -247,7 +247,7 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
     (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockReturnValue({ id });
     (service.deleteLessonMaterial as jest.Mock).mockResolvedValue({ _id: id });
     await deleteLessonMaterialController(req as Request, res as Response, next);
-      expect(service.deleteLessonMaterial).toHaveBeenCalledWith(id, req.userId.toString(), req.role);
+      expect(service.deleteLessonMaterial).toHaveBeenCalledWith(id, req.userId, req.role);
       expect(res.success).toHaveBeenCalledWith(200, {
         data: { _id: id },
         message: "Delete lesson material successfully"
@@ -498,7 +498,7 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
       };
       (service.deleteFileOfMaterial as jest.Mock).mockResolvedValue(mockResult);
       await deleteLessonMaterialFile(req as Request, res as Response, next);
-      expect(service.deleteFileOfMaterial).toHaveBeenCalledWith(id, req.userId.toString(), req.role);
+      expect(service.deleteFileOfMaterial).toHaveBeenCalledWith(id, req.userId, req.role);
       expect(res.success).toHaveBeenCalledWith(200, {
         data: mockResult,
         message: "Deleted file successfully"

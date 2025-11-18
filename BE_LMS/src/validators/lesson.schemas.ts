@@ -32,8 +32,8 @@ export const LessonQuerySchema = (listParamsSchema.extend({
     courseId: z.string().optional(),
     createdAt: datePreprocess,
     updatedAt: datePreprocess,
-    from: datePreprocess,
-    to: datePreprocess,
+    from: datePreprocess.optional(),
+    to: datePreprocess.optional(),
 }).refine(
     (val) => {
         if (val.from && val.to) {
@@ -50,12 +50,6 @@ export const LessonQuerySchema = (listParamsSchema.extend({
 export const LessonByIdSchema = z.object({
     id: z.string().min(1, "ID is required"),
 });
-
-export const LessonByCourseSchema = z.object({
-    courseId: z.string().min(1, "Course ID is required"),
-});
-
 export type CreateLessonParams = z.infer<typeof CreateLessonSchema>;
 export type LessonQueryParams = z.infer<typeof LessonQuerySchema>;
 export type LessonByIdParams = z.infer<typeof LessonByIdSchema>;
-export type LessonByCourseParams = z.infer<typeof LessonByCourseSchema>;

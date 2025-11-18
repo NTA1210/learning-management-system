@@ -40,7 +40,7 @@ import {
   specialistPublicRoutes,
   forumProtectedRoutes,
   forumPublicRoutes,
-  subjectRouter,
+  subjectRoutes,
   quizRoutes,
 } from "./routes";
 
@@ -55,7 +55,7 @@ export const createApp = () => {
       origin: APP_ORIGIN,
       credentials: true,
     })
-  );
+  );   
   app.use(cookieParser());
 
   //example API----------------------------------
@@ -80,8 +80,8 @@ export const createApp = () => {
   app.use("/courses", courseRoutes);
   app.use("/assignments", assignmentRoutes);
   app.use("/submissions", submissionRoutes);
-  app.use("/lesson", lessonRoutes);
-  app.use("/lesson-material", lessonMaterialRoutes);
+  app.use("/lessons", lessonRoutes);
+  app.use("/lesson-materials", lessonMaterialRoutes);
   app.use("/lesson-progress", lessonProgressRoutes);
   app.use("/majors", majorPublicRoutes);
   app.use("/specialists", specialistPublicRoutes);
@@ -95,7 +95,7 @@ export const createApp = () => {
   app.use("/majors", authenticate, majorProtectedRoutes);
   app.use("/specialists", authenticate, specialistProtectedRoutes);
   app.use("/forums", authenticate, forumProtectedRoutes);
-  app.use("/subjects", authenticate,subjectRouter);
+  app.use("/subjects", authenticate,subjectRoutes);
   app.use("/quizzes", quizRoutes);
   app.use(errorHandler);
 

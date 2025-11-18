@@ -30,7 +30,6 @@ jest.mock("mongoose", () => {
 // Mock all services before importing controller
 jest.mock("@/services/lesson.service", () => ({
   getLessons: jest.fn(),
-  getLessonsByCourse: jest.fn(),
   getLessonById: jest.fn(),
   createLessonService: jest.fn(),
   updateLessonService: jest.fn(),
@@ -45,9 +44,6 @@ jest.mock("@/validators/lesson.schemas", () => ({
   LessonQuerySchema: {
     parse: jest.fn(),
   },
-  LessonByCourseSchema: {
-    parse: jest.fn(),
-  },
   LessonByIdSchema: {
     parse: jest.fn(),
   },
@@ -56,7 +52,6 @@ jest.mock("@/validators/lesson.schemas", () => ({
 // Import controller and services
 import {
   listAllLessons,
-  getLessonsByCourseController,
   getLessonByIdController,
   createLesson,
   updateLesson,
@@ -104,7 +99,7 @@ describe("📚 Lesson Controller Unit Tests", () => {
 
       expect(lessonService.getLessons).toHaveBeenCalledWith(
         { page: 1, limit: 10, title: undefined },
-        mockReq.userId?.toString(),
+        mockReq.userId,
         mockReq.role
       );
       expect(mockRes.success).toHaveBeenCalledWith(200, {
@@ -128,7 +123,7 @@ describe("📚 Lesson Controller Unit Tests", () => {
 
       expect(lessonService.getLessons).toHaveBeenCalledWith(
         { page: 1, limit: 10 },
-        mockReq.userId?.toString(),
+        mockReq.userId,
         mockReq.role
       );
     });
@@ -147,39 +142,7 @@ describe("📚 Lesson Controller Unit Tests", () => {
     });
   });
 
-  describe("getLessonsByCourseController", () => {
-    it("should call getLessonsByCourse service with correct parameters", async () => {
-      const courseId = new mongoose.Types.ObjectId().toString();
-      mockReq.params = { courseId };
-      const mockLessons = [{ _id: "1", title: "Lesson 1" }];
-      (lessonService.getLessonsByCourse as jest.Mock).mockResolvedValue(mockLessons);
-      (lessonSchemas.LessonByCourseSchema.parse as jest.Mock).mockReturnValue({ courseId });
-
-      await getLessonsByCourseController(mockReq as Request, mockRes as Response, mockNext);
-
-      expect(lessonService.getLessonsByCourse).toHaveBeenCalledWith(
-        courseId,
-        mockReq.userId?.toString(),
-        mockReq.role
-      );
-      expect(mockRes.success).toHaveBeenCalledWith(200, {
-        data: mockLessons,
-        message: "Get lessons by course successfully",
-      });
-    });
-
-    it("should handle invalid courseId parameter", async () => {
-      mockReq.params = { courseId: "invalid" };
-      const error = new Error("Invalid course ID format");
-      (lessonSchemas.LessonByCourseSchema.parse as jest.Mock).mockImplementation(() => {
-        throw error;
-      });
-
-      await getLessonsByCourseController(mockReq as Request, mockRes as Response, mockNext);
-
-      expect(mockNext).toHaveBeenCalledWith(error);
-    });
-  });
+  // Route /lesson/course/:courseId và controller getLessonsByCourseController đã bị loại bỏ
 
   describe("getLessonByIdController", () => {
     it("should call getLessonById service with correct parameters", async () => {
@@ -193,7 +156,7 @@ describe("📚 Lesson Controller Unit Tests", () => {
 
       expect(lessonService.getLessonById).toHaveBeenCalledWith(
         lessonId,
-        mockReq.userId?.toString(),
+        mockReq.userId,
         mockReq.role
       );
       expect(mockRes.success).toHaveBeenCalledWith(200, {
@@ -232,7 +195,7 @@ describe("📚 Lesson Controller Unit Tests", () => {
 
       expect(lessonService.createLessonService).toHaveBeenCalledWith(
         lessonData,
-        mockReq.userId?.toString(),
+        mockReq.userId,
         mockReq.role
       );
       expect(mockRes.success).toHaveBeenCalledWith(200, {
@@ -284,7 +247,7 @@ describe("📚 Lesson Controller Unit Tests", () => {
       expect(lessonService.updateLessonService).toHaveBeenCalledWith(
         lessonId,
         updateData,
-        mockReq.userId?.toString(),
+        mockReq.userId,
         mockReq.role
       );
       expect(mockRes.success).toHaveBeenCalledWith(200, {
@@ -312,7 +275,7 @@ describe("📚 Lesson Controller Unit Tests", () => {
       expect(lessonService.updateLessonService).toHaveBeenCalledWith(
         lessonId,
         updateData,
-        mockReq.userId?.toString(),
+        mockReq.userId,
         mockReq.role
       );
     });
@@ -361,7 +324,7 @@ describe("📚 Lesson Controller Unit Tests", () => {
 
       expect(lessonService.deleteLessonService).toHaveBeenCalledWith(
         lessonId,
-        mockReq.userId?.toString(),
+        mockReq.userId,
         mockReq.role
       );
       expect(mockRes.success).toHaveBeenCalledWith(200, {
