@@ -10,12 +10,19 @@ import {DashboardPage ,
   LoginPage,
   RegisterPage,
   CourseManagementPage,
+  CourseDetailPage,
+  ListAllLessonsPage,
   AboutUsPage,
   FAQPage,
-  CourseDetailPage,
+  AssignmentPage,
+  QuizManagementPage,
+  QuizCoursePage,
+  FeedbackPage,
   MajorsSpecialistsPage,
 } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
+import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
+import AssignmentDetailPage from "../pages/AssignmentDetailPage";
 import ProtectedRoute from "../components/ProtectedRoute";
 import Profile from "../pages/profile";
 import Calendar from "../components/Calendar";
@@ -24,14 +31,15 @@ function AppRoutes() {
   return (
     <Router>
       <Routes>
-        {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
-        {/* Trang chi tiết khóa học */}
+
+        {/* Course detail */}
         <Route path="/courses/:id" element={
           <ProtectedRoute>
             <CourseDetailPage />
           </ProtectedRoute>
         } />
+
         {/* Auth routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -76,9 +84,47 @@ function AppRoutes() {
             <Calendar />
           </ProtectedRoute>
         } />
+
+        {/* Profile */}
         <Route path="/profile" element={
           <ProtectedRoute>
             <Profile />
+          </ProtectedRoute>
+        } />
+
+        {/* Lesson Materials */}
+        <Route path="/materials" element={
+          <ProtectedRoute>
+            <ListAllLessonsPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/materials/:lessonId" element={
+          <ProtectedRoute>
+            <LessonMaterialDetailPage />
+          </ProtectedRoute>
+        } />
+
+        {/* Assignments */}
+        <Route path="/assignments" element={
+          <ProtectedRoute>
+            <AssignmentPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/assignments/:id" element={
+          <ProtectedRoute>
+            <AssignmentDetailPage />
+          </ProtectedRoute>
+        } />
+
+        {/* Quiz Management */}
+        <Route path="/quiz" element={
+          <ProtectedRoute>
+            <QuizManagementPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/quiz/:courseId" element={
+          <ProtectedRoute>
+            <QuizCoursePage />
           </ProtectedRoute>
         } />
 
@@ -96,13 +142,18 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
 
+        {/* Feedback */}
+        <Route path="/help/feedback" element={
+          <ProtectedRoute>
+            <FeedbackPage />
+          </ProtectedRoute>
+        } />
         {/* Majors & Specialists */}
         <Route path="/majors-specialists" element={
           <ProtectedRoute>
             <MajorsSpecialistsPage />
           </ProtectedRoute>
         } />
-
         {/* Not found */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

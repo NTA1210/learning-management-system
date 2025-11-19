@@ -48,7 +48,7 @@ const LoginPage: React.FC = () => {
       const redirectPath = searchParams.get('redirect');
       
       // Delay to see log
-      //await new Promise(resolve => setTimeout(resolve, 3000));
+      // await new Promise(resolve => setTimeout(resolve, 3000));
 
       if (redirectPath) {
         // Redirect to the original path the user was trying to access
