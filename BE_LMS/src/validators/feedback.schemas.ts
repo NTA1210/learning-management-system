@@ -43,8 +43,8 @@ export const listFeedbacksSchema = z
     userId: z.string().regex(objectIdRegex).optional(),
     minRating: z.coerce.number().min(1).max(5).optional(),
     maxRating: z.coerce.number().min(1).max(5).optional(),
-    from: datePreprocess, // Date range start with validation
-    to: datePreprocess, // Date range end with validation
+    from: datePreprocess.optional(), // Date range start with validation
+    to: datePreprocess.optional(), // Date range end with validation
     sortBy: z.enum(["createdAt", "rating"]).default("createdAt"),
     sortOrder: z.enum(["asc", "desc"]).default("desc"),
   })
