@@ -4,6 +4,19 @@ import { AttemptStatus, Role } from "@/types";
 import appAssert from "@/utils/appAssert";
 import { EnrollQuizInput } from "@/validators/quizAttempt.schemas";
 
+/**
+ * Enroll in a quiz.
+ * Only students can enroll in quizzes.
+ * User must enroll within 15 minutes after the quiz starts.
+ * User cannot enroll if they have already completed the quiz.
+ * User cannot enroll if they are banned from taking the quiz.
+ * @param  data - Parameters to enroll in a quiz.
+ * @param  data.quizId - ID of the quiz to enroll in.
+ * @param  data.user - User who is enrolling in the quiz.
+ * @returns  - The created quiz attempt.
+ * @throws  - If the user is not a student or if the user has already completed the quiz or if the user is banned from taking the quiz.
+ * @throws  - If the quiz is not found.
+ */
 export const enrollQuiz = async ({ quizId, user }: EnrollQuizInput) => {
   // Chỉ học sinh mới được đăng ký làm bài quiz
   appAssert(

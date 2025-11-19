@@ -3,6 +3,7 @@ import { enrollQuiz } from "@/services/quizAttempt.service";
 import { catchErrors } from "@/utils/asyncHandler";
 import { enrollQuizSchema } from "@/validators/quizAttempt.schemas";
 
+// POST /quiz-attempts/enroll - Enroll in a quiz
 export const enrollQuizHandler = catchErrors(async (req, res) => {
   const input = enrollQuizSchema.parse(req.body);
   const { userId, role } = req;

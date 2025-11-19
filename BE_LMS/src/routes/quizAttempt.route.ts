@@ -4,6 +4,6 @@ import express from "express";
 // prefix: /quiz-attempts
 const quizAttemptRoutes = express.Router();
 
-quizAttemptRoutes.post("/", enrollQuizHandler);
+quizAttemptRoutes.post("/enroll", enrollQuizHandler);
 
 export default quizAttemptRoutes;
