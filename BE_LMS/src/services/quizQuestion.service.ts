@@ -19,7 +19,7 @@ import {
   IUpdateQuizQuestionParams,
   TUploadImagesParams,
 } from "@/validators/quizQuestion.schemas";
-import mongoose, { FilterQuery, get } from "mongoose";
+import mongoose, { FilterQuery } from "mongoose";
 import { parseStringPromise } from "xml2js";
 import { create } from "xmlbuilder";
 
@@ -43,7 +43,8 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
   });
 
   const questions = result.quiz?.question || [];
-  const importedTypes = new Set<QuizQuestionType>();
+
+  const types = new Set<QuizQuestionType>();
   const typeMap: Record<string, QuizQuestionType> = {
     truefalse: QuizQuestionType.TRUE_FALSE,
     multichoice: QuizQuestionType.MULTIPLE_CHOICE,
@@ -61,7 +62,7 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
     // Loại câu hỏi
     const type = typeMap[typeAttr] || QuizQuestionType.MCQ;
 
-    importedTypes.add(type);
+    types.add(type);
 
     const answers = q.answer || [];
     const options: string[] = [];
@@ -90,6 +91,8 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
   await QuizQuestionModel.deleteMany({ subjectId });
   const quizzes = await QuizQuestionModel.insertMany(importedQuestions);
 
+  const importedTypes = Array.from(types);
+
   return {
     data: quizzes,
     total: importedQuestions.length,
@@ -102,103 +105,87 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
  * @param quizQuestions Array of questions to export.
  * @returns Object containing XML string and total number of questions.
  */
+
 export const exportXMLFile = async (subjectId: string) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
 
-  const quizQuestions = await QuizQuestionModel.find({
-    subjectId,
-  }).lean<IQuizQuestion[]>();
-
-  appAssert(
-    quizQuestions.length > 0,
-    NOT_FOUND,
-    "No questions found for this subject"
-  );
+  const quizQuestions = await QuizQuestionModel.find({ subjectId }).lean();
+  appAssert(quizQuestions.length > 0, NOT_FOUND, "No questions found");
 
   const subjectCode = subject.code;
+  const types = new Set(quizQuestions.map((q) => q.type));
 
-  const root = create({ version: "1.0", encoding: "UTF-8" }).ele("quiz");
+  // root quiz
+  const root = create("quiz");
 
-  // --------------------
-  // 1️⃣ Add category question
-  // --------------------
-  const categoryQuestion = root
-    .com(`question: 0`)
-    .up()
-    .ele("question", { type: "category" });
-  categoryQuestion
+  // category question
+  const catQ = root.ele("question", { type: "category" });
+  catQ
     .ele("category")
     .ele("text")
-    .txt(`$subject$/top/Default for ${subjectCode}`);
-  categoryQuestion
+    .txt(`$course$/top/Default for ${subjectCode}`);
+  catQ
     .ele("info", { format: "moodle_auto_format" })
     .ele("text")
     .txt(
       `The default category for questions shared in context '${subjectCode}'.`
     );
-  categoryQuestion.ele("idnumber").txt("");
+  catQ.ele("idnumber").txt("");
 
-  // --------------------
-  // 2️⃣ Loop all quiz questions
-  // --------------------
-  const exportedTypes = new Set<QuizQuestionType>();
-
+  // add each quiz question
   quizQuestions.forEach((q, idx) => {
-    //Add types
-    exportedTypes.add(q.type);
+    // comment
+    root.com(`question: ${idx + 1}`);
 
-    // Add comment for question number
-    root.com(`question: ${idx + 1}`).up();
+    // always multichoice
+    const question = root.ele("question", { type: q.type });
 
-    // Create <question> element
-    const question = root.ele("question", { type: q.type || "multichoice" });
+    // name
+    question.ele("name").ele("text").dat(q.text.substring(0, 50));
 
-    // <name>
-    question.ele("name").ele("text").txt(q.text.substring(0, 50)); // truncate name if too long
+    // questiontext
+    question
+      .ele("questiontext", { format: "html" })
+      .ele("text")
+      .dat(`<p>${q.text}</p>`);
 
-    // <questiontext>
-    const questionText = question.ele("questiontext", { format: "html" });
-    questionText.ele("text").dat(`<p>${q.text}</p>`);
+    // generalfeedback
+    question.ele("generalfeedback", { format: "html" }).ele("text").dat("");
 
-    // <generalfeedback>
-    question.ele("generalfeedback", { format: "html" }).ele("text").txt("");
-
-    // Moodle grading info
+    // grading info
     question.ele("defaultgrade").txt("1.0000000");
     question.ele("penalty").txt("0.3333333");
     question.ele("hidden").txt("0");
     question.ele("idnumber").txt("");
 
-    // Extra fields (specific to multichoice)
+    // multichoice specific
     question.ele("single").txt("true");
     question.ele("shuffleanswers").txt("true");
     question.ele("answernumbering").txt("abc");
     question.ele("showstandardinstruction").txt("1");
 
-    // Feedback blocks
-    question.ele("correctfeedback", { format: "html" }).ele("text").txt("");
+    // feedback blocks
+    question.ele("correctfeedback", { format: "html" }).ele("text").dat("");
     question
       .ele("partiallycorrectfeedback", { format: "html" })
       .ele("text")
-      .txt("");
-    question.ele("incorrectfeedback", { format: "html" }).ele("text").txt("");
+      .dat("");
+    question.ele("incorrectfeedback", { format: "html" }).ele("text").dat("");
 
-    // <answer> blocks
-    if (q.options && q.options.length > 0) {
+    // answers
+    if (q.options && q.options.length) {
       q.options.forEach((opt: string, index: number) => {
         const fraction = q.correctOptions?.includes(index) ? "100" : "0";
         const ans = question.ele("answer", { fraction, format: "html" });
         ans.ele("text").dat(`<p>${opt}</p>`);
-        ans.ele("feedback", { format: "html" }).ele("text").txt("");
+        ans.ele("feedback", { format: "html" }).ele("text").dat("");
       });
     }
   });
 
-  // --------------------
-  // 3️⃣ Convert to string (pretty)
-  // --------------------
-  const xmlString = root.end({ format: "xml", prettyPrint: true } as any);
+  const xmlString = root.end({ prettyPrint: true, headless: false } as any);
+  const exportedTypes = Array.from(types);
   return { xmlString, total: quizQuestions.length, exportedTypes };
 };
 
