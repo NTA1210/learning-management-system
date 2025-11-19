@@ -5,6 +5,7 @@ import { type LoginRequest, type RegisterRequest, type AuthResponse, type Refres
 export * from './mock';
 export * from './courseService';
 export * from './enrollmentService';
+export * from './feedbackService';
 export * from './quizQuestionService';
 export * from './subjectService';
 
