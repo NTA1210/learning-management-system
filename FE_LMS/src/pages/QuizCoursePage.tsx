@@ -4,7 +4,13 @@ import { useTheme } from "../hooks/useTheme";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { ChevronLeft, ChevronRight, Trash2, Edit3, ArrowLeft } from "lucide-react";
-import { quizQuestionService, type QuizQuestion, type QuizQuestionImage } from "../services";
+import {
+  quizQuestionService,
+  subjectService,
+  type QuizQuestion,
+  type QuizQuestionImage,
+  type Subject,
+} from "../services";
 
 type EditFormState = {
   text: string;
@@ -26,6 +32,20 @@ export default function QuizCoursePage() {
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("Quiz Questions");
+  const [subjectInfo, setSubjectInfo] = useState<Subject | null>(null);
+  const [totalQuestions, setTotalQuestions] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(1000);
+  const [paginationInfo, setPaginationInfo] = useState({
+    totalItems: 0,
+    currentPage: 1,
+    limit: 20,
+    totalPages: 1,
+    hasNext: false,
+    hasPrev: false,
+  });
+  const [manualQuestions, setManualQuestions] = useState<QuizQuestion[] | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingQuestion, setEditingQuestion] = useState<QuizQuestion | null>(null);
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
@@ -79,71 +99,187 @@ export default function QuizCoursePage() {
     }).filter(Boolean);
   };
 
+  type LocationState = {
+    mergedQuestions?: QuizQuestion[];
+    subjectInfo?: Subject;
+  } | null;
+
+  const locationState = location.state as LocationState;
+
   useEffect(() => {
+    if (locationState?.mergedQuestions && locationState.mergedQuestions.length > 0) {
+      setManualQuestions(locationState.mergedQuestions);
+    } else {
+      setManualQuestions(null);
+    }
+  }, [locationState?.mergedQuestions]);
+
+  useEffect(() => {
+    if (!courseId) return;
+    let cancelled = false;
+
+    const fetchSubject = async () => {
+      try {
+        const subject = await subjectService.getSubjectById(courseId);
+        if (!cancelled) {
+          setSubjectInfo(subject);
+        }
+      } catch (error) {
+        console.error("QuizCoursePage: Failed to fetch subject info:", error);
+        if (!cancelled) {
+          setSubjectInfo(null);
+        }
+      }
+    };
+
+    if (locationState?.subjectInfo && locationState.subjectInfo._id === courseId) {
+      setSubjectInfo(locationState.subjectInfo);
+    } else {
+      fetchSubject();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId, locationState?.subjectInfo]);
+
+  useEffect(() => {
+    const subjectLabel = subjectInfo
+      ? `${subjectInfo.code ? `${subjectInfo.code} · ` : ""}${subjectInfo.name}`
+      : "Quiz Questions";
+    const countLabel = totalQuestions > 0 ? ` (${totalQuestions} questions)` : "";
+    setTitle(`${subjectLabel}${countLabel}`);
+  }, [subjectInfo, totalQuestions]);
+
+  useEffect(() => {
+    if (!courseId) return;
     let mounted = true;
 
-    (async () => {
+    const fetchQuestions = async () => {
       try {
         setLoading(true);
-        const subjectId = courseId; // courseId is actually subjectId from route /quiz/:courseId
 
-        if (!subjectId) {
-          console.warn("QuizCoursePage: No subjectId provided");
+        if (manualQuestions && manualQuestions.length > 0) {
+          const totalItems = manualQuestions.length;
+          const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+          const safePage = Math.min(Math.max(1, currentPage), totalPages);
+          if (safePage !== currentPage) {
+            setCurrentPage(safePage);
+            return;
+          }
+          const startIndex = (safePage - 1) * pageSize;
+          const sliced = manualQuestions.slice(startIndex, startIndex + pageSize);
+
           if (mounted) {
-            setTitle("Quiz Questions");
-            setQuizQuestions([]);
-            setLoading(false);
+            setQuizQuestions(sliced);
+            setPaginationInfo({
+              totalItems,
+              currentPage: safePage,
+              limit: pageSize,
+              totalPages,
+              hasNext: safePage < totalPages,
+              hasPrev: safePage > 1,
+            });
+            setTotalQuestions(totalItems);
           }
           return;
         }
 
-        console.log("QuizCoursePage: Fetching quiz questions for subjectId:", subjectId);
-
-        // Fetch all quiz questions and filter by subjectId on client side
         const result = await quizQuestionService.getAllQuizQuestions({
-          limit: 1000, // Get all questions
-          option: "subjectId", // Populate subjectId
+          subjectId: courseId,
+          page: currentPage,
+          limit: pageSize,
+          option: "subjectId",
         });
 
-        console.log("QuizCoursePage: All quiz questions result:", result);
-        console.log("QuizCoursePage: Total questions:", result.data?.length || 0);
+        const pagination = result.pagination || {
+          totalItems: result.data?.length || 0,
+          currentPage,
+          limit: pageSize,
+          totalPages: 1,
+          hasNext: false,
+          hasPrev: false,
+        };
 
-        // Filter by subjectId on client side
-        let filteredQuestions = (result.data || []).filter((q) => {
-          const qSubjectId = typeof q.subjectId === "object" && q.subjectId ? q.subjectId._id : q.subjectId;
-          return qSubjectId === subjectId;
-        });
-
-        // If navigated from import with importedIds, only show those
-        const state = location.state as { importedIds?: string[] } | null;
-        const importedIds = state?.importedIds;
-        if (importedIds && importedIds.length > 0) {
-          filteredQuestions = filteredQuestions.filter((q) => importedIds.includes(q._id));
+        if (pagination.totalPages > 0 && currentPage > pagination.totalPages) {
+          setCurrentPage(Math.max(1, pagination.totalPages));
+          return;
         }
 
-        console.log("QuizCoursePage: Filtered questions for subjectId:", filteredQuestions.length);
-
         if (mounted) {
-          setQuizQuestions(filteredQuestions);
-          setTitle(`Quiz Questions (${filteredQuestions.length} questions)`);
+          setQuizQuestions(result.data || []);
+          setPaginationInfo({
+            totalItems: pagination.totalItems ?? (result.data?.length || 0),
+            currentPage: pagination.currentPage ?? currentPage,
+            limit: pagination.limit ?? pageSize,
+            totalPages: pagination.totalPages ?? 1,
+            hasNext: pagination.hasNext ?? false,
+            hasPrev: pagination.hasPrev ?? false,
+          });
+          setTotalQuestions(pagination.totalItems ?? (result.data?.length || 0));
         }
       } catch (error) {
         console.error("QuizCoursePage: Error fetching quiz questions:", error);
         if (mounted) {
           setQuizQuestions([]);
-          setTitle("Quiz Questions");
+          setPaginationInfo({
+            totalItems: 0,
+            currentPage: 1,
+            limit: pageSize,
+            totalPages: 1,
+            hasNext: false,
+            hasPrev: false,
+          });
+          setTotalQuestions(0);
         }
       } finally {
         if (mounted) {
           setLoading(false);
         }
       }
-    })();
+    };
+
+    fetchQuestions();
 
     return () => {
       mounted = false;
     };
-  }, [courseId, location.state]);
+  }, [courseId, manualQuestions, currentPage, pageSize, refreshKey]);
+
+  useEffect(() => {
+    if (!subjectInfo) return;
+
+    const applySubject = (question: QuizQuestion): QuizQuestion => {
+      if (typeof question.subjectId === "string" || !question.subjectId) {
+        return {
+          ...question,
+          subjectId: {
+            _id: subjectInfo._id,
+            code: subjectInfo.code,
+            name: subjectInfo.name,
+          },
+        };
+      }
+      return question;
+    };
+
+    setQuizQuestions((prev) => prev.map(applySubject));
+    setManualQuestions((prev) => (prev ? prev.map(applySubject) : prev));
+  }, [subjectInfo]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [courseId]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [pageSize]);
+
+  useEffect(() => {
+    if (manualQuestions) {
+      setCurrentPage(1);
+    }
+  }, [manualQuestions]);
 
   const getSwalBaseOptions = () => ({
     width: 360,
@@ -206,22 +342,45 @@ export default function QuizCoursePage() {
 
     try {
       setDeletingId(questionId);
-      // Get question from current state to pass to delete function
       const question = quizQuestions.find((q) => q._id === questionId);
       await quizQuestionService.deleteQuizQuestion(questionId, question);
-      
-      // Remove question from state
-      setQuizQuestions((prev) => {
-        const updated = prev.filter((q) => q._id !== questionId);
-        setTitle(`Quiz Questions (${updated.length} questions)`);
-        return updated;
-      });
+
+      if (manualQuestions) {
+        setManualQuestions((prev) => prev?.filter((q) => q._id !== questionId) || null);
+      } else {
+        setRefreshKey((prev) => prev + 1);
+      }
+
       await showSwalSuccess("Question deleted.");
     } catch (error) {
       console.error("Error deleting question:", error);
       await showSwalError("Failed to delete question. Please try again.");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const pageSizeOptions = [20, 50, 100, 500, 1000];
+
+  const goToPage = (page: number) => {
+    const total = Math.max(1, paginationInfo.totalPages);
+    const nextPage = Math.min(Math.max(1, page), total);
+    setCurrentPage(nextPage);
+  };
+
+  const handlePageChange = (direction: "prev" | "next") => {
+    if (direction === "prev" && paginationInfo.hasPrev) {
+      goToPage(currentPage - 1);
+    }
+    if (direction === "next" && paginationInfo.hasNext) {
+      goToPage(currentPage + 1);
+    }
+  };
+
+  const handlePageSizeChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const value = Number(event.target.value);
+    if (!Number.isNaN(value)) {
+      setPageSize(value);
     }
   };
 
@@ -438,6 +597,9 @@ export default function QuizCoursePage() {
       setQuizQuestions((prev) =>
         prev.map((q) => (q._id === updatedQuestion._id ? { ...q, ...updatedQuestion } : q))
       );
+      setManualQuestions((prev) =>
+        prev ? prev.map((q) => (q._id === updatedQuestion._id ? { ...q, ...updatedQuestion } : q)) : prev
+      );
 
       await showSwalSuccess("Question updated.");
       handleCloseEdit();
@@ -453,13 +615,17 @@ export default function QuizCoursePage() {
   const bgColor = darkMode ? "#0f172a" : "#f8fafc";
   const cardBg = darkMode ? "rgba(15,23,42,0.6)" : "#ffffff";
   const borderColor = darkMode ? "rgba(148,163,184,0.2)" : "rgba(148,163,184,0.2)";
+  const startItem =
+    totalQuestions === 0 ? 0 : (paginationInfo.currentPage - 1) * paginationInfo.limit + 1;
+  const endItem =
+    totalQuestions === 0 ? 0 : Math.min(totalQuestions, startItem + quizQuestions.length - 1);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: bgColor }}>
+    <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: bgColor }}>
       <Navbar />
-      <div className="flex relative">
+      <div className="flex relative w-full">
         <Sidebar />
-        <div className="flex-1 p-6 md:ml-64 relative">
+        <div className="flex-1 w-full px-4 sm:px-6 py-6 md:ml-64 relative overflow-x-hidden">
           <div className="max-w-6xl mx-auto">
             <div className="mb-6 flex items-center justify-between">
               <h1 className="text-3xl font-bold" style={{ color: textColor }}>
@@ -476,21 +642,111 @@ export default function QuizCoursePage() {
                 <p style={{ color: textColor }}>No questions.</p>
               </div>
             ) : (
-              <div className="space-y-6">
-                <div className="mb-4">
-                  <button
-                    onClick={() => navigate(-1)}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors"
-                    style={{
-                      backgroundColor: darkMode ? "rgba(99,102,241,0.2)" : "#6366f1",
-                      color: darkMode ? "#a5b4fc" : "#ffffff",
-                    }}
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                    <span>Back subject</span>
-                  </button>
+              <>
+                
+                
+                
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+                  <div className="w-full md:w-auto">
+                    <button
+                      onClick={() => navigate(-1)}
+                      className="inline-flex items-center justify-start gap-2 px-4 py-3 rounded-xl font-semibold shadow-lg text-left whitespace-nowrap transition-colors w-full md:w-auto max-w-[220px]"
+                      style={{
+                        backgroundColor: darkMode ? "rgba(99,102,241,0.25)" : "#6366f1",
+                        color: darkMode ? "#a5b4fc" : "#ffffff",
+                      }}
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      <span>Back subject</span>
+                    </button>
+                  </div>
+                
+                  <div>
+                    <p className="text-sm" style={{ color: textColor }}>
+                      Showing{" "}
+                      <span className="font-semibold">
+                        {startItem} - {endItem}
+                      </span>{" "}
+                      of{" "}
+                      <span className="font-semibold">{totalQuestions}</span> questions
+                    </p>
+                    {subjectInfo && (
+                      <p className="text-xs mt-1" style={{ color: darkMode ? "#94a3b8" : "#475569" }}>
+                        Subject: {subjectInfo.code ? `${subjectInfo.code} · ` : ""}
+                        {subjectInfo.name}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <label className="text-sm" style={{ color: textColor }}>
+                      Rows per page
+                    </label>
+                    <select
+                      value={pageSize}
+                      onChange={handlePageSizeChange}
+                      className="rounded-lg border px-3 py-1 bg-transparent"
+                      style={{ borderColor: borderColor, color: textColor }}
+                    >
+                      {pageSizeOptions.map((size) => (
+                        <option key={size} value={size} className="bg-slate-900 text-white">
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handlePageChange("prev")}
+                        disabled={!paginationInfo.hasPrev}
+                        className="p-2 rounded-lg border transition-colors"
+                        style={{
+                          borderColor: borderColor,
+                          color: paginationInfo.hasPrev ? textColor : "#94a3b8",
+                          opacity: paginationInfo.hasPrev ? 1 : 0.4,
+                        }}
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <span className="text-sm" style={{ color: textColor }}>
+                        Page {paginationInfo.currentPage} / {paginationInfo.totalPages}
+                      </span>
+                      <button
+                        onClick={() => handlePageChange("next")}
+                        disabled={!paginationInfo.hasNext}
+                        className="p-2 rounded-lg border transition-colors"
+                        style={{
+                          borderColor: borderColor,
+                          color: paginationInfo.hasNext ? textColor : "#94a3b8",
+                          opacity: paginationInfo.hasNext ? 1 : 0.4,
+                        }}
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                {quizQuestions.map((question, index) => {
+
+                <div className="flex gap-6 w-full overflow-x-hidden">
+                  <div className="hidden lg:block w-40">
+                    <div className="sticky top-28">
+
+                    </div>
+                  </div>
+
+                  <div className="flex-1 space-y-6">
+                    <div className="mb-4 lg:hidden">
+                      <button
+                        onClick={() => navigate(-1)}
+                        className="inline-flex items-center justify-start gap-2 px-4 py-2 rounded-lg font-semibold text-left whitespace-nowrap transition-colors max-w-[220px]"
+                        style={{
+                          backgroundColor: darkMode ? "rgba(99,102,241,0.2)" : "#6366f1",
+                          color: darkMode ? "#a5b4fc" : "#ffffff",
+                        }}
+                      >
+                        <ArrowLeft className="w-4 h-4" />
+                        <span>Back subject</span>
+                      </button>
+                    </div>
+                    {quizQuestions.map((question, index) => {
                   const images = resolveImageSrc(question);
                   return (
                     <div
@@ -503,15 +759,15 @@ export default function QuizCoursePage() {
                     >
                       <div className="mb-4">
                         <div className="flex items-start justify-between mb-2">
-                          <h3
+                        <h3
                             className="text-xl font-semibold break-words flex-1"
-                            style={{ color: textColor }}
-                          >
-                            <span className="mr-2">Question {index + 1}:</span>
+                          style={{ color: textColor }}
+                        >
+                            <span className="mr-2">Question {startItem + index}:</span>
                             <span
                               dangerouslySetInnerHTML={{ __html: question.text }}
                             />
-                          </h3>
+                        </h3>
                           <div className="flex items-center gap-2 ml-4">
                             <button
                               onClick={() => handleOpenEditQuestion(question)}
@@ -675,8 +931,42 @@ export default function QuizCoursePage() {
                       )}
                     </div>
                   );
-                })}
-              </div>
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mt-8">
+                  <p className="text-sm" style={{ color: textColor }}>
+                    Page {paginationInfo.currentPage} of {paginationInfo.totalPages}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handlePageChange("prev")}
+                      disabled={!paginationInfo.hasPrev}
+                      className="px-4 py-2 rounded-lg border transition-colors"
+                      style={{
+                        borderColor: borderColor,
+                        color: paginationInfo.hasPrev ? textColor : "#94a3b8",
+                        opacity: paginationInfo.hasPrev ? 1 : 0.4,
+                      }}
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => handlePageChange("next")}
+                      disabled={!paginationInfo.hasNext}
+                      className="px-4 py-2 rounded-lg border transition-colors"
+                      style={{
+                        borderColor: borderColor,
+                        color: paginationInfo.hasNext ? textColor : "#94a3b8",
+                        opacity: paginationInfo.hasNext ? 1 : 0.4,
+                      }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>

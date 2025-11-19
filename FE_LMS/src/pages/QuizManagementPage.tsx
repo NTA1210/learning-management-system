@@ -4,8 +4,8 @@ import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
-import { PlusCircle, X, ImagePlus, CheckCircle, AlertCircle, Info, Upload } from "lucide-react";
-import { subjectService, quizQuestionService, type Subject } from "../services";
+import { PlusCircle, X, ImagePlus, CheckCircle, AlertCircle, Info, Upload, Download } from "lucide-react";
+import { subjectService, quizQuestionService, type Subject, type QuizQuestion } from "../services";
 import { useNavigate } from "react-router-dom";
 
 type Question = {
@@ -31,6 +31,14 @@ export default function QuizManagementPage() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportSubjectId, setExportSubjectId] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const closeExportModal = () => {
+    if (exporting) return;
+    setShowExportModal(false);
+    setExportSubjectId("");
+  };
   const quizUploadEndpoint = `${import.meta.env.VITE_BASE_API.replace(/\/$/, "")}/quiz-questions`;
   // Refs for file inputs for each question
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
@@ -69,7 +77,7 @@ export default function QuizManagementPage() {
   });
 
   // Step 2: Questions
-const [questions, setQuestions] = useState<Question[]>([
+  const [questions, setQuestions] = useState<Question[]>([
     {
       text: "",
       options: ["", "", "", ""],
@@ -141,7 +149,7 @@ const [questions, setQuestions] = useState<Question[]>([
     setCurrentStep(1);
   };
 
-const handleAddQuestion = () => {
+  const handleAddQuestion = () => {
     setQuestions([
       ...questions,
       {
@@ -180,7 +188,7 @@ const handleRemoveOptionFromQuestion = (questionIndex: number, optionIndex: numb
     };
     return updated;
   });
-};
+  };
 
   const handleUpdateQuestion = (index: number, field: keyof Question, value: unknown) => {
     const updated = [...questions];
@@ -472,20 +480,55 @@ const handleImportQuiz = async () => {
 
   try {
     setImporting(true);
+    
+    // 1. Fetch và lưu tất cả câu hỏi cũ trước khi import (vì BE sẽ xóa chúng)
+    const oldQuestionsResult = await quizQuestionService.getAllQuizQuestions({
+      subjectId: importSubjectId,
+      limit: 10000, // Lấy tất cả
+      option: "subjectId",
+    });
+    const oldQuestions = oldQuestionsResult.data || [];
+    
+    let subjectDetail: Subject | null = null;
+    try {
+      subjectDetail = await subjectService.getSubjectById(importSubjectId);
+    } catch (error) {
+      console.error("Failed to fetch subject info for import:", error);
+      subjectDetail = null;
+    }
+
+    const enhanceWithSubject = (questions: QuizQuestion[]) => {
+      if (!subjectDetail) return questions;
+      return questions.map((q) => {
+        if (typeof q.subjectId === "string" || !q.subjectId) {
+          return {
+            ...q,
+            subjectId: {
+              _id: subjectDetail?._id,
+              code: subjectDetail?.code,
+              name: subjectDetail?.name,
+            },
+          };
+        }
+        return q;
+      });
+    };
+
+    // 2. Import câu hỏi mới (BE sẽ xóa câu hỏi cũ và insert câu hỏi mới)
     const result = await quizQuestionService.importQuizFromXml(importSubjectId, importFile);
     const imported = Array.isArray(result) ? result : result?.data || [];
-    const importedIds = imported
-      .map((q: { _id?: string }) => q._id)
-      .filter((id: unknown): id is string => typeof id === "string" && id.length > 0);
+    
+    // 3. Merge câu hỏi cũ với câu hỏi mới để hiển thị cả hai
+    const allQuestions = enhanceWithSubject([...oldQuestions, ...imported]);
 
     showNotification("Quiz questions imported successfully", "success");
     setShowImportModal(false);
     setImportSubjectId("");
     setImportFile(null);
 
-    // Navigate to quiz page and only show imported questions in this view
+    // Navigate to quiz page và pass cả câu hỏi cũ và mới để hiển thị
     navigate(`/quiz/${importSubjectId}`, {
-      state: { importedIds },
+      state: { mergedQuestions: allQuestions, subjectInfo: subjectDetail ?? undefined },
     });
   } catch (error) {
     console.error("Import quiz failed:", error);
@@ -497,7 +540,41 @@ const handleImportQuiz = async () => {
   } finally {
     setImporting(false);
   }
-};
+  };
+
+  const handleExportQuiz = async () => {
+    if (!exportSubjectId) {
+      showNotification("Please choose a subject to export", "error");
+      return;
+    }
+
+    try {
+      setExporting(true);
+      const blob = await quizQuestionService.exportQuizQuestions(exportSubjectId);
+      const subject = subjects.find((s) => s._id === exportSubjectId);
+      const subjectLabel = subject?.code || subject?.name || "quiz";
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      const filename = `${subjectLabel}-${timestamp}.xml`;
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      showNotification("Exported quiz successfully", "success");
+      setShowExportModal(false);
+      setExportSubjectId("");
+    } catch (error) {
+      console.error("Export quiz failed:", error);
+      showNotification("Failed to export quiz", "error");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const pageBg = darkMode ? "#111827" : "#f8fafc";
   const cardBg = darkMode ? "rgba(30, 41, 59, 0.85)" : "#ffffff";
@@ -518,7 +595,7 @@ const handleImportQuiz = async () => {
       <div className="flex flex-col flex-1 w-0 overflow-hidden">
         <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 mt-16 sm:pl-24 md:pl-28">
           <div className="max-w-7xl mx-auto px-4 space-y-8">
-            <header className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold">Quiz Management</h1>
               </div>
@@ -533,6 +610,14 @@ const handleImportQuiz = async () => {
                 >
                   <Upload className="w-5 h-5" />
                   Import quiz
+                </button>
+                <button
+                  onClick={() => setShowExportModal(true)}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
+                  style={{ backgroundColor: darkMode ? "rgba(59,130,246,0.25)" : "#1d4ed8", color: "#e0f2fe" }}
+                >
+                  <Download className="w-5 h-5" />
+                  Export quiz
                 </button>
                 <button
                   onClick={() => setShowCreateModal(true)}
@@ -841,33 +926,33 @@ const handleImportQuiz = async () => {
                                 </button>
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {question.options.map((option, optIndex) => (
-                                  <div key={optIndex}>
-                                    <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                                      Option {String.fromCharCode(65 + optIndex)} <span className="text-red-500">*</span>
-                                    </label>
+                              {question.options.map((option, optIndex) => (
+                                <div key={optIndex}>
+                                  <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
+                                    Option {String.fromCharCode(65 + optIndex)} <span className="text-red-500">*</span>
+                                  </label>
                                     <div className="flex gap-2 items-center">
-                                      <input
-                                        type="text"
-                                        required
-                                        value={option}
-                                        onChange={(e) => handleUpdateOption(qIndex, optIndex, e.target.value)}
-                                        className="flex-1 px-4 py-2 rounded-lg"
-                                        style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
-                                        placeholder={`Option ${String.fromCharCode(65 + optIndex)}`}
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => handleUpdateCorrectOption(qIndex, optIndex)}
-                                       className="px-3 py-2 rounded-lg font-semibold text-sm"
-                                        style={{
-                                          backgroundColor: question.correctOptions[optIndex] === 1 ? "#10b981" : inputBg,
-                                          color: question.correctOptions[optIndex] === 1 ? "#fff" : textColor,
-                                          border: `1px solid ${inputBorder}`,
-                                        }}
-                                      >
-                                        {question.correctOptions[optIndex] === 1 ? "✓" : "○"}
-                                      </button>
+                                    <input
+                                      type="text"
+                                      required
+                                      value={option}
+                                      onChange={(e) => handleUpdateOption(qIndex, optIndex, e.target.value)}
+                                      className="flex-1 px-4 py-2 rounded-lg"
+                                      style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
+                                      placeholder={`Option ${String.fromCharCode(65 + optIndex)}`}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateCorrectOption(qIndex, optIndex)}
+                                      className="px-3 py-2 rounded-lg font-semibold text-sm"
+                                      style={{
+                                        backgroundColor: question.correctOptions[optIndex] === 1 ? "#10b981" : inputBg,
+                                        color: question.correctOptions[optIndex] === 1 ? "#fff" : textColor,
+                                        border: `1px solid ${inputBorder}`,
+                                      }}
+                                    >
+                                      {question.correctOptions[optIndex] === 1 ? "✓" : "○"}
+                                    </button>
                                       {question.options.length > 2 && (
                                         <button
                                           type="button"
@@ -877,9 +962,9 @@ const handleImportQuiz = async () => {
                                           Remove
                                         </button>
                                       )}
-                                    </div>
                                   </div>
-                                ))}
+                                </div>
+                              ))}
                               </div>
                             </div>
 
@@ -1001,14 +1086,7 @@ const handleImportQuiz = async () => {
                 >
                   <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: cardBorder }}>
                     <h3 className="text-xl font-semibold">Import Quiz Questions</h3>
-                    <button
-                      onClick={() => setShowImportModal(false)}
-                      className="text-sm font-semibold"
-                      style={{ color: labelColor }}
-                      disabled={importing}
-                    >
-                      Close
-                    </button>
+                    <span />
                   </div>
                   <div className="p-6 space-y-5">
                     <div>
@@ -1067,6 +1145,7 @@ const handleImportQuiz = async () => {
 
                     <div className="flex items-center justify-end gap-3 pt-2">
                       <button
+                        type="button"
                         onClick={() => setShowImportModal(false)}
                         className="px-4 py-2 rounded-lg font-semibold"
                         style={{
@@ -1078,12 +1157,76 @@ const handleImportQuiz = async () => {
                         Cancel
                       </button>
                       <button
+                        type="button"
                         onClick={handleImportQuiz}
                         className="px-4 py-2 rounded-lg font-semibold text-white disabled:opacity-60"
                         style={{ backgroundColor: "#0ea5e9" }}
                         disabled={importing}
                       >
                         {importing ? "Importing..." : "Import"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showExportModal && (
+              <div className="fixed inset-0 z-[130] flex items-center justify-center px-4">
+                <div className="absolute inset-0 bg-black/60" onClick={closeExportModal} />
+                <div
+                  className="relative w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
+                  style={{ backgroundColor: cardBg, border: cardBorder }}
+                >
+                  <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: cardBorder }}>
+                    <h3 className="text-xl font-semibold">Export Quiz Questions</h3>
+                    <span />
+                  </div>
+                  <div className="p-6 space-y-5">
+                    <div>
+                      <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
+                        Subject <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={exportSubjectId}
+                        onChange={(e) => setExportSubjectId(e.target.value)}
+                        className="w-full px-4 py-2 rounded-lg border"
+                        style={{ backgroundColor: inputBg, borderColor: inputBorder, color: textColor }}
+                        disabled={exporting}
+                      >
+                        <option value="">Select subject</option>
+                        {subjects.map((subject) => (
+                          <option key={subject._id} value={subject._id}>
+                            {subject.code ? `${subject.code} · ` : ""}
+                            {subject.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <p className="text-sm" style={{ color: labelColor }}>
+                      Choose a subject to download its quiz questions as an XML file.
+                    </p>
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={closeExportModal}
+                        className="px-4 py-2 rounded-lg font-semibold"
+                        style={{
+                          backgroundColor: darkMode ? "rgba(148,163,184,0.15)" : "#e2e8f0",
+                          color: textColor,
+                        }}
+                        disabled={exporting}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleExportQuiz}
+                        className="px-4 py-2 rounded-lg font-semibold text-white disabled:opacity-60"
+                        style={{ backgroundColor: "#1d4ed8" }}
+                        disabled={exporting || !exportSubjectId}
+                      >
+                        {exporting ? "Exporting..." : "Export"}
                       </button>
                     </div>
                   </div>

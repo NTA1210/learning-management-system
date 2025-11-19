@@ -1,4 +1,4 @@
-import http from "../utils/http";
+import http, { httpClient } from "../utils/http";
 
 export interface QuizQuestionImage {
   url: string;
@@ -206,6 +206,13 @@ export const quizQuestionService = {
     // Delete the question
     const deleteQuestionUrl = `/quiz-questions/${questionId}`;
     await http.del(deleteQuestionUrl);
+  },
+
+  exportQuizQuestions: async (subjectId: string): Promise<Blob> => {
+    const response = await httpClient.get(`/quiz-questions/export/${subjectId}`, {
+      responseType: "blob",
+    });
+    return response.data as Blob;
   },
 };
 
