@@ -203,6 +203,16 @@ const AssignmentPage: React.FC = () => {
         confirmButtonColor: darkMode ? "#4c1d95" : "#4f46e5",
         background: darkMode ? "#1f2937" : "#ffffff",
         color: darkMode ? "#ffffff" : "#1e293b",
+        didOpen: () => {
+          const swalContainer = document.querySelector(".swal2-container") as HTMLElement;
+          const swalBackdrop = document.querySelector(".swal2-backdrop-show") as HTMLElement;
+          if (swalContainer) {
+            swalContainer.style.zIndex = "99999";
+          }
+          if (swalBackdrop) {
+            swalBackdrop.style.zIndex = "99998";
+          }
+        },
       });
     } catch (err) {
       console.error("Error loading SweetAlert2:", err);
@@ -224,11 +234,48 @@ const AssignmentPage: React.FC = () => {
         cancelButtonText: "No",
         background: darkMode ? "#1f2937" : "#ffffff",
         color: darkMode ? "#ffffff" : "#1e293b",
+        didOpen: () => {
+          const swalContainer = document.querySelector(".swal2-container") as HTMLElement;
+          const swalBackdrop = document.querySelector(".swal2-backdrop-show") as HTMLElement;
+          if (swalContainer) {
+            swalContainer.style.zIndex = "99999";
+          }
+          if (swalBackdrop) {
+            swalBackdrop.style.zIndex = "99998";
+          }
+        },
       });
       return result.isConfirmed;
     } catch (err) {
       console.error("Error loading SweetAlert2:", err);
       return confirm(message); // Fallback to confirm if swal fails to load
+    }
+  };
+
+  const showSwalSuccess = async (message: string) => {
+    try {
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: message,
+        confirmButtonColor: darkMode ? "#4c1d95" : "#4f46e5",
+        background: darkMode ? "#1f2937" : "#ffffff",
+        color: darkMode ? "#ffffff" : "#1e293b",
+        didOpen: () => {
+          const swalContainer = document.querySelector(".swal2-container") as HTMLElement;
+          const swalBackdrop = document.querySelector(".swal2-backdrop-show") as HTMLElement;
+          if (swalContainer) {
+            swalContainer.style.zIndex = "99999";
+          }
+          if (swalBackdrop) {
+            swalBackdrop.style.zIndex = "99998";
+          }
+        },
+      });
+    } catch (err) {
+      console.error("Error loading SweetAlert2:", err);
+      alert(message);
     }
   };
 
@@ -280,6 +327,7 @@ const AssignmentPage: React.FC = () => {
       await httpClient.delete(`/assignments/${assignmentId}`, {
         withCredentials: true,
       });
+      await showSwalSuccess("Assignment deleted successfully");
       await fetchAssignments();
     } catch (err) {
       console.error("Error deleting assignment:", err);
@@ -290,9 +338,11 @@ const AssignmentPage: React.FC = () => {
   const handleCreateAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await httpClient.post("/assignments", formData, {
+      await httpClient.post(`/assignments/course/${formData.courseId}`, {
+        ...formData,
         withCredentials: true,
       });
+      await showSwalSuccess("Assignment created successfully");
       setShowCreateModal(false);
       setFormData({
         courseId: "",
@@ -322,6 +372,7 @@ const AssignmentPage: React.FC = () => {
       await httpClient.put(`/assignments/${editingAssignment._id}`, formData, {
         withCredentials: true,
       });
+      await showSwalSuccess("Assignment updated successfully");
       setShowEditModal(false);
       setEditingAssignment(null);
       setFormData({
@@ -615,7 +666,7 @@ const AssignmentPage: React.FC = () => {
                             </div>
                             <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
                               <User className="w-4 h-4 mr-2" />
-                              Created by: {assignment.createdBy.fullname || assignment.createdBy.username}
+                              {/* Created by: {assignment.createdBy.fullname || assignment.createdBy.username} */}
                             </div>
                             {assignment.allowLate && (
                               <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
