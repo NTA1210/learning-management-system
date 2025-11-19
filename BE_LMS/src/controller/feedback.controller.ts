@@ -32,7 +32,7 @@ export const createFeedbackHandler = catchErrors(async (req, res) => {
   const data = createFeedbackSchema.parse(parsedBody);
 
   // Get userId from request (set by authenticate middleware)
-  const userId = req.userId.toString();
+  const userId = req.userId!;
 
   // Call service
   const feedback = await createFeedback(data, userId, file);
@@ -53,7 +53,7 @@ export const listFeedbacksHandler = catchErrors(async (req, res) => {
   const filters = listFeedbacksSchema.parse(req.query);
 
   // Get user info from authenticate middleware
-  const userId = req.userId.toString();
+  const userId = req.userId!;
   const userRole = req.role;
 
   // Call service
@@ -76,7 +76,7 @@ export const getFeedbackByIdHandler = catchErrors(async (req, res) => {
   const { id } = feedbackIdSchema.parse(req.params);
 
   // Get user info from authenticate middleware
-  const userId = req.userId.toString();
+  const userId = req.userId!;
   const userRole = req.role;
 
   // Call service
@@ -93,7 +93,7 @@ export const getFeedbackByIdHandler = catchErrors(async (req, res) => {
  */
 export const getMyFeedbacksHandler = catchErrors(async (req, res) => {
   // Get user info from authenticate middleware
-  const userId = req.userId.toString();
+  const userId = req.userId!;
 
   // Parse pagination from query
   const page = req.query.page ? parseInt(req.query.page as string) : 1;
@@ -119,7 +119,7 @@ export const getFeedbacksByTargetHandler = catchErrors(async (req, res) => {
   const { targetId } = targetIdSchema.parse(req.params);
 
   // Get user info from authenticate middleware
-  const userId = req.userId.toString();
+  const userId = req.userId!;
   const userRole = req.role;
 
   // Parse pagination from query
@@ -147,7 +147,7 @@ export const deleteFeedbackHandler = catchErrors(async (req, res) => {
   const { id } = feedbackIdSchema.parse(req.params);
 
   // Get user info from authenticate middleware
-  const userId = req.userId.toString();
+  const userId = req.userId!;
   const userRole = req.role;
 
   // Call service
