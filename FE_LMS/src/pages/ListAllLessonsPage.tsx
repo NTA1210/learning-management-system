@@ -130,7 +130,7 @@ const ListAllLessonsPage: React.FC = () => {
       }
       params.sortOrder = order;
 
-      const response = await httpClient.get<ApiResponse>("/lesson/listAllLessons", {
+      const response = await httpClient.get<ApiResponse>("/lessons/", {
         params,
         withCredentials: true,
       });
@@ -187,6 +187,16 @@ const ListAllLessonsPage: React.FC = () => {
         confirmButtonColor: darkMode ? "#4c1d95" : "#4f46e5",
         background: darkMode ? "#1f2937" : "#ffffff",
         color: darkMode ? "#ffffff" : "#1e293b",
+        didOpen: () => {
+          const swalContainer = document.querySelector('.swal2-container') as HTMLElement;
+          const swalBackdrop = document.querySelector('.swal2-backdrop-show') as HTMLElement;
+          if (swalContainer) {
+            swalContainer.style.zIndex = '99999';
+          }
+          if (swalBackdrop) {
+            swalBackdrop.style.zIndex = '99998';
+          }
+        },
       });
     } catch (err) {
       console.error("Error loading SweetAlert2:", err);
@@ -208,6 +218,16 @@ const ListAllLessonsPage: React.FC = () => {
         cancelButtonText: "No",
         background: darkMode ? "#1f2937" : "#ffffff",
         color: darkMode ? "#ffffff" : "#1e293b",
+        didOpen: () => {
+          const swalContainer = document.querySelector('.swal2-container') as HTMLElement;
+          const swalBackdrop = document.querySelector('.swal2-backdrop-show') as HTMLElement;
+          if (swalContainer) {
+            swalContainer.style.zIndex = '99999';
+          }
+          if (swalBackdrop) {
+            swalBackdrop.style.zIndex = '99998';
+          }
+        },
       });
       return result.isConfirmed;
     } catch (err) {
@@ -226,6 +246,16 @@ const ListAllLessonsPage: React.FC = () => {
         confirmButtonColor: darkMode ? "#4c1d95" : "#4f46e5",
         background: darkMode ? "#1f2937" : "#ffffff",
         color: darkMode ? "#ffffff" : "#1e293b",
+        didOpen: () => {
+          const swalContainer = document.querySelector('.swal2-container') as HTMLElement;
+          const swalBackdrop = document.querySelector('.swal2-backdrop-show') as HTMLElement;
+          if (swalContainer) {
+            swalContainer.style.zIndex = '99999';
+          }
+          if (swalBackdrop) {
+            swalBackdrop.style.zIndex = '99998';
+          }
+        },
       });
     } catch (err) {
       console.error("Error loading SweetAlert2:", err);
@@ -275,7 +305,7 @@ const ListAllLessonsPage: React.FC = () => {
     if (!confirmed) return;
     
     try {
-      await httpClient.delete(`/lesson/deleteLessons/${lessonId}`, {
+      await httpClient.delete(`/lessons/${lessonId}`, {
         withCredentials: true,
       });
       await showSwalSuccess("Lesson deleted successfully");
@@ -310,7 +340,7 @@ const ListAllLessonsPage: React.FC = () => {
       if (formData.durationMinutes > 0) payload.durationMinutes = formData.durationMinutes;
       if (formData.publishedAt) payload.publishedAt = new Date(formData.publishedAt).toISOString();
 
-      await httpClient.post("/lesson/createLessons", payload, {
+      await httpClient.post("/lessons", payload, {
         withCredentials: true,
       });
       await showSwalSuccess("Lesson created successfully");
@@ -356,7 +386,7 @@ const ListAllLessonsPage: React.FC = () => {
       if (formData.durationMinutes > 0) payload.durationMinutes = formData.durationMinutes;
       if (formData.publishedAt) payload.publishedAt = new Date(formData.publishedAt).toISOString();
 
-      await httpClient.put(`/lesson/updateLessons/${editingLesson._id}`, payload, {
+      await httpClient.put(`/lessons/${editingLesson._id}`, payload, {
         withCredentials: true,
       });
       await showSwalSuccess("Lesson updated successfully");
@@ -402,37 +432,17 @@ const ListAllLessonsPage: React.FC = () => {
             <div className="mb-8">
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <h1
-                    className="text-3xl font-bold mb-2"
-                    style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
-                  >
-                    Lesson Materials
-                  </h1>
-                  <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
-                    Browse all available lessons across courses
-                  </p>
+              <h1
+                className="text-3xl font-bold mb-2"
+                style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
+              >
+                Lesson Materials
+              </h1>
+              <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                Browse all available lessons across courses
+              </p>
                 </div>
-                {canCreate && (
-                  <button
-                    onClick={handleCreate}
-                    className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg"
-                    style={{
-                      backgroundColor: darkMode ? "#059669" : "#10b981",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = darkMode
-                        ? "#047857"
-                        : "#059669";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = darkMode
-                        ? "#059669"
-                        : "#10b981";
-                    }}
-                  >
-                    + Create Lesson
-                  </button>
-                )}
+                
               </div>
             </div>
 
@@ -568,10 +578,11 @@ const ListAllLessonsPage: React.FC = () => {
                       />
                     </svg>
                   </span>
+                  
                 </div>
                 <span
                   style={{
-                    minWidth: 100,
+                  minWidth: 100,
                     fontVariantNumeric: "tabular-nums",
                     color: darkMode ? "#e5e7eb" : "#223344",
                   }}
@@ -607,6 +618,27 @@ const ListAllLessonsPage: React.FC = () => {
                 >
                   &#x203A;
                 </button>
+                {canCreate && (
+                  <button
+                    onClick={handleCreate}
+                    className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg"
+                    style={{
+                      backgroundColor: darkMode ? "#059669" : "#10b981",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = darkMode
+                        ? "#047857"
+                        : "#059669";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = darkMode
+                        ? "#059669"
+                        : "#10b981";
+                    }}
+                  >
+                    + Create Lesson
+                  </button>
+                )}
               </div>
             </div>
 
@@ -669,7 +701,7 @@ const ListAllLessonsPage: React.FC = () => {
                     >
                       <div className="p-6">
                         <div className="flex items-start justify-between mb-3">
-                          {/* Course Badge */}
+                        {/* Course Badge */}
                           <span
                             className="inline-block px-3 py-1 text-xs font-semibold rounded-full"
                             style={{
@@ -963,10 +995,9 @@ const ListAllLessonsPage: React.FC = () => {
                     className="block text-sm font-medium mb-2"
                     style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
                   >
-                    LessionLession *
+                    Course *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.courseId}
                     onChange={(e) =>
                       setFormData({ ...formData, courseId: e.target.value })
@@ -981,9 +1012,15 @@ const ListAllLessonsPage: React.FC = () => {
                         : "#e5e7eb",
                       color: darkMode ? "#ffffff" : "#000000",
                     }}
-                    placeholder="Enter lession (e.g. ReactJS... )"
                     required
-                  />
+                  >
+                    <option value="">Select a course</option>
+                    {availableCourses.map((course) => (
+                      <option key={course._id} value={course._id}>
+                        {course.title}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="md:col-span-2">
@@ -1046,15 +1083,30 @@ const ListAllLessonsPage: React.FC = () => {
                     Order
                   </label>
                   <input
-                    type="number"
-                    min={0}
-                    value={formData.order}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        order: Number(e.target.value),
-                      })
-                    }
+                    type="text"
+                    value={formData.order === 0 ? "" : String(formData.order)}
+                    onChange={(e) => {
+                      const value = e.target.value.trim();
+                      if (value === "") {
+                        setFormData({
+                          ...formData,
+                          order: 0,
+                        });
+                      } else if (/^\d+$/.test(value)) {
+                        const numValue = parseInt(value, 10);
+                        if (!isNaN(numValue) && numValue >= 0) {
+                          setFormData({
+                            ...formData,
+                            order: numValue,
+                          });
+                        }
+                      }
+                    }}
+                    onKeyPress={(e) => {
+                      if (!/[0-9]/.test(e.key) && e.key !== "Backspace" && e.key !== "Delete" && e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Tab") {
+                        e.preventDefault();
+                      }
+                    }}
                     className="w-full px-4 py-2 rounded-lg border"
                     style={{
                       backgroundColor: darkMode
@@ -1065,7 +1117,7 @@ const ListAllLessonsPage: React.FC = () => {
                         : "#e5e7eb",
                       color: darkMode ? "#ffffff" : "#000000",
                     }}
-                    placeholder="0"
+                    placeholder="Enter order number"
                   />
                 </div>
                 <div>
@@ -1076,15 +1128,30 @@ const ListAllLessonsPage: React.FC = () => {
                     Duration (minutes)
                   </label>
                   <input
-                    type="number"
-                    min={0}
-                    value={formData.durationMinutes}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        durationMinutes: Number(e.target.value),
-                      })
-                    }
+                    type="text"
+                    value={formData.durationMinutes === 0 ? "" : String(formData.durationMinutes)}
+                    onChange={(e) => {
+                      const value = e.target.value.trim();
+                      if (value === "") {
+                        setFormData({
+                          ...formData,
+                          durationMinutes: 0,
+                        });
+                      } else if (/^\d+$/.test(value)) {
+                        const numValue = parseInt(value, 10);
+                        if (!isNaN(numValue) && numValue >= 0) {
+                          setFormData({
+                            ...formData,
+                            durationMinutes: numValue,
+                          });
+                        }
+                      }
+                    }}
+                    onKeyPress={(e) => {
+                      if (!/[0-9]/.test(e.key) && e.key !== "Backspace" && e.key !== "Delete" && e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Tab") {
+                        e.preventDefault();
+                      }
+                    }}
                     className="w-full px-4 py-2 rounded-lg border"
                     style={{
                       backgroundColor: darkMode
@@ -1095,7 +1162,7 @@ const ListAllLessonsPage: React.FC = () => {
                         : "#e5e7eb",
                       color: darkMode ? "#ffffff" : "#000000",
                     }}
-                    placeholder="0"
+                    placeholder="Enter duration in minutes"
                   />
                 </div>
                 <div>
@@ -1303,15 +1370,30 @@ const ListAllLessonsPage: React.FC = () => {
                     Order
                   </label>
                   <input
-                    type="number"
-                    min={0}
-                    value={formData.order}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        order: Number(e.target.value),
-                      })
-                    }
+                    type="text"
+                    value={formData.order === 0 ? "" : String(formData.order)}
+                    onChange={(e) => {
+                      const value = e.target.value.trim();
+                      if (value === "") {
+                        setFormData({
+                          ...formData,
+                          order: 0,
+                        });
+                      } else if (/^\d+$/.test(value)) {
+                        const numValue = parseInt(value, 10);
+                        if (!isNaN(numValue) && numValue >= 0) {
+                          setFormData({
+                            ...formData,
+                            order: numValue,
+                          });
+                        }
+                      }
+                    }}
+                    onKeyPress={(e) => {
+                      if (!/[0-9]/.test(e.key) && e.key !== "Backspace" && e.key !== "Delete" && e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Tab") {
+                        e.preventDefault();
+                      }
+                    }}
                     className="w-full px-4 py-2 rounded-lg border"
                     style={{
                       backgroundColor: darkMode
@@ -1322,7 +1404,7 @@ const ListAllLessonsPage: React.FC = () => {
                         : "#e5e7eb",
                       color: darkMode ? "#ffffff" : "#000000",
                     }}
-                    placeholder="0"
+                    placeholder="Enter order number"
                   />
                 </div>
                 <div>
@@ -1333,15 +1415,30 @@ const ListAllLessonsPage: React.FC = () => {
                     Duration (minutes)
                   </label>
                   <input
-                    type="number"
-                    min={0}
-                    value={formData.durationMinutes}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        durationMinutes: Number(e.target.value),
-                      })
-                    }
+                    type="text"
+                    value={formData.durationMinutes === 0 ? "" : String(formData.durationMinutes)}
+                    onChange={(e) => {
+                      const value = e.target.value.trim();
+                      if (value === "") {
+                        setFormData({
+                          ...formData,
+                          durationMinutes: 0,
+                        });
+                      } else if (/^\d+$/.test(value)) {
+                        const numValue = parseInt(value, 10);
+                        if (!isNaN(numValue) && numValue >= 0) {
+                          setFormData({
+                            ...formData,
+                            durationMinutes: numValue,
+                          });
+                        }
+                      }
+                    }}
+                    onKeyPress={(e) => {
+                      if (!/[0-9]/.test(e.key) && e.key !== "Backspace" && e.key !== "Delete" && e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Tab") {
+                        e.preventDefault();
+                      }
+                    }}
                     className="w-full px-4 py-2 rounded-lg border"
                     style={{
                       backgroundColor: darkMode
@@ -1352,7 +1449,7 @@ const ListAllLessonsPage: React.FC = () => {
                         : "#e5e7eb",
                       color: darkMode ? "#ffffff" : "#000000",
                     }}
-                    placeholder="0"
+                    placeholder="Enter duration in minutes"
                   />
                 </div>
                 <div>

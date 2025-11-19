@@ -117,6 +117,16 @@ const LessonMaterialDetailPage: React.FC = () => {
         confirmButtonColor: darkMode ? "#4c1d95" : "#4f46e5",
         background: darkMode ? "#1f2937" : "#ffffff",
         color: darkMode ? "#ffffff" : "#1e293b",
+        didOpen: () => {
+          const swalContainer = document.querySelector('.swal2-container') as HTMLElement;
+          const swalBackdrop = document.querySelector('.swal2-backdrop-show') as HTMLElement;
+          if (swalContainer) {
+            swalContainer.style.zIndex = '99999';
+          }
+          if (swalBackdrop) {
+            swalBackdrop.style.zIndex = '99998';
+          }
+        },
       });
     } catch {
       alert(message);
@@ -137,6 +147,16 @@ const LessonMaterialDetailPage: React.FC = () => {
         cancelButtonText: "No",
         background: darkMode ? "#1f2937" : "#ffffff",
         color: darkMode ? "#ffffff" : "#1e293b",
+        didOpen: () => {
+          const swalContainer = document.querySelector('.swal2-container') as HTMLElement;
+          const swalBackdrop = document.querySelector('.swal2-backdrop-show') as HTMLElement;
+          if (swalContainer) {
+            swalContainer.style.zIndex = '99999';
+          }
+          if (swalBackdrop) {
+            swalBackdrop.style.zIndex = '99998';
+          }
+        },
       });
       return result.isConfirmed;
     } catch {
@@ -154,6 +174,16 @@ const LessonMaterialDetailPage: React.FC = () => {
         confirmButtonColor: darkMode ? "#4c1d95" : "#4f46e5",
         background: darkMode ? "#1f2937" : "#ffffff",
         color: darkMode ? "#ffffff" : "#1e293b",
+        didOpen: () => {
+          const swalContainer = document.querySelector('.swal2-container') as HTMLElement;
+          const swalBackdrop = document.querySelector('.swal2-backdrop-show') as HTMLElement;
+          if (swalContainer) {
+            swalContainer.style.zIndex = '99999';
+          }
+          if (swalBackdrop) {
+            swalBackdrop.style.zIndex = '99998';
+          }
+        },
       });
     } catch {
       alert(message);
@@ -309,7 +339,7 @@ const LessonMaterialDetailPage: React.FC = () => {
     setLoading(true);
     setError("");
     try {
-      const response = await httpClient.get(`/lesson/getLessonById/${lessonId}`, {
+      const response = await httpClient.get(`/lessons/${lessonId}`, {
         withCredentials: true,
       });
 
@@ -340,7 +370,7 @@ const LessonMaterialDetailPage: React.FC = () => {
     setMaterialsLoading(true);
     setMaterialsError("");
     try {
-      const response = await httpClient.get<ApiResponse>(`/lesson-material/byLesson/${lessonId}`, {
+      const response = await httpClient.get<ApiResponse>(`/lesson-materials/lessons/${lessonId}`, {
         withCredentials: true,
       });
 
@@ -367,7 +397,7 @@ const LessonMaterialDetailPage: React.FC = () => {
 
   const handleDownload = async (materialId: string) => {
     try {
-      const response = await httpClient.get(`/lesson-material/download/${materialId}`, {
+      const response = await httpClient.get(`/lesson-materials/${materialId}/download`, {
         withCredentials: true,
       });
       
@@ -422,7 +452,7 @@ const LessonMaterialDetailPage: React.FC = () => {
       // Ensure we have a signed URL
       let signedUrl = material.signedUrl;
       if (!signedUrl) {
-        const response = await httpClient.get(`/lesson-material/download/${material._id}`, {
+        const response = await httpClient.get(`/lesson-materials/${material._id}/download`, {
           withCredentials: true,
         });
         if (response.data?.success && response.data?.data?.signedUrl) {
@@ -678,7 +708,7 @@ const LessonMaterialDetailPage: React.FC = () => {
     if (!confirmed) return;
     
     try {
-      await httpClient.delete(`/lesson-material/deleteMaterial/${materialId}`, {
+      await httpClient.delete(`/lesson-materials/${materialId}`, {
         withCredentials: true,
       });
       await showSwalSuccess("Material deleted successfully");
@@ -718,7 +748,7 @@ const LessonMaterialDetailPage: React.FC = () => {
         }
         formDataToSend.append('type', materialType);
 
-        await httpClient.post("/lesson-material/uploadMaterial", formDataToSend, {
+        await httpClient.post("/lesson-materials/upload", formDataToSend, {
           withCredentials: true,
           headers: {
             'Content-Type': 'multipart/form-data',
@@ -764,7 +794,7 @@ const LessonMaterialDetailPage: React.FC = () => {
     if (!editingMaterial) return;
     
     try {
-      await httpClient.put(`/lesson-material/updateMaterial/${editingMaterial._id}`, formData, {
+      await httpClient.patch(`/lesson-materials/${editingMaterial._id}`, formData, {
         withCredentials: true,
       });
       await showSwalSuccess("Material updated successfully");
