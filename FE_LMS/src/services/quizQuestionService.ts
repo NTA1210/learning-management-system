@@ -98,6 +98,68 @@ export const quizQuestionService = {
     return { data: questions, pagination };
   },
 
+  // Update a quiz question
+  updateQuizQuestion: async (
+    questionId: string,
+    payload: {
+      subjectId?: string;
+      text?: string;
+      type?: string;
+      points?: number;
+      options?: string[];
+      correctOptions?: number[];
+      explanation?: string;
+      newImages?: File[];
+      deletedKeys?: string[];
+    }
+  ): Promise<QuizQuestion> => {
+    const formData = new FormData();
+
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value === undefined || value === null) return;
+
+      if (key === "newImages" || key === "deletedKeys") {
+        return;
+      }
+
+      if (Array.isArray(value)) {
+        formData.append(key, JSON.stringify(value));
+        return;
+      }
+
+      formData.append(key, value.toString());
+    });
+
+    if (payload.deletedKeys && payload.deletedKeys.length > 0) {
+      formData.append("deletedKeys", JSON.stringify(payload.deletedKeys));
+    }
+
+    if (payload.newImages && payload.newImages.length > 0) {
+      payload.newImages.forEach((file) => {
+        formData.append("files", file);
+      });
+    }
+
+    const response = await http.put(`/quiz-questions/${questionId}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    return response.data;
+  },
+
+  importQuizFromXml: async (subjectId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("subjectId", subjectId);
+    formData.append("file", file);
+
+    const response = await http.post("/quiz-questions/import", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    // API shape: { success, data, total, importedTypes }
+    return response.data;
+  },
+
   // Delete a quiz question
   deleteQuizQuestion: async (questionId: string, question?: QuizQuestion): Promise<void> => {
     // If question is not provided, try to get it from the current questions

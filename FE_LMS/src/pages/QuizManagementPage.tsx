@@ -4,8 +4,8 @@ import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
-import { PlusCircle, X, ImagePlus, CheckCircle, AlertCircle, Info } from "lucide-react";
-import { subjectService, type Subject } from "../services";
+import { PlusCircle, X, ImagePlus, CheckCircle, AlertCircle, Info, Upload } from "lucide-react";
+import { subjectService, quizQuestionService, type Subject } from "../services";
 import { useNavigate } from "react-router-dom";
 
 type Question = {
@@ -26,6 +26,11 @@ export default function QuizManagementPage() {
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessNotification, setShowSuccessNotification] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importSubjectId, setImportSubjectId] = useState("");
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
   const quizUploadEndpoint = `${import.meta.env.VITE_BASE_API.replace(/\/$/, "")}/quiz-questions`;
   // Refs for file inputs for each question
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
@@ -64,7 +69,7 @@ export default function QuizManagementPage() {
   });
 
   // Step 2: Questions
-  const [questions, setQuestions] = useState<Question[]>([
+const [questions, setQuestions] = useState<Question[]>([
     {
       text: "",
       options: ["", "", "", ""],
@@ -136,7 +141,7 @@ export default function QuizManagementPage() {
     setCurrentStep(1);
   };
 
-  const handleAddQuestion = () => {
+const handleAddQuestion = () => {
     setQuestions([
       ...questions,
       {
@@ -148,6 +153,34 @@ export default function QuizManagementPage() {
       },
     ]);
   };
+
+const handleAddOptionToQuestion = (questionIndex: number) => {
+  setQuestions((prev) => {
+    const updated = [...prev];
+    const question = updated[questionIndex];
+    updated[questionIndex] = {
+      ...question,
+      options: [...question.options, ""],
+      correctOptions: [...question.correctOptions, 0],
+    };
+    return updated;
+  });
+};
+
+const handleRemoveOptionFromQuestion = (questionIndex: number, optionIndex: number) => {
+  setQuestions((prev) => {
+    const updated = [...prev];
+    const question = updated[questionIndex];
+    if (question.options.length <= 2) return prev;
+
+    updated[questionIndex] = {
+      ...question,
+      options: question.options.filter((_, idx) => idx !== optionIndex),
+      correctOptions: question.correctOptions.filter((_, idx) => idx !== optionIndex),
+    };
+    return updated;
+  });
+};
 
   const handleUpdateQuestion = (index: number, field: keyof Question, value: unknown) => {
     const updated = [...questions];
@@ -427,6 +460,45 @@ export default function QuizManagementPage() {
     ]);
   };
 
+const handleImportQuiz = async () => {
+  if (!importSubjectId) {
+    showNotification("Subject is required", "error");
+    return;
+  }
+  if (!importFile) {
+    showNotification("Please choose an XML file", "error");
+    return;
+  }
+
+  try {
+    setImporting(true);
+    const result = await quizQuestionService.importQuizFromXml(importSubjectId, importFile);
+    const imported = Array.isArray(result) ? result : result?.data || [];
+    const importedIds = imported
+      .map((q: { _id?: string }) => q._id)
+      .filter((id: unknown): id is string => typeof id === "string" && id.length > 0);
+
+    showNotification("Quiz questions imported successfully", "success");
+    setShowImportModal(false);
+    setImportSubjectId("");
+    setImportFile(null);
+
+    // Navigate to quiz page and only show imported questions in this view
+    navigate(`/quiz/${importSubjectId}`, {
+      state: { importedIds },
+    });
+  } catch (error) {
+    console.error("Import quiz failed:", error);
+    let message = "Failed to import quiz questions";
+    if (error && typeof error === "object" && "message" in error) {
+      message = (error as { message?: string }).message || message;
+    }
+    showNotification(message, "error");
+  } finally {
+    setImporting(false);
+  }
+};
+
   const pageBg = darkMode ? "#111827" : "#f8fafc";
   const cardBg = darkMode ? "rgba(30, 41, 59, 0.85)" : "#ffffff";
   const cardBorder = darkMode ? "1px solid rgba(148, 163, 184, 0.2)" : "1px solid rgba(148, 163, 184, 0.2)";
@@ -450,14 +522,27 @@ export default function QuizManagementPage() {
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold">Quiz Management</h1>
               </div>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
-                style={{ backgroundColor: "#4f46e5", color: "#ffffff" }}
-              >
-                <PlusCircle className="w-5 h-5" />
-                Create quiz
-              </button>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
+                  style={{
+                    backgroundColor: darkMode ? "rgba(16,185,129,0.2)" : "rgba(16,185,129,0.15)",
+                    color: darkMode ? "#5eead4" : "#047857",
+                  }}
+                >
+                  <Upload className="w-5 h-5" />
+                  Import quiz
+                </button>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
+                  style={{ backgroundColor: "#4f46e5", color: "#ffffff" }}
+                >
+                  <PlusCircle className="w-5 h-5" />
+                  Create quiz
+                </button>
+              </div>
             </header>
 
             {/* Subjects list */}
@@ -738,37 +823,64 @@ export default function QuizManagementPage() {
                             </div>
 
                             {/* Options */}
-                            <div className="grid grid-cols-2 gap-3">
-                              {question.options.map((option, optIndex) => (
-                                <div key={optIndex}>
-                                  <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                                    Option {String.fromCharCode(65 + optIndex)} <span className="text-red-500">*</span>
-                                  </label>
-                                  <div className="flex gap-2">
-                                    <input
-                                      type="text"
-                                      required
-                                      value={option}
-                                      onChange={(e) => handleUpdateOption(qIndex, optIndex, e.target.value)}
-                                      className="flex-1 px-4 py-2 rounded-lg"
-                                      style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
-                                      placeholder={`Option ${String.fromCharCode(65 + optIndex)}`}
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => handleUpdateCorrectOption(qIndex, optIndex)}
-                                      className="px-3 py-2 rounded-lg font-semibold text-sm"
-                                      style={{
-                                        backgroundColor: question.correctOptions[optIndex] === 1 ? "#10b981" : inputBg,
-                                        color: question.correctOptions[optIndex] === 1 ? "#fff" : textColor,
-                                        border: `1px solid ${inputBorder}`,
-                                      }}
-                                    >
-                                      {question.correctOptions[optIndex] === 1 ? "✓" : "○"}
-                                    </button>
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <label className="text-sm font-semibold" style={{ color: labelColor }}>
+                                  Options
+                                </label>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddOptionToQuestion(qIndex)}
+                                  className="text-sm font-semibold px-3 py-1 rounded-lg"
+                                  style={{
+                                    backgroundColor: darkMode ? "rgba(99,102,241,0.15)" : "rgba(99,102,241,0.1)",
+                                    color: "#6366f1",
+                                  }}
+                                >
+                                  + Add option
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {question.options.map((option, optIndex) => (
+                                  <div key={optIndex}>
+                                    <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
+                                      Option {String.fromCharCode(65 + optIndex)} <span className="text-red-500">*</span>
+                                    </label>
+                                    <div className="flex gap-2 items-center">
+                                      <input
+                                        type="text"
+                                        required
+                                        value={option}
+                                        onChange={(e) => handleUpdateOption(qIndex, optIndex, e.target.value)}
+                                        className="flex-1 px-4 py-2 rounded-lg"
+                                        style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
+                                        placeholder={`Option ${String.fromCharCode(65 + optIndex)}`}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateCorrectOption(qIndex, optIndex)}
+                                       className="px-3 py-2 rounded-lg font-semibold text-sm"
+                                        style={{
+                                          backgroundColor: question.correctOptions[optIndex] === 1 ? "#10b981" : inputBg,
+                                          color: question.correctOptions[optIndex] === 1 ? "#fff" : textColor,
+                                          border: `1px solid ${inputBorder}`,
+                                        }}
+                                      >
+                                        {question.correctOptions[optIndex] === 1 ? "✓" : "○"}
+                                      </button>
+                                      {question.options.length > 2 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveOptionFromQuestion(qIndex, optIndex)}
+                                          className="text-sm text-red-500 hover:text-red-600"
+                                        >
+                                          Remove
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                ))}
+                              </div>
                             </div>
 
                             {/* Removed Difficulty and Category */}
@@ -876,6 +988,105 @@ export default function QuizManagementPage() {
                       </div>
                     )}
                   </form>
+                </div>
+              </div>
+            )}
+
+            {showImportModal && (
+              <div className="fixed inset-0 z-[130] flex items-center justify-center px-4">
+                <div className="absolute inset-0 bg-black/60" onClick={() => !importing && setShowImportModal(false)} />
+                <div
+                  className="relative w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden"
+                  style={{ backgroundColor: cardBg, border: cardBorder }}
+                >
+                  <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: cardBorder }}>
+                    <h3 className="text-xl font-semibold">Import Quiz Questions</h3>
+                    <button
+                      onClick={() => setShowImportModal(false)}
+                      className="text-sm font-semibold"
+                      style={{ color: labelColor }}
+                      disabled={importing}
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="p-6 space-y-5">
+                    <div>
+                      <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
+                        Subject <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={importSubjectId}
+                        onChange={(e) => setImportSubjectId(e.target.value)}
+                        className="w-full px-4 py-2 rounded-lg border"
+                        style={{ backgroundColor: inputBg, borderColor: inputBorder, color: textColor }}
+                        disabled={importing}
+                      >
+                        <option value="">Select subject</option>
+                        {subjects.map((subject) => (
+                          <option key={subject._id} value={subject._id}>
+                            {subject.code || subject.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
+                        XML file <span className="text-red-500">*</span>
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => importFileInputRef.current?.click()}
+                          className="px-4 py-2 rounded-lg font-semibold text-sm"
+                          style={{
+                            backgroundColor: darkMode ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.1)",
+                            color: "#6366f1",
+                          }}
+                          disabled={importing}
+                        >
+                          Choose XML file
+                        </button>
+                        <span className="text-xs md:text-sm truncate" style={{ color: labelColor }}>
+                          {importFile ? importFile.name : "No file selected"}
+                        </span>
+                      </div>
+                      <input
+                        ref={importFileInputRef}
+                        type="file"
+                        accept=".xml,application/xml,text/xml"
+                        onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                        className="hidden"
+                        disabled={importing}
+                      />
+                      <p className="text-xs mt-1" style={{ color: labelColor }}>
+                        Upload a Moodle-compatible XML file exported from another quiz.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                      <button
+                        onClick={() => setShowImportModal(false)}
+                        className="px-4 py-2 rounded-lg font-semibold"
+                        style={{
+                          backgroundColor: darkMode ? "rgba(148,163,184,0.15)" : "#e2e8f0",
+                          color: textColor,
+                        }}
+                        disabled={importing}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleImportQuiz}
+                        className="px-4 py-2 rounded-lg font-semibold text-white disabled:opacity-60"
+                        style={{ backgroundColor: "#0ea5e9" }}
+                        disabled={importing}
+                      >
+                        {importing ? "Importing..." : "Import"}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
