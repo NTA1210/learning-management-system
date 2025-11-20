@@ -6,7 +6,7 @@ import { datePreprocess } from "./helpers/date.schema";
 
 export const subjectIdSchema = z.string().length(24, "Invalid subject ID");
 export const importQuizQuestionParamsSchema = z.object({
-  file: z.any(),
+  xmlFile: z.any(),
   subjectId: subjectIdSchema,
 });
 
