@@ -1,46 +1,101 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
-
-type FeedbackCategory = "bug" | "feature" | "content" | "uiux" | "other";
+import { feedbackService } from "../services/feedbackService";
+import { userService } from "../services/userService";
+import type { FeedbackType } from "../types/feedback";
+import type { User } from "../types/auth";
 
 interface FeedbackFormState {
-	category: FeedbackCategory;
+	type: FeedbackType;
 	rating: number;
 	title: string;
-	message: string;
-	email: string;
-	screenshot?: File | null;
+	description: string;
+	targetId?: string;
 }
 
-const categories: { value: FeedbackCategory; label: string }[] = [
-	{ value: "bug", label: "Bug report" },
-	{ value: "feature", label: "Feature request" },
-	{ value: "content", label: "Content feedback" },
-	{ value: "uiux", label: "UI/UX" },
+const categories: { value: FeedbackType; label: string }[] = [
+	{ value: "system", label: "System" },
+	{ value: "teacher", label: "Teacher" },
 	{ value: "other", label: "Other" }
 ];
 
 export default function Feedback() {
 	const { darkMode } = useTheme();
 	const { user } = useAuth();
+	const navigate = useNavigate();
+	const isAdmin = (user?.role as string) === "admin";
+	const isTeacher = (user?.role as string) === "teacher";
 	const [submitting, setSubmitting] = useState(false);
 	const [success, setSuccess] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [teachers, setTeachers] = useState<User[]>([]);
+	const [loadingTeachers, setLoadingTeachers] = useState(false);
+	const [teacherError, setTeacherError] = useState<string | null>(null);
 	const [form, setForm] = useState<FeedbackFormState>({
-		category: "bug",
+		type: "system",
 		rating: 5,
 		title: "",
-		message: "",
-		email: "",
-		screenshot: null
+		description: "",
+		targetId: undefined
 	});
 
+	const categoryOptions = useMemo(
+		() => (isTeacher ? categories.filter((c) => c.value !== "teacher") : categories),
+		[isTeacher]
+	);
+
 	const isValid = useMemo(() => {
-		return form.title.trim().length >= 6 && form.message.trim().length >= 10 && form.rating > 0;
-	}, [form.title, form.message, form.rating]);
+		const commonValid = form.title.trim().length >= 6 && form.description.trim().length >= 10 && form.rating > 0;
+		// Nếu là feedback cho giáo viên thì bắt buộc phải chọn một giáo viên
+		if (form.type === "teacher") {
+			return commonValid && !!form.targetId;
+		}
+		return commonValid;
+	}, [form.title, form.description, form.rating, form.type, form.targetId]);
+
+	useEffect(() => {
+		if (isAdmin) {
+			navigate("/help/feedback-list", { replace: true });
+		}
+	}, [isAdmin, navigate]);
+
+	useEffect(() => {
+		if (!isTeacher || form.type !== "teacher") return;
+		setForm((prev) => ({
+			...prev,
+			type: "system",
+			targetId: undefined
+		}));
+	}, [isTeacher, form.type]);
+
+	// Tự động load danh sách giáo viên khi người dùng chọn type = "teacher"
+	useEffect(() => {
+		const shouldLoadTeachers = form.type === "teacher" && teachers.length === 0 && !loadingTeachers;
+		if (!shouldLoadTeachers) return;
+
+		const fetchTeachers = async () => {
+			setLoadingTeachers(true);
+			setTeacherError(null);
+			try {
+				const response = await userService.getUsers({ role: "teacher", limit: 50 });
+				setTeachers(response.users);
+			} catch {
+				setTeacherError("Unable to load teachers. Please try again later.");
+			} finally {
+				setLoadingTeachers(false);
+			}
+		};
+
+		void fetchTeachers();
+	}, [form.type, teachers.length, loadingTeachers]);
+
+	if (isAdmin) {
+		return null;
+	}
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -50,19 +105,24 @@ export default function Feedback() {
 		setError(null);
 
 		try {
-			// In a real app, send to backend API. Here we simulate.
-			await new Promise((r) => setTimeout(r, 900));
-			// eslint-disable-next-line no-console
-			console.log("Feedback submitted", form);
+			await feedbackService.submitFeedback({
+				type: form.type,
+				title: form.title.trim(),
+				description: form.description.trim(),
+				rating: form.rating,
+				// targetId chỉ gửi khi là feedback cho giáo viên
+				targetId: form.type === "teacher" ? form.targetId : undefined
+			});
 			setSuccess("Thank you! Your feedback has been recorded.");
 			setForm((prev) => ({
 				...prev,
 				title: "",
-				message: "",
-				screenshot: null,
+				description: "",
 				rating: 5,
-				category: "bug"
+				type: "system",
+				targetId: undefined
 			}));
+			navigate("/help/feedback-list");
 		} catch {
 			setError("Failed to send feedback. Please try again.");
 		} finally {
@@ -165,9 +225,14 @@ export default function Feedback() {
 								<div className="fade-in-up" style={{ animationDelay: "80ms" }}>
 									<label className="block text-sm font-medium mb-1">Category</label>
 									<select
-										value={form.category}
+										value={form.type}
 										onChange={(e) =>
-											setForm((f) => ({ ...f, category: e.target.value as FeedbackCategory }))
+											setForm((f) => ({
+												...f,
+												type: e.target.value as FeedbackType,
+												// Reset teacher khi đổi sang loại feedback khác
+												targetId: e.target.value === "teacher" ? f.targetId : undefined
+											}))
 										}
 										className="w-full rounded-xl px-3 py-2 outline-none transition-colors"
 										style={{
@@ -175,7 +240,7 @@ export default function Feedback() {
 											border: "1px solid rgba(148,163,184,0.25)"
 										}}
 									>
-										{categories.map((c) => (
+										{categoryOptions.map((c) => (
 											<option key={c.value} value={c.value}>
 												{c.label}
 											</option>
@@ -222,6 +287,42 @@ export default function Feedback() {
 								</div>
 							</div>
 
+							{/* Teacher selector (only when type = teacher) */}
+							{form.type === "teacher" && (
+								<div className="fade-in-up" style={{ animationDelay: "140ms" }}>
+									<label className="block text-sm font-medium mb-1">Teacher</label>
+									<select
+										value={form.targetId || ""}
+										onChange={(e) =>
+											setForm((f) => ({
+												...f,
+												targetId: e.target.value || undefined
+											}))
+										}
+										disabled={loadingTeachers}
+										className="w-full rounded-xl px-3 py-2 outline-none transition-colors"
+										style={{
+											backgroundColor: darkMode ? "#0f172a" : "#f9fafb",
+											border: "1px solid rgba(148,163,184,0.25)"
+										}}
+									>
+										<option value="">
+											{loadingTeachers ? "Loading teachers..." : "Select a teacher"}
+										</option>
+										{teachers.map((t) => (
+											<option key={t._id} value={t._id}>
+												{t.fullname || t.username}
+											</option>
+										))}
+									</select>
+									{teacherError && (
+										<p className="mt-1 text-xs" style={{ color: "#ef4444" }}>
+											{teacherError}
+										</p>
+									)}
+								</div>
+							)}
+
 							{/* Title */}
 							<div className="fade-in-up" style={{ animationDelay: "160ms" }}>
 								<label className="block text-sm font-medium mb-1">Title</label>
@@ -242,8 +343,8 @@ export default function Feedback() {
 							<div className="fade-in-up" style={{ animationDelay: "200ms" }}>
 								<label className="block text-sm font-medium mb-1">Detailed description</label>
 								<textarea
-									value={form.message}
-									onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
+									value={form.description}
+									onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
 									placeholder="Describe the issue or proposal with steps, expected vs actual, etc."
 									rows={6}
 									className="w-full rounded-xl px-3 py-2 outline-none resize-y placeholder-gray-400 transition-shadow focus:shadow-lg"
@@ -255,38 +356,6 @@ export default function Feedback() {
 								<p className="mt-1 text-xs" style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}>
 									Add context, reproduction steps (if any), and screenshots if possible.
 								</p>
-							</div>
-
-							{/* Contact & Screenshot */}
-							<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-								<div className="fade-in-up" style={{ animationDelay: "240ms" }}>
-									<label className="block text-sm font-medium mb-1">Contact email (optional)</label>
-									<input
-										type="email"
-										value={form.email}
-										onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-										placeholder="your@email.com"
-										className="w-full rounded-xl px-3 py-2 outline-none placeholder-gray-400 transition-shadow focus:shadow-lg"
-										style={{
-											backgroundColor: darkMode ? "#0f172a" : "#f9fafb",
-											border: "1px solid rgba(148,163,184,0.25)"
-										}}
-									/>
-								</div>
-								<div className="fade-in-up" style={{ animationDelay: "280ms" }}>
-									<label className="block text-sm font-medium mb-1">Attach screenshot (optional)</label>
-									<input
-										type="file"
-										accept="image/*"
-										onChange={(e) => setForm((f) => ({ ...f, screenshot: e.target.files?.[0] || null }))}
-										className="block w-full text-sm file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border file:border-gray-300 file:bg-transparent"
-									/>
-									{form.screenshot && (
-										<p className="mt-1 text-xs" style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}>
-											Selected: {form.screenshot.name}
-										</p>
-									)}
-								</div>
 							</div>
 
 							{/* Submit */}
