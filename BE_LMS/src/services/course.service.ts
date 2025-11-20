@@ -521,6 +521,20 @@ export const updateCourse = async (
     "You don't have permission to update this course"
   );
 
+  // ❌ FIX: Check for duplicate course title if title is being updated
+  if (data.title && data.title !== course.title) {
+    const existingCourse = await CourseModel.findOne({
+      title: data.title,
+      isDeleted: false,
+      _id: { $ne: courseId }, // Exclude current course
+    });
+    appAssert(
+      !existingCourse,
+      BAD_REQUEST,
+      "A course with this title already exists"
+    );
+  }
+
   // Validate dates if provided
   if (data.startDate || data.endDate) {
     const startDate = data.startDate
@@ -904,6 +918,13 @@ export const permanentDeleteCourse = async (
   courseId: string,
   userId: string
 ) => {
+  // ❌ FIX: Validate courseId format
+  appAssert(
+    courseId && courseId.match(/^[0-9a-fA-F]{24}$/),
+    BAD_REQUEST,
+    "Invalid course ID format"
+  );
+
   // ✅ Find deleted course only (must be soft-deleted first)
   const course = await CourseModel.findOne({
     _id: courseId,
@@ -953,3 +974,4 @@ export const permanentDeleteCourse = async (
     deletedCourseId: courseId,
   };
 };
+

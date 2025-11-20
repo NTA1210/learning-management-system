@@ -2,14 +2,17 @@ import z from "zod";
 import { ObjectId } from "mongoose";
 import { datePreprocess } from "./helpers/date.schema";
 
+// ObjectId validation regex
+const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+
 // Schema for creating a notification
 export const createNotificationSchema = z
   .object({
     title: z.string().min(1, "Title is required").max(200, "Title too long"),
     message: z.string().min(1, "Message is required").max(1000, "Message too long"),
     recipientType: z.enum(["user", "course", "all"]).default("user"),
-    recipientUser: z.string().length(24, "Invalid user ID").optional(),
-    recipientCourse: z.string().length(24, "Invalid course ID").optional(),
+    recipientUser: z.string().regex(objectIdRegex, "Invalid user ID format").optional(),
+    recipientCourse: z.string().regex(objectIdRegex, "Invalid course ID format").optional(),
   })
   .refine(
     (data) => {
@@ -72,12 +75,12 @@ export type ListNotificationsQuery = z.infer<typeof listNotificationsSchema>;
 // Schema for notification ID
 export const notificationIdSchema = z
   .string()
-  .length(24, "Invalid notification ID");
+  .regex(objectIdRegex, "Invalid notification ID format");
 
 // Schema for marking notification as read
 export const markReadNotificationSchema = z.object({
   notificationIds: z
-    .array(z.string().length(24, "Invalid notification ID"))
+    .array(z.string().regex(objectIdRegex, "Invalid notification ID format"))
     .min(1, "At least one notification ID is required"),
 });
 
