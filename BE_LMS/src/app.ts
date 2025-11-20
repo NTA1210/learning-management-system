@@ -44,6 +44,7 @@ import {
   quizRoutes,
   notificationRoutes,
 } from "./routes";
+import quizAttemptRoutes from "./routes/quizAttempt.route";
 
 export const createApp = () => {
   const app = express();
@@ -99,6 +100,9 @@ export const createApp = () => {
   app.use("/subjects", authenticate, subjectRoutes);
   app.use("/quizzes", quizRoutes);
   app.use("/notifications", authenticate, notificationRoutes);
+  app.use("/quiz-attempts", authenticate, quizAttemptRoutes);
+
+  //error handler
   app.use(errorHandler);
 
   return app;
