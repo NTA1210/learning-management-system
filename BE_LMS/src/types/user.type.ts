@@ -1,12 +1,12 @@
 import mongoose from "mongoose";
 
-export const enum Role {
+export enum Role {
   STUDENT = "student",
   TEACHER = "teacher",
   ADMIN = "admin",
 }
 
-export const enum UserStatus {
+export enum UserStatus {
   ACTIVE = "active",
   INACTIVE = "inactive",
 }
@@ -20,9 +20,10 @@ export default interface IUser
   fullname?: string;
   phone_number?: string;
   avatar_url?: string;
+  key?: string;
   bio?: string;
   isVerified: boolean;
-  status?: UserStatus;
+  status: UserStatus;
   specialistIds: mongoose.Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
