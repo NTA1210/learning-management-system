@@ -63,13 +63,13 @@ export const exportXMLFileHandler = catchErrors(async (req, res) => {
   /**Content-Type: application/xml → cho biết đây là dữ liệu XML.
   Content-Disposition: attachment; filename="..." → ép trình duyệt mở hộp thoại tải file. */
 
-  // res.status(OK).send(xmlString);
-  res.success(OK, {
-    xmlString,
-    total,
-    exportedTypes,
-    message: "Questions exported successfully",
-  });
+  res.status(OK).send(xmlString);
+  // res.success(OK, {
+  //   xmlString,
+  //   total,
+  //   exportedTypes,
+  //   message: "Questions exported successfully",
+  // });
 });
 
 // GET /quiz-questions/ - Get all questions
