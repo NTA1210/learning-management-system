@@ -46,3 +46,65 @@ export const createAnnouncement = async (
 
     return announcement;
 };
+
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Lấy danh sách thông báo của một khóa học.
+ * - Sắp xếp theo thời gian đăng giảm dần (mới nhất lên đầu).
+ * - Có thể phân trang (page, limit).
+ *
+ * Input: courseId, page, limit
+ * Output: List announcements, pagination info
+ */
+export const getAnnouncementsByCourse = async (
+    courseId: string,
+    page: number = 1,
+    limit: number = 10
+) => {
+    const skip = (page - 1) * limit;
+
+    // Validate course exists
+    const course = await CourseModel.findById(courseId);
+    appAssert(course, NOT_FOUND, `Course ${courseId} not found`);
+
+    // Parallel queries for better performance
+    const [announcements, total] = await Promise.all([
+        AnnouncementModel.find({ courseId })
+            .sort({ publishedAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate("authorId", "username fullname avatar_url")
+            .lean(),
+        AnnouncementModel.countDocuments({ courseId }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+        announcements,
+        pagination: {
+            total,
+            page,
+            limit,
+            totalPages,
+        },
+    };
+};
+
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Lấy chi tiết một thông báo.
+ *
+ * Input: announcementId
+ * Output: Announcement detail
+ */
+export const getAnnouncementById = async (announcementId: string) => {
+    const announcement = await AnnouncementModel.findById(announcementId)
+        .populate("authorId", "username fullname avatar_url")
+        .populate("courseId", "title")
+        .lean();
+
+    appAssert(announcement, NOT_FOUND, `Announcement ${announcementId} not found`);
+
+    return announcement;
+};
