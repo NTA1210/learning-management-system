@@ -57,7 +57,7 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
       ),
-      label: "Quizzes"
+      label: "Questions Bank"
     },
     {
       href: "/materials",
@@ -218,7 +218,9 @@ export default function Sidebar({
         const parsed = JSON.parse(raw);
         setStoredUser(parsed);
       }
-    } catch { }
+    } catch (error) {
+      console.warn('Unable to parse stored user info', error);
+    }
   }, []);
 
   const handleMouseEnter = () => {
@@ -547,7 +549,9 @@ export default function Sidebar({
               onClick={async () => {
                 try {
                   await authService.logout();
-                } catch { }
+                } catch (error) {
+                  console.error('Logout failed', error);
+                }
                 window.location.href = '/login';
               }}
               className="flex items-center w-full mt-5 px-3 py-2 text-sm text-red-600 hover:bg-red-50/70 rounded-md"

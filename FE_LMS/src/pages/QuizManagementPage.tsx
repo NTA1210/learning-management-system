@@ -609,7 +609,7 @@ const handleImportQuiz = async () => {
                   }}
                 >
                   <Upload className="w-5 h-5" />
-                  Import quiz
+                  Import Question
                 </button>
                 <button
                   onClick={() => setShowExportModal(true)}
@@ -617,7 +617,7 @@ const handleImportQuiz = async () => {
                   style={{ backgroundColor: darkMode ? "rgba(59,130,246,0.25)" : "#1d4ed8", color: "#e0f2fe" }}
                 >
                   <Download className="w-5 h-5" />
-                  Export quiz
+                  Export Question
                 </button>
               <button
                 onClick={() => setShowCreateModal(true)}
@@ -625,7 +625,7 @@ const handleImportQuiz = async () => {
                 style={{ backgroundColor: "#4f46e5", color: "#ffffff" }}
               >
                 <PlusCircle className="w-5 h-5" />
-                Create quiz
+                Create Question
               </button>
               </div>
             </header>
@@ -689,7 +689,7 @@ const handleImportQuiz = async () => {
                     className="sticky top-0 flex items-center justify-between px-6 py-4 z-10"
                     style={{ backgroundColor: cardBg, borderBottom: darkMode ? "1px solid rgba(148,163,184,0.2)" : "1px solid #e2e8f0" }}
                   >
-                    <h2 className="text-2xl font-bold">Create New Quiz</h2>
+                    <h2 className="text-2xl font-bold">Create New Question</h2>
                     <button
                       onClick={handleCloseModal}
                       className="px-3 py-1 rounded-lg text-sm font-semibold transition-colors"
@@ -712,7 +712,7 @@ const handleImportQuiz = async () => {
                         1
                       </div>
                       <span className="text-sm font-medium" style={{ color: currentStep >= 1 ? textColor : labelColor }}>
-                        Quiz Details
+                      Question Details
                       </span>
                     </div>
                     <div className="flex-1 h-0.5" style={{ backgroundColor: currentStep >= 2 ? "#6366f1" : "#e2e8f0" }} />
@@ -775,7 +775,7 @@ const handleImportQuiz = async () => {
                         {/* Quiz Title */}
                         <div>
                           <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                            Quiz Title <span className="text-red-500">*</span>
+                          Question Title <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="text"
@@ -784,7 +784,7 @@ const handleImportQuiz = async () => {
                             onChange={(e) => setQuizDetails({ ...quizDetails, title: e.target.value })}
                             className="w-full px-4 py-2 rounded-lg"
                             style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
-                            placeholder="Enter quiz title"
+                            placeholder="Enter Question title"
                           />
                         </div>
 
@@ -799,7 +799,7 @@ const handleImportQuiz = async () => {
                             className="w-full px-4 py-2 rounded-lg resize-none"
                             style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
                             rows={3}
-                            placeholder="Enter quiz description"
+                            placeholder="Enter Question description"
                           />
                         </div>
 
@@ -1067,7 +1067,7 @@ const handleImportQuiz = async () => {
                             className="px-4 py-2 rounded-lg font-semibold text-white disabled:opacity-50"
                             style={{ backgroundColor: "#6366f1" }}
                           >
-                            {isSubmitting ? "Creating..." : "Create Quiz"}
+                            {isSubmitting ? "Creating..." : "Create Question"}
                           </button>
                         </div>
                       </div>
@@ -1085,7 +1085,7 @@ const handleImportQuiz = async () => {
                   style={{ backgroundColor: cardBg, border: cardBorder }}
                 >
                   <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: cardBorder }}>
-                    <h3 className="text-xl font-semibold">Import Quiz Questions</h3>
+                    <h3 className="text-xl font-semibold">Import Questions</h3>
                     <span />
                   </div>
                   <div className="p-6 space-y-5">
@@ -1139,7 +1139,7 @@ const handleImportQuiz = async () => {
                         disabled={importing}
                       />
                       <p className="text-xs mt-1" style={{ color: labelColor }}>
-                        Upload a Moodle-compatible XML file exported from another quiz.
+                        Upload a Moodle-compatible XML file exported from another question.
                       </p>
                     </div>
 
@@ -1179,7 +1179,7 @@ const handleImportQuiz = async () => {
                   style={{ backgroundColor: cardBg, border: cardBorder }}
                 >
                   <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: cardBorder }}>
-                    <h3 className="text-xl font-semibold">Export Quiz Questions</h3>
+                    <h3 className="text-xl font-semibold">Export Questions</h3>
                     <span />
                   </div>
                   <div className="p-6 space-y-5">
@@ -1204,7 +1204,7 @@ const handleImportQuiz = async () => {
                       </select>
                     </div>
                     <p className="text-sm" style={{ color: labelColor }}>
-                      Choose a subject to download its quiz questions as an XML file.
+                      Choose a subject to download its questions as an XML file.
                     </p>
                     <div className="flex items-center justify-end gap-3 pt-2">
                       <button
@@ -1254,8 +1254,8 @@ const handleImportQuiz = async () => {
           >
             <CheckCircle className="w-6 h-6 flex-shrink-0" />
             <div className="flex-1">
-              <p className="font-semibold">Thành công!</p>
-              <p className="text-sm opacity-90">Đã tạo quiz questions thành công.</p>
+              <p className="font-semibold">Completed!</p>
+              <p className="text-sm opacity-90">Created questions successfully.</p>
             </div>
             <button
               onClick={() => setShowSuccessNotification(false)}
