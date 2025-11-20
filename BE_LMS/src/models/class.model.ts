@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import IClass, {ClassStatus} from "../types/class.type";
+import {ACTUAL_MAX_CLASS_LIMIT} from "@/constants/fieldLimits";
 
 const ClassSchema = new mongoose.Schema<IClass>({
         courseId: {
@@ -14,18 +15,15 @@ const ClassSchema = new mongoose.Schema<IClass>({
             trim: true,
             maxLength: 100,
         },
-        teacherIds: [
-            {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: "User",
-                required: true,
-            },
-        ],
+        teacherId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+        },
         capacity: {
             type: Number,
             required: true,
             min: 1,
-            max: 200,
+            max: ACTUAL_MAX_CLASS_LIMIT,
         },
         currentEnrollment: {
             type: Number,

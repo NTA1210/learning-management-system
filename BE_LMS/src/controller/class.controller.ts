@@ -1,45 +1,96 @@
-import { catchErrors } from "../utils/asyncHandler";
-import { OK, CREATED } from "../constants/http";
+import {catchErrors} from "../utils/asyncHandler";
+import {OK, CREATED} from "../constants/http";
 import {
-  createClassSchema,
-  updateClassSchema,
-  classIdSchema,
-  courseIdSchema,
-  teacherIdSchema,
-  studentIdSchema,
+    updateClassSchema,
+    classIdSchema,
+    courseIdSchema,
+    teacherIdSchema,
+    studentIdSchema, createEmptyClassesSchema, assignStudentsToClassesSchema, updateClassSchemaWithId,
 } from "../validators/class.schemas";
 import {
-  getClassById,
-  getClassesByCourse,
-  createClass,
-  updateClassById,
-  getTeacherClasses,
-  getStudentClasses,
-  deleteClassById,
+    getClassById,
+    getClassesByCourse,
+    updateClassById,
+    getTeacherClasses,
+    getStudentClasses,
+    deleteClassById, createEmptyClasses, assignStudentsIntoClasses,
 } from "../services/class.service";
-import mongoose from "mongoose";
 
 /**
- * Create a new class for a course
- * POST /classes
- * Admin only
+ * Create empty classes for a course.
+ * POST /classes/create.
+ *
+ * This function should only be run once at the beginning of a semester. Any subsequent runs will override all class data of that course.
  */
-export const createClassHandler = catchErrors(async (req, res) => {
-  // Validate request body
-  const data = createClassSchema.parse(req.body);
+export const createEmptyClassesHandler = catchErrors(async (req, res) => {
+    // Validate request body
+    const {courseId, totalStudents} = createEmptyClassesSchema.parse(req.body);
 
-  const userId = req.userId!.toString(); // From authenticate middleware
+    const userId = req.userId;
+    // Call service
+    const createdClasses = await createEmptyClasses(courseId, userId, totalStudents);
 
-  // Call service
-  const newClass = await createClass({
-    ...data,
-    createdBy: userId,
-  });
+    return res.success(CREATED, {
+        message: "Class created successfully",
+        data: createdClasses,
+    });
+});
 
-  return res.success(CREATED, {
-    message: "Class created successfully",
-    data: newClass,
-  });
+/**
+ * Assign students to classes.
+ * POST /classes/assign-students.
+ */
+export const assignStudentsToClassesHandler = catchErrors(async (req, res) => {
+    // Validate request body
+    const {classIds, courseId} = assignStudentsToClassesSchema.parse(req.body);
+
+    // Call service
+    const classes = await assignStudentsIntoClasses(classIds, courseId);
+
+    return res.success(CREATED, {
+        message: "Students assigned to classes successfully",
+        data: classes,
+    });
+});
+
+/**
+ * Assign teacher to a class.
+ * POST /classes/assign-teacher.
+ */
+export const assignTeacherToClassHandler = catchErrors(async (req, res) => {
+    // Validate class ID param
+    const {classId, teacherId} = updateClassSchemaWithId.parse(req.body);
+
+    // Call service
+    const updatedClass = await updateClassById(classId, {teacherId: teacherId as string});
+    return res.success(OK, {
+        message: "Teacher assigned to class successfully",
+        data: updatedClass,
+    });
+});
+
+/**
+ * Assign teacher to a class and students to multiple classes.
+ * POST /classes/assign-all.
+ */
+export const assignTeacherAndStudentsHandler = catchErrors(async (req, res) => {
+    // Validate request body
+    const {classId, teacherId} = updateClassSchemaWithId.parse(req.body);
+    const {classIds, courseId} = assignStudentsToClassesSchema.parse(req.body);
+
+    // Assign teacher to class
+    const updatedClass = await updateClassById(classId, {teacherId: teacherId as string});
+
+    // Assign students to classes
+    const classes = await assignStudentsIntoClasses(classIds, courseId);
+
+    return res.success(OK, {
+        message: "Teacher and students assigned successfully",
+        data: {
+            updatedClass,
+            classes,
+        },
+    });
 });
 
 /**
@@ -47,17 +98,17 @@ export const createClassHandler = catchErrors(async (req, res) => {
  * GET /courses/:courseId/classes
  */
 export const getClassesByCourseHandler = catchErrors(async (req, res) => {
-  // Validate course ID param
-  const courseId = courseIdSchema.parse(req.params.courseId);
-  const { status } = req.query;
+    // Validate course ID param
+    const courseId = courseIdSchema.parse(req.params.courseId);
+    const {status} = req.query;
 
-  // Call service
-  const classes = await getClassesByCourse(courseId, status as string);
+    // Call service
+    const classes = await getClassesByCourse(courseId, status as string);
 
-  return res.success(OK, {
-    message: "Classes retrieved successfully",
-    data: classes,
-  });
+    return res.success(OK, {
+        message: "Classes retrieved successfully",
+        data: classes,
+    });
 });
 
 /**
@@ -65,16 +116,16 @@ export const getClassesByCourseHandler = catchErrors(async (req, res) => {
  * GET /classes/:classId
  */
 export const getClassByIdHandler = catchErrors(async (req, res) => {
-  // Validate class ID param
-  const classId = classIdSchema.parse(req.params.classId);
+    // Validate class ID param
+    const classId = classIdSchema.parse(req.params.classId);
 
-  // Call service
-  const classData = await getClassById(classId);
+    // Call service
+    const classData = await getClassById(classId);
 
-  return res.success(OK, {
-    message: "Class retrieved successfully",
-    data: classData,
-  });
+    return res.success(OK, {
+        message: "Class retrieved successfully",
+        data: classData,
+    });
 });
 
 /**
@@ -83,18 +134,18 @@ export const getClassByIdHandler = catchErrors(async (req, res) => {
  * Admin only
  */
 export const updateClassHandler = catchErrors(async (req, res) => {
-  // Validate class ID param
-  const classId = classIdSchema.parse(req.params.classId);
-  // Validate request body
-  const data = updateClassSchema.parse(req.body);
+    // Validate class ID param
+    const classId = classIdSchema.parse(req.params.classId);
+    // Validate request body
+    const data = updateClassSchema.parse(req.body);
 
-  // Call service
-  const updatedClass = await updateClassById(classId, {...data, teacherIds: data.teacherIds as unknown as mongoose.Types.ObjectId[]});
+    // Call service
+    const updatedClass = await updateClassById(classId, data);
 
-  return res.success(OK, {
-    message: "Class updated successfully",
-    data: updatedClass,
-  });
+    return res.success(OK, {
+        message: "Class updated successfully",
+        data: updatedClass,
+    });
 });
 
 /**
@@ -102,21 +153,21 @@ export const updateClassHandler = catchErrors(async (req, res) => {
  * GET /teachers/:teacherId/classes
  */
 export const getTeacherClassesHandler = catchErrors(async (req, res) => {
-  // Validate teacher ID param
-  const teacherId = teacherIdSchema.parse(req.params.teacherId);
-  const { status, semester } = req.query;
+    // Validate teacher ID param
+    const teacherId = teacherIdSchema.parse(req.params.teacherId);
+    const {status, semester} = req.query;
 
-  // Call service
-  const classes = await getTeacherClasses(
-    teacherId,
-    status as string,
-    semester as string
-  );
+    // Call service
+    const classes = await getTeacherClasses(
+        teacherId,
+        status as string,
+        semester as string
+    );
 
-  return res.success(OK, {
-    message: "Teacher classes retrieved successfully",
-    data: classes,
-  });
+    return res.success(OK, {
+        message: "Teacher classes retrieved successfully",
+        data: classes,
+    });
 });
 
 /**
@@ -124,16 +175,16 @@ export const getTeacherClassesHandler = catchErrors(async (req, res) => {
  * GET /students/:studentId/classes
  */
 export const getStudentClassesHandler = catchErrors(async (req, res) => {
-  // Validate student ID param
-  const studentId = studentIdSchema.parse(req.params.studentId);
+    // Validate student ID param
+    const studentId = studentIdSchema.parse(req.params.studentId);
 
-  // Call service
-  const classes = await getStudentClasses(studentId);
+    // Call service
+    const classes = await getStudentClasses(studentId);
 
-  return res.success(OK, {
-    message: "Student classes retrieved successfully",
-    data: classes,
-  });
+    return res.success(OK, {
+        message: "Student classes retrieved successfully",
+        data: classes,
+    });
 });
 
 /**
@@ -142,14 +193,13 @@ export const getStudentClassesHandler = catchErrors(async (req, res) => {
  * Admin only
  */
 export const deleteClassHandler = catchErrors(async (req, res) => {
-  // Validate class ID param
-  const classId = classIdSchema.parse(req.params.classId);
+    // Validate class ID param
+    const classId = classIdSchema.parse(req.params.classId);
 
-  // Call service
-  await deleteClassById(classId);
+    // Call service
+    await deleteClassById(classId);
 
-  return res.success(OK, {
-    message: "Class deleted successfully",
-  });
+    return res.success(OK, {
+        message: "Class deleted successfully",
+    });
 });
-

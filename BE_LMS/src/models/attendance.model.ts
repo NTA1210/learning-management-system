@@ -1,44 +1,50 @@
 import mongoose from "mongoose";
-import { IAttendance } from "../types";
-import { AttendanceStatus } from "../types/attendance.type";
+import {IAttendance} from "../types";
+import {AttendanceStatus} from "../types/attendance.type";
 
 const AttendanceSchema = new mongoose.Schema<IAttendance>(
-  {
-    courseId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Course",
-      required: true,
-      index: true,
+    {
+        courseId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Course",
+            required: true,
+            index: true,
+        },
+        studentId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true,
+            index: true,
+        },
+        classId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Class",
+            required: true,
+            index: true,
+        },
+        date: {type: Date, required: true, index: true},
+        status: {
+            type: String,
+            enum: [
+                AttendanceStatus.PRESENT,
+                AttendanceStatus.ABSENT,
+                AttendanceStatus.LATE,
+                AttendanceStatus.EXCUSED,
+            ],
+            default: AttendanceStatus.ABSENT,
+        },
+        markedBy: {type: mongoose.Schema.Types.ObjectId, ref: "User"},
     },
-    studentId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-    date: { type: Date, required: true, index: true },
-    status: {
-      type: String,
-      enum: [
-        AttendanceStatus.PRESENT,
-        AttendanceStatus.ABSENT,
-        AttendanceStatus.LATE,
-        AttendanceStatus.EXCUSED,
-      ],
-      default: AttendanceStatus.ABSENT,
-    },
-    markedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  },
-  { timestamps: true }
+    {timestamps: true}
 );
 
 AttendanceSchema.index(
-  { courseId: 1, studentId: 1, date: 1 },
-  { unique: true }
+    {courseId: 1, studentId: 1, date: 1},
+    {unique: true}
 );
 const AttendanceModel = mongoose.model<IAttendance>(
-  "Attendance",
-  AttendanceSchema
+    "Attendance",
+    AttendanceSchema
 );
 
 export default AttendanceModel;

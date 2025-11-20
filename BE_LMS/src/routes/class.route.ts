@@ -1,17 +1,19 @@
 import { Router } from "express";
 import {
-  createClassHandler,
-  getClassesByCourseHandler,
-  getClassByIdHandler,
-  updateClassHandler,
-  getTeacherClassesHandler,
-  getStudentClassesHandler,
-  deleteClassHandler,
+    createEmptyClassesHandler,
+    getClassesByCourseHandler,
+    getClassByIdHandler,
+    updateClassHandler,
+    getTeacherClassesHandler,
+    getStudentClassesHandler,
+    deleteClassHandler, assignTeacherToClassHandler, assignTeacherAndStudentsHandler, assignStudentsToClassesHandler,
 } from "../controller/class.controller";
 import { authenticate, authorize } from "../middleware";
 import { Role } from "../types";
 
 const classRouter = Router();
+
+// Prefix: /classes
 
 // Public routes
 
@@ -23,12 +25,36 @@ classRouter.get("/:classId", getClassByIdHandler);
 
 // Protected routes
 
-// Create new class (Admin only)
+// Create new empty classes (Admin only)
 classRouter.post(
-  "/",
+  "/create",
   authenticate,
   authorize(Role.ADMIN),
-  createClassHandler
+  createEmptyClassesHandler
+);
+
+// Assign students to multiple classes (Admin only)
+classRouter.post(
+  "/assign-students",
+  authenticate,
+  authorize(Role.ADMIN),
+  assignStudentsToClassesHandler
+);
+
+// Assign teacher to a class (Admin only)
+classRouter.post(
+  "/assign-teacher",
+  authenticate,
+  authorize(Role.ADMIN),
+  assignTeacherToClassHandler
+);
+
+// Assign teacher to a class and students to multiple classes (Admin only)
+classRouter.post(
+  "/assign-all",
+  authenticate,
+  authorize(Role.ADMIN),
+  assignTeacherAndStudentsHandler
 );
 
 // Update class (Admin only)
