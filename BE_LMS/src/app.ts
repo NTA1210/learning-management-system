@@ -21,6 +21,7 @@ import {
 
 //routes
 import {
+  announcementRoutes,
   assignmentRoutes,
   authRoutes,
   lessonRoutes,
@@ -91,6 +92,7 @@ export const createApp = () => {
   app.use("/sessions", authenticate, authorize(Role.ADMIN), sessionRoutes);
   app.use("/enrollments", authenticate, enrollmentRoutes);
   app.use("/feedbacks", feedbackRoutes);
+  app.use("/announcements", authenticate, announcementRoutes);
   app.use("/course-invites", authenticate, courseInviteRoutes);
   app.use("/quiz-questions", quizQuestionRoutes);
   app.use("/majors", authenticate, majorProtectedRoutes);
