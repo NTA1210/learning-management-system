@@ -27,7 +27,7 @@ import { Role } from "../types";
  */
 export const createNotificationHandler = catchErrors(async (req, res) => {
   const data = createNotificationSchema.parse(req.body);
-  const senderId = req.userId!;
+  const senderId = (req as any).userId;
 
   const result = await createNotification(data, senderId, req.role!);
 
@@ -43,7 +43,7 @@ export const createNotificationHandler = catchErrors(async (req, res) => {
  */
 export const getNotificationsHandler = catchErrors(async (req, res) => {
   const query = listNotificationsSchema.parse(req.query);
-  const userId = req.userId!;
+  const userId = (req as any).userId;
 
   const result = await getNotifications(userId, query);
 
@@ -58,7 +58,7 @@ export const getNotificationsHandler = catchErrors(async (req, res) => {
  * GET /notifications/unread-count - Get unread notification count
  */
 export const getUnreadCountHandler = catchErrors(async (req, res) => {
-  const userId = req.userId!;
+  const userId = (req as any).userId;
   const result = await getUnreadNotificationCount(userId);
 
   return res.success(OK, {
@@ -72,7 +72,7 @@ export const getUnreadCountHandler = catchErrors(async (req, res) => {
  */
 export const markNotificationAsReadHandler = catchErrors(async (req, res) => {
   const notificationId = notificationIdSchema.parse(req.params.id);
-  const userId = req.userId!;
+  const userId = (req as any).userId;
 
   const notification = await markNotificationAsRead(notificationId, userId);
 
@@ -87,7 +87,7 @@ export const markNotificationAsReadHandler = catchErrors(async (req, res) => {
  */
 export const markNotificationsAsReadHandler = catchErrors(async (req, res) => {
   const data = markReadNotificationSchema.parse(req.body);
-  const userId = req.userId!;
+  const userId = (req as any).userId;
 
   const result = await markNotificationsAsRead(data.notificationIds, userId);
 
@@ -102,7 +102,7 @@ export const markNotificationsAsReadHandler = catchErrors(async (req, res) => {
  */
 export const markAllNotificationsAsReadHandler = catchErrors(
   async (req, res) => {
-    const userId = req.userId!;
+    const userId = (req as any).userId;
 
     const result = await markAllNotificationsAsRead(userId);
 
@@ -118,7 +118,7 @@ export const markAllNotificationsAsReadHandler = catchErrors(
  */
 export const deleteNotificationHandler = catchErrors(async (req, res) => {
   const notificationId = notificationIdSchema.parse(req.params.id);
-  const userId = req.userId!;
+  const userId = (req as any).userId;
 
   const result = await deleteNotification(notificationId, userId);
 
@@ -133,7 +133,7 @@ export const deleteNotificationHandler = catchErrors(async (req, res) => {
  */
 export const undoDeleteNotificationHandler = catchErrors(async (req, res) => {
   const notificationId = notificationIdSchema.parse(req.params.id);
-  const userId = req.userId!;
+  const userId = (req as any).userId;
 
   const result = await undoDeleteNotification(notificationId, userId);
 
@@ -148,7 +148,7 @@ export const undoDeleteNotificationHandler = catchErrors(async (req, res) => {
  */
 export const hardDeleteNotificationHandler = catchErrors(async (req, res) => {
   const notificationId = notificationIdSchema.parse(req.params.id);
-  const userId = req.userId!;
+  const userId = (req as any).userId;
 
   const result = await hardDeleteNotification(notificationId, userId);
 
