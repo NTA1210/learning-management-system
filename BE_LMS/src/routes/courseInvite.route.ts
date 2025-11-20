@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createCourseInviteHandler, joinCourseInviteHandler, listCourseInvitesHandler, updateCourseInviteHandler } from "@/controller/courseInvite.controller";
+import { createCourseInviteHandler, joinCourseInviteHandler, listCourseInvitesHandler, updateCourseInviteHandler, deleteCourseInviteHandler } from "@/controller/courseInvite.controller";
 import { authorize } from "@/middleware";
 import { Role } from "@/types";
 
@@ -49,4 +49,15 @@ courseInviteRoutes.patch(
   "/:id",
   authorize(Role.TEACHER, Role.ADMIN),
   updateCourseInviteHandler 
+);
+
+/**
+ * DELETE /course-invites/:id
+ * Xóa invite link vĩnh viễn (soft delete)
+ * Chỉ Teacher/Admin
+ */
+courseInviteRoutes.delete(
+  "/:id",
+  authorize(Role.TEACHER, Role.ADMIN),
+  deleteCourseInviteHandler
 );

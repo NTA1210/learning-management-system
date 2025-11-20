@@ -18,7 +18,7 @@ const enrollmentRoutes = Router();
 // prefix: /enrollments
 
 // GET /enrollments - List all enrollments (admin view)
-enrollmentRoutes.get("/", authorize(Role.ADMIN), getAllEnrollmentsHandler);
+enrollmentRoutes.get("/", authorize(Role.ADMIN, Role.TEACHER), getAllEnrollmentsHandler);
 
 // GET /enrollments/my-enrollments - Get my enrollments
 enrollmentRoutes.get("/my-enrollments", getMyEnrollmentsHandler);
