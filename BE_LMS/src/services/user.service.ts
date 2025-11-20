@@ -93,6 +93,14 @@ function formatUserResponse(user: IUser, viewerRole: Role) {
   return base;
 }
 
+/**
+ * Update user profile
+ * - Only admin can update status, isVerified, and specialistIds
+ * - Only admin and teacher can update email and phone_number
+ * - Only admin, teacher, and student can update fullname, bio, and avatar
+ * - Checks if username and email already exist
+ * - Checks if specialistIds are valid
+ */
 export const updateUserProfile = async (
   { userId, ...data }: TUpdateUserProfile,
   userRole: Role
