@@ -212,7 +212,14 @@ export const listCourses = async ({
   const [courses, total] = await Promise.all([
     CourseModel.find(filter)
       .populate("teacherIds", "username email fullname avatar_url")
-      .populate("subjectId", "name code slug description credits")
+      .populate({
+        path: "subjectId",
+        select: "name code slug description credits specialistIds",
+        populate: {
+          path: "specialistIds",
+          select: "name code description"
+        }
+      })
       .populate("createdBy", "username email fullname")
       .sort(sort)
       .skip(skip)
