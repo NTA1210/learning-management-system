@@ -1,7 +1,11 @@
-import { CREATED } from "@/constants/http";
-import { enrollQuiz } from "@/services/quizAttempt.service";
+import { CREATED, OK } from "@/constants/http";
+import { enrollQuiz, submitQuizAttempt } from "@/services/quizAttempt.service";
 import { catchErrors } from "@/utils/asyncHandler";
-import { enrollQuizSchema } from "@/validators/quizAttempt.schemas";
+import {
+  enrollQuizSchema,
+  quizAttemptIdSchema,
+  submitQuizSchema,
+} from "@/validators/quizAttempt.schemas";
 
 // POST /quiz-attempts/enroll - Enroll in a quiz
 export const enrollQuizHandler = catchErrors(async (req, res) => {
@@ -19,5 +23,18 @@ export const enrollQuizHandler = catchErrors(async (req, res) => {
   return res.success(CREATED, {
     data,
     message: "Quiz enrolled successfully",
+  });
+});
+
+// PUT /quiz-attempts/:quizAttemptId/submit - Update a quiz attempt
+export const submitQuizHandler = catchErrors(async (req, res) => {
+  const input = submitQuizSchema.parse({
+    quizAttemptId: req.params.quizAttemptId,
+    answers: req.body.answers,
+  });
+  const data = await submitQuizAttempt(input);
+  return res.success(OK, {
+    data,
+    message: "Submit quiz attempt successfully",
   });
 });

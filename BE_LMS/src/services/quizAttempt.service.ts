@@ -1,8 +1,11 @@
 import { BAD_REQUEST, NOT_FOUND } from "@/constants/http";
 import { QuizAttemptModel, QuizModel } from "@/models";
-import { AttemptStatus, Role } from "@/types";
+import { AttemptStatus, IQuiz, Role } from "@/types";
 import appAssert from "@/utils/appAssert";
-import { EnrollQuizInput } from "@/validators/quizAttempt.schemas";
+import {
+  EnrollQuizInput,
+  SubmitQuizInput,
+} from "@/validators/quizAttempt.schemas";
 
 /**
  * Enroll in a quiz.
@@ -63,11 +66,14 @@ export const enrollQuiz = async ({
   const now = new Date().getTime();
   // Kiểm tra quiz đã được xuất bản và trong thời gian làm bài
   appAssert(
-    now >= quiz.startTime.getTime() && now <= quiz.endTime.getTime(),
+    now >= quiz.startTime.getTime(),
     BAD_REQUEST,
-    "Quiz is not active"
+    "This quiz has not started yet"
   );
 
+  appAssert(now <= quiz.endTime.getTime(), BAD_REQUEST, "This quiz has ended");
+
+  // Kiem tra nguoi dung da lam bai chua
   if (quizAttempt && quizAttempt.status === AttemptStatus.IN_PROGRESS) {
     // Đã có bài làm dang dở, không tạo mới
     return quizAttempt;
@@ -89,4 +95,69 @@ export const enrollQuiz = async ({
   });
   await quizAttemptModel.save();
   return quizAttemptModel;
+};
+
+/**
+ * Submit a quiz attempt.
+ * @param  params - Parameters to submit a quiz attempt.
+ * @param  params.quizAttemptId - ID of the quiz attempt to submit.
+ * @param  params.answers - Array of answers to submit.
+ * @returns  - The submitted quiz attempt with score and other information.
+ * @throws  - If the quiz attempt is not found.
+ * @throws  - If the user was banned from taking the quiz.
+ * @throws  - If the user has already submitted the quiz.
+ * @throws  - If the time limit has been exceeded.
+ */
+export const submitQuizAttempt = async ({
+  quizAttemptId,
+  answers,
+}: SubmitQuizInput) => {
+  const quizAttempt = await QuizAttemptModel.findById(quizAttemptId).populate<{
+    quizId: IQuiz;
+  }>("quizId");
+  appAssert(quizAttempt, NOT_FOUND, "Quiz attempt not found");
+
+  appAssert(
+    quizAttempt.status !== AttemptStatus.ABANDONED,
+    BAD_REQUEST,
+    "You were banned from taking this quiz"
+  );
+
+  appAssert(
+    quizAttempt.status !== AttemptStatus.SUBMITTED,
+    BAD_REQUEST,
+    "You have already submitted this quiz"
+  );
+
+  // Kiem tra xem nguoi dung co dung thoi gian lam bai khong
+  const isOnTime =
+    quizAttempt.quizId.endTime.getTime() + 30 * 1000 >= Date.now();
+
+  appAssert(isOnTime, BAD_REQUEST, "Time limit exceeded");
+
+  //validate số lượng câu trả lời
+  appAssert(
+    answers.length === quizAttempt.quizId.snapshotQuestions.length,
+    BAD_REQUEST,
+    "Invalid number of answers submitted"
+  );
+
+  const {
+    totalQuestions,
+    totalScore,
+    totalQuizScore,
+    scorePercentage,
+    failedQuestions,
+    passedQuestions,
+    answers: answersSubmitted,
+  } = await quizAttempt.grade(answers, quizAttempt.quizId);
+  return {
+    totalQuestions,
+    totalScore,
+    totalQuizScore,
+    scorePercentage,
+    failedQuestions,
+    passedQuestions,
+    answersSubmitted,
+  };
 };

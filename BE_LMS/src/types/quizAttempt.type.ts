@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import IQuiz from "./quiz.type";
 
 export enum AttemptStatus {
   IN_PROGRESS = "in_progress",
@@ -26,5 +27,5 @@ export default interface IQuizAttempt extends mongoose.Document {
   userAgent?: string;
   createdAt?: Date;
   updatedAt?: Date;
-  grade(): any;
+  grade(answers: IQuestionAnswer[], quiz: IQuiz): any;
 }
