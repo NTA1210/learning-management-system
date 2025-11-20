@@ -37,6 +37,7 @@ export default function FeedbackList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const fetchFeedbacks = async () => {
     setLoading(true);
@@ -55,7 +56,6 @@ export default function FeedbackList() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this feedback?")) return;
     setDeletingId(id);
     try {
       await feedbackService.deleteFeedback(id);
@@ -66,6 +66,16 @@ export default function FeedbackList() {
     } finally {
       setDeletingId(null);
     }
+  };
+
+  const closeDeleteModal = () => {
+    setConfirmDeleteId(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!confirmDeleteId) return;
+    await handleDelete(confirmDeleteId);
+    setConfirmDeleteId(null);
   };
 
   useEffect(() => {
@@ -187,6 +197,20 @@ export default function FeedbackList() {
             }
             .pulse-button:hover::after {
               opacity: 1;
+            }
+            @keyframes modalFade {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes modalScale {
+              from { opacity: 0; transform: translateY(12px) scale(0.96); }
+              to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+            .modal-backdrop {
+              animation: modalFade 180ms ease-out forwards;
+            }
+            .modal-content {
+              animation: modalScale 220ms ease-out forwards;
             }
           `}
         </style>
@@ -379,7 +403,7 @@ export default function FeedbackList() {
                       {isAdmin && (
                         <button
                           type="button"
-                          onClick={() => void handleDelete(fb._id)}
+                          onClick={() => setConfirmDeleteId(fb._id)}
                           disabled={deletingId === fb._id}
                           className="text-xs px-3 py-1 rounded-full border transition-all"
                           style={{
@@ -408,7 +432,76 @@ export default function FeedbackList() {
                   </div>
                 </article>
               ))}
-          </section>
+            </section>
+
+            {confirmDeleteId && (
+              <div className="fixed inset-0 z-40 flex items-center justify-center modal-backdrop">
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundColor: darkMode
+                      ? "rgba(164, 176, 204, 0.2)"
+                      : "rgba(181, 191, 213, 0.1)",
+                    backdropFilter: "blur(4px)",
+                  }}
+                  onClick={closeDeleteModal}
+                />
+                <div
+                  className="relative z-50 max-w-sm w-full mx-4 rounded-3xl shadow-2xl modal-content"
+                  style={{
+                    background: darkMode ? "#020617" : "#ecfeff",
+                    border: darkMode
+                      ? "1px solid rgba(148, 163, 184, 0.4)"
+                      : "1px solid rgba(59, 130, 246, 0.35)",
+                  }}
+                >
+                  <div className="px-6 py-5">
+                    <p className="text-xs uppercase tracking-wide mb-1" style={{ color: "#0f766e" }}>
+                      Confirm delete
+                    </p>
+                    <h2 className="text-lg font-semibold mb-2">
+                      Are you sure you want to delete this feedback?
+                    </h2>
+                    <p
+                      className="text-xs mb-5"
+                      style={{ color: darkMode ? "#9ca3af" : "#64748b" }}
+                    >
+                      This action cannot be undone. The selected feedback will be permanently
+                      removed.
+                    </p>
+                    <div className="flex justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={closeDeleteModal}
+                        className="px-4 py-2 rounded-full font-semibold border text-sm transition-all"
+                        style={{
+                          background: darkMode ? "rgba(15,23,42,0.9)" : "#e0f2fe",
+                          color: darkMode ? "#e5e7eb" : "#0f172a",
+                          borderColor: darkMode
+                            ? "rgba(148,163,184,0.5)"
+                            : "rgba(59,130,246,0.45)",
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void confirmDelete()}
+                        disabled={deletingId === confirmDeleteId}
+                        className="px-6 py-2 rounded-full font-semibold text-sm relative overflow-hidden pulse-button transition-all"
+                        style={{
+                          background: "linear-gradient(135deg, #0f766e, #022c22)",
+                          color: "#f9fafb",
+                          opacity: deletingId === confirmDeleteId ? 0.7 : 1,
+                        }}
+                      >
+                        {deletingId === confirmDeleteId ? "Deleting..." : "OK"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
           {pagination && (
             <div className="mt-6 text-sm flex flex-wrap items-center gap-4" style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}>
