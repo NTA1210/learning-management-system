@@ -142,7 +142,7 @@ export default function CourseDetail() {
               onClick={() => navigate(-1)}
               className="bg-[#525fe1] text-white px-5 py-2 rounded-lg hover:scale-105 transition"
             >
-              Quay lại
+              Back
             </button>
           </div>
         ) : !course ? (
