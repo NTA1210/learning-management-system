@@ -145,7 +145,7 @@ export const listCourses = async ({
   // ✅ SOFT DELETE: Control deleted course visibility
   // ✅ FIX: Only admin can view deleted courses
   const isAdmin = userRole === Role.ADMIN;
-  
+
   if (onlyDeleted) {
     // Admin viewing recycle bin
     if (!isAdmin) {
@@ -193,20 +193,20 @@ export const listCourses = async ({
     if (to) filter.createdAt.$lte = to;
   }
 
-    // Search by title or description (text search)
-    if (search) {
-        filter.$or = [
-            {title: {$regex: search, $options: "i"}},
-            {description: {$regex: search, $options: "i"}},
-        ];
-    }
+  // Search by title or description (text search)
+  if (search) {
+    filter.$or = [
+      { title: { $regex: search, $options: "i" } },
+      { description: { $regex: search, $options: "i" } },
+    ];
+  }
 
-    // Calculate pagination
-    const skip = (page - 1) * limit;
+  // Calculate pagination
+  const skip = (page - 1) * limit;
 
-    // Build sort object
-    const sort: any = {};
-    sort[sortBy] = sortOrder === "asc" ? 1 : -1;
+  // Build sort object
+  const sort: any = {};
+  sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
   // Execute query with pagination
   const [courses, total] = await Promise.all([
@@ -221,22 +221,22 @@ export const listCourses = async ({
     CourseModel.countDocuments(filter),
   ]);
 
-    // Calculate pagination metadata
-    const totalPages = Math.ceil(total / limit);
-    const hasNextPage = page < totalPages;
-    const hasPrevPage = page > 1;
+  // Calculate pagination metadata
+  const totalPages = Math.ceil(total / limit);
+  const hasNextPage = page < totalPages;
+  const hasPrevPage = page > 1;
 
-    return {
-        courses,
-        pagination: {
-            total,
-            page,
-            limit,
-            totalPages,
-            hasNextPage,
-            hasPrevPage,
-        },
-    };
+  return {
+    courses,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNextPage,
+      hasPrevPage,
+    },
+  };
 };
 
 /**
@@ -286,6 +286,17 @@ export const createCourse = async (
     uniqueTeachers.size === data.teacherIds.length,
     BAD_REQUEST,
     "Teacher list contains duplicate entries"
+  );
+
+  // ❌ FIX: Check for duplicate course title
+  const existingCourse = await CourseModel.findOne({
+    title: data.title,
+    isDeleted: false,
+  });
+  appAssert(
+    !existingCourse,
+    BAD_REQUEST,
+    "A course with this title already exists"
   );
 
   // Validate dates
@@ -351,29 +362,29 @@ export const createCourse = async (
   // ✅ UNIVERSITY RULE: Validate teacher specialization matches subject
   // Only teachers with matching specialist can teach the course
   const subjectSpecialistIds = subject.specialistIds?.map((id) => id.toString()) || [];
-  
+
   if (subjectSpecialistIds.length > 0) {
     // Check each teacher has at least one matching specialist
     const invalidTeachers: string[] = [];
-    
+
     for (const teacher of teachers) {
       const teacherSpecialistIds = teacher.specialistIds?.map((id) => id.toString()) || [];
-      
+
       // Admin can bypass specialist check
       if (teacher.role === Role.ADMIN) {
         continue;
       }
-      
+
       // Check if teacher has at least one matching specialist
       const hasMatchingSpecialist = teacherSpecialistIds.some((teacherSpecId) =>
         subjectSpecialistIds.includes(teacherSpecId)
       );
-      
+
       if (!hasMatchingSpecialist) {
         invalidTeachers.push((teacher.fullname || teacher.username) as string);
       }
     }
-    
+
     appAssert(
       invalidTeachers.length === 0,
       BAD_REQUEST,
@@ -421,19 +432,19 @@ export const createCourse = async (
   // 🖼️ Upload logo if provided
   if (logoFile) {
     let uploadedKey: string | null = null;
-    
+
     try {
       const courseId = String(course._id);
       const { publicUrl, key } = await uploadCourseLogo(courseId, logoFile);
       uploadedKey = key; // Track uploaded key for cleanup if needed
-      
+
       // Update course with logo URL and key
       await CourseModel.findByIdAndUpdate(courseId, { logo: publicUrl, key });
       course.logo = publicUrl;
     } catch (err) {
       // ❌ Rollback: Clean up uploaded logo (if any) and delete course
       if (uploadedKey) {
-        await deleteCourseLogoFile(uploadedKey).catch(cleanupErr => 
+        await deleteCourseLogoFile(uploadedKey).catch(cleanupErr =>
           console.error("Failed to cleanup uploaded logo:", cleanupErr)
         );
       }
@@ -461,10 +472,10 @@ export const createCourse = async (
  * Cập nhật khóa học
  */
 export const updateCourse = async (
-    courseId: string,
-    data: UpdateCourseInput,
-    userId: Types.ObjectId,
-    logoFile?: Express.Multer.File
+  courseId: string,
+  data: UpdateCourseInput,
+  userId: Types.ObjectId,
+  logoFile?: Express.Multer.File
 ) => {
   // ❌ FIX: Validate courseId format
   appAssert(
@@ -487,9 +498,9 @@ export const updateCourse = async (
     "Cannot update a completed course"
   );
 
-    // Check if user is a teacher of this course or admin
-    const user = await UserModel.findById(userId);
-    appAssert(user, NOT_FOUND, "User not found");
+  // Check if user is a teacher of this course or admin
+  const user = await UserModel.findById(userId);
+  appAssert(user, NOT_FOUND, "User not found");
 
   const isTeacherOfCourse = course.teacherIds.some(
     (teacherId) => teacherId.equals(userId)
@@ -583,29 +594,29 @@ export const updateCourse = async (
     appAssert(courseSubject, NOT_FOUND, "Course subject not found");
 
     const subjectSpecialistIds = courseSubject.specialistIds?.map((id) => id.toString()) || [];
-    
+
     if (subjectSpecialistIds.length > 0) {
       // Check each teacher has at least one matching specialist
       const invalidTeachers: string[] = [];
-      
+
       for (const teacher of teachers) {
         const teacherSpecialistIds = teacher.specialistIds?.map((id) => id.toString()) || [];
-        
+
         // Admin can bypass specialist check
         if (teacher.role === Role.ADMIN) {
           continue;
         }
-        
+
         // Check if teacher has at least one matching specialist
         const hasMatchingSpecialist = teacherSpecialistIds.some((teacherSpecId) =>
           subjectSpecialistIds.includes(teacherSpecId)
         );
-        
+
         if (!hasMatchingSpecialist) {
           invalidTeachers.push((teacher.fullname || teacher.username) as string);
         }
       }
-      
+
       appAssert(
         invalidTeachers.length === 0,
         BAD_REQUEST,
@@ -634,7 +645,7 @@ export const updateCourse = async (
   // ====================================
   // 🖼️ HANDLE LOGO OPERATIONS
   // ====================================
-  
+
   const shouldRemoveLogo = data.logo === null || data.logo === "";
   const shouldUploadNewLogo = logoFile !== undefined;
 
@@ -643,27 +654,27 @@ export const updateCourse = async (
     if (course.key) {
       await deleteCourseLogoFile(course.key);
     }
-    
+
     // Remove logo field from updateData to avoid MongoDB conflict
     delete updateData.logo;
-    
+
     // Remove both logo and key from database
     updateData.$unset = { logo: 1, key: 1 };
-  } 
+  }
   else if (shouldUploadNewLogo) {
     // User wants to upload new logo
     // ⚠️ Important: Upload new logo FIRST before updating DB
     // This ensures atomicity - if upload fails, nothing changes
     const oldKey = course.key;
-    
+
     // Upload new logo first 
     const { publicUrl, key } = await uploadCourseLogo(courseId, logoFile);
     updateData.logo = publicUrl;
     updateData.key = key;
-    
+
     // Note: Old logo will be deleted ONLY after successful DB update
     // This is handled below after the DB update succeeds
-    
+
     // Store oldKey for cleanup after successful DB update
     updateData._oldLogoKey = oldKey;
   }
@@ -673,19 +684,19 @@ export const updateCourse = async (
   // ====================================
   // MongoDB requires separate $set and $unset operators
   // Cannot use both in the same object at root level
-  
+
   // Extract temporary fields that shouldn't go to DB
   const oldLogoKey = updateData._oldLogoKey;
   delete updateData._oldLogoKey;
-  
+
   const updateQuery: any = {};
-  
+
   // Add $unset operations (remove fields)
   if (updateData.$unset) {
     updateQuery.$unset = updateData.$unset;
     delete updateData.$unset; // Remove from updateData to avoid duplication
   }
-  
+
   // Add $set operations (update fields)
   if (Object.keys(updateData).length > 0) {
     updateQuery.$set = updateData;
@@ -696,7 +707,7 @@ export const updateCourse = async (
   // ====================================
   // Store new logo key for rollback if DB update fails
   const newLogoKey = updateData.key;
-  
+
   let updatedCourse;
   try {
     updatedCourse = await CourseModel.findByIdAndUpdate(
@@ -711,7 +722,7 @@ export const updateCourse = async (
 
     // ❌ FIX: Ensure course was updated successfully
     appAssert(updatedCourse, BAD_REQUEST, "Failed to update course");
-    
+
     // ✅ DB update successful - now safe to delete old logo if exists
     if (oldLogoKey) {
       await deleteCourseLogoFile(oldLogoKey).catch(err =>
@@ -769,16 +780,16 @@ export const deleteCourse = async (courseId: string, userId: string) => {
     courseId,
     status: { $in: ["pending", "approved"] }, // Active enrollments
   });
-  
+
   appAssert(
     activeEnrollmentCount === 0,
     BAD_REQUEST,
     `Cannot delete course with ${activeEnrollmentCount} active enrollment(s). Please cancel or complete all enrollments first.`
   );
 
-    // Check if user is a teacher of this course or admin
-    const user = await UserModel.findById(userId);
-    appAssert(user, NOT_FOUND, "User not found");
+  // Check if user is a teacher of this course or admin
+  const user = await UserModel.findById(userId);
+  appAssert(user, NOT_FOUND, "User not found");
 
   const isTeacherOfCourse = course.teacherIds.some(
     (teacherId) => teacherId.equals(userId)
@@ -804,7 +815,7 @@ export const deleteCourse = async (courseId: string, userId: string) => {
     { new: true }
   );
 
-  return { 
+  return {
     message: "Course deleted successfully",
     deletedAt: new Date(),
     deletedBy: userId,
