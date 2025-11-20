@@ -415,8 +415,11 @@ export const createCourse = async (
     // Force isPublished = false regardless of input
     finalIsPublished = false;
   } else {
+    // ✅ AUTO PUBLISH: Admin tạo course thì luôn publish
+    finalIsPublished = true;
+
     // ✅ AUTO STATUS: Admin tạo và publish luôn → status = ONGOING
-    if (finalIsPublished && finalStatus === CourseStatus.DRAFT) {
+    if (finalStatus === CourseStatus.DRAFT) {
       finalStatus = CourseStatus.ONGOING;
     }
   }
@@ -520,6 +523,20 @@ export const updateCourse = async (
     FORBIDDEN,
     "You don't have permission to update this course"
   );
+
+  // ❌ FIX: Check for duplicate course title if title is being updated
+  if (data.title && data.title !== course.title) {
+    const existingCourse = await CourseModel.findOne({
+      title: data.title,
+      isDeleted: false,
+      _id: { $ne: courseId }, // Exclude current course
+    });
+    appAssert(
+      !existingCourse,
+      BAD_REQUEST,
+      "A course with this title already exists"
+    );
+  }
 
   // Validate dates if provided
   if (data.startDate || data.endDate) {
@@ -637,11 +654,13 @@ export const updateCourse = async (
   // Prepare update data
   const updateData: any = { ...data };
 
-  // If teacher tries to publish course, prevent it
-  if (!isAdmin && data.isPublished === true) {
-    // Teacher cannot publish - only admin can approve
+  // ✅ FIX: Teacher CANNOT change isPublished field at all
+  // - Cannot publish (set true)
+  // - Cannot unpublish (set false) if already published by admin
+  if (!isAdmin && data.isPublished !== undefined) {
+    // Teacher tries to change isPublished field
     delete updateData.isPublished;
-    // Note: Course will remain unpublished, need admin to approve
+    // Note: Only admin can control publish status
   }
 
   // ✅ AUTO STATUS: When admin approves (publishes) a DRAFT course, auto change to ONGOING
@@ -904,6 +923,13 @@ export const permanentDeleteCourse = async (
   courseId: string,
   userId: string
 ) => {
+  // ❌ FIX: Validate courseId format
+  appAssert(
+    courseId && courseId.match(/^[0-9a-fA-F]{24}$/),
+    BAD_REQUEST,
+    "Invalid course ID format"
+  );
+
   // ✅ Find deleted course only (must be soft-deleted first)
   const course = await CourseModel.findOne({
     _id: courseId,
@@ -953,3 +979,4 @@ export const permanentDeleteCourse = async (
     deletedCourseId: courseId,
   };
 };
+
