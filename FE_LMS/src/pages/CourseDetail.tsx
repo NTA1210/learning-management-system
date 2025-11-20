@@ -53,7 +53,6 @@ export default function CourseDetail() {
         setLoading(true);
         const data = await courseService.getCourseById(id);
         if (mounted) {
-          // nới lỏng kiểu để gán các field từ backend thực tế
           const anyData = data as unknown as ApiCourse;
           setCourse(anyData);
           setError("");
