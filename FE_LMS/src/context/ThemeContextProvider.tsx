@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useLayoutEffect, useRef } from 'react';
 import { ThemeContext } from './ThemeContext';
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -16,21 +16,41 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   });
 
-  useEffect(() => {
-    // Apply dark mode class to document
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+  const transitionTimeoutRef = useRef<number | null>(null);
+
+  const applyThemeToRoot = (mode: boolean) => {
+    const root = document.documentElement;
+    root.classList.toggle('dark', mode);
+    root.setAttribute('data-theme', mode ? 'dark' : 'light');
+  };
+
+  const disableTransitionsTemporarily = () => {
+    const root = document.documentElement;
+    root.classList.add('theme-transition-disabled');
+    if (transitionTimeoutRef.current) {
+      window.clearTimeout(transitionTimeoutRef.current);
     }
+    transitionTimeoutRef.current = window.setTimeout(() => {
+      root.classList.remove('theme-transition-disabled');
+      transitionTimeoutRef.current = null;
+    }, 150);
+  };
+
+  useLayoutEffect(() => {
+    applyThemeToRoot(darkMode);
+    return () => {
+      if (transitionTimeoutRef.current) {
+        window.clearTimeout(transitionTimeoutRef.current);
+      }
+    };
   }, [darkMode]);
 
   const toggleDarkMode = () => {
-    setDarkMode(prevMode => {
-      const newMode = !prevMode;
-      localStorage.setItem('appDarkMode', newMode.toString());
-      return newMode;
-    });
+    const nextMode = !darkMode;
+    disableTransitionsTemporarily();
+    applyThemeToRoot(nextMode);
+    localStorage.setItem('appDarkMode', nextMode.toString());
+    setDarkMode(nextMode);
   };
 
   return (

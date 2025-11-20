@@ -1,9 +1,16 @@
+import {
+  EMAIL_REGEX,
+  INTERNATIONAL_PHONE_REGEX,
+  VIETNAM_PHONE_REGEX,
+} from "@/constants/regex";
+import { UserStatus } from "@/types";
 import z, { email } from "zod";
 
 export const listAllUsersSchema = z.object({
   role: z.string().optional(),
   email: email().optional(),
   username: z.string().optional(),
+  status: z.string().optional(),
   page: z
     .string()
     .optional()
@@ -21,3 +28,25 @@ export const listAllUsersSchema = z.object({
 export const courseIdSchema = z.string().length(24, "Invalid course ID");
 
 export type TGetAllUsersFilter = z.infer<typeof listAllUsersSchema>;
+
+export const userIdSchema = z.string().length(24, "Invalid user ID");
+
+export const updateUserProfileSchema = z.object({
+  userId: userIdSchema,
+  username: z.string().optional(),
+  email: z.string().regex(EMAIL_REGEX, "Invalid email format").optional(),
+  fullname: z.string().optional(),
+  phone_number: z
+    .string()
+    .regex(VIETNAM_PHONE_REGEX || INTERNATIONAL_PHONE_REGEX, {
+      message: "Invalid phone number format",
+    })
+    .optional(),
+  avatar: z.any().optional(),
+  bio: z.string().optional(),
+  status: z.enum(UserStatus).optional(),
+  specialistIds: z.array(z.string()).optional(),
+  isVerified: z.boolean().optional(),
+});
+
+export type TUpdateUserProfile = z.infer<typeof updateUserProfileSchema>;

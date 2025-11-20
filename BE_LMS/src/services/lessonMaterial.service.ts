@@ -3,19 +3,20 @@ import LessonMaterialModel from "../models/lessonMaterial.model";
 import LessonModel from "../models/lesson.model";
 import CourseModel from "../models/course.model";
 import EnrollmentModel from "../models/enrollment.model";
-import { 
+import {
   LessonMaterialQuerySchema,
-  CreateLessonMaterialParams 
+  CreateLessonMaterialParams,
 } from "../validators/lessonMaterial.shemas";
 import appAssert from "../utils/appAssert";
-import {
-  CONFLICT,
-  NOT_FOUND,
-  FORBIDDEN,
-  BAD_REQUEST,
-} from "../constants/http";
+import { CONFLICT, NOT_FOUND, FORBIDDEN, BAD_REQUEST } from "../constants/http";
 import { Role } from "../types";
-import { uploadFile, uploadFiles, getSignedUrl, removeFile, removeFiles } from "../utils/uploadFile";
+import {
+  uploadFile,
+  uploadFiles,
+  getSignedUrl,
+  removeFile,
+  removeFiles,
+} from "../utils/uploadFile";
 import { prefixLessonMaterial } from "../utils/filePrefix";
 import { v4 } from "uuid";
 import { removeDirAndFiles } from "minio";
@@ -26,71 +27,60 @@ import { removeDirAndFiles } from "minio";
  * - TEACHER: xem tài liệu mình upload hoặc thuộc course mình dạy.
  * - ADMIN: xem tất cả.
  */
-export const getLessonMaterials = async (query: any, userId?: string, userRole?: Role) => {
+export const getLessonMaterials = async (
+  query: any,
+  userId: mongoose.Types.ObjectId,
+  userRole?: Role
+) => {
   const filter: any = {};
   const { from, to } = query;
-  
+
   // Basic filtering
   if (query.title) {
-    filter.title = { $regex: query.title, $options: 'i' }; 
+    filter.title = { $regex: query.title, $options: "i" };
   }
-  
-  // Filter by type: need to match mimeType, originalName, or title pattern
+
+    // Filter by type: need to match mimeType, originalName, or title pattern
   if (query.type) {
     const typePatterns: Record<string, any> = {
-      'pdf': {
+      pdf: {
         $or: [
           { mimeType: { $regex: 'pdf', $options: 'i' } },
-          { originalName: { $regex: '\\.pdf$', $options: 'i' } },
-          { title: { $regex: '\\bpdf\\b|\\.pdf\\b', $options: 'i' } },
-          { key: { $regex: '\\.pdf$', $options: 'i' } }
         ]
       },
-      'video': {
+      video: {
         $or: [
           { mimeType: { $regex: 'video', $options: 'i' } },
           { mimeType: { $regex: 'mp4|avi|mov|wmv|flv|webm', $options: 'i' } },
-          { originalName: { $regex: '\\.(mp4|avi|mov|wmv|flv|webm)$', $options: 'i' } },
-          { title: { $regex: '\\b(video|mp4|avi|mov|wmv|flv|webm)\\b', $options: 'i' } },
-          { key: { $regex: '\\.(mp4|avi|mov|wmv|flv|webm)$', $options: 'i' } }
         ]
       },
-      'ppt': {
+      ppt: {
         $or: [
           { mimeType: { $regex: 'powerpoint|presentation|ms-powerpoint', $options: 'i' } },
-          { originalName: { $regex: '\\.(ppt|pptx)$', $options: 'i' } },
-          { title: { $regex: '\\b(powerpoint|ppt|pptx|presentation)\\b', $options: 'i' } },
-          { key: { $regex: '\\.(ppt|pptx)$', $options: 'i' } }
         ]
       },
-      'link': {
+      link: {
         $or: [
           { mimeType: { $regex: 'link|url', $options: 'i' } },
-          { originalName: { $regex: '\\.(url|link)$', $options: 'i' } },
-          { title: { $regex: '\\b(link|url)\\b', $options: 'i' } },
-          { key: { $regex: '^https?://', $options: 'i' } }
         ]
       }
     };
-    
+
     if (typePatterns[query.type]) {
       filter.$and = filter.$and || [];
       filter.$and.push(typePatterns[query.type]);
-    } else if (query.type === 'other') {
+    } else if (query.type === "other") {
       // For 'other', match files that don't match any known type
       filter.$nor = [
         { mimeType: { $regex: 'pdf|video|powerpoint|presentation|link|url', $options: 'i' } },
-        { originalName: { $regex: '\\.(pdf|mp4|avi|mov|ppt|pptx|url|link)$', $options: 'i' } },
-        { title: { $regex: '\\b(pdf|video|powerpoint|ppt|pptx|link|url)\\b', $options: 'i' } },
-        { key: { $regex: '\\.(pdf|mp4|avi|mov|ppt|pptx|url|link)$', $options: 'i' } }
       ];
     }
   }
-  
+
   if (query.size) {
     filter.size = query.size;
   }
-  
+
   if (query.uploadedBy) {
     filter.uploadedBy = new mongoose.Types.ObjectId(query.uploadedBy);
   }
@@ -108,7 +98,7 @@ export const getLessonMaterials = async (query: any, userId?: string, userRole?:
   // Search: Use regex search on title, note, and originalName instead of $text
   const searchConditions: any[] = [];
   if (query.search) {
-    const searchRegex = { $regex: query.search, $options: 'i' };
+    const searchRegex = { $regex: query.search, $options: "i" };
     searchConditions.push(
       { title: searchRegex },
       { note: searchRegex },
@@ -120,36 +110,38 @@ export const getLessonMaterials = async (query: any, userId?: string, userRole?:
   const accessConditions: any[] = [];
   if (userRole === Role.STUDENT) {
     // Students can only see materials from enrolled courses
-    const enrolledCourses = await EnrollmentModel.find({ 
-      studentId: userId, 
-      status: 'active' 
-    }).select('courseId');
-    
-    const enrolledCourseIds = enrolledCourses.map(enrollment => enrollment.courseId);
-    
+    const enrolledCourses = await EnrollmentModel.find({
+      studentId: userId,
+      status: "active",
+    }).select("courseId");
+
+    const enrolledCourseIds = enrolledCourses.map(
+      (enrollment) => enrollment.courseId
+    );
+
     // Get lessons from enrolled courses
     const enrolledLessons = await LessonModel.find({
-      courseId: { $in: enrolledCourseIds }
-    }).select('_id');
-    
-    const enrolledLessonIds = enrolledLessons.map(lesson => lesson._id);
-    
+      courseId: { $in: enrolledCourseIds },
+    }).select("_id");
+
+    const enrolledLessonIds = enrolledLessons.map((lesson) => lesson._id);
+
     filter.lessonId = { $in: enrolledLessonIds };
   } else if (userRole === Role.TEACHER) {
     // Teachers can see their own materials and materials from their courses
-    const teacherCourses = await CourseModel.find({ 
-      teacherIds: userId 
-    }).select('_id');
-    
-    const teacherCourseIds = teacherCourses.map(course => course._id);
-    
+    const teacherCourses = await CourseModel.find({
+      teacherIds: userId,
+    }).select("_id");
+
+    const teacherCourseIds = teacherCourses.map((course) => course._id);
+
     // Get lessons from teacher's courses
     const teacherLessons = await LessonModel.find({
-      courseId: { $in: teacherCourseIds }
-    }).select('_id');
-    
-    const teacherLessonIds = teacherLessons.map(lesson => lesson._id);
-    
+      courseId: { $in: teacherCourseIds },
+    }).select("_id");
+
+    const teacherLessonIds = teacherLessons.map((lesson) => lesson._id);
+
     accessConditions.push(
       { uploadedBy: new mongoose.Types.ObjectId(userId) }, // Own materials
       { lessonId: { $in: teacherLessonIds } } // Materials from teacher's courses
@@ -160,7 +152,7 @@ export const getLessonMaterials = async (query: any, userId?: string, userRole?:
   // Combine search and access conditions with $and
   if (searchConditions.length > 0 || accessConditions.length > 0) {
     const combinedConditions: any[] = [];
-    
+
     // If both search and access conditions exist, combine them
     if (searchConditions.length > 0 && accessConditions.length > 0) {
       // User must match access AND (search condition OR search condition OR ...)
@@ -171,7 +163,7 @@ export const getLessonMaterials = async (query: any, userId?: string, userRole?:
     } else if (accessConditions.length > 0) {
       combinedConditions.push({ $or: accessConditions });
     }
-    
+
     if (combinedConditions.length > 0) {
       filter.$and = filter.$and || [];
       filter.$and.push(...combinedConditions);
@@ -186,73 +178,93 @@ export const getLessonMaterials = async (query: any, userId?: string, userRole?:
   const [materials, total] = await Promise.all([
     LessonMaterialModel.find(filter)
       .populate({
-        path: 'lessonId',
-        select: 'title courseId',
+        path: "lessonId",
+        select: "title courseId",
         // Giữ lại material ngay cả khi lessonId không tồn tại (null)
-        options: { lean: true }
+        options: { lean: true },
       })
       .populate({
-        path: 'uploadedBy',
-        select: 'firstName lastName email',
+        path: "uploadedBy",
+        select: "firstName lastName email",
         // Giữ lại material ngay cả khi uploadedBy không tồn tại
-        options: { lean: true }
+        options: { lean: true },
       })
       .sort({ createdAt: -1 }) // Removed textScore sort since we're not using $text anymore
       .skip(skip)
       .limit(limit)
       .lean(),
-    LessonMaterialModel.countDocuments(filter)
+    LessonMaterialModel.countDocuments(filter),
   ]);
 
   // Add access information for each material
-  const materialsWithAccess = await Promise.all(materials.map(async (material) => {
-    let hasAccess = false;
-    let accessReason = '';
+  const materialsWithAccess = await Promise.all(
+    materials.map(async (material) => {
+      let hasAccess = false;
+      let accessReason = "";
 
-    if (userRole === Role.ADMIN) {
-      hasAccess = true;
-      accessReason = 'admin';
-    } else if (userRole === Role.TEACHER) {
-      // Check if teacher uploaded this material or is instructor of the lesson's course
-      const isUploader = material.uploadedBy && material.uploadedBy._id.toString() === userId;
-      const lesson = await LessonModel.findById(material.lessonId).populate('courseId', 'teacherIds');
-      const isInstructor = lesson && (lesson.courseId as any).teacherIds.includes(new mongoose.Types.ObjectId(userId));
-      
-      if (isUploader || isInstructor) {
+      if (userRole === Role.ADMIN) {
         hasAccess = true;
-        accessReason = isUploader ? 'uploader' : 'instructor';
+        accessReason = "admin";
+      } else if (userRole === Role.TEACHER) {
+        // Check if teacher uploaded this material or is instructor of the lesson's course
+        const isUploader =
+          material.uploadedBy && material.uploadedBy._id === userId;
+        const lesson = await LessonModel.findById(material.lessonId).populate(
+          "courseId",
+          "teacherIds"
+        );
+        const isInstructor =
+          lesson &&
+          (lesson.courseId as any).teacherIds.includes(
+            new mongoose.Types.ObjectId(userId)
+          );
+
+        if (isUploader || isInstructor) {
+          hasAccess = true;
+          accessReason = isUploader ? "uploader" : "instructor";
+        }
+      } else if (userRole === Role.STUDENT) {
+        // Check if student is enrolled in the lesson's course
+        const lesson = await LessonModel.findById(material.lessonId).populate(
+          "courseId",
+          "_id"
+        );
+        const enrollment = await EnrollmentModel.findOne({
+          studentId: userId,
+          courseId: (lesson as any).courseId._id,
+          status: "active",
+        });
+
+        if (enrollment) {
+          hasAccess = true;
+          accessReason = "enrolled";
+        }
       }
-    } else if (userRole === Role.STUDENT) {
-      // Check if student is enrolled in the lesson's course
-      const lesson = await LessonModel.findById(material.lessonId).populate('courseId', '_id');
-      const enrollment = await EnrollmentModel.findOne({
-        studentId: userId,
-        courseId: (lesson as any).courseId._id,
-        status: 'active'
-      });
-      
-      if (enrollment) {
-        hasAccess = true;
-        accessReason = 'enrolled';
+
+      // Generate signed URL from key when user has access and material has a real file
+      // Skip manual materials (key starts with 'manual-materials/') as they don't have files in MinIO
+      let signedUrl = undefined;
+      if (
+        hasAccess &&
+        material.key &&
+        !material.key.startsWith("manual-materials/")
+      ) {
+        signedUrl = await getSignedUrl(
+          material.key,
+          material.originalName || ""
+        );
       }
-    }
 
-    // Generate signed URL from key when user has access and material has a real file
-    // Skip manual materials (key starts with 'manual-materials/') as they don't have files in MinIO
-    let signedUrl = undefined;
-    if (hasAccess && material.key && !material.key.startsWith('manual-materials/')) {
-      signedUrl = await getSignedUrl(material.key, 24 * 60 * 60, material.originalName || '');
-    }
+      return {
+        ...material,
+        signedUrl,
+        hasAccess,
+        accessReason,
+      };
+    })
+  );
 
-    return {
-      ...material,
-      signedUrl,
-      hasAccess,
-      accessReason
-    };
-  }));
-
-    return {
+  return {
     materials: materialsWithAccess,
     pagination: {
       page,
@@ -260,8 +272,8 @@ export const getLessonMaterials = async (query: any, userId?: string, userRole?:
       total,
       totalPages: Math.ceil(total / limit),
       hasNext: page < Math.ceil(total / limit),
-      hasPrev: page > 1
-    }
+      hasPrev: page > 1,
+    },
   };
 };
 
@@ -272,14 +284,21 @@ export const getLessonMaterials = async (query: any, userId?: string, userRole?:
  * - TEACHER: nếu là giảng viên course thì xem tất cả, nếu không chỉ xem tài liệu do mình upload.
  * - ADMIN: xem tất cả.
  */
-export const getLessonMaterialsByLesson = async (lessonId: string, userId?: string, userRole?: Role) => {
+export const getLessonMaterialsByLesson = async (
+  lessonId: string,
+  userId: mongoose.Types.ObjectId,
+  userRole?: Role
+) => {
   // Validate lessonId
   if (!mongoose.Types.ObjectId.isValid(lessonId)) {
     appAssert(false, NOT_FOUND, "Invalid lesson ID format");
   }
 
   // Check if lesson exists
-  const lesson = await LessonModel.findById(lessonId).populate('courseId', 'title teacherIds');
+  const lesson = await LessonModel.findById(lessonId).populate(
+    "courseId",
+    "title teacherIds"
+  );
   appAssert(lesson, NOT_FOUND, "Lesson not found");
 
   // Access control based on user role
@@ -288,107 +307,127 @@ export const getLessonMaterialsByLesson = async (lessonId: string, userId?: stri
     const enrollment = await EnrollmentModel.findOne({
       studentId: userId,
       courseId: (lesson.courseId as any)._id,
-      status: 'active'
+      status: "active",
     });
     appAssert(enrollment, FORBIDDEN, "Not enrolled in this course");
 
     // Students can see materials from enrolled courses
-    const materials = await LessonMaterialModel.find({ 
-      lessonId
+    const materials = await LessonMaterialModel.find({
+      lessonId,
     })
-    .populate('uploadedBy', 'firstName lastName email')
-    .sort({ createdAt: -1 })
-    .lean();
+      .populate("uploadedBy", "firstName lastName email")
+      .sort({ createdAt: -1 })
+      .lean();
 
     // Generate signed URLs for materials
-    const materialsWithUrls = await Promise.all(materials.map(async (material) => {
-      let signedUrl = undefined;
-      if (material.key) {
-        signedUrl = await getSignedUrl(material.key, 24 * 60 * 60, material.originalName || '');
-      }
-      return {
-        ...material,
-        signedUrl,
-        hasAccess: true,
-        accessReason: 'enrolled'
-      };
-    }));
+    const materialsWithUrls = await Promise.all(
+      materials.map(async (material) => {
+        let signedUrl = undefined;
+        if (material.key) {
+          signedUrl = await getSignedUrl(
+            material.key,
+            material.originalName || ""
+          );
+        }
+        return {
+          ...material,
+          signedUrl,
+          hasAccess: true,
+          accessReason: "enrolled",
+        };
+      })
+    );
 
     return materialsWithUrls;
-
   } else if (userRole === Role.TEACHER) {
     // Check if teacher is instructor of the course
-    const isInstructor = (lesson.courseId as any).teacherIds.includes(new mongoose.Types.ObjectId(userId));
+    const isInstructor = (lesson.courseId as any).teacherIds.includes(
+      new mongoose.Types.ObjectId(userId)
+    );
 
     if (isInstructor) {
       // Instructors can see all materials
       const materials = await LessonMaterialModel.find({ lessonId })
-        .populate('uploadedBy', 'firstName lastName email')
+        .populate("uploadedBy", "firstName lastName email")
         .sort({ createdAt: -1 })
         .lean();
 
       // Generate signed URLs for materials
-      const materialsWithUrls = await Promise.all(materials.map(async (material) => {
-        let signedUrl = undefined;
-        if (material.key) {
-          signedUrl = await getSignedUrl(material.key, 24 * 60 * 60, material.originalName || '');
-        }
-        return {
-          ...material,
-          signedUrl,
-          hasAccess: true,
-          accessReason: 'instructor'
-        };
-      }));
+      const materialsWithUrls = await Promise.all(
+        materials.map(async (material) => {
+          let signedUrl = undefined;
+          if (material.key) {
+            signedUrl = await getSignedUrl(
+              material.key,
+              material.originalName || ""
+            );
+          }
+          return {
+            ...material,
+            signedUrl,
+            hasAccess: true,
+            accessReason: "instructor",
+          };
+        })
+      );
 
       return materialsWithUrls;
     } else {
       // Non-instructor teachers can only see materials they uploaded
-      const materials = await LessonMaterialModel.find({ 
+      const materials = await LessonMaterialModel.find({
         lessonId,
-        uploadedBy: userId
+        uploadedBy: userId,
       })
-      .populate('uploadedBy', 'firstName lastName email')
+        .populate("uploadedBy", "firstName lastName email")
+        .sort({ createdAt: -1 })
+        .lean();
+
+      // Generate signed URLs for materials
+      const materialsWithUrls = await Promise.all(
+        materials.map(async (material) => {
+          let signedUrl = undefined;
+          if (material.key) {
+            signedUrl = await getSignedUrl(
+              material.key,
+              material.originalName || ""
+            );
+          }
+          return {
+            ...material,
+            signedUrl,
+            hasAccess: true,
+            accessReason: "uploader",
+          };
+        })
+      );
+
+      return materialsWithUrls;
+    }
+  } else if (userRole === Role.ADMIN) {
+    // Admins can see all materials
+    const materials = await LessonMaterialModel.find({ lessonId })
+      .populate("uploadedBy", "firstName lastName email")
       .sort({ createdAt: -1 })
       .lean();
 
-      // Generate signed URLs for materials
-      const materialsWithUrls = await Promise.all(materials.map(async (material) => {
+    // Generate signed URLs for materials
+    const materialsWithUrls = await Promise.all(
+      materials.map(async (material) => {
         let signedUrl = undefined;
         if (material.key) {
-          signedUrl = await getSignedUrl(material.key, 24 * 60 * 60, material.originalName || '');
+          signedUrl = await getSignedUrl(
+            material.key,
+            material.originalName || ""
+          );
         }
         return {
           ...material,
           signedUrl,
           hasAccess: true,
-          accessReason: 'uploader'
+          accessReason: "admin",
         };
-      }));
-
-      return materialsWithUrls;
-    }
-
-  } else if (userRole === Role.ADMIN) {
-    // Admins can see all materials
-    const materials = await LessonMaterialModel.find({ lessonId })
-      .populate('uploadedBy', 'firstName lastName email')
-      .sort({ createdAt: -1 })
-      .lean();
-
-    // Generate signed URLs for materials
-    const materialsWithUrls = await Promise.all(materials.map(async (material) => {
-      let signedUrl = undefined;
-      if (material.key) {
-        signedUrl = await getSignedUrl(material.key, 24 * 60 * 60, material.originalName || '');
-      }
-      return {
-        ...material,
-        signedUrl,
-        hasAccess: true,
-        accessReason: 'admin'
-      };
-    }));
+      })
+    );
 
     return materialsWithUrls;
   }
@@ -404,47 +443,62 @@ export const getLessonMaterialsByLesson = async (lessonId: string, userId?: stri
  * - STUDENT: chỉ xem nếu đã ghi danh course.
  * - ADMIN: xem tất cả.
  */
-export const getLessonMaterialById = async (id: string, userId?: string, userRole?: Role) => {
+export const getLessonMaterialById = async (
+  id: string,
+  userId: mongoose.Types.ObjectId,
+  userRole?: Role
+) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     appAssert(false, NOT_FOUND, "Invalid material ID format");
   }
-  
+
   const material = await LessonMaterialModel.findById(id)
-    .populate('lessonId', 'title courseId')
-    .populate('uploadedBy', 'firstName lastName email')
+    .populate("lessonId", "title courseId")
+    .populate("uploadedBy", "firstName lastName email")
     .lean();
-    
+
   appAssert(material, NOT_FOUND, "Material not found");
 
   // Check access permissions
   let hasAccess = false;
-  let accessReason = '';
+  let accessReason = "";
 
   if (userRole === Role.ADMIN) {
     hasAccess = true;
-    accessReason = 'admin';
+    accessReason = "admin";
   } else if (userRole === Role.TEACHER) {
     // Check if teacher uploaded this material or is instructor of the lesson's course
-    const isUploader = material.uploadedBy && material.uploadedBy._id.toString() === userId;
-    const lesson = await LessonModel.findById(material.lessonId).populate('courseId', 'teacherIds');
-    const isInstructor = lesson && (lesson.courseId as any).teacherIds.includes(new mongoose.Types.ObjectId(userId));
-    
+    const isUploader =
+      material.uploadedBy && material.uploadedBy._id === userId;
+    const lesson = await LessonModel.findById(material.lessonId).populate(
+      "courseId",
+      "teacherIds"
+    );
+    const isInstructor =
+      lesson &&
+      (lesson.courseId as any).teacherIds.includes(
+        new mongoose.Types.ObjectId(userId)
+      );
+
     if (isUploader || isInstructor) {
       hasAccess = true;
-      accessReason = isUploader ? 'uploader' : 'instructor';
+      accessReason = isUploader ? "uploader" : "instructor";
     }
   } else if (userRole === Role.STUDENT) {
     // Check if student is enrolled in the lesson's course
-    const lesson = await LessonModel.findById(material.lessonId).populate('courseId', '_id');
+    const lesson = await LessonModel.findById(material.lessonId).populate(
+      "courseId",
+      "_id"
+    );
     const enrollment = await EnrollmentModel.findOne({
       studentId: userId,
       courseId: (lesson as any).courseId._id,
-      status: 'active'
+      status: "active",
     });
-    
+
     if (enrollment) {
       hasAccess = true;
-      accessReason = 'enrolled';
+      accessReason = "enrolled";
     }
   }
 
@@ -454,23 +508,26 @@ export const getLessonMaterialById = async (id: string, userId?: string, userRol
       ...material,
       signedUrl: undefined, // Hide signed URL
       hasAccess: false,
-      accessReason: 'not_enrolled',
-      message: 'You need to enroll in this course to access the material'
+      accessReason: "not_enrolled",
+      message: "You need to enroll in this course to access the material",
     };
   }
 
   // Generate signed URL from key when user has access and material has a real file
   // Skip manual materials (key starts with 'manual-materials/') as they don't have files in MinIO
   let signedUrl = undefined;
-  if (material.key && !material.key.startsWith('manual-materials/')) {
-    signedUrl = await getSignedUrl(material.key, 24 * 60 * 60, material.originalName || '');
+  if (material.key && !material.key.startsWith("manual-materials/")) {
+    signedUrl = await getSignedUrl(
+      material.key,
+      material.originalName || ""
+    );
   }
 
   return {
     ...material,
     signedUrl,
     hasAccess: true,
-    accessReason
+    accessReason,
   };
 };
 
@@ -481,9 +538,16 @@ export const getLessonMaterialById = async (id: string, userId?: string, userRol
  * - TEACHER phải là giảng viên của course chứa lesson.
  * - Tiêu đề không trùng trong cùng một lesson.
  */
-export const createLessonMaterial = async (data: CreateLessonMaterialParams, userId: string, userRole: Role) => {
+export const createLessonMaterial = async (
+  data: CreateLessonMaterialParams,
+  userId: mongoose.Types.ObjectId,
+  userRole: Role
+) => {
   // Validate lesson exists
-  const lesson = await LessonModel.findById(data.lessonId).populate('courseId', 'teacherIds');
+  const lesson = await LessonModel.findById(data.lessonId).populate(
+    "courseId",
+    "teacherIds"
+  );
   appAssert(lesson, NOT_FOUND, "Lesson not found");
 
   // Check if user has permission to add materials to this lesson
@@ -491,22 +555,38 @@ export const createLessonMaterial = async (data: CreateLessonMaterialParams, use
     appAssert(false, FORBIDDEN, "Students cannot create lesson materials");
   } else if (userRole === Role.TEACHER) {
     // Check if teacher is instructor of the course
-    const isInstructor = (lesson.courseId as any).teacherIds.includes(new mongoose.Types.ObjectId(userId));
-    appAssert(isInstructor, FORBIDDEN, "Only course instructors can add materials");
+    const isInstructor = (lesson.courseId as any).teacherIds.includes(
+      new mongoose.Types.ObjectId(userId)
+    );
+    appAssert(
+      isInstructor,
+      FORBIDDEN,
+      "Only course instructors can add materials"
+    );
   }
 
   // Check if material with same title exists in the same lesson
-  const existingMaterial = await LessonMaterialModel.exists({ 
-    title: data.title, 
-    lessonId: data.lessonId 
+  const existingMaterial = await LessonMaterialModel.exists({
+    title: data.title,
+    lessonId: data.lessonId,
   });
-  appAssert(!existingMaterial, CONFLICT, "Material with this title already exists in this lesson");
+  appAssert(
+    !existingMaterial,
+    CONFLICT,
+    "Material with this title already exists in this lesson"
+  );
 
   // Generate a unique key if not provided
   // Format: manual-materials/{lessonId}/{uuid} if auto-generated
   // This ensures key uniqueness while distinguishing from uploaded files
-  const dataWithKey = data as CreateLessonMaterialParams & { key?: string; originalName?: string; mimeType?: string; size?: number };
-  const materialKey = dataWithKey.key || `manual-materials/${data.lessonId}/${v4()}`;
+  const dataWithKey = data as CreateLessonMaterialParams & {
+    key?: string;
+    originalName?: string;
+    mimeType?: string;
+    size?: number;
+  };
+  const materialKey =
+    dataWithKey.key || `manual-materials/${data.lessonId}/${v4()}`;
 
   // Prepare material data with all provided fields
   const materialData: any = {
@@ -514,7 +594,7 @@ export const createLessonMaterial = async (data: CreateLessonMaterialParams, use
     title: data.title,
     note: data.note,
     key: materialKey,
-    uploadedBy: new mongoose.Types.ObjectId(userId)
+    uploadedBy: new mongoose.Types.ObjectId(userId),
   };
 
   // Add optional fields if provided
@@ -530,10 +610,10 @@ export const createLessonMaterial = async (data: CreateLessonMaterialParams, use
 
   // Create material with all provided fields
   const newMaterial = await LessonMaterialModel.create(materialData);
-  
+
   return await LessonMaterialModel.findById(newMaterial._id)
-    .populate('lessonId', 'title courseId')
-    .populate('uploadedBy', 'firstName lastName email')
+    .populate("lessonId", "title courseId")
+    .populate("uploadedBy", "firstName lastName email")
     .lean();
 };
 
@@ -544,7 +624,12 @@ export const createLessonMaterial = async (data: CreateLessonMaterialParams, use
  * - TEACHER: phải là người upload hoặc giảng viên course của lesson.
  * - Nếu đổi title, phải không trùng trong cùng lesson.
  */
-export const updateLessonMaterial = async (id: string, data: Partial<CreateLessonMaterialParams>, userId: string, userRole: Role) => {
+export const updateLessonMaterial = async (
+  id: string,
+  data: Partial<CreateLessonMaterialParams>,
+  userId: mongoose.Types.ObjectId,
+  userRole: Role
+) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     appAssert(false, NOT_FOUND, "Invalid material ID format");
   }
@@ -557,39 +642,56 @@ export const updateLessonMaterial = async (id: string, data: Partial<CreateLesso
     appAssert(false, FORBIDDEN, "Students cannot update lesson materials");
   } else if (userRole === Role.TEACHER) {
     // Check if teacher uploaded this material or is instructor of the lesson's course
-    const isUploader = material.uploadedBy && material.uploadedBy.toString() === userId;
-    const lesson = await LessonModel.findById(material.lessonId).populate('courseId', 'teacherIds');
-    const isInstructor = lesson && (lesson.courseId as any).teacherIds.includes(new mongoose.Types.ObjectId(userId));
-    
-    appAssert(isUploader || isInstructor, FORBIDDEN, "Not authorized to update this material");
+    const isUploader =
+      material.uploadedBy && material.uploadedBy === userId;
+    const lesson = await LessonModel.findById(material.lessonId).populate(
+      "courseId",
+      "teacherIds"
+    );
+    const isInstructor =
+      lesson &&
+      (lesson.courseId as any).teacherIds.includes(
+        new mongoose.Types.ObjectId(userId)
+      );
+
+    appAssert(
+      isUploader || isInstructor,
+      FORBIDDEN,
+      "Not authorized to update this material"
+    );
   }
 
   // If updating title, check for conflicts
   if (data.title && data.title !== material.title) {
-    const existingMaterial = await LessonMaterialModel.exists({ 
-      title: data.title, 
+    const existingMaterial = await LessonMaterialModel.exists({
+      title: data.title,
       lessonId: material.lessonId,
-      _id: { $ne: id }
+      _id: { $ne: id },
     });
-    appAssert(!existingMaterial, CONFLICT, "Material with this title already exists in this lesson");
+    appAssert(
+      !existingMaterial,
+      CONFLICT,
+      "Material with this title already exists in this lesson"
+    );
   }
 
   // Data is already validated in controller, no need to parse again
   const updateData: any = {};
   if (data.title !== undefined) updateData.title = data.title;
   if (data.note !== undefined) updateData.note = data.note;
-  if (data.originalName !== undefined) updateData.originalName = data.originalName;
+  if (data.originalName !== undefined)
+    updateData.originalName = data.originalName;
   if (data.mimeType !== undefined) updateData.mimeType = data.mimeType;
   if (data.size !== undefined) updateData.size = data.size;
   if (data.key !== undefined) updateData.key = data.key;
 
   const updatedMaterial = await LessonMaterialModel.findByIdAndUpdate(
-    id, 
-    updateData, 
+    id,
+    updateData,
     { new: true }
   )
-    .populate('lessonId', 'title courseId')
-    .populate('uploadedBy', 'firstName lastName email')
+    .populate("lessonId", "title courseId")
+    .populate("uploadedBy", "firstName lastName email")
     .lean();
 
   return updatedMaterial;
@@ -600,7 +702,11 @@ export const updateLessonMaterial = async (id: string, data: Partial<CreateLesso
  * - STUDENT không được phép.
  * - TEACHER: phải là người upload hoặc giảng viên course của lesson.
  */
-export const deleteLessonMaterial = async (id: string, userId: string, userRole: Role) => {
+export const deleteLessonMaterial = async (
+  id: string,
+  userId: mongoose.Types.ObjectId,
+  userRole: Role
+) => {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     appAssert(false, NOT_FOUND, "Invalid material ID format");
   }
@@ -613,11 +719,23 @@ export const deleteLessonMaterial = async (id: string, userId: string, userRole:
     appAssert(false, FORBIDDEN, "Students cannot delete lesson materials");
   } else if (userRole === Role.TEACHER) {
     // Check if teacher uploaded this material or is instructor of the lesson's course
-    const isUploader = material.uploadedBy && material.uploadedBy.toString() === userId;
-    const lesson = await LessonModel.findById(material.lessonId).populate('courseId', 'teacherIds');
-    const isInstructor = lesson && (lesson.courseId as any).teacherIds.includes(new mongoose.Types.ObjectId(userId));
-    
-    appAssert(isUploader || isInstructor, FORBIDDEN, "Not authorized to delete this material");
+    const isUploader =
+      material.uploadedBy && material.uploadedBy === userId;
+    const lesson = await LessonModel.findById(material.lessonId).populate(
+      "courseId",
+      "teacherIds"
+    );
+    const isInstructor =
+      lesson &&
+      (lesson.courseId as any).teacherIds.includes(
+        new mongoose.Types.ObjectId(userId)
+      );
+
+    appAssert(
+      isUploader || isInstructor,
+      FORBIDDEN,
+      "Not authorized to delete this material"
+    );
   }
 
   const deletedMaterial = await LessonMaterialModel.findByIdAndDelete(id);
@@ -633,14 +751,17 @@ export const deleteLessonMaterial = async (id: string, userId: string, userRole:
  * - Khi upload multiple files, sẽ tự động tạo title từ tên file nếu không có.
  */
 export const uploadLessonMaterial = async (
-  data: any, 
-  file: Express.Multer.File | Express.Multer.File[] | undefined, 
-  userId: string, 
+  data: any,
+  file: Express.Multer.File | Express.Multer.File[] | undefined,
+  userId: mongoose.Types.ObjectId,
   userRole: Role
 ) => {
   // Data is already validated in controller, no need to parse again
   // Validate lesson exists
-  const lesson = await LessonModel.findById(data.lessonId).populate('courseId', 'teacherIds');
+  const lesson = await LessonModel.findById(data.lessonId).populate(
+    "courseId",
+    "teacherIds"
+  );
   appAssert(lesson, NOT_FOUND, "Lesson not found");
 
   // Check if user has permission to add materials to this lesson
@@ -648,8 +769,14 @@ export const uploadLessonMaterial = async (
     appAssert(false, FORBIDDEN, "Students cannot upload lesson materials");
   } else if (userRole === Role.TEACHER) {
     // Check if teacher is instructor of the course
-    const isInstructor = (lesson.courseId as any).teacherIds.includes(new mongoose.Types.ObjectId(userId));
-    appAssert(isInstructor, FORBIDDEN, "Only course instructors can upload materials");
+    const isInstructor = (lesson.courseId as any).teacherIds.includes(
+      new mongoose.Types.ObjectId(userId)
+    );
+    appAssert(
+      isInstructor,
+      FORBIDDEN,
+      "Only course instructors can upload materials"
+    );
   }
 
   // Validate files
@@ -659,13 +786,15 @@ export const uploadLessonMaterial = async (
 
   // Get courseId from lesson to construct proper prefix
   const courseId = (lesson.courseId as any)._id || lesson.courseId;
-  const courseIdObj = courseId instanceof mongoose.Types.ObjectId 
-    ? courseId 
-    : new mongoose.Types.ObjectId(courseId.toString());
-  const lessonIdObj = lesson._id instanceof mongoose.Types.ObjectId 
-    ? lesson._id 
-    : new mongoose.Types.ObjectId((lesson._id as any).toString());
-  
+  const courseIdObj =
+    courseId instanceof mongoose.Types.ObjectId
+      ? courseId
+      : new mongoose.Types.ObjectId(courseId.toString());
+  const lessonIdObj =
+    lesson._id instanceof mongoose.Types.ObjectId
+      ? lesson._id
+      : new mongoose.Types.ObjectId((lesson._id as any).toString());
+
   // Create prefix string for this specific lesson
   const uploadPrefix = prefixLessonMaterial(courseIdObj, lessonIdObj);
 
@@ -688,16 +817,21 @@ export const uploadLessonMaterial = async (
     const materials = await Promise.all(
       uploadedResults.map(async (uploadResult, index) => {
         // Use provided title or fallback to original filename
-        const materialTitle = data.title || uploadResult.originalName || `Material ${index + 1}`;
-        
+        const materialTitle =
+          data.title || uploadResult.originalName || `Material ${index + 1}`;
+
         // Check if material with same title exists (only if title is provided)
         if (data.title && index === 0) {
-          const existingMaterial = await LessonMaterialModel.exists({ 
-            title: materialTitle, 
-            lessonId: data.lessonId 
+          const existingMaterial = await LessonMaterialModel.exists({
+            title: materialTitle,
+            lessonId: data.lessonId,
           });
           if (existingMaterial) {
-            appAssert(false, CONFLICT, "Material with this title already exists in this lesson");
+            appAssert(
+              false,
+              CONFLICT,
+              "Material with this title already exists in this lesson"
+            );
           }
         }
 
@@ -708,31 +842,34 @@ export const uploadLessonMaterial = async (
           originalName: uploadResult.originalName,
           mimeType: uploadResult.mimeType,
           size: uploadResult.size,
-          uploadedBy: new mongoose.Types.ObjectId(userId)
+          uploadedBy: new mongoose.Types.ObjectId(userId),
         });
       })
     );
 
     // Return populated materials
-    const materialIds = materials.map(m => m._id);
+    const materialIds = materials.map((m) => m._id);
     return await LessonMaterialModel.find({ _id: { $in: materialIds } })
-      .populate('lessonId', 'title courseId')
-      .populate('uploadedBy', 'firstName lastName email')
+      .populate("lessonId", "title courseId")
+      .populate("uploadedBy", "firstName lastName email")
       .sort({ createdAt: 1 })
       .lean();
-
   } else {
     // Case: Single file upload
     // Check if material with same title exists in the same lesson
-    const existingMaterial = await LessonMaterialModel.exists({ 
-      title: data.title, 
-      lessonId: data.lessonId 
+    const existingMaterial = await LessonMaterialModel.exists({
+      title: data.title,
+      lessonId: data.lessonId,
     });
-    appAssert(!existingMaterial, CONFLICT, "Material with this title already exists in this lesson");
+    appAssert(
+      !existingMaterial,
+      CONFLICT,
+      "Material with this title already exists in this lesson"
+    );
 
     // Upload file with prefix string
     const uploadResult = await uploadFile(file, uploadPrefix);
-    
+
     // Create material with file information (only store key, originalName, mimeType, size)
     const newMaterial = await LessonMaterialModel.create({
       lessonId: new mongoose.Types.ObjectId(data.lessonId),
@@ -741,12 +878,12 @@ export const uploadLessonMaterial = async (
       originalName: uploadResult.originalName,
       mimeType: uploadResult.mimeType,
       size: file.size,
-      uploadedBy: new mongoose.Types.ObjectId(userId)
+      uploadedBy: new mongoose.Types.ObjectId(userId),
     });
-    
+
     return await LessonMaterialModel.findById(newMaterial._id)
-      .populate('lessonId', 'title courseId')
-      .populate('uploadedBy', 'firstName lastName email')
+      .populate("lessonId", "title courseId")
+      .populate("uploadedBy", "firstName lastName email")
       .lean();
   }
 };
@@ -762,16 +899,16 @@ export const getMaterialForDownload = async (id: string) => {
   }
 
   const material = await LessonMaterialModel.findById(id)
-    .populate('lessonId', 'title courseId')
-    .populate('uploadedBy', 'firstName lastName email')
+    .populate("lessonId", "title courseId")
+    .populate("uploadedBy", "firstName lastName email")
     .lean();
-  
+
   appAssert(material, NOT_FOUND, "Material not found");
   return material;
 };
 
 //Delete file of material
-/** 
+/**
  * Yêu cầu nghiệp vụ: Xóa file của tài liệu bởi admin và giảng viên dạy bộ môn đó
  * - Xóa file trên MinIO (nếu có key)
  * - Xóa các thông tin liên quan đến file trong DB (key, originalName, mimeType, size)
@@ -779,7 +916,7 @@ export const getMaterialForDownload = async (id: string) => {
  */
 export const deleteFileOfMaterial = async (
   materialId: string,
-  userId: string,
+  userId: mongoose.Types.ObjectId,
   userRole: Role
 ) => {
   // ✅ Validate material ID
@@ -794,8 +931,12 @@ export const deleteFileOfMaterial = async (
   appAssert(material, NOT_FOUND, "Material not found");
 
   // ✅ Kiểm tra material có file không
-  if (!material.key || material.key.startsWith('manual-materials/')) {
-    appAssert(false, BAD_REQUEST, "This material does not have a file to delete");
+  if (!material.key || material.key.startsWith("manual-materials/")) {
+    appAssert(
+      false,
+      BAD_REQUEST,
+      "This material does not have a file to delete"
+    );
   }
 
   // ✅ Lấy thông tin lesson và kiểm tra quyền
@@ -809,10 +950,13 @@ export const deleteFileOfMaterial = async (
     appAssert(false, FORBIDDEN, "Students cannot delete lesson material files");
   } else if (userRole === Role.TEACHER) {
     // Check if teacher uploaded this material or is instructor of the lesson's course
-    const isUploader = material.uploadedBy && material.uploadedBy.toString() === userId;
-    const isInstructor = lesson && (lesson.courseId as any).teacherIds.some(
-      (t: mongoose.Types.ObjectId) => t.toString() === userId
-    );
+    const isUploader =
+      material.uploadedBy && material.uploadedBy === userId;
+    const isInstructor =
+      lesson &&
+      (lesson.courseId as any).teacherIds.some(
+        (t: mongoose.Types.ObjectId) => t === userId
+      );
     appAssert(
       isUploader || isInstructor,
       FORBIDDEN,
@@ -839,18 +983,18 @@ export const deleteFileOfMaterial = async (
         key: "",
         originalName: "",
         mimeType: "",
-        size: ""
-      }
+        size: "",
+      },
     },
     { new: true }
   )
-    .populate('lessonId', 'title courseId')
-    .populate('uploadedBy', 'firstName lastName email')
+    .populate("lessonId", "title courseId")
+    .populate("uploadedBy", "firstName lastName email")
     .lean();
 
   return {
     material: updatedMaterial,
     deletedKey: fileKey,
-    message: "File deleted successfully"
+    message: "File deleted successfully",
   };
 };

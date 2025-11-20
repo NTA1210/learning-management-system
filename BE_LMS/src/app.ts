@@ -40,11 +40,13 @@ import {
     specialistPublicRoutes,
     forumProtectedRoutes,
     forumPublicRoutes,
-    subjectRouter,
+    subjectRoutes,
     quizRoutes,
+    notificationRoutes,
     classRoutes,
     scheduleRoutes,
 } from "./routes";
+import quizAttemptRoutes from "./routes/quizAttempt.route";
 
 export const createApp = () => {
     const app = express();
@@ -82,27 +84,30 @@ export const createApp = () => {
     app.use("/courses", courseRoutes);
     app.use("/assignments", assignmentRoutes);
     app.use("/submissions", submissionRoutes);
-    app.use("/lesson", lessonRoutes);
-    app.use("/lesson-material", lessonMaterialRoutes);
+    app.use("/lessons", lessonRoutes);
+    app.use("/lesson-materials", lessonMaterialRoutes);
     app.use("/lesson-progress", lessonProgressRoutes);
     app.use("/majors", majorPublicRoutes);
     app.use("/specialists", specialistPublicRoutes);
     app.use("/forums", forumPublicRoutes);
     app.use("/classes", classRoutes);
     app.use("/schedules", scheduleRoutes);
-
     //protected routes
     app.use("/users", authenticate, userRoutes);
     app.use("/sessions", authenticate, authorize(Role.ADMIN), sessionRoutes);
     app.use("/enrollments", authenticate, enrollmentRoutes);
     app.use("/feedbacks", feedbackRoutes);
-    app.use("/course-invites", courseInviteRoutes);
+    app.use("/course-invites", authenticate, courseInviteRoutes);
     app.use("/quiz-questions", quizQuestionRoutes);
     app.use("/majors", authenticate, majorProtectedRoutes);
     app.use("/specialists", authenticate, specialistProtectedRoutes);
     app.use("/forums", authenticate, forumProtectedRoutes);
-    app.use("/subjects", authenticate, subjectRouter);
+    app.use("/subjects", authenticate, subjectRoutes);
     app.use("/quizzes", quizRoutes);
+    app.use("/notifications", authenticate, notificationRoutes);
+    app.use("/quiz-attempts", authenticate, quizAttemptRoutes);
+
+    //error handler
     app.use(errorHandler);
 
     return app;

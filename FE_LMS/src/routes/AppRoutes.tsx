@@ -18,6 +18,7 @@ import {DashboardPage ,
       QuizManagementPage,
       QuizCoursePage,
       FeedbackPage,
+      FeedbackListPage,
     } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -145,6 +146,11 @@ function AppRoutes() {
         <Route path="/help/feedback" element={
           <ProtectedRoute>
             <FeedbackPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/help/feedback-list" element={
+          <ProtectedRoute>
+            <FeedbackListPage />
           </ProtectedRoute>
         } />
 

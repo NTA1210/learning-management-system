@@ -1,4 +1,5 @@
-import { NOT_FOUND, BAD_REQUEST, CONFLICT, UNAUTHORIZED } from "../constants/http";
+import { Types } from "mongoose";
+import { NOT_FOUND, BAD_REQUEST, CONFLICT, UNAUTHORIZED, FORBIDDEN } from "../constants/http";
 import EnrollmentModel from "../models/enrollment.model";
 import CourseModel from "../models/course.model";
 import UserModel from "../models/user.model";
@@ -6,6 +7,9 @@ import appAssert from "../utils/appAssert";
 import { compareValue } from "../utils/bcrypt";
 import { CourseStatus } from "../types/course.type";
 import { EnrollmentStatus, EnrollmentRole, EnrollmentMethod } from "@/types/enrollment.type";
+import { Role } from "../types/user.type";
+
+type ObjectIdLike = Types.ObjectId | string;
 
 // Ensure models are registered
 void CourseModel;
@@ -50,7 +54,7 @@ export const getEnrollmentById = async (enrollmentId: string) => {
  * - pagination: { total, page, limit, totalPages }
  */
 export const getStudentEnrollments = async (filters: {
-  studentId: string;
+  studentId: ObjectIdLike;
   status?: string;
   page?: number;
   limit?: number;
@@ -86,6 +90,8 @@ export const getStudentEnrollments = async (filters: {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+      hasNext: skip + enrollments.length < total,
+      hasPrev: page > 1,
     },
   };
 };
@@ -151,18 +157,23 @@ export const getCourseEnrollments = async (filters: {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+      hasNext: skip + enrollments.length < total,
+      hasPrev: page > 1,
     },
   };
 };
 
 /**
  * Yêu cầu nghiệp vụ:
- * - Lấy toàn bộ danh sách enrollment trong hệ thống (dành cho admin)
+ * - Lấy toàn bộ danh sách enrollment trong hệ thống
  * - Hỗ trợ filter đa điều kiện: status, courseId, studentId
  * - Hỗ trợ filter theo khoảng thời gian tạo (from, to)
  * - Hỗ trợ phân trang (page, limit)
  * - Sắp xếp theo thời gian tạo mới nhất (createdAt desc)
  * - Populate cả thông tin student và course
+ * - Phân quyền:
+ *   + Admin xem được tất cả enrollment
+ *   + Teacher chỉ xem enrollment thuộc khóa học mình dạy
  * 
  * Input:
  * - status (string, optional)
@@ -170,31 +181,60 @@ export const getCourseEnrollments = async (filters: {
  * - studentId (string, optional)
  * - page (number, default: 1)
  * - limit (number, default: 10)
+ * - viewer: { role, userId } để xử lý phân quyền
  * 
  * Output:
- * - enrollments: Danh sách tất cả enrollment theo filter
+ * - enrollments: Danh sách enrollment theo filter & quyền
  * - pagination: { total, page, limit, totalPages }
  */
-export const getAllEnrollments = async (filters: {
-  status?: string;
-  courseId?: string;
-  studentId?: string;
-  page?: number;
-  limit?: number;
-  from?: Date;
-  to?: Date;
-}) => {
+export const getAllEnrollments = async (
+  filters: {
+    status?: string;
+    courseId?: string;
+    studentId?: string;
+    page?: number;
+    limit?: number;
+    from?: Date;
+    to?: Date;
+  },
+  viewer?: {
+    role?: Role;
+    userId?: ObjectIdLike;
+  }
+) => {
   const { status, courseId, studentId, page = 1, limit = 10, from, to } = filters;
   const skip = (page - 1) * limit;
 
   const query: any = {};
   if (status) query.status = status;
-  if (courseId) query.courseId = courseId;
   if (studentId) query.studentId = studentId;
   if (from || to) {
     query.createdAt = {};
     if (from) query.createdAt.$gte = from;
     if (to) query.createdAt.$lte = to;
+  }
+
+  const viewerRole = viewer?.role;
+  const viewerId = viewer?.userId;
+
+  if (viewerRole && viewerRole !== Role.ADMIN && viewerRole !== Role.TEACHER) {
+    appAssert(false, FORBIDDEN, "You are not allowed to view enrollments");
+  }
+
+  if (viewerRole === Role.TEACHER) {
+    appAssert(viewerId, FORBIDDEN, "Unauthorized");
+    const teacherCourses = await CourseModel.find({ teacherIds: viewerId }).select("_id").lean();
+    const allowedCourseIds = teacherCourses.map((course) => course._id.toString());
+
+    if (courseId) {
+      const canAccess = allowedCourseIds.includes(courseId.toString());
+      appAssert(canAccess, FORBIDDEN, "You can only view enrollments for your own courses");
+      query.courseId = courseId;
+    } else {
+      query.courseId = { $in: allowedCourseIds };
+    }
+  } else if (courseId) {
+    query.courseId = courseId;
   }
 
   const [enrollments, total] = await Promise.all([
@@ -214,6 +254,8 @@ export const getAllEnrollments = async (filters: {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
+      hasNext: skip + enrollments.length < total,
+      hasPrev: page > 1,
     },
   };
 };
@@ -250,7 +292,7 @@ export const getAllEnrollments = async (filters: {
  * Output: Enrollment mới được tạo (hoặc cập nhật) với thông tin student và course đã populate
  */
 export const createEnrollment = async (data: {
-  studentId: string;
+  studentId: ObjectIdLike;
   courseId: string;
   status?: EnrollmentStatus.PENDING | EnrollmentStatus.APPROVED;
   role?: EnrollmentRole;
@@ -542,7 +584,7 @@ export const updateEnrollment = async (
  */
 export const updateSelfEnrollment = async (
   enrollmentId: string,
-  studentId: string,
+  studentId: ObjectIdLike,
   data: {
     status?: EnrollmentStatus.CANCELLED;
   }

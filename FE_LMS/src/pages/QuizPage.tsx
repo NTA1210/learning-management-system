@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
@@ -49,7 +48,6 @@ interface Quiz {
 }
 
 const QuizPage: React.FC = () => {
-  const { darkMode } = useTheme();
   const { user } = useAuth();
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -288,15 +286,15 @@ const QuizPage: React.FC = () => {
   const getQuizStatus = (quiz: Quiz) => {
     const now = new Date();
     if (quiz.startDate && new Date(quiz.startDate) > now) {
-      return { text: "Not Started", color: darkMode ? "#9ca3af" : "#6b7280", bg: darkMode ? "rgba(156, 163, 175, 0.2)" : "rgba(156, 163, 175, 0.1)" };
+      return { text: "Not Started", color: "var(--status-neutral-text)", bg: "var(--status-neutral-bg)" };
     }
     if (quiz.dueDate && new Date(quiz.dueDate) < now) {
-      return { text: "Closed", color: darkMode ? "#fca5a5" : "#dc2626", bg: darkMode ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.1)" };
+      return { text: "Closed", color: "var(--status-closed-text)", bg: "var(--status-closed-bg)" };
     }
     if (quiz.status === "published") {
-      return { text: "Available", color: darkMode ? "#86efac" : "#16a34a", bg: darkMode ? "rgba(34, 197, 94, 0.2)" : "rgba(34, 197, 94, 0.1)" };
+      return { text: "Available", color: "var(--status-available-text)", bg: "var(--status-available-bg)" };
     }
-    return { text: quiz.status, color: darkMode ? "#9ca3af" : "#6b7280", bg: darkMode ? "rgba(156, 163, 175, 0.2)" : "rgba(156, 163, 175, 0.1)" };
+    return { text: quiz.status, color: "var(--status-neutral-text)", bg: "var(--status-neutral-bg)" };
   };
 
   const handleCourseClick = (courseId: string) => {
@@ -311,8 +309,8 @@ const QuizPage: React.FC = () => {
     <div
       className="flex h-screen overflow-hidden relative"
       style={{
-        backgroundColor: darkMode ? "#1a202c" : "#f8fafc",
-        color: darkMode ? "#ffffff" : "#1e293b",
+        backgroundColor: "var(--page-bg)",
+        color: "var(--page-text)",
       }}
     >
       <Navbar />
@@ -327,7 +325,7 @@ const QuizPage: React.FC = () => {
                 <label
                   htmlFor="quiz-title"
                   className="block text-sm font-medium mb-2"
-                  style={{ color: darkMode ? "#d1d5db" : "#6b7280" }}
+                  style={{ color: "var(--muted-text)" }}
                 >
                   Quiz Title
                 </label>
@@ -339,19 +337,19 @@ const QuizPage: React.FC = () => {
                   onChange={(e) => setQuizTitle(e.target.value)}
                   className="w-full max-w-md px-4 py-2 rounded-lg border transition-colors duration-300"
                   style={{
-                    backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                    borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
-                    color: darkMode ? "#ffffff" : "#000000",
+                    backgroundColor: "var(--input-bg)",
+                    borderColor: "var(--input-border)",
+                    color: "var(--input-text)",
                   }}
                 />
               </div>
               <h1
                 className="text-3xl font-bold mb-2"
-                style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
+                style={{ color: "var(--heading-text)" }}
               >
                 {quizTitle || "Quizzes"}
               </h1>
-              <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+              <p style={{ color: "var(--muted-text)" }}>
                 Select a course to view available quizzes
               </p>
             </div>
@@ -361,8 +359,8 @@ const QuizPage: React.FC = () => {
               <div
                 className="p-4 rounded-lg mb-6 flex items-center"
                 style={{
-                  backgroundColor: darkMode ? "rgba(239, 68, 68, 0.1)" : "#fee2e2",
-                  color: darkMode ? "#fca5a5" : "#dc2626",
+                  backgroundColor: "var(--error-bg)",
+                  color: "var(--error-text)",
                 }}
               >
                 <XCircle className="w-5 h-5 mr-3" />
@@ -375,7 +373,7 @@ const QuizPage: React.FC = () => {
               <div className="flex justify-center items-center py-12">
                 <div
                   className="animate-spin rounded-full h-12 w-12 border-b-2"
-                  style={{ borderColor: darkMode ? "#6366f1" : "#4f46e5" }}
+                  style={{ borderColor: "var(--spinner-border)" }}
                 ></div>
               </div>
             ) : (
@@ -384,13 +382,13 @@ const QuizPage: React.FC = () => {
                 <div>
                   <h2
                     className="text-xl font-semibold mb-4"
-                    style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
+                    style={{ color: "var(--heading-text)" }}
                   >
                     My Courses
                   </h2>
                   {enrollments.length === 0 ? (
                     <div className="text-center py-12">
-                      <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                      <p style={{ color: "var(--muted-text)" }}>
                         No courses available. Please enroll in a course first.
                       </p>
                     </div>
@@ -408,31 +406,23 @@ const QuizPage: React.FC = () => {
                             onClick={() => handleCourseClick(courseId)}
                             className="rounded-lg shadow-md overflow-hidden transition-all duration-200 hover:shadow-lg cursor-pointer"
                             style={{
-                              backgroundColor: isSelected
-                                ? darkMode
-                                  ? "rgba(99, 102, 241, 0.3)"
-                                  : "rgba(99, 102, 241, 0.1)"
-                                : darkMode
-                                ? "rgba(31, 41, 55, 0.8)"
-                                : "rgba(255, 255, 255, 0.9)",
+                              backgroundColor: isSelected ? "var(--card-selected-bg)" : "var(--card-surface)",
                               border: isSelected
-                                ? `2px solid ${darkMode ? "#6366f1" : "#4f46e5"}`
-                                : darkMode
-                                ? "1px solid rgba(75, 85, 99, 0.3)"
-                                : "1px solid rgba(229, 231, 235, 0.5)",
+                                ? `2px solid var(--card-selected-border)`
+                                : `1px solid var(--card-border)`,
                             }}
                           >
                             <div className="p-4">
                               <h3
                                 className="text-lg font-semibold mb-1"
-                                style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
+                                style={{ color: "var(--heading-text)" }}
                               >
                                 {course ? course.title : `Course ${courseId.substring(0, 8)}...`}
                               </h3>
                               {course?.code && (
                                 <p
                                   className="text-sm mb-2"
-                                  style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
+                                  style={{ color: "var(--muted-text)" }}
                                 >
                                   Code: {course.code}
                                 </p>
@@ -440,7 +430,7 @@ const QuizPage: React.FC = () => {
                               {course?.description && (
                                 <p
                                   className="text-sm line-clamp-2"
-                                  style={{ color: darkMode ? "#d1d5db" : "#6b7280" }}
+                                  style={{ color: "var(--muted-text)" }}
                                 >
                                   {course.description}
                                 </p>
@@ -457,19 +447,19 @@ const QuizPage: React.FC = () => {
                 <div>
                   <h2
                     className="text-xl font-semibold mb-4"
-                    style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
+                    style={{ color: "var(--heading-text)" }}
                   >
                     {selectedCourseId ? "Quizzes" : "Select a course to view quizzes"}
                   </h2>
                   {!selectedCourseId ? (
                     <div className="text-center py-12">
-                      <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                      <p style={{ color: "var(--muted-text)" }}>
                         Click on a course to view its quizzes
                       </p>
                     </div>
                   ) : quizzes.length === 0 ? (
                     <div className="text-center py-12">
-                      <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                      <p style={{ color: "var(--muted-text)" }}>
                         No quizzes available for this course.
                       </p>
                     </div>
@@ -482,15 +472,15 @@ const QuizPage: React.FC = () => {
                             key={quiz._id}
                             className="rounded-lg shadow-md overflow-hidden transition-all duration-200 hover:shadow-lg"
                             style={{
-                              backgroundColor: darkMode ? "rgba(31, 41, 55, 0.8)" : "rgba(255, 255, 255, 0.9)",
-                              border: darkMode ? "1px solid rgba(75, 85, 99, 0.3)" : "1px solid rgba(229, 231, 235, 0.5)",
+                              backgroundColor: "var(--card-surface)",
+                              border: `1px solid var(--card-border)`,
                             }}
                           >
                             <div className="p-6">
                               {/* Quiz Title */}
                               <h3
                                 className="text-xl font-semibold mb-2"
-                                style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
+                                style={{ color: "var(--heading-text)" }}
                               >
                                 {quiz.title}
                               </h3>
@@ -498,27 +488,27 @@ const QuizPage: React.FC = () => {
                               {/* Quiz Description */}
                               <p
                                 className="text-sm mb-4 line-clamp-2"
-                                style={{ color: darkMode ? "#d1d5db" : "#6b7280" }}
+                                style={{ color: "var(--muted-text)" }}
                               >
                                 {quiz.description}
                               </p>
 
                               {/* Quiz Details */}
                               <div className="space-y-2 mb-4">
-                                <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                                <div className="flex items-center text-sm" style={{ color: "var(--muted-text)" }}>
                                   <FileText className="w-4 h-4 mr-2" />
                                   {quiz.totalQuestions} questions
                                 </div>
-                                <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                                <div className="flex items-center text-sm" style={{ color: "var(--muted-text)" }}>
                                   <Clock className="w-4 h-4 mr-2" />
                                   Duration: {quiz.duration} minutes
                                 </div>
-                                <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                                <div className="flex items-center text-sm" style={{ color: "var(--muted-text)" }}>
                                   <CheckCircle className="w-4 h-4 mr-2" />
                                   Max Score: {quiz.maxScore} points
                                 </div>
                                 {quiz.dueDate && (
-                                  <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                                  <div className="flex items-center text-sm" style={{ color: "var(--muted-text)" }}>
                                     <Calendar className="w-4 h-4 mr-2" />
                                     Due: {formatDate(quiz.dueDate)}
                                   </div>
@@ -526,7 +516,7 @@ const QuizPage: React.FC = () => {
                               </div>
 
                               {/* Status Badge */}
-                              <div className="flex items-center justify-between pt-4 mt-auto border-t gap-2" style={{ borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "rgba(229, 231, 235, 0.5)" }}>
+                              <div className="flex items-center justify-between pt-4 mt-auto border-t gap-2" style={{ borderColor: "var(--divider-color)" }}>
                                 <span
                                   className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full"
                                   style={{

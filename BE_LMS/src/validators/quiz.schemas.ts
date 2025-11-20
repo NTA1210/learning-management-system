@@ -101,3 +101,14 @@ export const updateQuizSchema = z
   );
 
 export type UpdateQuiz = z.infer<typeof updateQuizSchema>;
+
+export const quizIdSchema = z.string().length(24, "Invalid quiz ID");
+
+export const getQuizzesSchema = z.object({
+  courseId: courseIdSchema.optional(),
+  isDeleted: z.boolean().optional(),
+  isCompleted: z.boolean().optional(),
+  isPublished: z.boolean().optional(),
+});
+
+export type GetQuizzes = z.infer<typeof getQuizzesSchema>;

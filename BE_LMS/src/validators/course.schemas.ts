@@ -2,6 +2,9 @@ import z from "zod";
 import {CourseStatus} from "../types/course.type";
 import {datePreprocess} from "./helpers/date.schema";
 
+// ObjectId validation regex
+const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+
 // Schema for listing courses with pagination and filters
 export const listCoursesSchema = z
     .object({
@@ -18,10 +21,10 @@ export const listCoursesSchema = z
                 message: "Limit must be between 1 and 100",
             }),
         search: z.string().optional(),
-        from: datePreprocess, // Date range start with validation
-        to: datePreprocess, // Date range end with validation
-        subjectId: z.string().optional(), // Filter by subject ID
-        teacherId: z.string().optional(), // Filter by teacher ID
+        from: datePreprocess.optional(), // Date range start with validation
+        to: datePreprocess.optional(), // Date range end with validation
+        subjectId: z.string().regex(objectIdRegex, "Invalid subject ID format").optional(), // Filter by subject ID
+        teacherId: z.string().regex(objectIdRegex, "Invalid teacher ID format").optional(), // Filter by teacher ID
         isPublished: z
             .string()
             .optional()
@@ -81,7 +84,7 @@ export const createCourseSchema = z
     .object({
         title: z.string().min(1, "Title is required").max(255),
         // ✅ UNIVERSITY RULE: Subject is required (every course must belong to a subject)
-        subjectId: z.string().min(1, "Subject ID is required"),
+        subjectId: z.string().regex(objectIdRegex, "Invalid subject ID format"),
         logo: z.string().optional(), // URL to logo image
         description: z.string().optional(),
         startDate: z
@@ -160,8 +163,7 @@ export type CreateCourseInput = z.infer<typeof createCourseSchema>;
 export const updateCourseSchema = z
     .object({
         title: z.string().min(1).max(255).optional(),
-        subjectId: z.string().optional(), // ✅ NEW: Subject reference
-        logo: z.string().nullish(), // ✅ Allow null or empty string to remove logo
+        subjectId: z.string().regex(objectIdRegex, "Invalid subject ID format").optional(), // ✅ NEW: Subject reference        logo: z.string().nullish(), // ✅ Allow null or empty string to remove logo
         description: z.string().optional(),
         startDate: z
             .string()
@@ -245,4 +247,4 @@ export const updateCourseSchema = z
 export type UpdateCourseInput = z.infer<typeof updateCourseSchema>;
 
 // Schema for course ID param
-export const courseIdSchema = z.string().min(1, "Course ID is required");
+export const courseIdSchema = z.string().regex(objectIdRegex, "Invalid course ID format");

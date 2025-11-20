@@ -4,6 +4,7 @@ import CourseModel from "../models/course.model";
 import SpecialistModel from "../models/specialist.model";
 import UserModel from "../models/user.model";
 import EnrollmentModel from "../models/enrollment.model";
+import { Types } from "mongoose";
 import SubjectModel from "../models/subject.model";
 import appAssert from "../utils/appAssert";
 import { NOT_FOUND, BAD_REQUEST, FORBIDDEN } from "../constants/http";
@@ -144,7 +145,7 @@ export const listCourses = async ({
   // ✅ SOFT DELETE: Control deleted course visibility
   // ✅ FIX: Only admin can view deleted courses
   const isAdmin = userRole === Role.ADMIN;
-  
+
   if (onlyDeleted) {
     // Admin viewing recycle bin
     if (!isAdmin) {
@@ -192,26 +193,33 @@ export const listCourses = async ({
     if (to) filter.createdAt.$lte = to;
   }
 
-    // Search by title or description (text search)
-    if (search) {
-        filter.$or = [
-            {title: {$regex: search, $options: "i"}},
-            {description: {$regex: search, $options: "i"}},
-        ];
-    }
+  // Search by title or description (text search)
+  if (search) {
+    filter.$or = [
+      { title: { $regex: search, $options: "i" } },
+      { description: { $regex: search, $options: "i" } },
+    ];
+  }
 
-    // Calculate pagination
-    const skip = (page - 1) * limit;
+  // Calculate pagination
+  const skip = (page - 1) * limit;
 
-    // Build sort object
-    const sort: any = {};
-    sort[sortBy] = sortOrder === "asc" ? 1 : -1;
+  // Build sort object
+  const sort: any = {};
+  sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
   // Execute query with pagination
   const [courses, total] = await Promise.all([
     CourseModel.find(filter)
       .populate("teacherIds", "username email fullname avatar_url")
-      .populate("subjectId", "name code slug description credits")
+      .populate({
+        path: "subjectId",
+        select: "name code slug description credits specialistIds",
+        populate: {
+          path: "specialistIds",
+          select: "name code description"
+        }
+      })
       .populate("createdBy", "username email fullname")
       .sort(sort)
       .skip(skip)
@@ -220,22 +228,22 @@ export const listCourses = async ({
     CourseModel.countDocuments(filter),
   ]);
 
-    // Calculate pagination metadata
-    const totalPages = Math.ceil(total / limit);
-    const hasNextPage = page < totalPages;
-    const hasPrevPage = page > 1;
+  // Calculate pagination metadata
+  const totalPages = Math.ceil(total / limit);
+  const hasNextPage = page < totalPages;
+  const hasPrevPage = page > 1;
 
-    return {
-        courses,
-        pagination: {
-            total,
-            page,
-            limit,
-            totalPages,
-            hasNextPage,
-            hasPrevPage,
-        },
-    };
+  return {
+    courses,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNextPage,
+      hasPrevPage,
+    },
+  };
 };
 
 /**
@@ -269,7 +277,7 @@ export const getCourseById = async (courseId: string) => {
  */
 export const createCourse = async (
   data: CreateCourseInput,
-  userId: string,
+  userId: Types.ObjectId,
   logoFile?: Express.Multer.File
 ) => {
   // ❌ FIX: Validate teacherIds array
@@ -285,6 +293,17 @@ export const createCourse = async (
     uniqueTeachers.size === data.teacherIds.length,
     BAD_REQUEST,
     "Teacher list contains duplicate entries"
+  );
+
+  // ❌ FIX: Check for duplicate course title
+  const existingCourse = await CourseModel.findOne({
+    title: data.title,
+    isDeleted: false,
+  });
+  appAssert(
+    !existingCourse,
+    BAD_REQUEST,
+    "A course with this title already exists"
   );
 
   // Validate dates
@@ -350,29 +369,29 @@ export const createCourse = async (
   // ✅ UNIVERSITY RULE: Validate teacher specialization matches subject
   // Only teachers with matching specialist can teach the course
   const subjectSpecialistIds = subject.specialistIds?.map((id) => id.toString()) || [];
-  
+
   if (subjectSpecialistIds.length > 0) {
     // Check each teacher has at least one matching specialist
     const invalidTeachers: string[] = [];
-    
+
     for (const teacher of teachers) {
       const teacherSpecialistIds = teacher.specialistIds?.map((id) => id.toString()) || [];
-      
+
       // Admin can bypass specialist check
       if (teacher.role === Role.ADMIN) {
         continue;
       }
-      
+
       // Check if teacher has at least one matching specialist
       const hasMatchingSpecialist = teacherSpecialistIds.some((teacherSpecId) =>
         subjectSpecialistIds.includes(teacherSpecId)
       );
-      
+
       if (!hasMatchingSpecialist) {
         invalidTeachers.push((teacher.fullname || teacher.username) as string);
       }
     }
-    
+
     appAssert(
       invalidTeachers.length === 0,
       BAD_REQUEST,
@@ -396,8 +415,11 @@ export const createCourse = async (
     // Force isPublished = false regardless of input
     finalIsPublished = false;
   } else {
+    // ✅ AUTO PUBLISH: Admin tạo course thì luôn publish
+    finalIsPublished = true;
+
     // ✅ AUTO STATUS: Admin tạo và publish luôn → status = ONGOING
-    if (finalIsPublished && finalStatus === CourseStatus.DRAFT) {
+    if (finalStatus === CourseStatus.DRAFT) {
       finalStatus = CourseStatus.ONGOING;
     }
   }
@@ -420,19 +442,19 @@ export const createCourse = async (
   // 🖼️ Upload logo if provided
   if (logoFile) {
     let uploadedKey: string | null = null;
-    
+
     try {
       const courseId = String(course._id);
       const { publicUrl, key } = await uploadCourseLogo(courseId, logoFile);
       uploadedKey = key; // Track uploaded key for cleanup if needed
-      
+
       // Update course with logo URL and key
       await CourseModel.findByIdAndUpdate(courseId, { logo: publicUrl, key });
       course.logo = publicUrl;
     } catch (err) {
       // ❌ Rollback: Clean up uploaded logo (if any) and delete course
       if (uploadedKey) {
-        await deleteCourseLogoFile(uploadedKey).catch(cleanupErr => 
+        await deleteCourseLogoFile(uploadedKey).catch(cleanupErr =>
           console.error("Failed to cleanup uploaded logo:", cleanupErr)
         );
       }
@@ -460,10 +482,10 @@ export const createCourse = async (
  * Cập nhật khóa học
  */
 export const updateCourse = async (
-    courseId: string,
-    data: UpdateCourseInput,
-    userId: string,
-    logoFile?: Express.Multer.File
+  courseId: string,
+  data: UpdateCourseInput,
+  userId: Types.ObjectId,
+  logoFile?: Express.Multer.File
 ) => {
   // ❌ FIX: Validate courseId format
   appAssert(
@@ -486,12 +508,12 @@ export const updateCourse = async (
     "Cannot update a completed course"
   );
 
-    // Check if user is a teacher of this course or admin
-    const user = await UserModel.findById(userId);
-    appAssert(user, NOT_FOUND, "User not found");
+  // Check if user is a teacher of this course or admin
+  const user = await UserModel.findById(userId);
+  appAssert(user, NOT_FOUND, "User not found");
 
   const isTeacherOfCourse = course.teacherIds.some(
-    (teacherId) => teacherId.toString() === userId
+    (teacherId) => teacherId.equals(userId)
   );
 
   const isAdmin = user.role === Role.ADMIN;
@@ -501,6 +523,20 @@ export const updateCourse = async (
     FORBIDDEN,
     "You don't have permission to update this course"
   );
+
+  // ❌ FIX: Check for duplicate course title if title is being updated
+  if (data.title && data.title !== course.title) {
+    const existingCourse = await CourseModel.findOne({
+      title: data.title,
+      isDeleted: false,
+      _id: { $ne: courseId }, // Exclude current course
+    });
+    appAssert(
+      !existingCourse,
+      BAD_REQUEST,
+      "A course with this title already exists"
+    );
+  }
 
   // Validate dates if provided
   if (data.startDate || data.endDate) {
@@ -582,29 +618,29 @@ export const updateCourse = async (
     appAssert(courseSubject, NOT_FOUND, "Course subject not found");
 
     const subjectSpecialistIds = courseSubject.specialistIds?.map((id) => id.toString()) || [];
-    
+
     if (subjectSpecialistIds.length > 0) {
       // Check each teacher has at least one matching specialist
       const invalidTeachers: string[] = [];
-      
+
       for (const teacher of teachers) {
         const teacherSpecialistIds = teacher.specialistIds?.map((id) => id.toString()) || [];
-        
+
         // Admin can bypass specialist check
         if (teacher.role === Role.ADMIN) {
           continue;
         }
-        
+
         // Check if teacher has at least one matching specialist
         const hasMatchingSpecialist = teacherSpecialistIds.some((teacherSpecId) =>
           subjectSpecialistIds.includes(teacherSpecId)
         );
-        
+
         if (!hasMatchingSpecialist) {
           invalidTeachers.push((teacher.fullname || teacher.username) as string);
         }
       }
-      
+
       appAssert(
         invalidTeachers.length === 0,
         BAD_REQUEST,
@@ -618,11 +654,13 @@ export const updateCourse = async (
   // Prepare update data
   const updateData: any = { ...data };
 
-  // If teacher tries to publish course, prevent it
-  if (!isAdmin && data.isPublished === true) {
-    // Teacher cannot publish - only admin can approve
+  // ✅ FIX: Teacher CANNOT change isPublished field at all
+  // - Cannot publish (set true)
+  // - Cannot unpublish (set false) if already published by admin
+  if (!isAdmin && data.isPublished !== undefined) {
+    // Teacher tries to change isPublished field
     delete updateData.isPublished;
-    // Note: Course will remain unpublished, need admin to approve
+    // Note: Only admin can control publish status
   }
 
   // ✅ AUTO STATUS: When admin approves (publishes) a DRAFT course, auto change to ONGOING
@@ -633,7 +671,7 @@ export const updateCourse = async (
   // ====================================
   // 🖼️ HANDLE LOGO OPERATIONS
   // ====================================
-  
+
   const shouldRemoveLogo = data.logo === null || data.logo === "";
   const shouldUploadNewLogo = logoFile !== undefined;
 
@@ -642,27 +680,27 @@ export const updateCourse = async (
     if (course.key) {
       await deleteCourseLogoFile(course.key);
     }
-    
+
     // Remove logo field from updateData to avoid MongoDB conflict
     delete updateData.logo;
-    
+
     // Remove both logo and key from database
     updateData.$unset = { logo: 1, key: 1 };
-  } 
+  }
   else if (shouldUploadNewLogo) {
     // User wants to upload new logo
     // ⚠️ Important: Upload new logo FIRST before updating DB
     // This ensures atomicity - if upload fails, nothing changes
     const oldKey = course.key;
-    
+
     // Upload new logo first 
     const { publicUrl, key } = await uploadCourseLogo(courseId, logoFile);
     updateData.logo = publicUrl;
     updateData.key = key;
-    
+
     // Note: Old logo will be deleted ONLY after successful DB update
     // This is handled below after the DB update succeeds
-    
+
     // Store oldKey for cleanup after successful DB update
     updateData._oldLogoKey = oldKey;
   }
@@ -672,19 +710,19 @@ export const updateCourse = async (
   // ====================================
   // MongoDB requires separate $set and $unset operators
   // Cannot use both in the same object at root level
-  
+
   // Extract temporary fields that shouldn't go to DB
   const oldLogoKey = updateData._oldLogoKey;
   delete updateData._oldLogoKey;
-  
+
   const updateQuery: any = {};
-  
+
   // Add $unset operations (remove fields)
   if (updateData.$unset) {
     updateQuery.$unset = updateData.$unset;
     delete updateData.$unset; // Remove from updateData to avoid duplication
   }
-  
+
   // Add $set operations (update fields)
   if (Object.keys(updateData).length > 0) {
     updateQuery.$set = updateData;
@@ -695,7 +733,7 @@ export const updateCourse = async (
   // ====================================
   // Store new logo key for rollback if DB update fails
   const newLogoKey = updateData.key;
-  
+
   let updatedCourse;
   try {
     updatedCourse = await CourseModel.findByIdAndUpdate(
@@ -710,7 +748,7 @@ export const updateCourse = async (
 
     // ❌ FIX: Ensure course was updated successfully
     appAssert(updatedCourse, BAD_REQUEST, "Failed to update course");
-    
+
     // ✅ DB update successful - now safe to delete old logo if exists
     if (oldLogoKey) {
       await deleteCourseLogoFile(oldLogoKey).catch(err =>
@@ -768,19 +806,19 @@ export const deleteCourse = async (courseId: string, userId: string) => {
     courseId,
     status: { $in: ["pending", "approved"] }, // Active enrollments
   });
-  
+
   appAssert(
     activeEnrollmentCount === 0,
     BAD_REQUEST,
     `Cannot delete course with ${activeEnrollmentCount} active enrollment(s). Please cancel or complete all enrollments first.`
   );
 
-    // Check if user is a teacher of this course or admin
-    const user = await UserModel.findById(userId);
-    appAssert(user, NOT_FOUND, "User not found");
+  // Check if user is a teacher of this course or admin
+  const user = await UserModel.findById(userId);
+  appAssert(user, NOT_FOUND, "User not found");
 
   const isTeacherOfCourse = course.teacherIds.some(
-    (teacherId) => teacherId.toString() === userId
+    (teacherId) => teacherId.equals(userId)
   );
   const isAdmin = user.role === Role.ADMIN;
 
@@ -803,7 +841,7 @@ export const deleteCourse = async (courseId: string, userId: string) => {
     { new: true }
   );
 
-  return { 
+  return {
     message: "Course deleted successfully",
     deletedAt: new Date(),
     deletedBy: userId,
@@ -885,6 +923,13 @@ export const permanentDeleteCourse = async (
   courseId: string,
   userId: string
 ) => {
+  // ❌ FIX: Validate courseId format
+  appAssert(
+    courseId && courseId.match(/^[0-9a-fA-F]{24}$/),
+    BAD_REQUEST,
+    "Invalid course ID format"
+  );
+
   // ✅ Find deleted course only (must be soft-deleted first)
   const course = await CourseModel.findOne({
     _id: courseId,
@@ -934,3 +979,4 @@ export const permanentDeleteCourse = async (
     deletedCourseId: courseId,
   };
 };
+

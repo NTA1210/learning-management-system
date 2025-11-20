@@ -24,6 +24,7 @@ const UserSchema = new mongoose.Schema<IUser>(
             match: VIETNAM_PHONE_REGEX || INTERNATIONAL_PHONE_REGEX,
         },
         avatar_url: {type: String},
+        key: { type: String },
         bio: {type: String},
         isVerified: {type: Boolean, required: true, default: false},
         status: {type: String, required: true, default: UserStatus.ACTIVE},

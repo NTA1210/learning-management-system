@@ -35,10 +35,10 @@ import {
 
 describe("📎 LessonMaterial Service Unit Tests", () => {
   const userIds = {
-    admin: new mongoose.Types.ObjectId().toString(),
-    teacher: new mongoose.Types.ObjectId().toString(),
-    student: new mongoose.Types.ObjectId().toString(),
-    uploader: new mongoose.Types.ObjectId().toString(),
+    admin: new mongoose.Types.ObjectId(),
+    teacher: new mongoose.Types.ObjectId(),
+    student: new mongoose.Types.ObjectId(),
+    uploader: new mongoose.Types.ObjectId(),
   };
 
   const courseId = new mongoose.Types.ObjectId();
@@ -48,7 +48,7 @@ describe("📎 LessonMaterial Service Unit Tests", () => {
   const lesson = {
     _id: lessonId,
     title: "L1",
-    courseId: { _id: courseId, teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] },
+    courseId: { _id: courseId, teacherIds: [userIds.teacher] },
   } as any;
 
   const material = {
@@ -56,7 +56,7 @@ describe("📎 LessonMaterial Service Unit Tests", () => {
     lessonId,
     title: "Doc 1",
     key: "manual-materials/x/y",
-    uploadedBy: new mongoose.Types.ObjectId(userIds.uploader),
+    uploadedBy: userIds.uploader,
   } as any;
 
 const buildFindQuery = (results: any[]) => ({
@@ -136,7 +136,7 @@ const buildFindQuery = (results: any[]) => ({
 
       // Mock for access checks inside map
       (LessonModel.findById as any).mockReturnValue({ 
-        populate: jest.fn().mockResolvedValue({ courseId: { _id: courseId, teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } }) 
+        populate: jest.fn().mockResolvedValue({ courseId: { _id: courseId, teacherIds: [userIds.teacher] } }) 
       });
       (EnrollmentModel.findOne as any).mockResolvedValue(null);
       
@@ -231,7 +231,7 @@ const buildFindQuery = (results: any[]) => ({
       (LessonModel.find as any).mockReturnValue({ select: jest.fn().mockResolvedValue([{ _id: lessonId }]) });
       (LessonMaterialModel.find as any).mockReturnValue(buildFindQuery([instructorMaterial]));
       (LessonMaterialModel.countDocuments as any).mockResolvedValue(1);
-      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      const teacherIdsArray = [userIds.teacher];
       teacherIdsArray.includes = jest.fn((id: any) =>
         teacherIdsArray.some((tid) => tid.toString() === id.toString())
       );
@@ -250,7 +250,7 @@ const buildFindQuery = (results: any[]) => ({
         _id: new mongoose.Types.ObjectId(),
         lessonId,
         key: "files/uploader.pdf",
-        uploadedBy: { _id: new mongoose.Types.ObjectId(uploaderId) },
+        uploadedBy: { _id: uploaderId },
       };
       (CourseModel.find as any).mockReturnValue({ select: jest.fn().mockResolvedValue([{ _id: courseId }]) });
       (LessonModel.find as any).mockReturnValue({ select: jest.fn().mockResolvedValue([{ _id: lessonId }]) });
@@ -342,7 +342,7 @@ const buildFindQuery = (results: any[]) => ({
       (LessonModel.findById as any).mockReturnValue({ 
         populate: jest.fn().mockResolvedValue({ 
           ...lesson, 
-          courseId: { _id: courseId, teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } 
+          courseId: { _id: courseId, teacherIds: [userIds.teacher] } 
         }) 
       });
       (LessonMaterialModel.find as any).mockReturnValue({ 
@@ -392,7 +392,11 @@ const buildFindQuery = (results: any[]) => ({
       (LessonModel.findById as any).mockReturnValue({
         populate: jest.fn().mockResolvedValue({ ...lesson }),
       });
-      const result = await getLessonMaterialsByLesson(lessonId.toString(), undefined, undefined);
+      const result = await getLessonMaterialsByLesson(
+        lessonId.toString(),
+        undefined as unknown as mongoose.Types.ObjectId,
+        undefined
+      );
       expect(result).toEqual([]);
     });
   });
@@ -407,9 +411,9 @@ const buildFindQuery = (results: any[]) => ({
     });
 
     it("teacher uploader has access and gets signed url if not manual", async () => {
-      const m = { ...material, key: "files/a.pdf", uploadedBy: { _id: new mongoose.Types.ObjectId(userIds.uploader) } };
+      const m = { ...material, key: "files/a.pdf", uploadedBy: { _id: userIds.uploader } };
       (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(m) });
-      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } }) });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [userIds.teacher] } }) });
       const result = await getLessonMaterialById(materialId.toString(), userIds.uploader, Role.TEACHER);
       expect(result.hasAccess).toBe(true);
       expect(result.signedUrl).toBeDefined();
@@ -419,7 +423,7 @@ const buildFindQuery = (results: any[]) => ({
       const m = { ...material, key: "files/a.pdf" };
       (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(m) });
       // Mock teacherIds as array with includes method that compares by value
-      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      const teacherIdsArray = [userIds.teacher];
       teacherIdsArray.includes = jest.fn((id: any) => {
         return teacherIdsArray.some(tid => tid.toString() === id.toString());
       });
@@ -452,7 +456,7 @@ const buildFindQuery = (results: any[]) => ({
         populate: jest.fn().mockReturnThis(),
         lean: jest.fn().mockResolvedValue(manualMaterial),
       });
-      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      const teacherIdsArray = [userIds.teacher];
       teacherIdsArray.includes = jest.fn((id: any) =>
         teacherIdsArray.some((tid) => tid.toString() === id.toString())
       );
@@ -474,7 +478,7 @@ const buildFindQuery = (results: any[]) => ({
 
   describe("createLessonMaterial", () => {
     it("admin can create manual material", async () => {
-      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } }) });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [userIds.teacher] } }) });
       (LessonMaterialModel.exists as any).mockResolvedValue(null);
       (LessonMaterialModel.create as any).mockResolvedValue({ _id: materialId });
       (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(material) });
@@ -486,7 +490,7 @@ const buildFindQuery = (results: any[]) => ({
 
     it("teacher instructor can create manual material", async () => {
       // Mock teacherIds with custom includes that compares by value
-      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      const teacherIdsArray = [userIds.teacher];
       teacherIdsArray.includes = jest.fn((id: any) => {
         return teacherIdsArray.some(tid => tid.toString() === id.toString());
       });
@@ -507,7 +511,7 @@ const buildFindQuery = (results: any[]) => ({
     });
 
     it("throws error when title conflict exists", async () => {
-      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } }) });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [userIds.teacher] } }) });
       (LessonMaterialModel.exists as any).mockResolvedValue({ _id: materialId });
       const data = { lessonId: lessonId.toString(), title: "Doc 1" } as any;
       await expect(createLessonMaterial(data, userIds.admin, Role.ADMIN)).rejects.toThrow("Material with this title already exists");
@@ -521,7 +525,7 @@ const buildFindQuery = (results: any[]) => ({
     });
 
     it("uses provided optional file metadata when creating", async () => {
-      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      const teacherIdsArray = [userIds.teacher];
       teacherIdsArray.includes = jest.fn((id: any) =>
         teacherIdsArray.some((tid) => tid.toString() === id.toString())
       );
@@ -560,7 +564,7 @@ const buildFindQuery = (results: any[]) => ({
   describe("updateLessonMaterial", () => {
     it("admin updates title", async () => {
       (LessonMaterialModel.findById as any).mockResolvedValue({ ...material });
-      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } }) });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [userIds.teacher] } }) });
       (LessonMaterialModel.exists as any).mockResolvedValue(null);
       (LessonMaterialModel.findByIdAndUpdate as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue({ ...material, title: "New" }) });
 
@@ -571,7 +575,7 @@ const buildFindQuery = (results: any[]) => ({
     it("instructor updates title", async () => {
       (LessonMaterialModel.findById as any).mockResolvedValue({ ...material });
       // Mock teacherIds with custom includes that compares by value
-      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      const teacherIdsArray = [userIds.teacher];
       teacherIdsArray.includes = jest.fn((id: any) => {
         return teacherIdsArray.some(tid => tid.toString() === id.toString());
       });
@@ -591,7 +595,7 @@ const buildFindQuery = (results: any[]) => ({
 
     it("throws error when title conflict exists", async () => {
       (LessonMaterialModel.findById as any).mockResolvedValue({ ...material, title: "Old Title" });
-      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } }) });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [userIds.teacher] } }) });
       (LessonMaterialModel.exists as any).mockResolvedValue({ _id: new mongoose.Types.ObjectId() });
       await expect(updateLessonMaterial(materialId.toString(), { title: "Existing Title" }, userIds.admin, Role.ADMIN)).rejects.toThrow("Material with this title already exists");
     });
@@ -605,11 +609,11 @@ const buildFindQuery = (results: any[]) => ({
     it("updates optional fields when provided", async () => {
       const materialDoc = {
         ...material,
-        uploadedBy: new mongoose.Types.ObjectId(userIds.admin),
+        uploadedBy: userIds.admin,
       };
       (LessonMaterialModel.findById as any).mockResolvedValue(materialDoc);
       (LessonModel.findById as any).mockReturnValue({
-        populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [new mongoose.Types.ObjectId(userIds.admin)] } }),
+        populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [userIds.admin] } }),
       });
       (LessonMaterialModel.exists as any).mockResolvedValue(null);
       (LessonMaterialModel.findByIdAndUpdate as any).mockReturnValue({
@@ -662,7 +666,7 @@ const buildFindQuery = (results: any[]) => ({
     it("instructor deletes", async () => {
       (LessonMaterialModel.findById as any).mockResolvedValue({ ...material });
       // Mock teacherIds with custom includes that compares by value
-      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      const teacherIdsArray = [userIds.teacher];
       teacherIdsArray.includes = jest.fn((id: any) => {
         return teacherIdsArray.some(tid => tid.toString() === id.toString());
       });
@@ -694,7 +698,7 @@ const buildFindQuery = (results: any[]) => ({
 
   describe("uploadLessonMaterial", () => {
     it("single file upload by admin", async () => {
-      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ _id: lessonId, courseId: { _id: courseId, teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } }) });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ _id: lessonId, courseId: { _id: courseId, teacherIds: [userIds.teacher] } }) });
       (LessonMaterialModel.exists as any).mockResolvedValue(null);
       (LessonMaterialModel.create as any).mockResolvedValue({ _id: materialId });
       (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(material) });
@@ -706,7 +710,7 @@ const buildFindQuery = (results: any[]) => ({
 
     it("single file upload by instructor", async () => {
       // Mock teacherIds with custom includes that compares by value
-      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      const teacherIdsArray = [userIds.teacher];
       teacherIdsArray.includes = jest.fn((id: any) => {
         return teacherIdsArray.some(tid => tid.toString() === id.toString());
       });
@@ -721,7 +725,7 @@ const buildFindQuery = (results: any[]) => ({
     });
 
     it("multi upload returns array", async () => {
-      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ _id: lessonId, courseId: { _id: courseId, teacherIds: [new mongoose.Types.ObjectId(userIds.teacher)] } }) });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ _id: lessonId, courseId: { _id: courseId, teacherIds: [userIds.teacher] } }) });
       (LessonMaterialModel.create as any).mockResolvedValueOnce({ _id: new mongoose.Types.ObjectId() }).mockResolvedValueOnce({ _id: new mongoose.Types.ObjectId() });
       (LessonMaterialModel.find as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), sort: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue([material, { ...material, _id: new mongoose.Types.ObjectId() }]) });
       const files = [{ size: 5 } as any, { size: 6 } as any];
@@ -750,7 +754,7 @@ const buildFindQuery = (results: any[]) => ({
     });
 
     it("throws error when multi upload detects title conflict", async () => {
-      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      const teacherIdsArray = [userIds.teacher];
       teacherIdsArray.includes = jest.fn((id: any) => teacherIdsArray.some((tid) => tid.toString() === id.toString()));
       (LessonModel.findById as any).mockReturnValue({
         populate: jest.fn().mockResolvedValue({ _id: lessonId, courseId: { _id: courseId, teacherIds: teacherIdsArray } }),
@@ -787,7 +791,7 @@ const buildFindQuery = (results: any[]) => ({
       originalName: "test.pdf",
       mimeType: "application/pdf",
       size: 1000,
-      uploadedBy: new mongoose.Types.ObjectId(userIds.uploader),
+      uploadedBy: userIds.uploader,
     } as any;
 
     const updatedMaterial = {
@@ -798,7 +802,7 @@ const buildFindQuery = (results: any[]) => ({
       originalName: undefined,
       mimeType: undefined,
       size: undefined,
-      uploadedBy: { _id: new mongoose.Types.ObjectId(userIds.uploader) },
+      uploadedBy: { _id: userIds.uploader },
     } as any;
 
     it("admin deletes file successfully", async () => {
@@ -827,7 +831,7 @@ const buildFindQuery = (results: any[]) => ({
 
     it("teacher instructor deletes file successfully", async () => {
       (LessonMaterialModel.findById as any).mockResolvedValue(materialWithFile);
-      const teacherIdsArray = [new mongoose.Types.ObjectId(userIds.teacher)];
+      const teacherIdsArray = [userIds.teacher];
       (LessonModel.findById as any).mockReturnValue({ 
         populate: jest.fn().mockResolvedValue({ 
           courseId: { _id: courseId, teacherIds: teacherIdsArray } 

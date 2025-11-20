@@ -38,12 +38,7 @@ const QuizAttemptSchema = new mongoose.Schema<IQuizAttempt>(
     score: { type: Number },
     status: {
       type: String,
-      enum: [
-        AttemptStatus.COMPLETED,
-        AttemptStatus.IN_PROGRESS,
-        AttemptStatus.SUBMITTED,
-        AttemptStatus.ABANDONED,
-      ],
+      enum: AttemptStatus,
       default: AttemptStatus.IN_PROGRESS,
     },
     ipAddress: { type: String },
@@ -54,6 +49,7 @@ const QuizAttemptSchema = new mongoose.Schema<IQuizAttempt>(
 
 //Indexes
 QuizAttemptSchema.index({ quizId: 1, studentId: 1, startAt: -1 });
+QuizAttemptSchema.index({ quizId: 1, studentId: 1 }, { unique: true });
 QuizAttemptSchema.index({ studentId: 1, status: 1 });
 QuizAttemptSchema.index({ quizId: 1, submittedAt: -1 });
 
@@ -85,7 +81,7 @@ QuizAttemptSchema.methods.grade = async function () {
   });
 
   attempt.score = totalScore;
-  attempt.status = AttemptStatus.COMPLETED;
+  attempt.status = AttemptStatus.SUBMITTED;
   attempt.submittedAt = new Date();
 
   await attempt.save();

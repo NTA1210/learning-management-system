@@ -1,8 +1,7 @@
 import mongoose from "mongoose";
 
-export const enum AttemptStatus {
+export enum AttemptStatus {
   IN_PROGRESS = "in_progress",
-  COMPLETED = "completed",
   SUBMITTED = "submitted",
   ABANDONED = "abandoned",
 }

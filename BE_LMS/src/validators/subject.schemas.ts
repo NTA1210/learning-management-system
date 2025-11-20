@@ -21,10 +21,10 @@ export const listSubjectsSchema = (listParamsSchema
     code: z.string().optional(),
     specialistId: z.string().optional(),
     isActive: z.union([z.string(), z.boolean()]).optional(),
-    createdAt: datePreprocess,
-    updatedAt: datePreprocess,
-    from: datePreprocess,
-    to: datePreprocess,
+    createdAt: datePreprocess.optional(),
+    updatedAt: datePreprocess.optional(),
+    from: datePreprocess.optional(),
+    to: datePreprocess.optional(),
   })
   .refine(
     (val) => {

@@ -27,16 +27,12 @@ export default interface IQuiz extends mongoose.Document {
   // questionIds: mongoose.Types.ObjectId[];
   snapshotQuestions: SnapshotQuestion[];
   isPublished?: boolean;
-  isCompleted?: boolean;
+  deletedAt?: Date;
+  deletedBy?: mongoose.Types.ObjectId;
   createdBy?: mongoose.Types.ObjectId;
   createdAt?: Date;
   updatedAt?: Date;
   // Methods
-  // createSnapshot(): Promise<IQuiz>;
-  addSnapshotQuestions(questions: SnapshotQuestion[]): Promise<void>;
-  updateSnapshotQuestions(diff: {
-    updated: Partial<SnapshotQuestion>[];
-    added: SnapshotQuestion[];
-    deleted: { id: string }[];
-  }): Promise<void>;
+  generateHashPassword(): string;
+  compareHashPassword(password: string): boolean;
 }

@@ -5,7 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { httpClient } from "../utils/http";
-import { ArrowLeft, Download, FileText, Video, Presentation, Link as LinkIcon, File, Eye, X, Minimize2, Maximize2 } from "lucide-react";
+import { ArrowLeft, Download, FileText, Video, Presentation, Link as LinkIcon, File, Eye, X, Minimize2, Maximize2, Trash, Pencil } from "lucide-react";
 
 interface Lesson {
   _id: string;
@@ -86,6 +86,18 @@ const LessonMaterialDetailPage: React.FC = () => {
   const [isResizing, setIsResizing] = useState(false);
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [resizeMode, setResizeMode] = useState<"horizontal" | "vertical" | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingMaterial, setEditingMaterial] = useState<LessonMaterial | null>(null);
+  const [formData, setFormData] = useState({
+    title: "",
+    note: "",
+    originalName: "",
+    mimeType: "",
+    size: 0,
+  });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // >>> ADDED: refs & raf helpers for smooth resize
   const popupRef = React.useRef<HTMLDivElement | null>(null);
@@ -100,9 +112,78 @@ const LessonMaterialDetailPage: React.FC = () => {
       const Swal = (await import("sweetalert2")).default;
       await Swal.fire({
         icon: "error",
-        title: "Oops...",
+        title: "Error",
         text: message,
-        confirmButtonColor: "#4f46e5",
+        confirmButtonColor: darkMode ? "#4c1d95" : "#4f46e5",
+        background: darkMode ? "#1f2937" : "#ffffff",
+        color: darkMode ? "#ffffff" : "#1e293b",
+        didOpen: () => {
+          const swalContainer = document.querySelector('.swal2-container') as HTMLElement;
+          const swalBackdrop = document.querySelector('.swal2-backdrop-show') as HTMLElement;
+          if (swalContainer) {
+            swalContainer.style.zIndex = '99999';
+          }
+          if (swalBackdrop) {
+            swalBackdrop.style.zIndex = '99998';
+          }
+        },
+      });
+    } catch {
+      alert(message);
+    }
+  };
+
+  const showSwalConfirm = async (message: string): Promise<boolean> => {
+    try {
+      const Swal = (await import("sweetalert2")).default;
+      const result = await Swal.fire({
+        icon: "warning",
+        title: "Confirm",
+        text: message,
+        showCancelButton: true,
+        confirmButtonColor: darkMode ? "#dc2626" : "#ef4444",
+        cancelButtonColor: darkMode ? "#4b5563" : "#6b7280",
+        confirmButtonText: "Yes",
+        cancelButtonText: "No",
+        background: darkMode ? "#1f2937" : "#ffffff",
+        color: darkMode ? "#ffffff" : "#1e293b",
+        didOpen: () => {
+          const swalContainer = document.querySelector('.swal2-container') as HTMLElement;
+          const swalBackdrop = document.querySelector('.swal2-backdrop-show') as HTMLElement;
+          if (swalContainer) {
+            swalContainer.style.zIndex = '99999';
+          }
+          if (swalBackdrop) {
+            swalBackdrop.style.zIndex = '99998';
+          }
+        },
+      });
+      return result.isConfirmed;
+    } catch {
+      return confirm(message);
+    }
+  };
+
+  const showSwalSuccess = async (message: string) => {
+    try {
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: message,
+        confirmButtonColor: darkMode ? "#4c1d95" : "#4f46e5",
+        background: darkMode ? "#1f2937" : "#ffffff",
+        color: darkMode ? "#ffffff" : "#1e293b",
+        didOpen: () => {
+          const swalContainer = document.querySelector('.swal2-container') as HTMLElement;
+          const swalBackdrop = document.querySelector('.swal2-backdrop-show') as HTMLElement;
+          if (swalContainer) {
+            swalContainer.style.zIndex = '99999';
+          }
+          if (swalBackdrop) {
+            swalBackdrop.style.zIndex = '99998';
+          }
+        },
       });
     } catch {
       alert(message);
@@ -136,6 +217,7 @@ const LessonMaterialDetailPage: React.FC = () => {
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = 'unset';
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isViewerOpen, viewerMinimized]);
 
   // Initialize popup size when opened
@@ -257,7 +339,7 @@ const LessonMaterialDetailPage: React.FC = () => {
     setLoading(true);
     setError("");
     try {
-      const response = await httpClient.get(`/lesson/getLessonById/${lessonId}`, {
+      const response = await httpClient.get(`/lessons/${lessonId}`, {
         withCredentials: true,
       });
 
@@ -288,7 +370,7 @@ const LessonMaterialDetailPage: React.FC = () => {
     setMaterialsLoading(true);
     setMaterialsError("");
     try {
-      const response = await httpClient.get<ApiResponse>(`/lesson-material/byLesson/${lessonId}`, {
+      const response = await httpClient.get<ApiResponse>(`/lesson-materials/lessons/${lessonId}`, {
         withCredentials: true,
       });
 
@@ -315,7 +397,7 @@ const LessonMaterialDetailPage: React.FC = () => {
 
   const handleDownload = async (materialId: string) => {
     try {
-      const response = await httpClient.get(`/lesson-material/download/${materialId}`, {
+      const response = await httpClient.get(`/lesson-materials/${materialId}/download`, {
         withCredentials: true,
       });
       
@@ -370,7 +452,7 @@ const LessonMaterialDetailPage: React.FC = () => {
       // Ensure we have a signed URL
       let signedUrl = material.signedUrl;
       if (!signedUrl) {
-        const response = await httpClient.get(`/lesson-material/download/${material._id}`, {
+        const response = await httpClient.get(`/lesson-materials/${material._id}/download`, {
           withCredentials: true,
         });
         if (response.data?.success && response.data?.data?.signedUrl) {
@@ -395,7 +477,7 @@ const LessonMaterialDetailPage: React.FC = () => {
       if (isOfficeDoc) {
         // No need to create blob URL for Office docs
         setViewerObjectUrl(null);
-      } else {
+      } else if (signedUrl) {
         // Fetch as blob to avoid download disposition and create an object URL
         const res = await fetch(signedUrl);
         if (!res.ok) {
@@ -578,6 +660,165 @@ const LessonMaterialDetailPage: React.FC = () => {
     return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
   };
 
+  const isAdmin = user?.role === 'admin';
+  const isTeacher = user?.role === 'teacher';
+  const canCreate = isAdmin || isTeacher;
+
+  const handleCreate = () => {
+    setFormData({
+      title: "",
+      note: "",
+      originalName: "",
+      mimeType: "",
+      size: 0,
+    });
+    setSelectedFile(null);
+    setShowCreateModal(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      // Auto-fill form data from file
+      setFormData(prev => ({
+        ...prev,
+        originalName: file.name,
+        mimeType: file.type || "",
+        size: file.size,
+        title: prev.title || file.name.replace(/\.[^/.]+$/, ""), // Use filename without extension as default title
+      }));
+    }
+  };
+
+  const handleEdit = (material: LessonMaterial) => {
+    setEditingMaterial(material);
+    setFormData({
+      title: material.title,
+      note: material.note || "",
+      originalName: material.originalName || "",
+      mimeType: material.mimeType || "",
+      size: material.size || 0,
+    });
+    setShowEditModal(true);
+  };
+
+  const handleDelete = async (materialId: string) => {
+    const confirmed = await showSwalConfirm("Are you sure you want to delete this material?");
+    if (!confirmed) return;
+    
+    try {
+      await httpClient.delete(`/lesson-materials/${materialId}`, {
+        withCredentials: true,
+      });
+      await showSwalSuccess("Material deleted successfully");
+      await fetchMaterials();
+    } catch (err) {
+      console.error("Error deleting material:", err);
+      let errorMessage = "Failed to delete material";
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { data?: { message?: string } }; message?: string };
+        errorMessage = axiosError.response?.data?.message || axiosError.message || errorMessage;
+      }
+      await showSwalError(errorMessage);
+    }
+  };
+
+  const handleCreateMaterial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!lessonId) return;
+    
+    try {
+      if (selectedFile) {
+        // Upload file using FormData
+        const formDataToSend = new FormData();
+        formDataToSend.append('file', selectedFile);
+        formDataToSend.append('lessonId', lessonId);
+        formDataToSend.append('title', formData.title);
+        if (formData.note) {
+          formDataToSend.append('note', formData.note);
+        }
+        // Determine type from mimeType
+        let materialType = 'other';
+        if (formData.mimeType) {
+          if (formData.mimeType.includes('pdf')) materialType = 'pdf';
+          else if (formData.mimeType.includes('video')) materialType = 'video';
+          else if (formData.mimeType.includes('presentation') || formData.mimeType.includes('powerpoint')) materialType = 'ppt';
+          else if (formData.mimeType.includes('link')) materialType = 'link';
+        }
+        formDataToSend.append('type', materialType);
+
+        await httpClient.post("/lesson-materials/upload", formDataToSend, {
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+      } else {
+        // Create material without file
+        await httpClient.post("/lesson-material/createMaterial", {
+          lessonId,
+          ...formData,
+        }, {
+          withCredentials: true,
+        });
+      }
+      
+      await showSwalSuccess("Material created successfully");
+      setShowCreateModal(false);
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setFormData({
+        title: "",
+        note: "",
+        originalName: "",
+        mimeType: "",
+        size: 0,
+      });
+      await fetchMaterials();
+    } catch (err) {
+      console.error("Error creating material:", err);
+      let errorMessage = "Failed to create material";
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { data?: { message?: string } }; message?: string };
+        errorMessage = axiosError.response?.data?.message || axiosError.message || errorMessage;
+      }
+      await showSwalError(errorMessage);
+    }
+  };
+
+  const handleUpdateMaterial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMaterial) return;
+    
+    try {
+      await httpClient.patch(`/lesson-materials/${editingMaterial._id}`, formData, {
+        withCredentials: true,
+      });
+      await showSwalSuccess("Material updated successfully");
+      setShowEditModal(false);
+      setEditingMaterial(null);
+      setFormData({
+        title: "",
+        note: "",
+        originalName: "",
+        mimeType: "",
+        size: 0,
+      });
+      await fetchMaterials();
+    } catch (err) {
+      console.error("Error updating material:", err);
+      let errorMessage = "Failed to update material";
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { data?: { message?: string } }; message?: string };
+        errorMessage = axiosError.response?.data?.message || axiosError.message || errorMessage;
+      }
+      await showSwalError(errorMessage);
+    }
+  };
+
   return (
     <div
       className="flex h-screen overflow-hidden relative"
@@ -700,15 +941,36 @@ const LessonMaterialDetailPage: React.FC = () => {
                 </div>
               ) : null}
 
-              <h2
-                className="text-2xl font-bold mb-2"
-                style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
-              >
-                Lesson Materials
-              </h2>
-              <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
-                {materials.length} material{materials.length !== 1 ? 's' : ''} available
-              </p>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2
+                    className="text-2xl font-bold mb-2"
+                    style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
+                  >
+                    Lesson Materials
+                  </h2>
+                  <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                    {materials.length} material{materials.length !== 1 ? 's' : ''} available
+                  </p>
+                </div>
+                {canCreate && (
+                  <button
+                    onClick={handleCreate}
+                    className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg"
+                    style={{ 
+                      backgroundColor: darkMode ? '#059669' : '#10b981'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = darkMode ? '#047857' : '#059669';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = darkMode ? '#059669' : '#10b981';
+                    }}
+                  >
+                    + Create Material
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Materials Error Message */}
@@ -833,36 +1095,79 @@ const LessonMaterialDetailPage: React.FC = () => {
                           </div>
                         </div>
 
-                        {material.hasAccess && (
-                          <div className="ml-4 flex items-center gap-2">
-                            <button
-                              onClick={() => handleView(material)}
-                              className="px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-lg flex items-center"
-                              style={{
-                                backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.15)' : 'rgba(99, 102, 241, 0.1)',
-                                color: darkMode ? '#a5b4fc' : '#4f46e5',
-                                border: darkMode ? '1px solid rgba(99, 102, 241, 0.35)' : '1px solid rgba(79, 70, 229, 0.25)',
-                              }}
-                            >
-                              <Eye size={18} className="mr-2" />
-                              View
-                            </button>
-                            <button
-                              onClick={() => handleDownload(material._id)}
-                              className="px-4 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg flex items-center"
-                              style={{ backgroundColor: darkMode ? '#059669' : '#10b981' }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.backgroundColor = darkMode ? '#047857' : '#059669';
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.backgroundColor = darkMode ? '#059669' : '#10b981';
-                              }}
-                            >
-                              <Download size={18} className="mr-2" />
-                              Download
-                            </button>
-                          </div>
-                        )}
+                        <div className="ml-4 flex items-center gap-2 flex-wrap">
+                          {material.hasAccess && (
+                            <>
+                              <button
+                                onClick={() => handleView(material)}
+                                className="px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-lg flex items-center"
+                                style={{
+                                  backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.15)' : 'rgba(99, 102, 241, 0.1)',
+                                  color: darkMode ? '#a5b4fc' : '#4f46e5',
+                                  border: darkMode ? '1px solid rgba(99, 102, 241, 0.35)' : '1px solid rgba(79, 70, 229, 0.25)',
+                                }}
+                              >
+                                <Eye size={18} className="mr-2" />
+                                View
+                              </button>
+                              <button
+                                onClick={() => handleDownload(material._id)}
+                                className="px-4 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg flex items-center"
+                                style={{ backgroundColor: darkMode ? '#059669' : '#10b981' }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = darkMode ? '#047857' : '#059669';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = darkMode ? '#059669' : '#10b981';
+                                }}
+                              >
+                                <Download size={18} className="mr-2" />
+                                Download
+                              </button>
+                            </>
+                          )}
+                          {canCreate && (
+                            <>
+                              <button
+                                onClick={() => handleEdit(material)}
+                                className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md flex items-center gap-2"
+                                style={{
+                                  backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff',
+                                  color: darkMode ? '#a5b4fc' : '#4f46e5'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = darkMode ? 'rgba(99, 102, 241, 0.3)' : '#e0e7ff';
+                                  e.currentTarget.style.transform = 'scale(1.05)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff';
+                                  e.currentTarget.style.transform = 'scale(1)';
+                                }}
+                              >
+                                <Pencil size={16} />
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDelete(material._id)}
+                                className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md flex items-center gap-2"
+                                style={{
+                                  backgroundColor: darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2',
+                                  color: darkMode ? '#fca5a5' : '#dc2626'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = darkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca';
+                                  e.currentTarget.style.transform = 'scale(1.05)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2';
+                                  e.currentTarget.style.transform = 'scale(1)';
+                                }}
+                              >
+                                <Trash size={16} />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1062,6 +1367,386 @@ const LessonMaterialDetailPage: React.FC = () => {
             >
               <X size={18} />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Create Material Modal */}
+      {showCreateModal && (
+        <div 
+          className="fixed inset-0 z-[9999] p-4 flex items-center justify-center transition-all duration-300 bg-black/40"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowCreateModal(false);
+              setSelectedFile(null);
+              setFormData({
+                title: "",
+                note: "",
+                originalName: "",
+                mimeType: "",
+                size: 0,
+              });
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl"
+            style={{ backgroundColor: darkMode ? '#0b132b' : '#ffffff', border: '1px solid rgba(255,255,255,0.08)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid #eee' }}>
+              <h3 className="text-xl font-semibold" style={{ color: darkMode ? '#ffffff' : '#111827' }}>
+                Create Material
+              </h3>
+              <button
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setSelectedFile(null);
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                  }
+                  setFormData({
+                    title: "",
+                    note: "",
+                    originalName: "",
+                    mimeType: "",
+                    size: 0,
+                  });
+                }}
+                className="px-3 py-1 rounded-lg text-sm"
+                style={{ backgroundColor: darkMode ? '#1f2937' : '#f3f4f6', color: darkMode ? '#e5e7eb' : '#111827' }}
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateMaterial} className="px-6 py-6" encType="multipart/form-data">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    File (Optional)
+                  </label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleFileChange}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    accept="*/*"
+                  />
+                  {selectedFile && (
+                    <div className="flex items-center justify-between mt-2 p-3 rounded-lg" style={{ backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.05)' }}>
+                      <p className="text-sm flex-1" style={{ color: darkMode ? '#a5b4fc' : '#6366f1' }}>
+                        <span className="font-medium">{selectedFile.name}</span> ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedFile(null);
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = '';
+                          }
+                          setFormData(prev => ({
+                            ...prev,
+                            originalName: "",
+                            mimeType: "",
+                            size: 0,
+                          }));
+                        }}
+                        className="ml-2 px-2 py-1 rounded text-sm"
+                        style={{
+                          backgroundColor: darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2',
+                          color: darkMode ? '#fca5a5' : '#dc2626'
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={e => setFormData({ ...formData, title: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="Material Title"
+                    required
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Note
+                  </label>
+                  <textarea
+                    value={formData.note}
+                    onChange={e => setFormData({ ...formData, note: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border h-24"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="Optional note about this material..."
+                  />
+                </div>
+                {!selectedFile && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                        Original Name
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.originalName}
+                        onChange={e => setFormData({ ...formData, originalName: e.target.value })}
+                        className="w-full px-4 py-2 rounded-lg border"
+                        style={{
+                          backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                          borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                          color: darkMode ? '#ffffff' : '#000000',
+                        }}
+                        placeholder="filename.pdf"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                        MIME Type
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.mimeType}
+                        onChange={e => setFormData({ ...formData, mimeType: e.target.value })}
+                        className="w-full px-4 py-2 rounded-lg border"
+                        style={{
+                          backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                          borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                          color: darkMode ? '#ffffff' : '#000000',
+                        }}
+                        placeholder="application/pdf"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                        Size (bytes)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={formData.size}
+                        onChange={e => setFormData({ ...formData, size: Number(e.target.value) })}
+                        className="w-full px-4 py-2 rounded-lg border"
+                        style={{
+                          backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                          borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                          color: darkMode ? '#ffffff' : '#000000',
+                        }}
+                        placeholder="0"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 px-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setSelectedFile(null);
+                    setFormData({
+                      title: "",
+                      note: "",
+                      originalName: "",
+                      mimeType: "",
+                      size: 0,
+                    });
+                  }}
+                  className="px-4 py-2 rounded-lg"
+                  style={{ backgroundColor: darkMode ? '#1f2937' : '#e5e7eb', color: darkMode ? '#e5e7eb' : '#111827' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-lg text-white font-medium transition-all duration-200"
+                  style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#5b21b6' : '#4338ca';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#4c1d95' : '#4f46e5';
+                  }}
+                >
+                  Create
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Material Modal */}
+      {showEditModal && editingMaterial && (
+        <div 
+          className="fixed inset-0 z-[9999] p-4 flex items-center justify-center transition-all duration-300 bg-black/40"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowEditModal(false);
+              setEditingMaterial(null);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl"
+            style={{ backgroundColor: darkMode ? '#0b132b' : '#ffffff', border: '1px solid rgba(255,255,255,0.08)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid #eee' }}>
+              <h3 className="text-xl font-semibold" style={{ color: darkMode ? '#ffffff' : '#111827' }}>
+                Edit Material
+              </h3>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingMaterial(null);
+                }}
+                className="px-3 py-1 rounded-lg text-sm"
+                style={{ backgroundColor: darkMode ? '#1f2937' : '#f3f4f6', color: darkMode ? '#e5e7eb' : '#111827' }}
+              >
+                Close
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateMaterial} className="px-6 py-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={e => setFormData({ ...formData, title: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="Material Title"
+                    required
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Note
+                  </label>
+                  <textarea
+                    value={formData.note}
+                    onChange={e => setFormData({ ...formData, note: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border h-24"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="Optional note about this material..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Original Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.originalName}
+                    onChange={e => setFormData({ ...formData, originalName: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="filename.pdf"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    MIME Type
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.mimeType}
+                    onChange={e => setFormData({ ...formData, mimeType: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="application/pdf"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
+                    Size (bytes)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={formData.size}
+                    onChange={e => setFormData({ ...formData, size: Number(e.target.value) })}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 px-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingMaterial(null);
+                  }}
+                  className="px-4 py-2 rounded-lg"
+                  style={{ backgroundColor: darkMode ? '#1f2937' : '#e5e7eb', color: darkMode ? '#e5e7eb' : '#111827' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-lg text-white font-medium transition-all duration-200"
+                  style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#5b21b6' : '#4338ca';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#4c1d95' : '#4f46e5';
+                  }}
+                >
+                  Update
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

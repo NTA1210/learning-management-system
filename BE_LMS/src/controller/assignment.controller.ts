@@ -1,5 +1,6 @@
   import { catchErrors } from "../utils/asyncHandler";
-  import { CREATED, OK } from "../constants/http";
+  import { CREATED, OK, BAD_REQUEST } from "../constants/http";
+  import appAssert from "../utils/appAssert";
   import {
     listAssignmentsSchema,
     assignmentIdSchema,
@@ -26,6 +27,8 @@
       dueAfter: query.dueAfter,
       sortBy: query.sortBy,
       sortOrder: query.sortOrder,
+      userId: req.userId,
+      userRole: req.role,
     });
 
     return res.success(OK, {
@@ -37,7 +40,11 @@
 
   export const getAssignmentByIdHandler = catchErrors(async (req, res) => {
     const assignmentId = assignmentIdSchema.parse(req.params.id);
-    const assignment = await getAssignmentById(assignmentId);
+    const assignment = await getAssignmentById(
+      assignmentId,
+      req.userId,
+      req.role
+    );
 
     return res.success(OK, {
       data: assignment,
@@ -47,7 +54,18 @@
 
   export const createAssignmentHandler = catchErrors(async (req, res) => {
     const data = createAssignmentSchema.parse(req.body);
-    const assignment = await createAssignment(data);
+    const { courseId } = req.params as { courseId?: string };
+    appAssert(courseId && courseId.length === 24, BAD_REQUEST, "Missing or invalid course ID");
+
+    const userId = req.userId;
+    const userRole = req.role;
+    appAssert(userId, BAD_REQUEST, "Missing user ID");
+
+    const assignment = await createAssignment(
+      { ...data, courseId },
+      userId,
+      userRole
+    );
 
     return res.success(CREATED, {
       data: assignment,
