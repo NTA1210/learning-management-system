@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type ChangeEvent } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useTheme } from "../hooks/useTheme";
+import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { ChevronLeft, ChevronRight, Trash2, Edit3, ArrowLeft } from "lucide-react";
@@ -29,6 +30,7 @@ export default function QuizCoursePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { darkMode } = useTheme();
+  const { user } = useAuth();
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("Quiz Questions");
@@ -53,8 +55,17 @@ export default function QuizCoursePage() {
   const newImageInputRef = useRef<HTMLInputElement | null>(null);
   // Track current image index for each question
   const [currentImageIndices, setCurrentImageIndices] = useState<Record<string, number>>({});
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const resolvedRole = (user?.role as "admin" | "teacher" | "student") || "teacher";
 
   const apiBase = import.meta.env.VITE_BASE_API || "";
+  const handleToggleSidebar = () => {
+    setMobileSidebarOpen((prev) => !prev);
+  };
+  const handleCloseSidebar = () => {
+    setMobileSidebarOpen(false);
+  };
 
   // Resolve image source from various possible fields
   const resolveImageSrc = (q: QuizQuestion): string[] => {
@@ -622,12 +633,18 @@ export default function QuizCoursePage() {
 
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ backgroundColor: bgColor }}>
-      <Navbar />
-      <div className="flex relative w-full">
-        <Sidebar />
+      <Navbar onToggleSidebar={handleToggleSidebar} />
+      <Sidebar
+        variant="mobile"
+        role={resolvedRole}
+        isOpen={mobileSidebarOpen}
+        onClose={handleCloseSidebar}
+      />
+      <div className="flex relative w-full pt-20 md:pt-24">
+        <Sidebar role={resolvedRole} />
         <div className="flex-1 w-full px-4 sm:px-6 py-6 md:ml-64 relative overflow-x-hidden">
           <div className="max-w-6xl mx-auto">
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h1 className="text-3xl font-bold" style={{ color: textColor }}>
                 {title}
               </h1>
@@ -646,11 +663,11 @@ export default function QuizCoursePage() {
                 
                 
                 
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
                   <div className="w-full md:w-auto">
                     <button
                       onClick={() => navigate(-1)}
-                      className="inline-flex items-center justify-start gap-2 px-4 py-3 rounded-xl font-semibold shadow-lg text-left whitespace-nowrap transition-colors w-full md:w-auto max-w-[220px]"
+                      className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold shadow-lg text-center whitespace-nowrap transition-colors w-full sm:w-auto sm:max-w-[240px] md:hidden"
                       style={{
                         backgroundColor: darkMode ? "rgba(99,102,241,0.25)" : "#6366f1",
                         color: darkMode ? "#a5b4fc" : "#ffffff",
@@ -661,8 +678,8 @@ export default function QuizCoursePage() {
                     </button>
                   </div>
                 
-                  <div>
-                    <p className="text-sm" style={{ color: textColor }}>
+                  <div className="space-y-1 text-left md:text-center">
+                    <p className="text-sm font-medium" style={{ color: textColor }}>
                       Showing{" "}
                       <span className="font-semibold">
                         {startItem} - {endItem}
@@ -671,20 +688,20 @@ export default function QuizCoursePage() {
                       <span className="font-semibold">{totalQuestions}</span> questions
                     </p>
                     {subjectInfo && (
-                      <p className="text-xs mt-1" style={{ color: darkMode ? "#94a3b8" : "#475569" }}>
+                      <p className="text-xs" style={{ color: darkMode ? "#94a3b8" : "#475569" }}>
                         Subject: {subjectInfo.code ? `${subjectInfo.code} · ` : ""}
                         {subjectInfo.name}
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-between md:justify-end">
                     <label className="text-sm" style={{ color: textColor }}>
                       Rows per page
                     </label>
                     <select
                       value={pageSize}
                       onChange={handlePageSizeChange}
-                      className="rounded-lg border px-3 py-1 bg-transparent"
+                      className="rounded-lg border px-3 py-1 bg-transparent flex-1 min-w-[120px] sm:flex-none sm:w-auto"
                       style={{ borderColor: borderColor, color: textColor }}
                     >
                       {pageSizeOptions.map((size) => (
@@ -725,18 +742,12 @@ export default function QuizCoursePage() {
                   </div>
                 </div>
 
-                <div className="flex gap-6 w-full overflow-x-hidden">
-                  <div className="hidden lg:block w-40">
+                <div className="flex flex-col md:flex-row w-full gap-6 overflow-x-hidden">
+                  <div className="hidden md:block w-40 flex-shrink-0">
                     <div className="sticky top-28">
-
-                    </div>
-                  </div>
-
-                  <div className="flex-1 space-y-6">
-                    <div className="mb-4 lg:hidden">
                       <button
                         onClick={() => navigate(-1)}
-                        className="inline-flex items-center justify-start gap-2 px-4 py-2 rounded-lg font-semibold text-left whitespace-nowrap transition-colors max-w-[220px]"
+                        className="inline-flex w-full items-center justify-start gap-2 px-4 py-3 rounded-xl font-semibold shadow-lg text-left whitespace-nowrap transition-colors"
                         style={{
                           backgroundColor: darkMode ? "rgba(99,102,241,0.2)" : "#6366f1",
                           color: darkMode ? "#a5b4fc" : "#ffffff",
@@ -746,29 +757,29 @@ export default function QuizCoursePage() {
                         <span>Back subject</span>
                       </button>
                     </div>
+                  </div>
+                  <div className="flex-1 space-y-6">
                     {quizQuestions.map((question, index) => {
                   const images = resolveImageSrc(question);
                   return (
                     <div
                       key={question._id}
-                      className="rounded-2xl p-6"
+                      className="rounded-2xl w-full p-4 sm:p-6"
                       style={{
                         backgroundColor: cardBg,
                         border: `1px solid ${borderColor}`,
                       }}
                     >
                       <div className="mb-4">
-                        <div className="flex items-start justify-between mb-2">
-                        <h3
-                            className="text-xl font-semibold break-words flex-1"
-                          style={{ color: textColor }}
-                        >
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between mb-2">
+                          <h3
+                            className="text-lg md:text-xl font-semibold break-words flex-1"
+                            style={{ color: textColor }}
+                          >
                             <span className="mr-2">Question {startItem + index}:</span>
-                            <span
-                              dangerouslySetInnerHTML={{ __html: question.text }}
-                            />
-                        </h3>
-                          <div className="flex items-center gap-2 ml-4">
+                            <span dangerouslySetInnerHTML={{ __html: question.text }} />
+                          </h3>
+                          <div className="flex items-center gap-2 md:ml-4 self-end md:self-auto">
                             <button
                               onClick={() => handleOpenEditQuestion(question)}
                               className="p-2 rounded-lg transition-colors flex-shrink-0"
@@ -778,7 +789,7 @@ export default function QuizCoursePage() {
                               }}
                               title="Edit question"
                             >
-                              <Edit3 className="w-5 h-5" />
+                              <Edit3 className="w-4 h-4 md:w-5 md:h-5" />
                             </button>
                             <button
                               onClick={() => handleDeleteQuestion(question._id)}
@@ -790,9 +801,9 @@ export default function QuizCoursePage() {
                                 opacity: deletingId === question._id ? 0.5 : 1,
                                 cursor: deletingId === question._id ? "not-allowed" : "pointer",
                               }}
-                              title="Xóa câu hỏi"
+                              title="Delete question"
                             >
-                              <Trash2 className="w-5 h-5" />
+                              <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
                             </button>
                           </div>
                         </div>
@@ -890,7 +901,7 @@ export default function QuizCoursePage() {
                             return (
                               <div
                                 key={optIndex}
-                                className="p-3 rounded-lg break-words"
+                                className="p-3 rounded-lg break-words text-sm md:text-base"
                                 style={{
                                   backgroundColor: isCorrect
                                     ? darkMode
