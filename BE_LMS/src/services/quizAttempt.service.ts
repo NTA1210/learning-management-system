@@ -17,7 +17,11 @@ import { EnrollQuizInput } from "@/validators/quizAttempt.schemas";
  * @throws  - If the user is not a student or if the user has already completed the quiz or if the user is banned from taking the quiz.
  * @throws  - If the quiz is not found.
  */
-export const enrollQuiz = async ({ quizId, user }: EnrollQuizInput) => {
+export const enrollQuiz = async ({
+  quizId,
+  hashPassword,
+  user,
+}: EnrollQuizInput) => {
   // Chỉ học sinh mới được đăng ký làm bài quiz
   appAssert(
     user.role === Role.STUDENT,
@@ -28,6 +32,13 @@ export const enrollQuiz = async ({ quizId, user }: EnrollQuizInput) => {
   // Logic đăng ký làm bài quiz
   const quiz = await QuizModel.findById(quizId);
   appAssert(quiz, NOT_FOUND, "Quiz not found");
+
+  // Kiem tra mat khau
+  appAssert(
+    quiz.compareHashPassword(hashPassword),
+    BAD_REQUEST,
+    "Invalid password"
+  );
 
   // Kiem tra nguoi dung da lam bai chua
   const quizAttempt = await QuizAttemptModel.findOne({

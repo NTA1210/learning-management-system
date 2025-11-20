@@ -5,6 +5,7 @@ const quizIdSchema = z.string().length(24, "Invalid quiz ID");
 
 export const enrollQuizSchema = z.object({
   quizId: quizIdSchema,
+  hashPassword: z.string(),
 });
 
 export type EnrollUserInfo = {
