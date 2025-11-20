@@ -654,11 +654,13 @@ export const updateCourse = async (
   // Prepare update data
   const updateData: any = { ...data };
 
-  // If teacher tries to publish course, prevent it
-  if (!isAdmin && data.isPublished === true) {
-    // Teacher cannot publish - only admin can approve
+  // ✅ FIX: Teacher CANNOT change isPublished field at all
+  // - Cannot publish (set true)
+  // - Cannot unpublish (set false) if already published by admin
+  if (!isAdmin && data.isPublished !== undefined) {
+    // Teacher tries to change isPublished field
     delete updateData.isPublished;
-    // Note: Course will remain unpublished, need admin to approve
+    // Note: Only admin can control publish status
   }
 
   // ✅ AUTO STATUS: When admin approves (publishes) a DRAFT course, auto change to ONGOING
