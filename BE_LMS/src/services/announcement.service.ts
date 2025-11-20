@@ -4,6 +4,7 @@ import appAssert from "../utils/appAssert";
 import { FORBIDDEN, NOT_FOUND } from "../constants/http";
 import {
     CreateAnnouncementInput,
+    UpdateAnnouncementInput,
 } from "../validators/announcement.schemas";
 import { Role } from "../types/user.type";
 import { Types } from "mongoose";
@@ -107,4 +108,69 @@ export const getAnnouncementById = async (announcementId: string) => {
     appAssert(announcement, NOT_FOUND, `Announcement ${announcementId} not found`);
 
     return announcement;
+};
+
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Cập nhật thông báo.
+ * - Chỉ người tạo (Author) hoặc Admin mới được sửa.
+ *
+ * Input: announcementId, data update, userId, userRole
+ * Output: Updated announcement
+ */
+export const updateAnnouncement = async (
+    announcementId: string,
+    data: UpdateAnnouncementInput,
+    userId: Types.ObjectId,
+    userRole: Role
+) => {
+    const announcement = await AnnouncementModel.findById(announcementId);
+    appAssert(announcement, NOT_FOUND, `Announcement ${announcementId} not found`);
+
+    const isAdmin = userRole === Role.ADMIN;
+    const isAuthor = announcement.authorId?.toString() === userId.toString();
+
+    appAssert(
+        isAdmin || isAuthor,
+        FORBIDDEN,
+        `You do not have permission to update announcement ${announcementId}`
+    );
+
+    const updatedAnnouncement = await AnnouncementModel.findByIdAndUpdate(
+        announcementId,
+        data,
+        { new: true }
+    ).lean();
+
+    return updatedAnnouncement;
+};
+
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Xóa thông báo.
+ * - Chỉ người tạo (Author) hoặc Admin mới được xóa.
+ *
+ * Input: announcementId, userId, userRole
+ * Output: Success message
+ */
+export const deleteAnnouncement = async (
+    announcementId: string,
+    userId: Types.ObjectId,
+    userRole: Role
+) => {
+    const announcement = await AnnouncementModel.findById(announcementId);
+    appAssert(announcement, NOT_FOUND, `Announcement ${announcementId} not found`);
+
+    const isAdmin = userRole === Role.ADMIN;
+    const isAuthor = announcement.authorId?.toString() === userId.toString();
+
+    appAssert(
+        isAdmin || isAuthor,
+        FORBIDDEN,
+        `You do not have permission to delete announcement ${announcementId}`
+    );
+
+    await AnnouncementModel.findByIdAndDelete(announcementId);
+
+    return { message: "Announcement deleted successfully" };
 };

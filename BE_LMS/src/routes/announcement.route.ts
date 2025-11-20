@@ -3,6 +3,8 @@ import {
     createAnnouncementHandler,
     getAnnouncementsByCourseHandler,
     getAnnouncementByIdHandler,
+    updateAnnouncementHandler,
+    deleteAnnouncementHandler,
 } from "../controller/announcement.controller";
 import authorize from "../middleware/authorize";
 import { Role } from "../types/user.type";
@@ -26,5 +28,19 @@ announcementRoutes.get(
 
 // GET /announcements/:id - Get announcement details
 announcementRoutes.get("/:id", getAnnouncementByIdHandler);
+
+// PUT /announcements/:id - Update announcement (Teacher/Admin only)
+announcementRoutes.put(
+    "/:id",
+    authorize(Role.TEACHER, Role.ADMIN),
+    updateAnnouncementHandler
+);
+
+// DELETE /announcements/:id - Delete announcement (Teacher/Admin only)
+announcementRoutes.delete(
+    "/:id",
+    authorize(Role.TEACHER, Role.ADMIN),
+    deleteAnnouncementHandler
+);
 
 export default announcementRoutes;

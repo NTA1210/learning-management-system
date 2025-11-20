@@ -8,6 +8,13 @@ export const createAnnouncementSchema = z.object({
 
 export type CreateAnnouncementInput = z.infer<typeof createAnnouncementSchema>;
 
+export const updateAnnouncementSchema = z.object({
+    title: z.string().min(5).max(255).optional(),
+    content: z.string().min(10).optional(),
+});
+
+export type UpdateAnnouncementInput = z.infer<typeof updateAnnouncementSchema>;
+
 export const announcementIdSchema = z.string().min(1, "Announcement ID is required");
 export const courseIdParamSchema = z.string().length(24, "Invalid course ID");
 

@@ -2,6 +2,7 @@ import { catchErrors } from "../utils/asyncHandler";
 import { CREATED, OK } from "../constants/http";
 import {
     createAnnouncementSchema,
+    updateAnnouncementSchema,
     announcementIdSchema,
     courseIdParamSchema,
     getAnnouncementsQuerySchema,
@@ -10,6 +11,8 @@ import {
     createAnnouncement,
     getAnnouncementsByCourse,
     getAnnouncementById,
+    updateAnnouncement,
+    deleteAnnouncement,
 } from "../services/announcement.service";
 
 /**
@@ -58,5 +61,44 @@ export const getAnnouncementByIdHandler = catchErrors(async (req, res) => {
     return res.success(OK, {
         data: announcement,
         message: "Announcement retrieved successfully",
+    });
+});
+
+/**
+ * PUT /announcements/:id
+ * Update an announcement
+ */
+export const updateAnnouncementHandler = catchErrors(async (req, res) => {
+    const announcementId = announcementIdSchema.parse(req.params.id);
+    const data = updateAnnouncementSchema.parse(req.body);
+    const userId = req.userId;
+    const userRole = req.role;
+
+    const updatedAnnouncement = await updateAnnouncement(
+        announcementId,
+        data,
+        userId,
+        userRole
+    );
+
+    return res.success(OK, {
+        data: updatedAnnouncement,
+        message: "Announcement updated successfully",
+    });
+});
+
+/**
+ * DELETE /announcements/:id
+ * Delete an announcement
+ */
+export const deleteAnnouncementHandler = catchErrors(async (req, res) => {
+    const announcementId = announcementIdSchema.parse(req.params.id);
+    const userId = req.userId;
+    const userRole = req.role;
+
+    const result = await deleteAnnouncement(announcementId, userId, userRole);
+
+    return res.success(OK, {
+        message: result.message,
     });
 });
