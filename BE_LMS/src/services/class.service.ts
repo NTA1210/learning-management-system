@@ -663,7 +663,6 @@ export const updateEnrollmentCount = async (classId: string) => {
  */
 export const classHasCapacity = async (classId: string): Promise<boolean> => {
     const classData = await ClassModel.findById(classId);
-
     appAssert(classData, NOT_FOUND, "Class not found");
 
     const currentCount = await EnrollmentModel.countDocuments({
