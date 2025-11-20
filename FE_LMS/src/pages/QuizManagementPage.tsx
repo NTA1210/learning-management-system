@@ -619,14 +619,14 @@ const handleImportQuiz = async () => {
                   <Download className="w-5 h-5" />
                   Export quiz
                 </button>
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
-                  style={{ backgroundColor: "#4f46e5", color: "#ffffff" }}
-                >
-                  <PlusCircle className="w-5 h-5" />
-                  Create quiz
-                </button>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
+                style={{ backgroundColor: "#4f46e5", color: "#ffffff" }}
+              >
+                <PlusCircle className="w-5 h-5" />
+                Create quiz
+              </button>
               </div>
             </header>
 

@@ -37,7 +37,7 @@ export default function QuizCoursePage() {
   const [subjectInfo, setSubjectInfo] = useState<Subject | null>(null);
   const [totalQuestions, setTotalQuestions] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(1000);
+  const [pageSize, setPageSize] = useState(100);
   const [paginationInfo, setPaginationInfo] = useState({
     totalItems: 0,
     currentPage: 1,
@@ -371,7 +371,11 @@ export default function QuizCoursePage() {
     }
   };
 
-  const pageSizeOptions = [20, 50, 100, 500, 1000];
+  const pageSizeOptions = [20, 50, 100];
+  const pageOptions = Array.from(
+    { length: Math.max(1, paginationInfo.totalPages) },
+    (_, index) => index + 1
+  );
 
   const goToPage = (page: number) => {
     const total = Math.max(1, paginationInfo.totalPages);
@@ -640,126 +644,115 @@ export default function QuizCoursePage() {
         isOpen={mobileSidebarOpen}
         onClose={handleCloseSidebar}
       />
-      <div className="flex relative w-full pt-20 md:pt-24">
+      <div className="flex relative w-full pt-32 md:pt-28 lg:pt-24">
         <Sidebar role={resolvedRole} />
-        <div className="flex-1 w-full px-4 sm:px-6 py-6 md:ml-64 relative overflow-x-hidden">
+        <div className="flex-1 w-full px-4 sm:px-6 py-6 md:ml-[50px] relative overflow-x-hidden">
           <div className="max-w-6xl mx-auto">
-            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h1 className="text-3xl font-bold" style={{ color: textColor }}>
-                {title}
-              </h1>
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between md:ml-[50px]">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => navigate(-1)}
+                  className="inline-flex items-center justify-center rounded-xl shadow-lg transition-colors w-18 h-20 sm:w-12 sm:h-12 -ml-1 sm:-ml-3 md:-ml-6"
+                  style={{
+                    backgroundColor: darkMode ? "rgba(99,102,241,0.25)" : "#6366f1",
+                    color: darkMode ? "#a5b4fc" : "#ffffff",
+                  }}
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                  <span className="sr-only">Back to subjects</span>
+                </button>
+                <h1 className="text-3xl font-bold" style={{ color: textColor }}>
+                  {title}
+                </h1>
+              </div>
             </div>
 
-            {loading ? (
-              <div className="text-center py-12">
-                <p style={{ color: textColor }}>Loading...</p>
-              </div>
-            ) : quizQuestions.length === 0 ? (
-              <div className="text-center py-12">
-                <p style={{ color: textColor }}>No questions.</p>
-              </div>
-            ) : (
-              <>
-                
-                
-                
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
-                  <div className="w-full md:w-auto">
-                    <button
-                      onClick={() => navigate(-1)}
-                      className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold shadow-lg text-center whitespace-nowrap transition-colors w-full sm:w-auto sm:max-w-[240px] md:hidden"
-                      style={{
-                        backgroundColor: darkMode ? "rgba(99,102,241,0.25)" : "#6366f1",
-                        color: darkMode ? "#a5b4fc" : "#ffffff",
-                      }}
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                      <span>Back subject</span>
-                    </button>
-                  </div>
-                
-                  <div className="space-y-1 text-left md:text-center">
-                    <p className="text-sm font-medium" style={{ color: textColor }}>
-                      Showing{" "}
-                      <span className="font-semibold">
-                        {startItem} - {endItem}
-                      </span>{" "}
-                      of{" "}
-                      <span className="font-semibold">{totalQuestions}</span> questions
-                    </p>
-                    {subjectInfo && (
-                      <p className="text-xs" style={{ color: darkMode ? "#94a3b8" : "#475569" }}>
-                        Subject: {subjectInfo.code ? `${subjectInfo.code} · ` : ""}
-                        {subjectInfo.name}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-                    <label className="text-sm" style={{ color: textColor }}>
-                      Rows per page
-                    </label>
-                    <select
-                      value={pageSize}
-                      onChange={handlePageSizeChange}
-                      className="rounded-lg border px-3 py-1 bg-transparent flex-1 min-w-[120px] sm:flex-none sm:w-auto"
-                      style={{ borderColor: borderColor, color: textColor }}
-                    >
-                      {pageSizeOptions.map((size) => (
-                        <option key={size} value={size} className="bg-slate-900 text-white">
-                          {size}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handlePageChange("prev")}
-                        disabled={!paginationInfo.hasPrev}
-                        className="p-2 rounded-lg border transition-colors"
-                        style={{
-                          borderColor: borderColor,
-                          color: paginationInfo.hasPrev ? textColor : "#94a3b8",
-                          opacity: paginationInfo.hasPrev ? 1 : 0.4,
-                        }}
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <span className="text-sm" style={{ color: textColor }}>
-                        Page {paginationInfo.currentPage} / {paginationInfo.totalPages}
-                      </span>
-                      <button
-                        onClick={() => handlePageChange("next")}
-                        disabled={!paginationInfo.hasNext}
-                        className="p-2 rounded-lg border transition-colors"
-                        style={{
-                          borderColor: borderColor,
-                          color: paginationInfo.hasNext ? textColor : "#94a3b8",
-                          opacity: paginationInfo.hasNext ? 1 : 0.4,
-                        }}
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+            <div className="md:pl-12">
+              {loading ? (
+                <div className="text-center py-12">
+                  <p style={{ color: textColor }}>Loading...</p>
                 </div>
+              ) : quizQuestions.length === 0 ? (
+                <div className="text-center py-12">
+                  <p style={{ color: textColor }}>No questions.</p>
+                </div>
+              ) : (
+                <>
+                  
+                  
+                  
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-6">
+                    <div className="space-y-1 text-left w-full md:flex-1">
+                      <p className="text-sm font-medium" style={{ color: textColor }}>
+                        Showing{" "}
+                        <span className="font-semibold">
+                          {startItem} - {endItem}
+                        </span>{" "}
+                        of{" "}
+                        <span className="font-semibold">{totalQuestions}</span> questions
+                      </p>
+                      {subjectInfo && (
+                        <p className="text-xs" style={{ color: darkMode ? "#94a3b8" : "#475569" }}>
+                          Subject: {subjectInfo.code ? `${subjectInfo.code} · ` : ""}
+                          {subjectInfo.name}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-3 w-full sm:flex-row sm:items-center sm:gap-4 sm:justify-end md:w-auto">
+                      <div className="flex flex-col gap-1 w-full sm:w-44">
+                        <label className="text-sm" style={{ color: textColor }}>
+                          Rows per page
+                        </label>
+                        <select
+                          value={pageSize}
+                          onChange={handlePageSizeChange}
+                          className="rounded-lg border px-3 py-1 bg-transparent w-full"
+                          style={{ borderColor: borderColor, color: textColor }}
+                        >
+                          {pageSizeOptions.map((size) => (
+                            <option key={size} value={size} className="bg-slate-900 text-white">
+                              {size}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-1 self-start md:self-auto mt-[23px]">
 
-                <div className="flex flex-col md:flex-row w-full gap-6 overflow-x-hidden">
-                  <div className="hidden md:block w-40 flex-shrink-0">
-                    <div className="sticky top-28">
-                      <button
-                        onClick={() => navigate(-1)}
-                        className="inline-flex w-full items-center justify-start gap-2 px-4 py-3 rounded-xl font-semibold shadow-lg text-left whitespace-nowrap transition-colors"
-                        style={{
-                          backgroundColor: darkMode ? "rgba(99,102,241,0.2)" : "#6366f1",
-                          color: darkMode ? "#a5b4fc" : "#ffffff",
-                        }}
-                      >
-                        <ArrowLeft className="w-4 h-4" />
-                        <span>Back subject</span>
-                      </button>
+
+                        <button
+                          onClick={() => handlePageChange("prev")}
+                          disabled={!paginationInfo.hasPrev}
+                          className="p-2 rounded-lg border transition-colors"
+                          style={{
+                            borderColor: borderColor,
+                            color: paginationInfo.hasPrev ? textColor : "#94a3b8",
+                            opacity: paginationInfo.hasPrev ? 1 : 0.4,
+                          }}
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                        </button>
+                        <span className="text-sm" style={{ color: textColor }}>
+                          Page {paginationInfo.currentPage} / {paginationInfo.totalPages}
+                        </span>
+                        <button
+                          onClick={() => handlePageChange("next")}
+                          disabled={!paginationInfo.hasNext}
+                          className="p-2 rounded-lg border transition-colors"
+                          style={{
+                            borderColor: borderColor,
+                            color: paginationInfo.hasNext ? textColor : "#94a3b8",
+                            opacity: paginationInfo.hasNext ? 1 : 0.4,
+                          }}
+                        >
+                          <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex-1 space-y-6">
-                    {quizQuestions.map((question, index) => {
+
+                  <div className="flex flex-col w-full gap-6 overflow-x-hidden">
+                    <div className="flex-1 space-y-6">
+                {quizQuestions.map((question, index) => {
                   const images = resolveImageSrc(question);
                   return (
                     <div
@@ -771,18 +764,18 @@ export default function QuizCoursePage() {
                       }}
                     >
                       <div className="mb-4">
-                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between mb-2">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-6 mb-2">
                           <h3
-                            className="text-lg md:text-xl font-semibold break-words flex-1"
+                            className="text-lg md:text-xl font-semibold break-words flex-1 leading-relaxed"
                             style={{ color: textColor }}
                           >
                             <span className="mr-2">Question {startItem + index}:</span>
                             <span dangerouslySetInnerHTML={{ __html: question.text }} />
                           </h3>
-                          <div className="flex items-center gap-2 md:ml-4 self-end md:self-auto">
+                          <div className="flex items-center gap-2 md:gap-3 md:ml-4 self-end md:self-auto md:flex-shrink-0">
                             <button
                               onClick={() => handleOpenEditQuestion(question)}
-                              className="p-2 rounded-lg transition-colors flex-shrink-0"
+                              className="p-1.5 sm:p-2 rounded-lg transition-colors flex items-center justify-center"
                               style={{
                                 backgroundColor: darkMode ? "rgba(59,130,246,0.2)" : "#e0f2fe",
                                 color: darkMode ? "#93c5fd" : "#0369a1",
@@ -794,7 +787,7 @@ export default function QuizCoursePage() {
                             <button
                               onClick={() => handleDeleteQuestion(question._id)}
                               disabled={deletingId === question._id}
-                              className="p-2 rounded-lg transition-colors flex-shrink-0"
+                              className="p-1.5 sm:p-2 rounded-lg transition-colors flex items-center justify-center"
                               style={{
                                 backgroundColor: darkMode ? "rgba(239, 68, 68, 0.2)" : "#fee2e2",
                                 color: darkMode ? "#fca5a5" : "#dc2626",
@@ -925,7 +918,7 @@ export default function QuizCoursePage() {
                                 </span>
                                 {option}
                                 {isCorrect && (
-                                  <span className="ml-2 text-green-500">✓ (Đúng)</span>
+                                  <span className="ml-2 text-green-500">✓ (True)</span>
                                 )}
                               </div>
                             );
@@ -942,43 +935,59 @@ export default function QuizCoursePage() {
                       )}
                     </div>
                   );
-                    })}
+                })}
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mt-8">
-                  <p className="text-sm" style={{ color: textColor }}>
-                    Page {paginationInfo.currentPage} of {paginationInfo.totalPages}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handlePageChange("prev")}
-                      disabled={!paginationInfo.hasPrev}
-                      className="px-4 py-2 rounded-lg border transition-colors"
-                      style={{
-                        borderColor: borderColor,
-                        color: paginationInfo.hasPrev ? textColor : "#94a3b8",
-                        opacity: paginationInfo.hasPrev ? 1 : 0.4,
-                      }}
-                    >
-                      Previous
-                    </button>
-                    <button
-                      onClick={() => handlePageChange("next")}
-                      disabled={!paginationInfo.hasNext}
-                      className="px-4 py-2 rounded-lg border transition-colors"
-                      style={{
-                        borderColor: borderColor,
-                        color: paginationInfo.hasNext ? textColor : "#94a3b8",
-                        opacity: paginationInfo.hasNext ? 1 : 0.4,
-                      }}
-                    >
-                      Next
-                    </button>
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mt-8 mb-12">
+                    <p className="text-sm" style={{ color: textColor }}>
+                      Page {paginationInfo.currentPage} of {paginationInfo.totalPages}
+                    </p>
+                    <div className="flex flex-wrap gap-2 justify-center items-center">
+                      <button
+                        onClick={() => handlePageChange("prev")}
+                        disabled={!paginationInfo.hasPrev}
+                        className="px-3 py-1.5 rounded-lg border transition-colors"
+                        style={{
+                          borderColor: borderColor,
+                          color: paginationInfo.hasPrev ? textColor : "#94a3b8",
+                          opacity: paginationInfo.hasPrev ? 1 : 0.4,
+                        }}
+                      >
+                        Previous
+                      </button>
+                      {pageOptions.map((page) => (
+                        <button
+                          key={`bottom-${page}`}
+                          onClick={() => goToPage(page)}
+                          className={`px-3 py-1 rounded-lg border text-sm transition-colors ${
+                            currentPage === page ? "bg-indigo-500 text-white" : ""
+                          }`}
+                          style={{
+                            borderColor: borderColor,
+                            color: currentPage === page ? "#ffffff" : textColor,
+                          }}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => handlePageChange("next")}
+                        disabled={!paginationInfo.hasNext}
+                        className="px-3 py-1.5 rounded-lg border transition-colors"
+                        style={{
+                          borderColor: borderColor,
+                          color: paginationInfo.hasNext ? textColor : "#94a3b8",
+                          opacity: paginationInfo.hasNext ? 1 : 0.4,
+                        }}
+                      >
+                        Next
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
