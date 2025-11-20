@@ -415,8 +415,11 @@ export const createCourse = async (
     // Force isPublished = false regardless of input
     finalIsPublished = false;
   } else {
+    // ✅ AUTO PUBLISH: Admin tạo course thì luôn publish
+    finalIsPublished = true;
+
     // ✅ AUTO STATUS: Admin tạo và publish luôn → status = ONGOING
-    if (finalIsPublished && finalStatus === CourseStatus.DRAFT) {
+    if (finalStatus === CourseStatus.DRAFT) {
       finalStatus = CourseStatus.ONGOING;
     }
   }
