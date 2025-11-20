@@ -1,5 +1,55 @@
 @import "tailwindcss";
 
+:root {
+  color-scheme: light;
+  --page-bg: #f8fafc;
+  --page-text: #1e293b;
+  --heading-text: #1f2937;
+  --muted-text: #6b7280;
+  --input-bg: #ffffff;
+  --input-border: #e5e7eb;
+  --input-text: #000000;
+  --error-bg: #fee2e2;
+  --error-text: #dc2626;
+  --spinner-border: #4f46e5;
+  --card-surface: rgba(255, 255, 255, 0.9);
+  --card-border: rgba(229, 231, 235, 0.5);
+  --card-selected-bg: rgba(99, 102, 241, 0.1);
+  --card-selected-border: #4f46e5;
+  --divider-color: rgba(229, 231, 235, 0.5);
+  --status-neutral-bg: rgba(156, 163, 175, 0.1);
+  --status-neutral-text: #6b7280;
+  --status-available-bg: rgba(34, 197, 94, 0.1);
+  --status-available-text: #16a34a;
+  --status-closed-bg: rgba(239, 68, 68, 0.1);
+  --status-closed-text: #dc2626;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page-bg: #1a202c;
+  --page-text: #ffffff;
+  --heading-text: #ffffff;
+  --muted-text: #d1d5db;
+  --input-bg: rgba(55, 65, 81, 0.8);
+  --input-border: rgba(75, 85, 99, 0.3);
+  --input-text: #ffffff;
+  --error-bg: rgba(239, 68, 68, 0.1);
+  --error-text: #fca5a5;
+  --spinner-border: #6366f1;
+  --card-surface: rgba(31, 41, 55, 0.8);
+  --card-border: rgba(75, 85, 99, 0.3);
+  --card-selected-bg: rgba(99, 102, 241, 0.3);
+  --card-selected-border: #6366f1;
+  --divider-color: rgba(75, 85, 99, 0.3);
+  --status-neutral-bg: rgba(156, 163, 175, 0.2);
+  --status-neutral-text: #9ca3af;
+  --status-available-bg: rgba(34, 197, 94, 0.2);
+  --status-available-text: #86efac;
+  --status-closed-bg: rgba(239, 68, 68, 0.2);
+  --status-closed-text: #fca5a5;
+}
+
 /* Ensure dark mode works with Tailwind */
 .dark {
   color-scheme: dark;
@@ -8,6 +58,13 @@
 /* Add smooth transitions for dark mode */
 * {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+html.theme-transition-disabled *,
+html.theme-transition-disabled *::before,
+html.theme-transition-disabled *::after {
+  transition: none !important;
+  animation: none !important;
 }
 
 /* Custom scrollbar for dark mode */
