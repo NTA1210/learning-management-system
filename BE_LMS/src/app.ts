@@ -1,15 +1,17 @@
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import {Role} from "./types";
-import {uploadFile} from "./utils/uploadFile";
+import { Role } from "./types";
+import { uploadFile } from "./utils/uploadFile";
+import "./models/semester.model"; // ✅ Register Semester model
+
 
 //config
 import upload from "./config/multer";
 
 //constants
-import {OK} from "./constants/http";
-import {APP_ORIGIN} from "./constants/env";
+import { OK } from "./constants/http";
+import { APP_ORIGIN } from "./constants/env";
 
 //middleware
 import {authenticate, authorize, customResponse, errorHandler,} from "./middleware";
@@ -48,7 +50,7 @@ export const createApp = () => {
 
     app.use(customResponse);
     app.use(express.json());
-    app.use(express.urlencoded({extended: true}));
+    app.use(express.urlencoded({ extended: true }));
     app.use(
         cors({
             origin: APP_ORIGIN,
@@ -65,7 +67,7 @@ export const createApp = () => {
     app.post("/uploadExample", upload.single("file"), async (req, res) => {
         const file = req.file;
         if (!file) {
-            return res.status(400).json({error: "No file uploaded"});
+            return res.status(400).json({ error: "No file uploaded" });
         }
         const result = await uploadFile(file, "/example");
         res.status(200).json(result);
