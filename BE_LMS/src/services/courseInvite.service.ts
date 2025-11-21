@@ -6,12 +6,12 @@ import {
   NOT_FOUND,
 } from "@/constants/http";
 import { CourseInviteModel, CourseModel, UserModel, EnrollmentModel } from "@/models";
-import { Role, EnrollmentStatus, EnrollmentMethod} from "@/types";
+import { Role, EnrollmentStatus, EnrollmentMethod, ICourse } from "@/types";
 import appAssert from "@/utils/appAssert";
 import { APP_ORIGIN } from "@/constants/env";
-import { TCreateCourseInvite, TListCourseInvite, TUpdateCourseInvite, TCourseInviteId } from "@/validators/courseInvite.schemas";
+import { TCreateCourseInvite, TListCourseInvite, TUpdateCourseInvite } from "@/validators/courseInvite.schemas";
 import ICourseInvite from "@/types/courseInvite.type";
-import { FilterQuery } from "mongoose";
+import { FilterQuery, Types } from "mongoose";
 
 /**
  * Yêu cầu nghiệp vụ:
@@ -29,7 +29,7 @@ import { FilterQuery } from "mongoose";
  */
 export const createCourseInvite = async (
   data: TCreateCourseInvite,
-  createdBy: string
+  createdBy: Types.ObjectId
 ) => {
   const { courseId, expiresInDays, maxUses, invitedEmails } = data;
 
@@ -42,8 +42,8 @@ export const createCourseInvite = async (
   appAssert(user, NOT_FOUND, "User not found");
 
   if (user.role !== Role.ADMIN) {
-    const isTeacherOfCourse = course.teacherIds.some(
-      (teacherId) => teacherId.toString() === createdBy
+    const isTeacherOfCourse = course.teacherIds.some((teacherId) =>
+      teacherId.equals(createdBy)
     );
     appAssert(
       isTeacherOfCourse,
@@ -69,6 +69,7 @@ export const createCourseInvite = async (
     invitedEmail: email,
     isActive: true,
     expiresAt: { $gt: new Date() },
+    deletedAt: null //chỉ check deletedAt
   })
 
   if (existing) {
@@ -140,7 +141,7 @@ export const createCourseInvite = async (
  * Output: enrollment record
  */
 
-export const joinCourseByInvite = async (token: string, userId: string) => {
+export const joinCourseByInvite = async (token: string, userId: Types.ObjectId) => {
   //Hash token bằng SHA256 để tìm trong DB
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex")
 
@@ -153,6 +154,13 @@ export const joinCourseByInvite = async (token: string, userId: string) => {
   //ktra tồn tại
 
   appAssert(invite, NOT_FOUND, "Invalid or expired invite link");
+
+  //Check deleted, chặn sử dụng link đã xóa
+  appAssert(
+    !invite.deletedAt,
+    BAD_REQUEST,
+    "This invite link has been deleted"
+  );
 
   //ktra active === true
   appAssert(invite.isActive, BAD_REQUEST, "This invite link is no longer active");
@@ -236,12 +244,14 @@ export const joinCourseByInvite = async (token: string, userId: string) => {
 
 export const listCourseInvites = async (
   query: TListCourseInvite,
-  viewerId: string,
+  viewerId: Types.ObjectId,
   viewerRole: Role,
 ) => {
   const { courseId, invitedEmail, isActive, page, limit, from, to } = query;
 // Build filter query
-  const filter: FilterQuery<ICourseInvite> = {};
+  const filter: FilterQuery<ICourseInvite> = {
+    deletedAt: null, //Mặc định ẩn invite đã xóa
+  };
   // Filter by courseId
   if(courseId) {
     filter.courseId = courseId;
@@ -328,7 +338,7 @@ export const listCourseInvites = async (
 export const updateCourseInvite = async (
   inviteId: string,
   data: TUpdateCourseInvite,
-  updatedBy: string
+  updatedBy: Types.ObjectId
 ) => {
   // Tìm invite trong DB
   const invite = await CourseInviteModel.findById(inviteId).populate(
@@ -337,14 +347,21 @@ export const updateCourseInvite = async (
   );
   appAssert(invite, NOT_FOUND, "Course invite not found");
 
+  //CRITICAL: Không cho phép update invite đã xóa
+  appAssert(
+    !invite.deletedAt,
+    BAD_REQUEST,
+    "Cannot update deleted invite. Please create a new one."
+  );
+
   // Kiểm tra quyền: chỉ teacher của khóa học hoặc admin mới cập nhật được
   const user = await UserModel.findById(updatedBy);
   appAssert(user, NOT_FOUND, "User not found");
 
   if (user.role !== Role.ADMIN) {
-    const course = invite.courseId as any;
-    const isTeacherOfCourse = course.teacherIds.some(
-      (teacherId: any) => teacherId.toString() === updatedBy
+    const course = invite.courseId as unknown as ICourse;
+    const isTeacherOfCourse = course.teacherIds.some((teacherId) =>
+      teacherId.equals(updatedBy)
     );
     appAssert(
       isTeacherOfCourse,
@@ -417,5 +434,73 @@ export const updateCourseInvite = async (
     isActive: updatedInvite.isActive,
     createdAt: updatedInvite.createdAt,
     updatedAt: updatedInvite.updatedAt,
+  };
+};
+
+/**
+ * Xóa vĩnh viễn invite link (soft delete)
+ * 
+ * Business Rules:
+ * 1. Permission:
+ *    - Chỉ teacher của course hoặc admin mới được xóa
+ * 
+ * 2. Sau khi xóa (deletedAt != null), invite KHÔNG THỂ:
+ *    - Enable lại (bất kỳ cách nào)
+ *    - Sử dụng token để join course
+ *    - Hiển thị trong danh sách mặc định
+ * 
+ * 3. Data retention (soft delete):
+ *    - Vẫn tồn tại trong DB
+ *    - Giữ nguyên history: usedCount, invitedEmails, createdAt, ...
+ *    - Có thể query với param includeDeleted=true (nếu cần audit)
+ * 
+ * 4. Side effects:
+ *    - Auto set isActive=false khi xóa
+ *    - Ghi lại deletedAt timestamp
+ *    - Idempotent: Gọi lại không throw error
+ */
+export const deleteCourseInvite = async (
+  inviteId: string,
+  userId: Types.ObjectId
+) => {
+  // 1. Tìm invite
+  const invite = await CourseInviteModel.findById(inviteId).populate(
+    "courseId",
+    "title teacherIds"
+  );
+  appAssert(invite, NOT_FOUND, "Course invite not found");
+
+  // 2. Kiểm tra quyền (same as PATCH)
+  const user = await UserModel.findById(userId);
+  appAssert(user, NOT_FOUND, "User not found");
+
+  if (user.role !== Role.ADMIN) {
+    const course = invite.courseId as unknown as ICourse;
+    const isTeacherOfCourse = course.teacherIds.some((teacherId) =>
+      teacherId.equals(userId)
+    );
+    appAssert(
+      isTeacherOfCourse,
+      FORBIDDEN,
+      "Only course teachers or admin can delete invite links"
+    );
+  }
+
+  // 3. Kiểm tra đã xóa chưa (idempotent - không throw error)
+  if (invite.deletedAt) {
+    return {
+      message: "Invite already deleted",
+      deletedAt: invite.deletedAt,
+    };
+  }
+         
+  // 4. Soft delete - đánh dấu xóa
+  invite.deletedAt = new Date();
+  invite.isActive = false; 
+  await invite.save();
+
+  return {
+    message: "Invite deleted successfully",
+    deletedAt: invite.deletedAt,
   };
 };

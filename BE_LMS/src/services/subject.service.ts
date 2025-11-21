@@ -1,4 +1,9 @@
-import { SubjectModel, CourseModel, UserModel } from "../models";
+import {
+  SubjectModel,
+  CourseModel,
+  UserModel,
+  QuizQuestionModel,
+} from "../models";
 import appAssert from "../utils/appAssert";
 import { CONFLICT, NOT_FOUND, FORBIDDEN } from "../constants/http";
 import { ISubject, Role } from "@/types";
@@ -77,7 +82,7 @@ export const listSubjects = async ({
   sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
   const [subjects, total] = await Promise.all([
-    SubjectModel.find(filter).sort(sort).skip(skip).limit(limit).lean(),
+    SubjectModel.find(filter).populate("specialistIds").sort(sort).skip(skip).limit(limit).lean(),
     SubjectModel.countDocuments(filter),
   ]);
 
@@ -118,8 +123,6 @@ export const getSubjectBySlug = async (slug: string) => {
   return subject;
 };
 
-
-
 /**
  * Nghiệp vụ: Danh sách môn tiên quyết của một Subject (populate tối thiểu).
  */
@@ -157,7 +160,9 @@ export const searchSubjectsAutocomplete = async (query: string, limit = 10) => {
 export const getRelatedSubjects = async (subjectId: string, limit = 10) => {
   const subject = await SubjectModel.findById(subjectId).lean();
   appAssert(subject, NOT_FOUND, "Subject not found");
-  const specialistIds = (subject.specialistIds || []).map((id: any) => new mongoose.Types.ObjectId(id));
+  const specialistIds = (subject.specialistIds || []).map(
+    (id: any) => new mongoose.Types.ObjectId(id)
+  );
   const related = await SubjectModel.find({
     _id: { $ne: subject._id },
     $or: [
@@ -171,7 +176,6 @@ export const getRelatedSubjects = async (subjectId: string, limit = 10) => {
     .lean();
   return related;
 };
-
 
 /**
  * Helper function: Kiểm tra quyền truy cập subject
@@ -189,13 +193,19 @@ const checkSubjectPermission = async (
   }
 
   // Nếu không phải teacher thì không có quyền
-  appAssert(userRole === Role.TEACHER, FORBIDDEN, "Only admin and teacher can access this resource");
+  appAssert(
+    userRole === Role.TEACHER,
+    FORBIDDEN,
+    "Only admin and teacher can access this resource"
+  );
 
   // Lấy thông tin user để kiểm tra specialistIds
   const user = await UserModel.findById(userId).lean();
   appAssert(user, NOT_FOUND, "User not found");
 
-  const userSpecialistIds = (user.specialistIds || []).map((id: any) => id.toString());
+  const userSpecialistIds = (user.specialistIds || []).map((id: any) =>
+    id.toString()
+  );
 
   // Nếu teacher không có specialistIds thì không có quyền
   appAssert(
@@ -205,7 +215,9 @@ const checkSubjectPermission = async (
   );
 
   // Kiểm tra xem teacher có specialistIds trùng với subject không
-  const subjectSpecialistIds = (subject.specialistIds || []).map((id: any) => id.toString());
+  const subjectSpecialistIds = (subject.specialistIds || []).map((id: any) =>
+    id.toString()
+  );
 
   const hasAccess = userSpecialistIds.some((userSpecId: string) =>
     subjectSpecialistIds.includes(userSpecId)
@@ -232,7 +244,9 @@ export const createSubject = async (
   if (userRole === Role.TEACHER) {
     const user = await UserModel.findById(userId).lean();
     appAssert(user, NOT_FOUND, "User not found");
-    const userSpecialistIds = (user.specialistIds || []).map((id: any) => id.toString());
+    const userSpecialistIds = (user.specialistIds || []).map((id: any) =>
+      id.toString()
+    );
     appAssert(
       userSpecialistIds.length > 0,
       FORBIDDEN,
@@ -240,7 +254,9 @@ export const createSubject = async (
     );
 
     // Kiểm tra xem tất cả specialistIds trong data có thuộc về teacher không
-    const dataSpecialistIds = (data.specialistIds || []).map((id: any) => id.toString());
+    const dataSpecialistIds = (data.specialistIds || []).map((id: any) =>
+      id.toString()
+    );
     const allAssigned = dataSpecialistIds.every((specId: string) =>
       userSpecialistIds.includes(specId)
     );
@@ -257,12 +273,20 @@ export const createSubject = async (
 
   if (data.slug) {
     const existingBySlug = await SubjectModel.findOne({ slug: data.slug });
-    appAssert(!existingBySlug, CONFLICT, "Subject with this slug already exists");
+    appAssert(
+      !existingBySlug,
+      CONFLICT,
+      "Subject with this slug already exists"
+    );
   }
 
   if (data.code) {
     const existingByCode = await SubjectModel.findOne({ code: data.code });
-    appAssert(!existingByCode, CONFLICT, "Subject with this code already exists");
+    appAssert(
+      !existingByCode,
+      CONFLICT,
+      "Subject with this code already exists"
+    );
   }
 
   return await SubjectModel.create(data);
@@ -289,8 +313,12 @@ export const updateSubjectById = async (
   if (userRole === Role.TEACHER && data.specialistIds) {
     const user = await UserModel.findById(userId).lean();
     appAssert(user, NOT_FOUND, "User not found");
-    const userSpecialistIds = (user.specialistIds || []).map((id: any) => id.toString());
-    const dataSpecialistIds = (data.specialistIds || []).map((id: any) => id.toString());
+    const userSpecialistIds = (user.specialistIds || []).map((id: any) =>
+      id.toString()
+    );
+    const dataSpecialistIds = (data.specialistIds || []).map((id: any) =>
+      id.toString()
+    );
     const allAssigned = dataSpecialistIds.every((specId: string) =>
       userSpecialistIds.includes(specId)
     );
@@ -303,17 +331,29 @@ export const updateSubjectById = async (
 
   if (data.name && data.name !== subject.name) {
     const existingByName = await SubjectModel.findOne({ name: data.name });
-    appAssert(!existingByName, CONFLICT, "Subject with this name already exists");
+    appAssert(
+      !existingByName,
+      CONFLICT,
+      "Subject with this name already exists"
+    );
   }
 
   if (data.slug && data.slug !== subject.slug) {
     const existingBySlug = await SubjectModel.findOne({ slug: data.slug });
-    appAssert(!existingBySlug, CONFLICT, "Subject with this slug already exists");
+    appAssert(
+      !existingBySlug,
+      CONFLICT,
+      "Subject with this slug already exists"
+    );
   }
 
   if (data.code && data.code !== subject.code) {
     const existingByCode = await SubjectModel.findOne({ code: data.code });
-    appAssert(!existingByCode, CONFLICT, "Subject with this code already exists");
+    appAssert(
+      !existingByCode,
+      CONFLICT,
+      "Subject with this code already exists"
+    );
   }
 
   Object.assign(subject, { ...data, updatedAt: new Date() });
@@ -342,8 +382,12 @@ export const updateSubjectBySlug = async (
   if (userRole === Role.TEACHER && data.specialistIds) {
     const user = await UserModel.findById(userId).lean();
     appAssert(user, NOT_FOUND, "User not found");
-    const userSpecialistIds = (user.specialistIds || []).map((id: any) => id.toString());
-    const dataSpecialistIds = (data.specialistIds || []).map((id: any) => id.toString());
+    const userSpecialistIds = (user.specialistIds || []).map((id: any) =>
+      id.toString()
+    );
+    const dataSpecialistIds = (data.specialistIds || []).map((id: any) =>
+      id.toString()
+    );
     const allAssigned = dataSpecialistIds.every((specId: string) =>
       userSpecialistIds.includes(specId)
     );
@@ -356,17 +400,29 @@ export const updateSubjectBySlug = async (
 
   if (data.name && data.name !== subject.name) {
     const existingByName = await SubjectModel.findOne({ name: data.name });
-    appAssert(!existingByName, CONFLICT, "Subject with this name already exists");
+    appAssert(
+      !existingByName,
+      CONFLICT,
+      "Subject with this name already exists"
+    );
   }
 
   if (data.slug && data.slug !== subject.slug) {
     const existingBySlug = await SubjectModel.findOne({ slug: data.slug });
-    appAssert(!existingBySlug, CONFLICT, "Subject with this slug already exists");
+    appAssert(
+      !existingBySlug,
+      CONFLICT,
+      "Subject with this slug already exists"
+    );
   }
 
   if (data.code && data.code !== subject.code) {
     const existingByCode = await SubjectModel.findOne({ code: data.code });
-    appAssert(!existingByCode, CONFLICT, "Subject with this code already exists");
+    appAssert(
+      !existingByCode,
+      CONFLICT,
+      "Subject with this code already exists"
+    );
   }
 
   Object.assign(subject, { ...data, updatedAt: new Date() });
@@ -379,7 +435,11 @@ export const updateSubjectBySlug = async (
  * - Chặn xóa nếu đang được Course sử dụng.
  * - Kiểm tra quyền: Admin có thể xóa tất cả, Teacher chỉ có thể xóa subject mà họ phụ trách.
  */
-export const deleteSubjectById = async (subjectId: string, userId: string, userRole: Role) => {
+export const deleteSubjectById = async (
+  subjectId: string,
+  userId: string,
+  userRole: Role
+) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
 
@@ -390,7 +450,9 @@ export const deleteSubjectById = async (subjectId: string, userId: string, userR
   appAssert(
     coursesUsing === 0,
     CONFLICT,
-    `Cannot delete subject. ${coursesUsing} course${coursesUsing > 1 ? "s are" : " is"} using this subject.`
+    `Cannot delete subject. ${coursesUsing} course${
+      coursesUsing > 1 ? "s are" : " is"
+    } using this subject.`
   );
 
   return SubjectModel.deleteOne({ _id: subjectId });
@@ -401,18 +463,26 @@ export const deleteSubjectById = async (subjectId: string, userId: string, userR
  * - Chặn xóa nếu đang được Course sử dụng.
  * - Kiểm tra quyền: Admin có thể xóa tất cả, Teacher chỉ có thể xóa subject mà họ phụ trách.
  */
-export const deleteSubjectBySlug = async (slug: string, userId: string, userRole: Role) => {
+export const deleteSubjectBySlug = async (
+  slug: string,
+  userId: string,
+  userRole: Role
+) => {
   const subject = await SubjectModel.findOne({ slug });
   appAssert(subject, NOT_FOUND, "Subject not found");
 
   // Kiểm tra quyền
   await checkSubjectPermission(subject, userId, userRole);
 
-  const coursesUsing = await CourseModel.countDocuments({ subjectId: subject.id });
+  const coursesUsing = await CourseModel.countDocuments({
+    subjectId: subject.id,
+  });
   appAssert(
     coursesUsing === 0,
     CONFLICT,
-    `Cannot delete subject. ${coursesUsing} course${coursesUsing > 1 ? "s are" : " is"} using this subject.`
+    `Cannot delete subject. ${coursesUsing} course${
+      coursesUsing > 1 ? "s are" : " is"
+    } using this subject.`
   );
 
   return SubjectModel.deleteOne({ slug });
@@ -422,7 +492,11 @@ export const deleteSubjectBySlug = async (slug: string, userId: string, userRole
  * Nghiệp vụ: Bật trạng thái hoạt động cho Subject.
  * - Kiểm tra quyền: Admin có thể bật tất cả, Teacher chỉ có thể bật subject mà họ phụ trách.
  */
-export const activateSubjectById = async (subjectId: string, userId: string, userRole: Role) => {
+export const activateSubjectById = async (
+  subjectId: string,
+  userId: string,
+  userRole: Role
+) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
 
@@ -439,7 +513,11 @@ export const activateSubjectById = async (subjectId: string, userId: string, use
  * Nghiệp vụ: Tắt trạng thái hoạt động cho Subject.
  * - Kiểm tra quyền: Admin có thể tắt tất cả, Teacher chỉ có thể tắt subject mà họ phụ trách.
  */
-export const deactivateSubjectById = async (subjectId: string, userId: string, userRole: Role) => {
+export const deactivateSubjectById = async (
+  subjectId: string,
+  userId: string,
+  userRole: Role
+) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
 
@@ -458,7 +536,12 @@ export const deactivateSubjectById = async (subjectId: string, userId: string, u
  * - Chặn self-reference.
  * - Kiểm tra quyền: Admin có thể thêm tất cả, Teacher chỉ có thể thêm cho subject mà họ phụ trách.
  */
-export const addPrerequisites = async (subjectId: string, prerequisiteIds: string[], userId: string, userRole: Role) => {
+export const addPrerequisites = async (
+  subjectId: string,
+  prerequisiteIds: string[],
+  userId: string,
+  userRole: Role
+) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
 
@@ -468,9 +551,15 @@ export const addPrerequisites = async (subjectId: string, prerequisiteIds: strin
   const toAdd = prerequisiteIds
     .filter((id) => id && id !== subjectId)
     .map((id) => new mongoose.Types.ObjectId(id));
-  const set = new Set([...(subject.prerequisites || [] as any)].map((x: any) => x.toString()));
+  const set = new Set(
+    [...(subject.prerequisites || ([] as any))].map((x: any) => x.toString())
+  );
   for (const oid of toAdd) {
-    if (!set.has(oid.toString())) (subject.prerequisites as any) = [...(subject.prerequisites || [] as any), oid];
+    if (!set.has(oid.toString()))
+      (subject.prerequisites as any) = [
+        ...(subject.prerequisites || ([] as any)),
+        oid,
+      ];
   }
   subject.updatedAt = new Date();
   await subject.save();
@@ -481,7 +570,12 @@ export const addPrerequisites = async (subjectId: string, prerequisiteIds: strin
  * Nghiệp vụ: Gỡ một môn tiên quyết khỏi Subject.
  * - Kiểm tra quyền: Admin có thể gỡ tất cả, Teacher chỉ có thể gỡ cho subject mà họ phụ trách.
  */
-export const removePrerequisite = async (subjectId: string, prerequisiteId: string, userId: string, userRole: Role) => {
+export const removePrerequisite = async (
+  subjectId: string,
+  prerequisiteId: string,
+  userId: string,
+  userRole: Role
+) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
 
@@ -489,8 +583,30 @@ export const removePrerequisite = async (subjectId: string, prerequisiteId: stri
   await checkSubjectPermission(subject, userId, userRole);
 
   const target = new mongoose.Types.ObjectId(prerequisiteId);
-  subject.prerequisites = (subject.prerequisites || []).filter((x: any) => !x.equals(target));
+  subject.prerequisites = (subject.prerequisites || []).filter(
+    (x: any) => !x.equals(target)
+  );
   subject.updatedAt = new Date();
   await subject.save();
   return subject.toObject();
+};
+
+/**
+ * Xóa tất cả câu hỏi trắc nghiệm thuộc một Subject.
+ * - Trả về số lượng câu hỏi trắc nghiệm đã được xóa.
+ * @param  subjectId - ID của Subject cần xóa câu hỏi trắc nghiệm.
+ * @returns  - Số lượng câu hỏi trắc nghiệm đã được xóa.
+ */
+export const deleteQuestionsBySubjectId = async (subjectId: string) => {
+  const subject = await SubjectModel.findById(subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+
+  // Xóa tất cả quiz questions liên quan đến subjectId
+
+  const count = await QuizQuestionModel.find({ subjectId }).countDocuments();
+  await QuizQuestionModel.deleteMany({ subjectId });
+
+  return {
+    deletedCount: count,
+  };
 };

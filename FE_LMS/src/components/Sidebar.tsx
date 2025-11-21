@@ -11,6 +11,8 @@ interface SidebarProps {
     email: string;
     avatar?: string;
   };
+  variant?: 'desktop' | 'mobile';
+  onClose?: () => void;
 }
 
 interface MenuItem {
@@ -49,15 +51,6 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
       label: "Assignments"
     },
     {
-      href: "/quiz",
-      icon: (
-        <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-      ),
-      label: "Quizzes"
-    },
-    {
       href: "/materials",
       icon: (
         <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -65,12 +58,30 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
         </svg>
       ),
       label: "Lession Materials"
+    },
+    {
+      href: "/quizz",
+      icon: (
+        <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+        </svg>
+      ),
+      label: "Quiz"
     }
   ];
 
   if (role === 'admin') {
     return [
       ...baseItems,
+      {
+        href: "/quiz",
+        icon: (
+          <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        ),
+        label: "Questions Bank"
+      },
       {
         href: "/calendar",
         icon: (
@@ -90,15 +101,6 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
         label: "Manage Users"
       },
       {
-        href: "/admin/room-management",
-        icon: (
-          <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-          </svg>
-        ),
-        label: "Room Management"
-      },
-      {
         href: "/admin/room-control",
         icon: (
           <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -113,6 +115,15 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
   if (role === 'teacher') {
     return [
       ...baseItems,
+      {
+        href: "/quiz",
+        icon: (
+          <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+        ),
+        label: "Questions Bank"
+      },
       {
         href: "/grading",
         icon: (
@@ -161,7 +172,13 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
   return baseItems;
 };
 
-export default function Sidebar({ isOpen = true, role = 'admin', userInfo }: SidebarProps) {
+export default function Sidebar({
+  isOpen = true,
+  role = 'admin',
+  userInfo,
+  variant = 'desktop',
+  onClose
+}: SidebarProps) {
   const { darkMode } = useTheme();
   const menuItems = getMenuItems(role);
   const feedbackLink = '/help/feedback-list';
@@ -210,7 +227,9 @@ export default function Sidebar({ isOpen = true, role = 'admin', userInfo }: Sid
         const parsed = JSON.parse(raw);
         setStoredUser(parsed);
       }
-    } catch { }
+    } catch (error) {
+      console.warn('Unable to parse stored user info', error);
+    }
   }, []);
 
   const handleMouseEnter = () => {
@@ -258,8 +277,87 @@ export default function Sidebar({ isOpen = true, role = 'admin', userInfo }: Sid
   };
   const effectiveRole = (storedUser?.role as 'admin' | 'teacher' | 'student') || role;
 
+  if (variant === 'mobile') {
+    return (
+      <div className="fixed inset-0 z-[150] md:hidden">
+        <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+        <div
+          className="absolute left-0 top-0 h-full w-72 max-w-[85vw] shadow-2xl flex flex-col"
+          style={{
+            backgroundColor: darkMode ? 'rgba(15,23,42,0.95)' : '#ffffff',
+            color: darkMode ? '#f1f5f9' : '#0f172a'
+          }}
+        >
+          <div
+            className="flex items-center justify-between px-4 py-4 border-b"
+            style={{ borderColor: darkMode ? 'rgba(148,163,184,0.15)' : 'rgba(148,163,184,0.2)' }}
+          >
+            <div className="flex items-center gap-3">
+              <img
+                className="h-10 w-10 rounded-xl object-cover"
+                src={user.avatar}
+                alt="Profile"
+              />
+              <div className="flex flex-col">
+                <span className="text-sm font-semibold">{user.name}</span>
+                <span className="text-xs opacity-75">{user.email}</span>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg transition-colors"
+              style={{
+                backgroundColor: darkMode ? 'rgba(71,85,105,0.35)' : '#eff6ff',
+                color: darkMode ? '#e2e8f0' : '#1e3a8a'
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-5 space-y-5">
+            <nav className="space-y-1">
+              {menuItems.map((item, index) => (
+                <Link
+                  key={index}
+                  to={item.href}
+                  onClick={onClose}
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors"
+                  style={{
+                    backgroundColor: darkMode ? 'rgba(71,85,105,0.3)' : 'rgba(15,23,42,0.05)',
+                    color: darkMode ? '#e2e8f0' : '#0f172a'
+                  }}
+                >
+                  <span>{item.icon}</span>
+                  <span>{item.label}</span>
+                </Link>
+              ))}
+            </nav>
+            <div className="border-t pt-4" style={{ borderColor: darkMode ? 'rgba(148,163,184,0.2)' : '#e2e8f0' }}>
+              <p className="text-xs uppercase tracking-wide mb-2" style={{ color: darkMode ? '#94a3b8' : '#64748b' }}>
+                Help & Support
+              </p>
+              <div className="space-y-1">
+                <Link to="/help/faq" onClick={onClose} className="block px-3 py-2 rounded-lg text-sm" style={{ color: darkMode ? '#e2e8f0' : '#0f172a', backgroundColor: darkMode ? 'rgba(148,163,184,0.1)' : '#f8fafc' }}>
+                  FAQ / Usage
+                </Link>
+                <Link to="/help/feedback" onClick={onClose} className="block px-3 py-2 rounded-lg text-sm" style={{ color: darkMode ? '#e2e8f0' : '#0f172a', backgroundColor: darkMode ? 'rgba(148,163,184,0.1)' : '#f8fafc' }}>
+                  Feedback
+                </Link>
+                <Link to="/help/about" onClick={onClose} className="block px-3 py-2 rounded-lg text-sm" style={{ color: darkMode ? '#e2e8f0' : '#0f172a', backgroundColor: darkMode ? 'rgba(148,163,184,0.1)' : '#f8fafc' }}>
+                  About Us
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="hidden sm:block">
+    <div className="hidden md:block">
       {/* Hover sensor to expand when cursor reaches screen's left edge */}
       <div
         className="fixed left-0 top-1/2 -translate-y-1/2 h-[600px] w-4 z-[9001]"
@@ -460,7 +558,9 @@ export default function Sidebar({ isOpen = true, role = 'admin', userInfo }: Sid
               onClick={async () => {
                 try {
                   await authService.logout();
-                } catch { }
+                } catch (error) {
+                  console.error('Logout failed', error);
+                }
                 window.location.href = '/login';
               }}
               className="flex items-center w-full mt-5 px-3 py-2 text-sm text-red-600 hover:bg-red-50/70 rounded-md"

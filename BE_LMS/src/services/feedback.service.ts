@@ -71,7 +71,7 @@ export const createFeedback = async (
 
   // Populate user info
   await feedback.populate("userId", "username email fullname avatar_url");
-  
+
   // Populate targetId if it's a teacher feedback
   if (feedback.targetId && feedback.type === FeedbackType.TEACHER) {
     await feedback.populate("targetId", "username email fullname avatar_url role");

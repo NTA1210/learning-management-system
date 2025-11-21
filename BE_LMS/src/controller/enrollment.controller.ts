@@ -31,7 +31,7 @@ export const getEnrollmentHandler = catchErrors(async (req, res) => {
 
 // GET /enrollments/my-enrollments - Get all enrollments for the authenticated student
 export const getMyEnrollmentsHandler = catchErrors(async (req, res) => {
-  const studentId = req.userId!.toString(); // userId from authenticate middleware
+  const studentId = req.userId!; // userId from authenticate middleware
   const filters = getEnrollmentsQuerySchema.parse(req.query);
 
   const result = await getStudentEnrollments({
@@ -78,7 +78,10 @@ export const getCourseEnrollmentsHandler = catchErrors(async (req, res) => {
 export const getAllEnrollmentsHandler = catchErrors(async (req, res) => {
   const filters = getEnrollmentsQuerySchema.parse(req.query);
 
-  const result = await getAllEnrollments(filters); // No userId passed
+  const result = await getAllEnrollments(filters, {
+    role: req.role!,
+    userId: req.userId!,
+  });
   return res.success(OK, {
     data: result.enrollments,
     pagination: result.pagination,
@@ -100,7 +103,7 @@ export const createEnrollmentHandler = catchErrors(async (req, res) => {
 // POST /enrollments/enroll - Student tự enroll vào course
 export const enrollSelfHandler = catchErrors(async (req, res) => {
   const { courseId, role, password } = enrollSelfSchema.parse(req.body); // Validate body
-  const studentId = req.userId!.toString(); // Lấy từ authenticate middleware
+  const studentId = req.userId!; // Lấy từ authenticate middleware
 
   const enrollment = await createEnrollment({
     studentId,
@@ -125,7 +128,7 @@ export const updateEnrollmentHandler = catchErrors(async (req, res) => {
 export const updateSelfEnrollmentHandler = catchErrors(async (req, res) => {
   const { id } = enrollmentIdSchema.parse(req.params); // Validate ID
   const data = updateSelfEnrollmentSchema.parse(req.body); // Validate body
-  const studentId = req.userId!.toString(); // Lấy từ authenticate middleware
+  const studentId = req.userId!; // Lấy từ authenticate middleware
 
   const enrollment = await updateSelfEnrollment(id, studentId, data);
   return res.success(OK, { data: enrollment, message: "Enrollment updated successfully" });
