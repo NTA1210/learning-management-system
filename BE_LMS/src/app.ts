@@ -14,10 +14,11 @@ import { OK } from "./constants/http";
 import { APP_ORIGIN } from "./constants/env";
 
 //middleware
-import {authenticate, authorize, customResponse, errorHandler,} from "./middleware";
+import { authenticate, authorize, customResponse, errorHandler, } from "./middleware";
 
 //routes
 import {
+    announcementRoutes,
     assignmentRoutes,
     authRoutes,
     courseInviteRoutes,
@@ -89,6 +90,7 @@ export const createApp = () => {
     app.use("/schedules", scheduleRoutes);
 
     //protected routes
+    app.use("/announcements", authenticate, announcementRoutes);
     app.use("/users", authenticate, userRoutes);
     app.use("/sessions", authenticate, authorize(Role.ADMIN), sessionRoutes);
     app.use("/enrollments", authenticate, enrollmentRoutes);
