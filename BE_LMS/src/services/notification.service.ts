@@ -197,7 +197,7 @@ export const getNotifications = async (
   const [notifications, total] = await Promise.all([
     NotificationModel.find(filter)
       .populate("sender", "username fullname avatar_url")
-      .populate("recipientCourse", "title code")
+      .populate("recipientCourse", "title")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)

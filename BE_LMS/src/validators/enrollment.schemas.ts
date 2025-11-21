@@ -25,8 +25,8 @@ export const getEnrollmentsQuerySchema = z
       .string()
       .optional()
       .transform((val) => (val ? parseInt(val) : 10)),
-    from: datePreprocess,
-    to: datePreprocess,
+    from: datePreprocess.optional(),
+    to: datePreprocess.optional(),
   })
   .refine(
     (val) => {

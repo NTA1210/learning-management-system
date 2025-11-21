@@ -10,6 +10,8 @@ export default interface ICourseInvite
   usedCount: number;
   expiresAt: Date;
   isActive: boolean; // Có thể disable link mà không cần xóa
+  // Soft delete fields
+  deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
