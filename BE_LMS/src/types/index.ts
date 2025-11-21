@@ -24,3 +24,12 @@ export { default as ISpecialist } from "./specialist.type";
 export { default as IMajor } from "./major.type";
 export { default as ISubject } from "./subject.type";
 export { default as IFeedback } from "./feedback.type";
+// Class and Schedule Management
+export { default as IClass } from "./class.type";
+export * from "./class.type";
+export { default as ITimeSlot } from "./timeSlot.type";
+export * from "./timeSlot.type";
+export { default as IClassSchedule } from "./classSchedule.type";
+export * from "./classSchedule.type";
+export { default as IScheduleException } from "./scheduleException.type";
+export * from "./scheduleException.type";

@@ -17,3 +17,5 @@ export * from "./specialist.route";
 export * from "./forum.route";
 export { default as quizRoutes } from "./quiz.route";
 export { default as subjectRoutes } from "./subject.route";
+export {default as classRoutes} from "./class.route";
+export {default as scheduleRoutes} from "./schedule.route";

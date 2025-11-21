@@ -22,3 +22,8 @@ export { default as MajorModel } from "./major.model";
 export { default as QuizQuestionModel } from "./quizQuestion.model";
 export { default as SubjectModel } from "./subject.model";
 export { default as FeedbackModel } from "./feedback.model";
+// Class and Schedule Management
+export { default as ClassModel } from "./class.model";
+export { default as TimeSlotModel } from "./timeSlot.model";
+export { default as ClassScheduleModel } from "./classSchedule.model";
+export { default as ScheduleExceptionModel } from "./scheduleException.model";
