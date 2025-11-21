@@ -13,6 +13,7 @@ import {
     getAnnouncementById,
     updateAnnouncement,
     deleteAnnouncement,
+    getAllAnnouncements,
 } from "../services/announcement.service";
 
 /**
@@ -29,6 +30,22 @@ export const createAnnouncementHandler = catchErrors(async (req, res) => {
     return res.success(CREATED, {
         data: announcement,
         message: "Announcement created successfully",
+    });
+});
+
+/**
+ * GET /announcements
+ * Get all announcements (Admin/Teacher)
+ */
+export const getAllAnnouncementsHandler = catchErrors(async (req, res) => {
+    const { page, limit } = getAnnouncementsQuerySchema.parse(req.query);
+
+    const result = await getAllAnnouncements(page, limit);
+
+    return res.success(OK, {
+        data: result.announcements,
+        pagination: result.pagination,
+        message: "All announcements retrieved successfully",
     });
 });
 

@@ -5,6 +5,7 @@ import {
     getAnnouncementByIdHandler,
     updateAnnouncementHandler,
     deleteAnnouncementHandler,
+    getAllAnnouncementsHandler,
 } from "../controller/announcement.controller";
 import authorize from "../middleware/authorize";
 import { Role } from "../types/user.type";
@@ -18,6 +19,13 @@ announcementRoutes.post(
     "/",
     authorize(Role.TEACHER, Role.ADMIN),
     createAnnouncementHandler
+);
+
+// GET /announcements - Get all announcements (Teacher/Admin only)
+announcementRoutes.get(
+    "/",
+    authorize(Role.TEACHER, Role.ADMIN),
+    getAllAnnouncementsHandler
 );
 
 // GET /announcements/course/:courseId - Get all announcements for a course

@@ -174,3 +174,43 @@ export const deleteAnnouncement = async (
 
     return { message: "Announcement deleted successfully" };
 };
+
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Lấy danh sách tất cả thông báo trong hệ thống.
+ * - Sắp xếp theo thời gian đăng giảm dần (mới nhất lên đầu).
+ * - Có thể phân trang (page, limit).
+ *
+ * Input: page, limit
+ * Output: List announcements, pagination info
+ */
+export const getAllAnnouncements = async (
+    page: number = 1,
+    limit: number = 10
+) => {
+    const skip = (page - 1) * limit;
+
+    // Parallel queries for better performance
+    const [announcements, total] = await Promise.all([
+        AnnouncementModel.find({})
+            .sort({ publishedAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate("authorId", "username fullname avatar_url")
+            .populate("courseId", "title")
+            .lean(),
+        AnnouncementModel.countDocuments({}),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+        announcements,
+        pagination: {
+            total,
+            page,
+            limit,
+            totalPages,
+        },
+    };
+};
