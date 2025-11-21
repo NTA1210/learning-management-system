@@ -113,19 +113,19 @@ export const createNotification = async (
       return { message: "No enrolled students found in this course" };
     }
 
-    // Create notification for each enrolled student
-    const notifications = await Promise.all(
-      enrollments.map((enrollment) =>
-        NotificationModel.create({
-          title,
-          message,
-          sender: senderId,
-          recipientUser: enrollment.studentId,
-          recipientCourse,
-          recipientType: "course",
-          isRead: false,
-        })
-      )
+    // Create notification objects for each enrolled student
+    const notificationsToInsert = enrollments.map((enrollment) => ({
+      title,
+      message,
+      sender: senderId,
+      recipientUser: enrollment.studentId,
+      recipientCourse,
+      recipientType: "course",
+      isRead: false,
+    }));
+
+    const notifications = await NotificationModel.insertMany(
+      notificationsToInsert
     );
 
     return {
@@ -143,18 +143,18 @@ export const createNotification = async (
       return { message: "No active users found" };
     }
 
-    // Create notification for each user
-    const notifications = await Promise.all(
-      users.map((user) =>
-        NotificationModel.create({
-          title,
-          message,
-          sender: senderId,
-          recipientUser: user._id,
-          recipientType: "all",
-          isRead: false,
-        })
-      )
+    // Create notification objects for each user
+    const notificationsToInsert = users.map((user) => ({
+      title,
+      message,
+      sender: senderId,
+      recipientUser: user._id,
+      recipientType: "all",
+      isRead: false,
+    }));
+
+    const notifications = await NotificationModel.insertMany(
+      notificationsToInsert
     );
 
     return {

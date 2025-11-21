@@ -7,6 +7,7 @@ import {
   deleteCourseHandler,
   restoreCourseHandler,
   permanentDeleteCourseHandler,
+  getMyCoursesHandler,
 } from "../controller/course.controller";
 import authenticate from "../middleware/authenticate";
 import authorize from "../middleware/authorize";
@@ -18,6 +19,10 @@ const courseRoutes = Router();
 // prefix: /courses
 
 // Protected routes (require authentication)
+// GET /courses/my-courses - Get my courses (Student: enrolled, Teacher: created/assigned, Admin: all)
+// ✅ Must be before /:id route
+courseRoutes.get("/my-courses", authenticate, getMyCoursesHandler);
+
 // GET /courses - List all courses with pagination and filters
 // ✅ Students must login to browse courses (university internal system)
 courseRoutes.get("/", authenticate, listCoursesHandler);

@@ -1,6 +1,6 @@
 import z from "zod";
-import {CourseStatus} from "../types/course.type";
-import {datePreprocess} from "./helpers/date.schema";
+import { CourseStatus } from "../types/course.type";
+import { datePreprocess } from "./helpers/date.schema";
 
 // ObjectId validation regex
 const objectIdRegex = /^[0-9a-fA-F]{24}$/;
@@ -12,7 +12,7 @@ export const listCoursesSchema = z
             .string()
             .optional()
             .transform((val) => (val ? parseInt(val, 10) : 1))
-            .refine((val) => val > 0, {message: "Page must be greater than 0"}),
+            .refine((val) => val > 0, { message: "Page must be greater than 0" }),
         limit: z
             .string()
             .optional()
@@ -24,6 +24,7 @@ export const listCoursesSchema = z
         from: datePreprocess.optional(), // Date range start with validation
         to: datePreprocess.optional(), // Date range end with validation
         subjectId: z.string().regex(objectIdRegex, "Invalid subject ID format").optional(), // Filter by subject ID
+        semesterId: z.string().regex(objectIdRegex, "Invalid semester ID format").optional(), // Filter by semester ID
         teacherId: z.string().regex(objectIdRegex, "Invalid teacher ID format").optional(), // Filter by teacher ID
         isPublished: z
             .string()
@@ -125,6 +126,12 @@ export const createCourseSchema = z
                 z.array(z.string()), // Already array
             ])
             .pipe(z.array(z.string()).min(1, "At least one teacher is required")), // Required
+        semesterId: z
+            .union([
+                z.string(),
+                z.array(z.string()).transform((val) => val[0]), // Handle array input from multipart
+            ])
+            .pipe(z.string().regex(objectIdRegex, "Invalid semester ID format")), // Required
         isPublished: z
             .union([
                 z.boolean(),
@@ -163,7 +170,8 @@ export type CreateCourseInput = z.infer<typeof createCourseSchema>;
 export const updateCourseSchema = z
     .object({
         title: z.string().min(1).max(255).optional(),
-        subjectId: z.string().regex(objectIdRegex, "Invalid subject ID format").optional(), // ✅ NEW: Subject reference        logo: z.string().nullish(), // ✅ Allow null or empty string to remove logo
+        subjectId: z.string().regex(objectIdRegex, "Invalid subject ID format").optional(), // ✅ NEW: Subject reference
+        logo: z.string().nullish(), // ✅ Allow null or empty string to remove logo
         description: z.string().optional(),
         startDate: z
             .string()

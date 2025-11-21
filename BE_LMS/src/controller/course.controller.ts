@@ -14,8 +14,43 @@ import {
   deleteCourse,
   restoreCourse,
   permanentDeleteCourse,
+  getMyCourses,
 } from "../services/course.service";
 import { parseFormData } from "../utils/parseFormData";
+
+/**
+ * GET /courses/my-courses - Get my courses
+ */
+export const getMyCoursesHandler = catchErrors(async (req, res) => {
+  const query = listCoursesSchema.parse(req.query);
+  const userId = (req as any).userId;
+  const userRole = (req as any).role;
+
+  const result = await getMyCourses({
+    userId,
+    userRole,
+    params: {
+      page: query.page,
+      limit: query.limit,
+      search: query.search,
+      from: query.from,
+      to: query.to,
+      subjectId: query.subjectId,
+      semesterId: query.semesterId,
+      teacherId: query.teacherId,
+      isPublished: query.isPublished,
+      status: query.status,
+      sortBy: query.sortBy,
+      sortOrder: query.sortOrder,
+    },
+  });
+
+  return res.success(OK, {
+    data: result.courses,
+    message: "My courses retrieved successfully",
+    pagination: result.pagination,
+  });
+});
 
 /**
  * GET /courses - List all courses with filters
@@ -36,6 +71,7 @@ export const listCoursesHandler = catchErrors(async (req, res) => {
     from: query.from,
     to: query.to,
     subjectId: query.subjectId,
+    semesterId: query.semesterId,
     teacherId: query.teacherId,
     isPublished: query.isPublished,
     status: query.status,
@@ -115,7 +151,7 @@ export const updateCourseHandler = catchErrors(async (req, res) => {
 
   // Call service with logo file
   const course = await updateCourse(courseId, data, userId, logoFile);
-  
+
   return res.success(OK, {
     data: course,
     message: "Course updated successfully",
