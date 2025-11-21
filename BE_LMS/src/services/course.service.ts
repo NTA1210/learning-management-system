@@ -6,6 +6,8 @@ import UserModel from "../models/user.model";
 import EnrollmentModel from "../models/enrollment.model";
 import { Types } from "mongoose";
 import SubjectModel from "../models/subject.model";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import SemesterModel from "../models/semester.model"; // Required for Mongoose to register the model
 import appAssert from "../utils/appAssert";
 import { NOT_FOUND, BAD_REQUEST, FORBIDDEN } from "../constants/http";
 import {
@@ -67,6 +69,7 @@ export type ListCoursesParams = {
   from?: Date; // Date range start for createdAt filtering
   to?: Date; // Date range end for createdAt filtering
   subjectId?: string; // ✅ NEW: Filter by subject instead of specialist
+  semesterId?: string; // ✅ NEW: Filter by semester
   teacherId?: string;
   isPublished?: boolean;
   status?: CourseStatus;
@@ -94,6 +97,7 @@ export const listCourses = async ({
   from,
   to,
   subjectId,
+  semesterId,
   teacherId,
   isPublished,
   status,
@@ -166,19 +170,34 @@ export const listCourses = async ({
     filter.isDeleted = false;
   }
 
-  // Filter by published status
-  if (isPublished !== undefined) {
-    filter.isPublished = isPublished;
+  // ✅ VISIBILITY CONTROL: Enforce strict rules for non-admins
+  if (userRole !== Role.ADMIN) {
+    // Non-admins (Student/Teacher) can ONLY see:
+    // 1. ONGOING courses
+    // 2. PUBLISHED courses
+    filter.status = CourseStatus.ONGOING;
+    filter.isPublished = true;
+  } else {
+    // Admin logic remains flexible
+    if (isPublished !== undefined) {
+      filter.isPublished = isPublished;
+    }
+    if (status) {
+      filter.status = status;
+    }
   }
 
-  // Filter by status
-  if (status) {
-    filter.status = status;
-  }
+  // Status filter is handled above for non-admins
+  // For admins, it's handled in the else block above
 
   // ✅ NEW: Filter by subject ID
   if (subjectId) {
     filter.subjectId = subjectId;
+  }
+
+  // ✅ NEW: Filter by semester ID
+  if (semesterId) {
+    filter.semesterId = semesterId;
   }
 
   // Filter by teacher ID
@@ -220,6 +239,7 @@ export const listCourses = async ({
           select: "name code description"
         }
       })
+      .populate("semesterId", "name year type startDate endDate")
       .populate("createdBy", "username email fullname")
       .sort(sort)
       .skip(skip)
@@ -264,6 +284,7 @@ export const getCourseById = async (courseId: string) => {
   })
     .populate("teacherIds", "username email fullname avatar_url bio")
     .populate("subjectId", "name code slug description credits")
+    .populate("semesterId", "name year type startDate endDate")
     .populate("createdBy", "username email fullname")
     .lean();
 
@@ -418,15 +439,35 @@ export const createCourse = async (
     // ✅ AUTO PUBLISH: Admin tạo course thì luôn publish
     finalIsPublished = true;
 
-    // ✅ AUTO STATUS: Admin tạo và publish luôn → status = ONGOING
     if (finalStatus === CourseStatus.DRAFT) {
       finalStatus = CourseStatus.ONGOING;
     }
   }
 
+  // ✅ AUTO-ASSIGN SEMESTER: If semesterId is not provided, find it based on startDate
+  let semesterId = data.semesterId;
+  if (!semesterId) {
+    const semester = await SemesterModel.findOne({
+      startDate: { $lte: startDate },
+      endDate: { $gte: startDate },
+    });
+
+    appAssert(
+      semester,
+      BAD_REQUEST,
+      `Cannot determine semester for start date ${startDate.toISOString().split('T')[0]}. Please create a semester covering this date first.`
+    );
+    semesterId = (semester as any)._id.toString();
+  } else {
+    // Validate provided semesterId
+    const semester = await SemesterModel.findById(semesterId);
+    appAssert(semester, BAD_REQUEST, "Invalid semester ID");
+  }
+
   // Create course with createdBy
   const courseData = {
     ...data,
+    semesterId, // ✅ Include the determined semesterId
     startDate,
     endDate,
     status: finalStatus,
@@ -469,6 +510,7 @@ export const createCourse = async (
   const populatedCourse = await CourseModel.findById(String(course._id))
     .populate("teacherIds", "username email fullname avatar_url")
     .populate("subjectId", "name code slug description credits")
+    .populate("semesterId", "name year type startDate endDate")
     .populate("createdBy", "username email fullname")
     .lean();
 
@@ -743,6 +785,7 @@ export const updateCourse = async (
     )
       .populate("teacherIds", "username email fullname avatar_url")
       .populate("subjectId", "name code slug description credits")
+      .populate("semesterId", "name year type startDate endDate")
       .populate("createdBy", "username email fullname")
       .lean();
 
@@ -977,6 +1020,123 @@ export const permanentDeleteCourse = async (
     message: "Course permanently deleted successfully",
     warning: "This action cannot be undone",
     deletedCourseId: courseId,
+  };
+};
+
+/**
+ * Lấy danh sách khóa học của tôi (My Courses)
+ * - Student: Các khóa học đã enroll
+ * - Teacher: Các khóa học đã tạo hoặc được phân công dạy
+ * - Admin: Tất cả khóa học
+ */
+export const getMyCourses = async ({
+  userId,
+  userRole,
+  params,
+}: {
+  userId: string;
+  userRole: Role;
+  params: ListCoursesParams;
+}) => {
+  const {
+    page,
+    limit,
+    search,
+    subjectId,
+    semesterId,
+    isPublished,
+    status,
+    sortBy = "createdAt",
+    sortOrder = "desc",
+  } = params;
+
+  // Validate pagination
+  appAssert(page > 0, BAD_REQUEST, "Page must be greater than 0");
+  appAssert(limit > 0 && limit <= 100, BAD_REQUEST, "Limit must be between 1 and 100");
+
+  const filter: any = { isDeleted: false };
+
+  // 1. Role-based filtering
+  if (userRole === Role.STUDENT) {
+    // Student: Find enrolled courses
+    const enrollments = await EnrollmentModel.find({
+      studentId: userId,
+      // Optional: Filter by enrollment status if needed (e.g., only APPROVED)
+      // status: EnrollmentStatus.APPROVED 
+    }).select("courseId");
+
+    const courseIds = enrollments.map((e) => e.courseId);
+    filter._id = { $in: courseIds };
+  } else if (userRole === Role.TEACHER) {
+    // Teacher: Created by me OR Assigned to me
+    filter.$or = [
+      { createdBy: userId },
+      { teacherIds: userId },
+    ];
+  } else if (userRole === Role.ADMIN) {
+    // Admin: See all (no extra filter needed on _id/owner)
+  }
+
+  // 2. Common filters (Search, Subject, Semester, Status, Published)
+  if (search) {
+    filter.$and = filter.$and || [];
+    filter.$and.push({
+      $or: [
+        { title: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+      ],
+    });
+  }
+
+  if (subjectId) filter.subjectId = subjectId;
+  if (semesterId) filter.semesterId = semesterId;
+
+  // Allow filtering by status/published for My Courses (even for students/teachers)
+  // because "My Courses" is a personal view, seeing Drafts/Pending is expected for Teachers
+  if (status) filter.status = status;
+  if (isPublished !== undefined) filter.isPublished = isPublished;
+
+  // 3. Pagination & Sort
+  const skip = (page - 1) * limit;
+  const sort: any = {};
+  sort[sortBy] = sortOrder === "asc" ? 1 : -1;
+
+  // 4. Execute Query
+  const [courses, total] = await Promise.all([
+    CourseModel.find(filter)
+      .populate("teacherIds", "username email fullname avatar_url")
+      .populate({
+        path: "subjectId",
+        select: "name code slug description credits specialistIds",
+        populate: {
+          path: "specialistIds",
+          select: "name code description",
+        },
+      })
+      .populate("semesterId", "name year type startDate endDate")
+      .populate("createdBy", "username email fullname")
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    CourseModel.countDocuments(filter),
+  ]);
+
+  // 5. Pagination Metadata
+  const totalPages = Math.ceil(total / limit);
+  const hasNextPage = page < totalPages;
+  const hasPrevPage = page > 1;
+
+  return {
+    courses,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNextPage,
+      hasPrevPage,
+    },
   };
 };
 
