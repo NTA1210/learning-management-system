@@ -126,7 +126,12 @@ export const createCourseSchema = z
                 z.array(z.string()), // Already array
             ])
             .pipe(z.array(z.string()).min(1, "At least one teacher is required")), // Required
-        semesterId: z.string().regex(objectIdRegex, "Invalid semester ID format"), // Required
+        semesterId: z
+            .union([
+                z.string(),
+                z.array(z.string()).transform((val) => val[0]), // Handle array input from multipart
+            ])
+            .pipe(z.string().regex(objectIdRegex, "Invalid semester ID format")), // Required
         isPublished: z
             .union([
                 z.boolean(),
