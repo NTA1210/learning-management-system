@@ -8,6 +8,7 @@ export const enum CourseStatus {
 }
 
 export default interface ICourse extends mongoose.Document {
+    semesterId: mongoose.Types.ObjectId;
     title: string;
     subjectId?: mongoose.Types.ObjectId;
     logo?: string;

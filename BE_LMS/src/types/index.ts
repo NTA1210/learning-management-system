@@ -1,4 +1,4 @@
-export * from "./apiResponse.type";
+export * from "./dto/apiResponse.type";
 export { default as IAnnouncement } from "./announcement.type";
 export { default as IAssignment } from "./assignment.type";
 export { default as IAttendance } from "./attendance.type";

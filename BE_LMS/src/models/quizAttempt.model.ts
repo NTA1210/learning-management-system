@@ -1,8 +1,6 @@
 import mongoose from "mongoose";
 import { AttemptStatus, IQuestionAnswer, IQuiz, IQuizAttempt } from "../types";
-import QuizModel from "./quiz.model";
-import appAssert from "../utils/appAssert";
-import { NOT_FOUND } from "../constants/http";
+import { Answer } from "@/validators/quizAttempt.schemas";
 
 const QuestionAnswerSchema = new mongoose.Schema<IQuestionAnswer>(
   {
@@ -54,18 +52,17 @@ QuizAttemptSchema.index({ studentId: 1, status: 1 });
 QuizAttemptSchema.index({ quizId: 1, submittedAt: -1 });
 
 /** 🔥 Method chấm điểm */
-QuizAttemptSchema.methods.grade = async function () {
+QuizAttemptSchema.methods.grade = async function (
+  answers: Answer[],
+  quiz: IQuiz
+) {
   const attempt = this as IQuizAttempt;
-
-  const quiz = await QuizModel.findById(attempt.quizId);
-  appAssert(quiz, NOT_FOUND, "Quiz not found");
-
   let totalScore = 0;
 
   // Duyệt qua từng câu trả lời
-  attempt.answers!.forEach((ans) => {
+  answers!.forEach((ans) => {
     const question = quiz.snapshotQuestions.find(
-      (q: any) => q._id.toString() === ans.questionId.toString()
+      (q: any) => q.id.toString() === ans.questionId.toString()
     );
 
     if (!question) return;
@@ -79,13 +76,33 @@ QuizAttemptSchema.methods.grade = async function () {
 
     if (isCorrect) totalScore += question.points;
   });
+  const totalQuestions = quiz.snapshotQuestions.length;
+  const totalQuizScore = quiz.snapshotQuestions.reduce(
+    (total, q) => total + q.points,
+    0
+  );
+  const scorePercentage = (totalScore / totalQuizScore) * 10;
 
-  attempt.score = totalScore;
+  attempt.score = scorePercentage;
   attempt.status = AttemptStatus.SUBMITTED;
   attempt.submittedAt = new Date();
+  attempt.answers = answers;
+  attempt.durationSeconds =
+    (attempt.submittedAt.getTime() - attempt.startedAt.getTime()) / 1000;
+
+  const failedQuestions = answers.filter((a) => !a.correct).length;
+  const passedQuestions = answers.filter((a) => a.correct).length;
 
   await attempt.save();
-  return { totalScore, answers: attempt.answers };
+  return {
+    totalQuestions,
+    totalScore,
+    totalQuizScore,
+    scorePercentage,
+    failedQuestions,
+    passedQuestions,
+    answers,
+  };
 };
 
 QuizAttemptSchema.index({ quizId: 1, studentId: 1 });

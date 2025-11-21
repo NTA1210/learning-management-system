@@ -4,6 +4,11 @@ import {CourseStatus} from "../types/course.type";
 
 const CourseSchema = new mongoose.Schema<ICourse>(
     {
+        semesterId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Semester",
+            required: true,
+        },
         title: {type: String, required: true},
         // ✅ UNIVERSITY RULE: Course MUST belong to a Subject
         subjectId: {type: mongoose.Schema.Types.ObjectId, ref: "Subject", required: true},
@@ -49,7 +54,7 @@ const CourseSchema = new mongoose.Schema<ICourse>(
 
 //indexes
 // ✅ FIX: Removed unique constraint - one subject can have multiple courses
-CourseSchema.index({subjectId: 1});
+CourseSchema.index({semesterId: 1, subjectId: 1}, {unique: true});
 CourseSchema.index({isPublished: 1, createdAt: -1});
 CourseSchema.index({teacherIds: 1, isPublished: 1, createdAt: -1});
 CourseSchema.index({isPublished: 1, title: "text", description: "text"});
