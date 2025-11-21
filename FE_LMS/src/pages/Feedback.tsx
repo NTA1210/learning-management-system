@@ -43,6 +43,8 @@ export default function Feedback() {
 		targetId: undefined
 	});
 
+	const emojiOptions = ["😀", "🙂", "😐", "😕", "😡", "❤️", "🚀"];
+
 	const categoryOptions = useMemo(
 		() => (isTeacher ? categories.filter((c) => c.value !== "teacher") : categories),
 		[isTeacher]
@@ -130,6 +132,13 @@ export default function Feedback() {
 		}
 	};
 
+	const handleEmojiInsert = (emoji: string) => {
+		setForm((prev) => ({
+			...prev,
+			description: prev.description ? `${prev.description} ${emoji}` : emoji
+		}));
+	};
+
 	return (
 		<div
 			className="flex h-screen overflow-hidden relative"
@@ -186,16 +195,36 @@ export default function Feedback() {
 							backgroundSize: "200% 100%"
 						}}
 					/>
-					<header className="mb-6 fade-in-up" style={{ animationDelay: "40ms" }}>
-						<h1
-							className="text-2xl sm:text-3xl font-bold tracking-tight"
-							style={{ color: darkMode ? "#ffffff" : "#111827" }}
+					<header className="mb-6 fade-in-up flex items-center justify-between" style={{ animationDelay: "40ms" }}>
+						<div>
+							<h1
+								className="text-2xl sm:text-3xl font-bold tracking-tight"
+								style={{ color: darkMode ? "#ffffff" : "#111827" }}
+							>
+								Feedback
+							</h1>
+							<p className="mt-2 text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+								Tell us about your experience so we can improve the platform.
+							</p>
+						</div>
+
+						<button
+							type="button"
+							onClick={() => navigate(-1)}
+							className="px-3 py-2 rounded-full font-semibold border transition-all pulse-button relative click-animate flex items-center justify-center"
+							style={{
+								background: darkMode ? "rgba(30,41,59,0.85)" : "rgba(226,232,255,0.8)",
+								color: darkMode ? "#e0e7ff" : "#4338ca",
+								borderColor: darkMode ? "rgba(148,163,184,0.5)" : "rgba(99,102,241,0.35)",
+								width: "48px",
+								height: "40px"
+							}}
+							aria-label="Go back"
 						>
-							Feedback
-						</h1>
-						<p className="mt-2 text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
-							Tell us about your experience so we can improve the platform.
-						</p>
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+								<path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+							</svg>
+						</button>
 					</header>
 					{submitting && (
 						<div className="w-full h-1 overflow-hidden rounded-full mb-3" style={{ background: darkMode ? "#111827" : "#e5e7eb" }}>
@@ -353,7 +382,24 @@ export default function Feedback() {
 										border: "1px solid rgba(148,163,184,0.25)"
 									}}
 								/>
-								<p className="mt-1 text-xs" style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}>
+								<div className="flex flex-wrap gap-2 mt-3">
+									{emojiOptions.map((emoji) => (
+										<button
+											key={emoji}
+											type="button"
+											onClick={() => handleEmojiInsert(emoji)}
+											className="px-3 py-1 rounded-full border text-lg click-animate"
+											style={{
+												borderColor: darkMode ? "rgba(148,163,184,0.4)" : "rgba(148,163,184,0.6)",
+												backgroundColor: darkMode ? "rgba(15,23,42,0.7)" : "#fff"
+											}}
+											aria-label={`Insert emoji ${emoji}`}
+										>
+											{emoji}
+										</button>
+									))}
+								</div>
+								<p className="mt-2 text-xs" style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}>
 									Add context, reproduction steps (if any), and screenshots if possible.
 								</p>
 							</div>
