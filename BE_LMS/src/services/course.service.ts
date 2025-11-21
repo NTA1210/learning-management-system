@@ -444,30 +444,13 @@ export const createCourse = async (
     }
   }
 
-  // ✅ AUTO-ASSIGN SEMESTER: If semesterId is not provided, find it based on startDate
-  let semesterId = data.semesterId;
-  if (!semesterId) {
-    const semester = await SemesterModel.findOne({
-      startDate: { $lte: startDate },
-      endDate: { $gte: startDate },
-    });
-
-    appAssert(
-      semester,
-      BAD_REQUEST,
-      `Cannot determine semester for start date ${startDate.toISOString().split('T')[0]}. Please create a semester covering this date first.`
-    );
-    semesterId = (semester as any)._id.toString();
-  } else {
-    // Validate provided semesterId
-    const semester = await SemesterModel.findById(semesterId);
-    appAssert(semester, BAD_REQUEST, "Invalid semester ID");
-  }
+  // Validate provided semesterId
+  const semester = await SemesterModel.findById(data.semesterId);
+  appAssert(semester, BAD_REQUEST, "Invalid semester ID");
 
   // Create course with createdBy
   const courseData = {
     ...data,
-    semesterId, // ✅ Include the determined semesterId
     startDate,
     endDate,
     status: finalStatus,
