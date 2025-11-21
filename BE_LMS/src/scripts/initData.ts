@@ -287,14 +287,14 @@ async function seed() {
             {
                 courseId: courses[0]._id,
                 title: "JS Exercise 1",
-                maxScore: 100,
+                maxScore: 10,
                 createdBy: users[1]._id,
                 dueDate: new Date(Date.now() + 7 * 24 * 3600 * 1000),
             },
             {
                 courseId: courses[1]._id,
                 title: "Design Project",
-                maxScore: 100,
+                maxScore: 10,
                 createdBy: users[1]._id,
                 dueDate: new Date(Date.now() + 10 * 24 * 3600 * 1000),
             },
