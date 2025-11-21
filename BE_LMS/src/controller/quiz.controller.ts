@@ -52,8 +52,8 @@ export const deleteQuizHandler = catchErrors(async (req, res) => {
 export const getQuizzesHandler = catchErrors(async (req, res) => {
   const role = req.role;
   const userId = req.userId;
-  const input = getQuizzesSchema.parse(req.query);
-  const data = await getQuizzes(input, role, userId);
+  const input = getQuizzesSchema.parse({ ...req.query, courseId: req.query.courseId });
+  const data = await getQuizzes(input, role);
 
   return res.success(OK, {
     data,

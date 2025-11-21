@@ -214,61 +214,59 @@ export const deleteQuiz = async ({
  * @throws If the user is not a teacher of the course.
  * @throws If courseId is not provided for students.
  */
-export const getQuizzes = async (
-  input: GetQuizzes,
-  role: string,
-  userId?: mongoose.Types.ObjectId
-) => {
-  const { courseId, isPublished, isCompleted, isDeleted } = input;
+export const getQuizzes = async (input: GetQuizzes, role: string) => {
+  const { courseId, isPublished, isCompleted, isDeleted, page, limit, search } = input;
   const filter: any = {};
-  if (courseId) {
-    const course = await CourseModel.findById(courseId);
-    appAssert(course, NOT_FOUND, 'Course not found');
 
-    if (role === Role.TEACHER) {
-      const isTeacherOfCourse = course.teacherIds.some((teacherId) => teacherId.equals(userId));
-      appAssert(isTeacherOfCourse, FORBIDDEN, 'You are not a teacher of this course');
-    }
+  const course = await CourseModel.findById(courseId);
+  appAssert(course, NOT_FOUND, 'Course not found');
+  filter.courseId = courseId;
 
-    filter.courseId = courseId;
-
-    if (role === Role.STUDENT) {
-      filter.isPublished = true;
-      filter.deletedAt = { $exists: false };
-    } else {
-      if (isPublished !== undefined) {
-        filter.isPublished = isPublished;
-      }
-      if (isDeleted !== undefined) {
-        if (isDeleted) {
-          filter.deletedAt = { $exists: true };
-        } else {
-          filter.deletedAt = { $exists: false };
-        }
-      }
-      if (isCompleted !== undefined) {
-        filter.endTime = isCompleted ? { $lte: new Date() } : { $gt: new Date() };
-      }
-    }
+  if (role === Role.STUDENT) {
+    filter.isPublished = true;
+    filter.deletedAt = null;
   } else {
-    if (role === Role.STUDENT) {
-      appAssert(userId, FORBIDDEN, 'courseId is required');
+    if (isPublished !== undefined) filter.isPublished = isPublished;
+    if (isCompleted !== undefined) {
+      if (isCompleted) filter.endTime = { $gte: new Date() };
+      else filter.endTime = { $lt: new Date() };
+    }
+    if (isDeleted !== undefined) {
+      if (isDeleted) filter.deletedAt = { $ne: null };
+      else filter.deletedAt = null;
     }
   }
 
-  const quizzes = await QuizModel.find(filter).sort({ createdAt: -1 }).lean();
-
-  for (let quiz of quizzes) {
-    if (quiz.endTime.getTime() < Date.now()) {
-      (quiz as any).isCompleted = true;
-    } else {
-      (quiz as any).isCompleted = false;
-    }
-
-    if (quiz.deletedAt) {
-      (quiz as any).isDeleted = true;
-    }
+  if (search) {
+    filter.title = { $regex: search, $options: 'i' };
+    filter.description = { $regex: search, $options: 'i' };
   }
 
-  return quizzes;
+  if (page) filter.page = page;
+
+  const [quizzes, total] = await Promise.all([
+    QuizModel.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+    QuizModel.countDocuments(filter),
+  ]);
+
+  // Calculate pagination metadata
+  const totalPages = Math.ceil(total / limit);
+  const hasNextPage = page < totalPages;
+  const hasPrevPage = page > 1;
+
+  return {
+    quizzes,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNextPage,
+      hasPrevPage,
+    },
+  };
 };
