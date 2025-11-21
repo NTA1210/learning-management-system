@@ -70,83 +70,45 @@ export const createCourseInvite = async (
     Date.now() + expiresInDays * 24 * 60 * 60 * 1000
   );
 
-  // Khởi tạo mảng kết quả
-  const results = [];
 
-  // Dùng vòng lặp for...of để xử lý tuần tự từng email
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+  // Tạo bản ghi invite (Lưu mảng email)
+  const invite = await CourseInviteModel.create({
+    tokenHash,
+    courseId,
+    createdBy,
+    invitedEmails: uniqueEmails, // <--- Lưu mảng
+    maxUses,
+    expiresAt,
+    isActive: true,
+  });
+
+  appAssert(invite, INTERNAL_SERVER_ERROR, "Failed to create invite link");
+
+  const inviteLink = `${APP_ORIGIN}/courses/join?token=${token}`;
+
+  //Gửi email (Song song)
   for (const email of uniqueEmails) {
-
-    // 1. Kiểm tra invite đã tồn tại chưa
-    const existing = await CourseInviteModel.findOne({
-      courseId,
-      invitedEmail: email,
-      isActive: true,
-      expiresAt: { $gt: new Date() },
-      deletedAt: null
-    });
-
-    if (existing) {
-      results.push({
-        email,
-        skip: true,
-        reason: "Existing active invite found",
-      });
-      continue;
-    }
-
-    // 2. Tạo token và lưu vào DB
-    const token = crypto.randomBytes(32).toString("hex");
-    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-
-    const invite = await CourseInviteModel.create({
-      tokenHash,
-      courseId,
-      createdBy,
-      invitedEmail: email,
-      maxUses,
-      expiresAt,
-      isActive: true,
-    });
-
-    appAssert(invite, INTERNAL_SERVER_ERROR, "Failed to create invite link");
-
-    const inviteLink = `${APP_ORIGIN}/courses/join?token=${token}`;
-
-    // 3. Gửi email
-    const { data, error } = await sendMail({
+    const { error } = await sendMail({
       to: email,
       ...getCourseInviteTemplate(inviteLink, course.title),
     });
 
     if (error) {
-      console.error(`Failed to send invite email to ${email}:`, error);
+      console.error(`Failed to send invite to ${email}`, error);
     }
 
-    results.push({
-      email,
-      invite: {
-        _id: invite._id,
-        courseId: invite.courseId,
-        maxUses: invite.maxUses,
-        usedCount: invite.usedCount,
-        expiresAt: invite.expiresAt,
-        isActive: invite.isActive,
-        createdAt: invite.createdAt,
-      },
-      inviteLink,
-      emailId: data?.id,
-    });
-
-    // --- DELAY ĐỂ TRÁNH RATE LIMIT (2 req/s) ---
-    // Chờ 600ms trước khi xử lý email tiếp theo
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    // Delay 500ms (hoặc 1000ms tùy giới hạn) giữa các lần gửi
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
   return {
-    courseId,
-    invitedCount: results.length,
-    invites: results
-  }
+    invite,
+    inviteLink,
+    invitedCount: uniqueEmails.length
+  };
 };
 
 /**
@@ -206,10 +168,11 @@ export const joinCourseByInvite = async (token: string, userId: Types.ObjectId) 
   appAssert(user.role === Role.STUDENT, BAD_REQUEST, "Only students can join courses via invite links");
 
   //Ràng buộc email được gửi đến và email đăng nhập phải trùng nhau
-  appAssert(invite.invitedEmail === user.email,
+  appAssert(
+    invite.invitedEmails.includes(user.email), // Check xem email user có trong mảng không
     FORBIDDEN,
-    `Invite was sent to ${invite.invitedEmail}, please use that email to join the course`
-  )
+    `Invite was not sent to ${user.email}. Please use an invited email to join.`
+  );
   //ktra student đã enroll chưa
   const existingEnrollment = await EnrollmentModel.findOne({
     courseId: invite.courseId._id,
@@ -243,7 +206,7 @@ export const joinCourseByInvite = async (token: string, userId: Types.ObjectId) 
     message: `Successfully joined the course "${(invite.courseId as any).title}".`,
     enrollment,
     alreadyEnrolled: false,
-    invitedEmail: invite.invitedEmail,
+    invitedEmail: invite.invitedEmails,
   }
 }
 
@@ -281,7 +244,7 @@ export const listCourseInvites = async (
   }
   // Filter by invitedEmail
   if (invitedEmail) {
-    filter.invitedEmail = { $regex: invitedEmail, $options: "i" };
+    filter.invitedEmails = { $regex: invitedEmail, $options: "i" } as any;
   }
   // Filter by isActive
   if (isActive !== undefined) {
@@ -319,7 +282,7 @@ export const listCourseInvites = async (
   const results = invites.map((invite) => ({
     id: invite._id,
     course: invite.courseId,
-    invitedEmail: invite.invitedEmail,
+    invitedEmail: invite.invitedEmails,
     maxUses: invite.maxUses,
     usedCount: invite.usedCount,
     expiresAt: invite.expiresAt,
@@ -450,7 +413,7 @@ export const updateCourseInvite = async (
   return {
     id: updatedInvite._id,
     courseId: updatedInvite.courseId,
-    invitedEmail: updatedInvite.invitedEmail,
+    invitedEmail: updatedInvite.invitedEmails,
     maxUses: updatedInvite.maxUses,
     usedCount: updatedInvite.usedCount,
     expiresAt: updatedInvite.expiresAt,
@@ -471,10 +434,10 @@ export const updateCourseInvite = async (
  *    - Enable lại (bất kỳ cách nào)
  *    - Sử dụng token để join course
  *    - Hiển thị trong danh sách mặc định
- * 
- * 3. Data retention (soft delete):
+   
+   3. Data retention (soft delete):
  *    - Vẫn tồn tại trong DB
- *    - Giữ nguyên history: usedCount, invitedEmails, createdAt, ...
+      - Giữ nguyên history: usedCount, invitedEmails, createdAt, ...
  *    - Có thể query với param includeDeleted=true (nếu cần audit)
  * 
  * 4. Side effects:
