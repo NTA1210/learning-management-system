@@ -10,7 +10,6 @@ export const enum AttendanceStatus {
 export default interface IAttendance extends mongoose.Document {
     courseId: mongoose.Types.ObjectId;
     studentId: mongoose.Types.ObjectId;
-    classId: mongoose.Types.ObjectId;
     date: Date;
     status: AttendanceStatus;
     markedBy?: mongoose.Types.ObjectId;

@@ -1,16 +1,18 @@
 import TimeSlotModel from "../models/timeSlot.model";
-import ClassScheduleModel from "../models/classSchedule.model";
+import ScheduleModel from "../models/schedule.model";
 import ScheduleExceptionModel from "../models/scheduleException.model";
-import ClassModel from "../models/class.model";
-import {ScheduleStatus} from "../types/classSchedule.type";
+import {ScheduleStatus} from "../types/schedule.type";
 import {ExceptionStatus, ExceptionType} from "../types/scheduleException.type";
 import {DayOfWeek} from "../types/timeSlot.type";
 import appAssert from "../utils/appAssert";
 import {BAD_REQUEST, CONFLICT, NOT_FOUND} from "../constants/http";
+import {CourseModel, UserModel} from "@/models";
+import {Role} from "@/types";
+import mongoose from "mongoose";
 
 export interface CreateScheduleInput {
-    classId: string;
-    teacherId: string;
+    courseId: string;
+    teacherId: mongoose.Types.ObjectId;
     dayOfWeek: DayOfWeek;
     timeSlotId: string;
     effectiveFrom: Date;
@@ -25,9 +27,9 @@ export interface CreateExceptionInput {
     exceptionType: ExceptionType;
     newTimeSlotId?: string;
     newLocation?: string;
-    replacementTeacherId?: string;
+    replacementTeacherId?: mongoose.Types.ObjectId;
     reason: string;
-    requestedBy: string;
+    requestedBy: mongoose.Types.ObjectId;
 }
 
 export const getAllTimeSlots = async (filter: any = {}) => {
@@ -35,18 +37,18 @@ export const getAllTimeSlots = async (filter: any = {}) => {
 };
 
 export const createScheduleRequest = async (input: CreateScheduleInput) => {
-    // Verify class exists
-    const classData = await ClassModel.findById(input.classId);
-    appAssert(classData, NOT_FOUND, "Class not found");
+    // Verify course exists
+    const courseData = await CourseModel.findById(input.courseId);
+    appAssert(courseData, NOT_FOUND, "Course not found");
 
-    // Verify teacher is assigned to this class
-    const isAssigned = classData.teacherIds.some(
-        (id: any) => id.toString() === input.teacherId
+    // Verify teacher is assigned to this course
+    const isAssigned = courseData.teacherIds.some(
+        (id: mongoose.Types.ObjectId) => id === input.teacherId
     );
-    appAssert(isAssigned, BAD_REQUEST, "Teacher is not assigned to this class");
+    appAssert(isAssigned, BAD_REQUEST, "Teacher is not assigned to this course");
 
     // Check if slot is available for this teacher
-    const conflict = await ClassScheduleModel.findOne({
+    const conflict = await ScheduleModel.findOne({
         teacherId: input.teacherId,
         dayOfWeek: input.dayOfWeek,
         timeSlotId: input.timeSlotId,
@@ -56,10 +58,10 @@ export const createScheduleRequest = async (input: CreateScheduleInput) => {
     appAssert(
         !conflict,
         CONFLICT,
-        "Teacher already has a class scheduled in this slot"
+        "Teacher already has a course scheduled in this slot"
     );
 
-    const schedule = await ClassScheduleModel.create({
+    const schedule = await ScheduleModel.create({
         ...input,
         status: ScheduleStatus.PENDING,
         requestedBy: input.teacherId,
@@ -67,7 +69,7 @@ export const createScheduleRequest = async (input: CreateScheduleInput) => {
     });
 
     return schedule.populate([
-        {path: "classId", select: "className courseId"},
+        {path: "courseId", select: "title subjectId startDate endDate"},
         {path: "teacherId", select: "fullname email"},
         {path: "timeSlotId"},
     ]);
@@ -92,9 +94,9 @@ export const getTeacherWeeklySchedule = async (
         ];
     }
 
-    const schedules = await ClassScheduleModel.find(query)
+    const schedules = await ScheduleModel.find(query)
         .populate([
-            {path: "classId", select: "className courseId capacity"},
+            {path: "courseId", select: "title subjectId startDate endDate"},
             {path: "timeSlotId"},
         ])
         .sort({dayOfWeek: 1})
@@ -109,9 +111,9 @@ export const getTeacherWeeklySchedule = async (
     return weeklySchedule;
 };
 
-export const getClassSchedule = async (classId: string) => {
-    return await ClassScheduleModel.find({
-        classId,
+export const getCourseSchedule = async (courseId: string) => {
+    return ScheduleModel.find({
+        courseId,
         status: {$in: [ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
     })
         .populate([
@@ -128,13 +130,16 @@ export const getClassSchedule = async (classId: string) => {
 export const approveScheduleRequest = async (
     scheduleId: string,
     approved: boolean,
-    adminId: string,
+    adminId: mongoose.Types.ObjectId,
     approvalNote?: string
 ) => {
-    const schedule = await ClassScheduleModel.findById(scheduleId);
+    // Verify the admin ID is actually an admin
+    const admin = await UserModel.findById({adminId});
+    appAssert(admin && admin.role === Role.ADMIN, NOT_FOUND, "Admin user not found");
 
+    // FInd schedule
+    const schedule = await ScheduleModel.findById(scheduleId);
     appAssert(schedule, NOT_FOUND, "Schedule not found");
-
     appAssert(
         schedule.status === ScheduleStatus.PENDING,
         BAD_REQUEST,
@@ -143,7 +148,7 @@ export const approveScheduleRequest = async (
 
     // If approving, check for conflicts again (in case another schedule was approved meanwhile)
     if (approved) {
-        const conflict = await ClassScheduleModel.findOne({
+        const conflict = await ScheduleModel.findOne({
             _id: {$ne: scheduleId},
             teacherId: schedule.teacherId,
             dayOfWeek: schedule.dayOfWeek,
@@ -154,19 +159,19 @@ export const approveScheduleRequest = async (
         appAssert(
             !conflict,
             CONFLICT,
-            "Teacher already has an approved class in this slot"
+            "Teacher already has an approved course in this slot"
         );
     }
 
     schedule.status = approved ? ScheduleStatus.APPROVED : ScheduleStatus.REJECTED;
-    schedule.approvedBy = adminId as any;
+    schedule.approvedBy = adminId;
     schedule.approvedAt = new Date();
     schedule.approvalNote = approvalNote;
 
     await schedule.save();
 
     return schedule.populate([
-        {path: "classId", select: "className courseId"},
+        {path: "courseId", select: "title subjectId startDate endDate"},
         {path: "teacherId", select: "fullname email"},
         {path: "timeSlotId"},
         {path: "approvedBy", select: "fullname email"},
@@ -177,11 +182,11 @@ export const approveScheduleRequest = async (
  * Get pending schedule requests
  */
 export const getPendingScheduleRequests = async () => {
-    return ClassScheduleModel.find({
+    return ScheduleModel.find({
         status: ScheduleStatus.PENDING,
     })
         .populate([
-            {path: "classId", select: "className courseId"},
+            {path: "courseId", select: "title subjectId startDate endDate"},
             {path: "teacherId", select: "fullname email"},
             {path: "timeSlotId"},
         ])
@@ -193,28 +198,26 @@ export const getPendingScheduleRequests = async () => {
  * Create a schedule exception
  */
 export const createScheduleException = async (input: CreateExceptionInput) => {
-    const schedule = await ClassScheduleModel.findById(input.scheduleId);
-
+    const schedule = await ScheduleModel.findById(input.scheduleId);
     appAssert(schedule, NOT_FOUND, "Schedule not found");
 
     // Verify requester is the teacher of this schedule
     appAssert(
-        schedule.teacherId.toString() === input.requestedBy,
+        schedule.teacherId === input.requestedBy,
         BAD_REQUEST,
         "You can only create exceptions for your own schedules"
     );
 
     // Check if exception already exists for this date
     const existingException = await ScheduleExceptionModel.findOne({
-        classScheduleId: input.scheduleId,
+        scheduleId: input.scheduleId,
         exceptionDate: input.exceptionDate,
     });
-
     appAssert(!existingException, CONFLICT, "Exception already exists for this date");
 
     const exception = await ScheduleExceptionModel.create({
-        classScheduleId: input.scheduleId,
-        classId: schedule.classId,
+        scheduleId: input.scheduleId,
+        courseId: schedule.courseId,
         exceptionDate: input.exceptionDate,
         exceptionType: input.exceptionType,
         newTimeSlotId: input.newTimeSlotId,
@@ -228,8 +231,8 @@ export const createScheduleException = async (input: CreateExceptionInput) => {
     });
 
     return exception.populate([
-        {path: "classScheduleId"},
-        {path: "classId", select: "className courseId"},
+        {path: "scheduleId"},
+        {path: "courseId", select: "title subjectId startDate endDate"},
         {path: "newTimeSlotId"},
         {path: "replacementTeacherId", select: "fullname email"},
     ]);
@@ -241,13 +244,15 @@ export const createScheduleException = async (input: CreateExceptionInput) => {
 export const approveScheduleException = async (
     exceptionId: string,
     approved: boolean,
-    adminId: string,
+    adminId: mongoose.Types.ObjectId,
     approvalNote?: string
 ) => {
+    // Verify the admin ID is actually an admin
+    const admin = await UserModel.findById({adminId});
+    appAssert(admin && admin.role === Role.ADMIN, NOT_FOUND, "Admin user not found");
+
     const exception = await ScheduleExceptionModel.findById(exceptionId);
-
     appAssert(exception, NOT_FOUND, "Exception not found");
-
     appAssert(
         exception.status === ExceptionStatus.PENDING,
         BAD_REQUEST,
@@ -264,8 +269,8 @@ export const approveScheduleException = async (
     // TODO: If approved, notify students about the change
 
     return exception.populate([
-        {path: "classScheduleId"},
-        {path: "classId", select: "className courseId"},
+        {path: "scheduleId"},
+        {path: "courseId", select: "title subjectId startDate endDate"},
         {path: "newTimeSlotId"},
         {path: "replacementTeacherId", select: "fullname email"},
         {path: "approvedBy", select: "fullname email"},
@@ -276,7 +281,7 @@ export const approveScheduleException = async (
  * Get schedule with exceptions for a date range
  */
 export const getScheduleWithExceptions = async (
-    classId: string,
+    courseId: string,
     startDate: string,
     endDate: string
 ) => {
@@ -284,8 +289,8 @@ export const getScheduleWithExceptions = async (
     const end = new Date(endDate);
 
     // Get recurring schedule
-    const schedules = await ClassScheduleModel.find({
-        classId,
+    const schedules = await ScheduleModel.find({
+        courseId,
         status: {$in: [ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
         effectiveFrom: {$lte: end},
         $or: [{effectiveTo: {$exists: false}}, {effectiveTo: {$gte: start}}],
@@ -299,7 +304,7 @@ export const getScheduleWithExceptions = async (
 
     // Get exceptions in the date range
     const exceptions = await ScheduleExceptionModel.find({
-        classId,
+        courseId,
         exceptionDate: {$gte: start, $lte: end},
         status: {$in: [ExceptionStatus.APPROVED, ExceptionStatus.ACTIVE]},
     })
@@ -324,7 +329,7 @@ export const checkSlotAvailability = async (
     dayOfWeek: string,
     timeSlotId: string
 ): Promise<boolean> => {
-    const conflict = await ClassScheduleModel.findOne({
+    const conflict = await ScheduleModel.findOne({
         teacherId,
         dayOfWeek,
         timeSlotId,

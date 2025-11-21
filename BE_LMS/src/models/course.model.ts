@@ -34,7 +34,6 @@ const CourseSchema = new mongoose.Schema<ICourse>(
         enrollRequiresApproval: {type: Boolean, default: false},
         enrollPasswordHash: {type: String, default: null},
         createdBy: {type: mongoose.Schema.Types.ObjectId, ref: "User"},
-        classIds: [{type: mongoose.Schema.Types.ObjectId, ref: "Class"}],
         // Soft delete fields
         // TODO: Check for isDeleted usage in services and controllers, then delete this field
         isDeleted: {type: Boolean, default: false, index: true},

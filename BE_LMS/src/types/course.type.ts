@@ -18,8 +18,6 @@ export default interface ICourse extends mongoose.Document {
     status: CourseStatus;
     /** Can be multiple teachers. */
     teacherIds: mongoose.Types.ObjectId[];
-    /** Classes under this course. */
-    classIds: mongoose.Types.ObjectId[];
     isPublished: boolean;
     capacity?: number;
     meta?: Record<string, any>;
