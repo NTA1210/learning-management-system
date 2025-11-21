@@ -1,7 +1,7 @@
-import z from "zod";
-import ListParams from "@/types/dto/listParams.dto";
-import { datePreprocess } from "./helpers/date.schema";
-import { listParamsSchema } from "./listParams.schema";
+import z from 'zod';
+import ListParams from '@/types/dto/listParams.dto';
+import { datePreprocess } from './helpers/date.schema';
+import { listParamsSchema } from './helpers/listParams.schema';
 
 type ListSubjectsFilters = ListParams & {
   name?: string;
@@ -13,7 +13,7 @@ type ListSubjectsFilters = ListParams & {
   to?: Date;
 };
 
-export const listSubjectsSchema = (listParamsSchema
+export const listSubjectsSchema = listParamsSchema
   .extend({
     search: z.string().optional(),
     name: z.string().optional(),
@@ -34,16 +34,16 @@ export const listSubjectsSchema = (listParamsSchema
       return true;
     },
     {
-      message: "From date must be less than or equal to To date",
-      path: ["to"],
+      message: 'From date must be less than or equal to To date',
+      path: ['to'],
     }
-  )) satisfies z.ZodType<ListSubjectsFilters>;
+  ) satisfies z.ZodType<ListSubjectsFilters>;
 
 export type ListSubjectsQuery = z.infer<typeof listSubjectsSchema>;
 
 export const createSubjectSchema = z.object({
-  name: z.string().min(1, "Name is required").max(255),
-  code: z.string().min(1, "Code is required").max(64),
+  name: z.string().min(1, 'Name is required').max(255),
+  code: z.string().min(1, 'Code is required').max(64),
   credits: z.number().int().min(0).max(100),
   description: z.string().optional(),
   slug: z.string().min(1).max(255).optional(),
@@ -67,8 +67,8 @@ export const updateSubjectSchema = z.object({
 
 export type UpdateSubjectInput = z.infer<typeof updateSubjectSchema>;
 
-export const subjectIdSchema = z.string().min(1, "Subject ID is required");
-export const subjectSlugSchema = z.string().min(1, "Subject slug is required");
+export const subjectIdSchema = z.string().min(1, 'Subject ID is required');
+export const subjectSlugSchema = z.string().min(1, 'Subject slug is required');
 
 // Activate/Deactivate
 export const subjectActivateSchema = z.object({ id: z.string().min(1) });
@@ -93,7 +93,7 @@ export const autocompleteSchema = z.object({
     .string()
     .optional()
     .transform((v) => (v ? parseInt(v, 10) : 10))
-    .refine((v) => v > 0 && v <= 50, { message: "limit in (1..50)" }),
+    .refine((v) => v > 0 && v <= 50, { message: 'limit in (1..50)' }),
 });
 
 // Related
@@ -103,8 +103,5 @@ export const relatedSubjectsSchema = z.object({
     .string()
     .optional()
     .transform((v) => (v ? parseInt(v, 10) : 10))
-    .refine((v) => v > 0 && v <= 50, { message: "limit in (1..50)" }),
+    .refine((v) => v > 0 && v <= 50, { message: 'limit in (1..50)' }),
 });
-
-
-
