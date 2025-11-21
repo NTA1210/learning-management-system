@@ -12,39 +12,33 @@ import {OK} from "./constants/http";
 import {APP_ORIGIN} from "./constants/env";
 
 //middleware
-import {
-    authenticate,
-    customResponse,
-    authorize,
-    errorHandler,
-} from "./middleware";
+import {authenticate, authorize, customResponse, errorHandler,} from "./middleware";
 
 //routes
 import {
     assignmentRoutes,
     authRoutes,
-    lessonRoutes,
-    lessonMaterialRoutes,
-    lessonProgressRoutes,
-    courseRoutes,
     courseInviteRoutes,
+    courseRoutes,
     enrollmentRoutes,
     feedbackRoutes,
-    quizQuestionRoutes,
-    sessionRoutes,
-    submissionRoutes,
-    userRoutes,
-    majorProtectedRoutes,
-    majorPublicRoutes,
-    specialistProtectedRoutes,
-    specialistPublicRoutes,
     forumProtectedRoutes,
     forumPublicRoutes,
-    subjectRoutes,
-    quizRoutes,
+    lessonMaterialRoutes,
+    lessonProgressRoutes,
+    lessonRoutes,
+    majorProtectedRoutes,
+    majorPublicRoutes,
     notificationRoutes,
-    classRoutes,
+    quizQuestionRoutes,
+    quizRoutes,
     scheduleRoutes,
+    sessionRoutes,
+    specialistProtectedRoutes,
+    specialistPublicRoutes,
+    subjectRoutes,
+    submissionRoutes,
+    userRoutes,
 } from "./routes";
 import quizAttemptRoutes from "./routes/quizAttempt.route";
 
@@ -90,8 +84,8 @@ export const createApp = () => {
     app.use("/majors", majorPublicRoutes);
     app.use("/specialists", specialistPublicRoutes);
     app.use("/forums", forumPublicRoutes);
-    app.use("/classes", classRoutes);
     app.use("/schedules", scheduleRoutes);
+
     //protected routes
     app.use("/users", authenticate, userRoutes);
     app.use("/sessions", authenticate, authorize(Role.ADMIN), sessionRoutes);

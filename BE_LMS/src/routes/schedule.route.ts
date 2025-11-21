@@ -1,98 +1,109 @@
-import { Router } from "express";
+import {Router} from "express";
 import {
-  getTimeSlotsHandler,
-  createScheduleRequestHandler,
-  getTeacherScheduleHandler,
-  getClassScheduleHandler,
-  checkSlotAvailabilityHandler,
-  getScheduleWithExceptionsHandler,
-  getPendingRequestsHandler,
-  approveScheduleRequestHandler,
-  createScheduleExceptionHandler,
-  approveScheduleExceptionHandler,
+    getTimeSlotsHandler,
+    createScheduleRequestHandler,
+    getTeacherScheduleHandler,
+    checkSlotAvailabilityHandler,
+    getScheduleWithExceptionsHandler,
+    getPendingRequestsHandler,
+    approveScheduleRequestHandler,
+    createScheduleExceptionHandler,
+    approveScheduleExceptionHandler, getCourseScheduleHandler,
 } from "../controller/schedule.controller";
-import { authenticate, authorize } from "../middleware";
-import { Role } from "../types";
+import {authenticate, authorize} from "../middleware";
+import {Role} from "../types";
 
 const scheduleRouter = Router();
+
+// Prefix: /schedules
 
 // Public routes
 
 // Get all available time slots
-scheduleRouter.get("/timeslots", getTimeSlotsHandler);
+// GET /schedules/time-slots
+scheduleRouter.get("/time-slots", getTimeSlotsHandler);
 
 // Protected routes
 
 // Create schedule request (Teachers only)
+// POST /schedules
 scheduleRouter.post(
-  "/",
-  authenticate,
-  authorize(Role.TEACHER),
-  createScheduleRequestHandler
+    "/",
+    authenticate,
+    authorize(Role.TEACHER),
+    createScheduleRequestHandler
 );
 
-// Get teacher's weekly schedule
+// Get teacher's weekly schedule (?teacherId=)
+// GET /schedules?teacherId=
 scheduleRouter.get(
-  "/teachers/:teacherId/schedule",
-  authenticate,
-  getTeacherScheduleHandler
+    "/",
+    authenticate,
+    getTeacherScheduleHandler
 );
 
-// Get class schedule
+// Get course schedule (?courseId=)
+// GET /schedules?courseId=
 scheduleRouter.get(
-  "/classes/:classId/schedule",
-  authenticate,
-  getClassScheduleHandler
+    "/",
+    authenticate,
+    getCourseScheduleHandler
 );
 
 // Check slot availability
+// GET /schedules/check-availability?dayOfWeek=&timeSlotId=&teacherId=
 scheduleRouter.get(
-  "/check-availability",
-  authenticate,
-  checkSlotAvailabilityHandler
+    "/check-availability",
+    authenticate,
+    checkSlotAvailabilityHandler
 );
 
 // Get schedule with exceptions for date range
+// GET /schedules/exceptions/:courseId?startDate=&endDate=
 scheduleRouter.get(
-  "/classes/:classId/schedule/range",
-  authenticate,
-  getScheduleWithExceptionsHandler
+    "/exceptions/:courseId",
+    authenticate,
+    getScheduleWithExceptionsHandler
 );
 
 // Admin routes to approve/reject schedule requests
 
 // Get pending schedule requests (Admin only)
+// GET /schedules/pending
 scheduleRouter.get(
-  "/pending",
-  authenticate,
-  authorize(Role.ADMIN),
-  getPendingRequestsHandler
+    "/pending",
+    authenticate,
+    authorize(Role.ADMIN),
+    getPendingRequestsHandler
 );
 
 // Approve/reject schedule request (Admin only)
+// PATCH /schedules/:scheduleId/approve
 scheduleRouter.patch(
-  "/:scheduleId/approve",
-  authenticate,
-  authorize(Role.ADMIN),
-  approveScheduleRequestHandler
+    "/:scheduleId/approve",
+    authenticate,
+    authorize(Role.ADMIN),
+    approveScheduleRequestHandler
 );
 
 // Exception routes
 
 // Create schedule exception (Teachers for their own schedules)
+// POST /schedules/exceptions/:scheduleId
 scheduleRouter.post(
-  "/:scheduleId/exceptions",
-  authenticate,
-  authorize(Role.TEACHER),
-  createScheduleExceptionHandler
+    "/exceptions/:scheduleId",
+    authenticate,
+    authorize(Role.TEACHER),
+    createScheduleExceptionHandler
 );
 
 // Approve/reject schedule exception (Admin only)
+// PATCH /schedules/exceptions/:exceptionId/approve
 scheduleRouter.patch(
-  "/exceptions/:exceptionId/approve",
-  authenticate,
-  authorize(Role.ADMIN),
-  approveScheduleExceptionHandler
+    "/exceptions/:exceptionId/approve",
+    authenticate,
+    authorize(Role.ADMIN),
+    approveScheduleExceptionHandler
 );
 
 export default scheduleRouter;

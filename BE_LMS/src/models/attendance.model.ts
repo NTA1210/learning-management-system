@@ -16,12 +16,6 @@ const AttendanceSchema = new mongoose.Schema<IAttendance>(
             required: true,
             index: true,
         },
-        classId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Class",
-            required: true,
-            index: true,
-        },
         date: {type: Date, required: true, index: true},
         status: {
             type: String,

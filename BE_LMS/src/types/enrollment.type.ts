@@ -30,11 +30,6 @@ export enum EnrollmentMethod {
 export default interface IEnrollment extends mongoose.Document {
     studentId: mongoose.Types.ObjectId;
     courseId: mongoose.Types.ObjectId;
-    /**
-     * Reference to the specific class within the course.
-     * Students enroll in a specific class, not just the course.
-     */
-    classId?: mongoose.Types.ObjectId;
     status: EnrollmentStatus;
     method: EnrollmentMethod;
     role?: EnrollmentRole;
