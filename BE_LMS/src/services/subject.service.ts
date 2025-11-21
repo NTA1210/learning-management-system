@@ -82,7 +82,7 @@ export const listSubjects = async ({
   sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
   const [subjects, total] = await Promise.all([
-    SubjectModel.find(filter).sort(sort).skip(skip).limit(limit).lean(),
+    SubjectModel.find(filter).populate("specialistIds").sort(sort).skip(skip).limit(limit).lean(),
     SubjectModel.countDocuments(filter),
   ]);
 
