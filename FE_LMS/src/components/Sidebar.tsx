@@ -164,6 +164,7 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
 export default function Sidebar({ isOpen = true, role = 'admin', userInfo }: SidebarProps) {
   const { darkMode } = useTheme();
   const menuItems = getMenuItems(role);
+  const feedbackLink = '/help/feedback-list';
   const [isExpanded, setIsExpanded] = useState(false);
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
   const [closingSubmenu, setClosingSubmenu] = useState<string | null>(null);
@@ -382,7 +383,7 @@ export default function Sidebar({ isOpen = true, role = 'admin', userInfo }: Sid
                     </svg>
                     <span className="whitespace-nowrap">FAQ/Usage</span>
                   </Link>
-                  <Link to="/help/feedback" className="flex items-center w-full px-3 py-2 text-sm hover:bg-gray-100/20 rounded-md" style={{ color: darkMode ? '#9ca3af' : '#374151' }}>
+                  <Link to={feedbackLink} className="flex items-center w-full px-3 py-2 text-sm hover:bg-gray-100/20 rounded-md" style={{ color: darkMode ? '#9ca3af' : '#374151' }}>
                     <svg className="w-4 h-4 mr-2 min-w-[1rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                     </svg>

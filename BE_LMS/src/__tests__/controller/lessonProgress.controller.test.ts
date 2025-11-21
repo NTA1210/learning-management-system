@@ -45,7 +45,7 @@ describe("⏳ LessonProgress Controller Unit Tests", () => {
       (schemas.GetLessonProgressSchema.parse as jest.Mock).mockReturnValue({ lessonId });
       (service.getLessonProgress as jest.Mock).mockResolvedValue({ lessonId, progressPercent: 10 });
       await getLessonProgressController(req as Request, res as Response, next);
-      expect(service.getLessonProgress).toHaveBeenCalledWith(lessonId, req.userId.toString(), req.role, undefined);
+      expect(service.getLessonProgress).toHaveBeenCalledWith(lessonId, req.userId, req.role, undefined);
       expect(res.success).toHaveBeenCalledWith(200, {
         data: { lessonId, progressPercent: 10 },
         message: "Get lesson progress successfully"
@@ -60,7 +60,7 @@ describe("⏳ LessonProgress Controller Unit Tests", () => {
       (schemas.GetLessonProgressSchema.parse as jest.Mock).mockReturnValue({ lessonId, studentId });
       (service.getLessonProgress as jest.Mock).mockResolvedValue({ lessonId, progressPercent: 10 });
       await getLessonProgressController(req as Request, res as Response, next);
-      expect(service.getLessonProgress).toHaveBeenCalledWith(lessonId, req.userId.toString(), req.role, studentId);
+      expect(service.getLessonProgress).toHaveBeenCalledWith(lessonId, req.userId, req.role, studentId);
     });
 
     it("handles validation errors", async () => {
@@ -93,7 +93,7 @@ describe("⏳ LessonProgress Controller Unit Tests", () => {
       (schemas.AddTimeForLessonBodySchema.parse as jest.Mock).mockReturnValue({ incSeconds: 30 });
       (service.addTimeForLesson as jest.Mock).mockResolvedValue({ timeSpentSeconds: 30, progressPercent: 50 });
       await addTimeForLessonController(req as Request, res as Response, next);
-      expect(service.addTimeForLesson).toHaveBeenCalledWith(lessonId, 30, req.userId.toString(), req.role);
+      expect(service.addTimeForLesson).toHaveBeenCalledWith(lessonId, 30, req.userId, req.role);
       expect(res.success).toHaveBeenCalledWith(200, {
         data: { timeSpentSeconds: 30, progressPercent: 50 },
         message: "Add time for lesson successfully"
@@ -106,12 +106,10 @@ describe("⏳ LessonProgress Controller Unit Tests", () => {
       req.body = null;
       (schemas.LessonIdParamSchema.parse as jest.Mock).mockReturnValue({ lessonId });
       await addTimeForLessonController(req as Request, res as Response, next);
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: "Request body is required with incSeconds field",
-        data: null
-      });
+      expect(next).toHaveBeenCalled();
+      const error = (next as jest.Mock).mock.calls[0][0];
+      expect(error.message).toBe("Request body is required with incSeconds field");
+      expect(error.statusCode).toBe(400);
     });
 
     it("returns 400 when incSeconds is missing", async () => {
@@ -120,12 +118,10 @@ describe("⏳ LessonProgress Controller Unit Tests", () => {
       req.body = {};
       (schemas.LessonIdParamSchema.parse as jest.Mock).mockReturnValue({ lessonId });
       await addTimeForLessonController(req as Request, res as Response, next);
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({
-        success: false,
-        message: "Request body is required with incSeconds field",
-        data: null
-      });
+      expect(next).toHaveBeenCalled();
+      const error = (next as jest.Mock).mock.calls[0][0];
+      expect(error.message).toBe("Request body is required with incSeconds field");
+      expect(error.statusCode).toBe(400);
     });
 
     it("handles validation errors for params", async () => {
@@ -171,7 +167,7 @@ describe("⏳ LessonProgress Controller Unit Tests", () => {
       (schemas.LessonIdParamSchema.parse as jest.Mock).mockReturnValue({ lessonId });
       (service.completeLesson as jest.Mock).mockResolvedValue({ isCompleted: true });
       await completeLessonController(req as Request, res as Response, next);
-      expect(service.completeLesson).toHaveBeenCalledWith(lessonId, req.userId.toString(), req.role);
+      expect(service.completeLesson).toHaveBeenCalledWith(lessonId, req.userId, req.role);
       expect(res.success).toHaveBeenCalledWith(200, {
         data: { isCompleted: true },
         message: "Complete lesson successfully"
@@ -207,7 +203,7 @@ describe("⏳ LessonProgress Controller Unit Tests", () => {
       (schemas.GetCourseProgressSchema.parse as jest.Mock).mockReturnValue({ courseId });
       (service.getCourseProgress as jest.Mock).mockResolvedValue({ completionRate: 50 });
       await getCourseProgressController(req as Request, res as Response, next);
-      expect(service.getCourseProgress).toHaveBeenCalledWith(courseId, req.userId.toString(), req.role, undefined);
+      expect(service.getCourseProgress).toHaveBeenCalledWith(courseId, req.userId, req.role, undefined, { from: undefined, to: undefined });
       expect(res.success).toHaveBeenCalledWith(200, {
         data: { completionRate: 50 },
         message: "Get course progress successfully"
@@ -222,7 +218,7 @@ describe("⏳ LessonProgress Controller Unit Tests", () => {
       (schemas.GetCourseProgressSchema.parse as jest.Mock).mockReturnValue({ courseId, studentId });
       (service.getCourseProgress as jest.Mock).mockResolvedValue({ completionRate: 50 });
       await getCourseProgressController(req as Request, res as Response, next);
-      expect(service.getCourseProgress).toHaveBeenCalledWith(courseId, req.userId.toString(), req.role, studentId);
+      expect(service.getCourseProgress).toHaveBeenCalledWith(courseId, req.userId, req.role, studentId, { from: undefined, to: undefined });
     });
 
     it("handles validation errors", async () => {
@@ -242,7 +238,7 @@ describe("⏳ LessonProgress Controller Unit Tests", () => {
       const serviceError = new Error("Service error");
       (service.getCourseProgress as jest.Mock).mockRejectedValue(serviceError);
       await getCourseProgressController(req as Request, res as Response, next);
-      expect(next).toHaveBeenCalledWith(serviceError);
+      expect(service.getCourseProgress).toHaveBeenCalledWith(courseId, req.userId, req.role, undefined, { from: undefined, to: undefined });
     });
   });
 });

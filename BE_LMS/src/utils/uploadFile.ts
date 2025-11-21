@@ -6,6 +6,32 @@ import { nowLocal } from "./time";
 import AppError from "./AppError";
 import { INTERNAL_SERVER_ERROR } from "@/constants/http";
 import AppErrorCode from "@/constants/appErrorCode";
+import path from "path";
+import slugify from "slugify";
+
+/**
+ * Tạo tên file an toàn cho storage (MinIO/S3)
+ * @param originalName Tên file gốc từ client
+ * @returns Tên file đã slugify, giữ extension
+ */
+export const slugifyFileName = (originalName: string) => {
+  // Lấy extension
+  const ext = path.extname(originalName); // ví dụ: '.png'
+  const nameWithoutExt = path.basename(originalName, ext);
+
+  // Slugify phần tên file
+  const safeName = slugify(nameWithoutExt, {
+    replacement: "-", // thay khoảng trắng bằng '-'
+    remove: /[<>:"/\\|?*~`!@#$%^&+=]/g, // loại bỏ các ký tự đặc biệt
+    lower: true, // chuyển thành chữ thường
+    strict: true, // chỉ giữ chữ, số và replacement
+    locale: "vi", // hỗ trợ tiếng Việt
+    trim: true, // bỏ dấu '-' ở đầu/cuối
+  });
+
+  // Ghép lại với extension
+  return `${safeName}${ext.toLowerCase()}`;
+};
 
 /**
  * Upload 1 file, trả về public URL
@@ -15,7 +41,7 @@ import AppErrorCode from "@/constants/appErrorCode";
  */
 export const uploadFile = async (file: Express.Multer.File, prefix: string) => {
   try {
-    const key = `${prefix}/${v4()}/${file.originalname}`;
+    const key = `${prefix}/${v4()}/${slugifyFileName(file.originalname)}`;
     await minioClient.putObject(BUCKET_NAME, key, file.buffer, file.size, {
       "Content-Type":
         mime.lookup(file.originalname) || "application/octet-stream",
@@ -82,6 +108,14 @@ export const getPublicUrl = (key: string) =>
   `https://${MINIO_ENDPOINT}/${BUCKET_NAME}/${key}`;
 
 /**
+ *
+ * @param publicUrl
+ * @returns
+ */
+export const getKeyFromPublicUrl = (publicUrl: string) =>
+  publicUrl.replace(`https://${MINIO_ENDPOINT}/${BUCKET_NAME}/`, "");
+
+/**
  * method to get signed url
  * @param key
  * @param expiresIn
@@ -89,8 +123,8 @@ export const getPublicUrl = (key: string) =>
  */
 export const getSignedUrl = (
   key: string,
+  filename: string,
   expiresIn = 24 * 60 * 60,
-  filename: string
 ) => {
   try {
     return minioClient.presignedGetObject(BUCKET_NAME, key, expiresIn, {
@@ -113,10 +147,12 @@ export const getSignedUrl = (
  */
 export const removeFile = async (key: string) => {
   try {
+    console.log("KEY:", key, " typeof key:", typeof key);
+
     return await minioClient.removeObject(BUCKET_NAME, key);
   } catch (error) {
     throw new AppError(
-      `Remove file error ${(error as Error).message}`,
+      `Remove file error ${error as Error}`,
       INTERNAL_SERVER_ERROR
     );
   }
@@ -127,9 +163,9 @@ export const removeFile = async (key: string) => {
  * @param keys
  * @returns
  */
-export const removeFiles = async (key: string[]) => {
+export const removeFiles = async (keys: string[]) => {
   try {
-    return await minioClient.removeObjects(BUCKET_NAME, key);
+    return await minioClient.removeObjects(BUCKET_NAME, keys);
   } catch (error) {
     throw new AppError(
       `Remove files error ${(error as Error).message}`,

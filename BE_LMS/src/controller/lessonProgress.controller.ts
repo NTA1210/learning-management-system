@@ -1,5 +1,5 @@
 import { catchErrors } from "../utils/asyncHandler";
-import { OK } from "../constants/http";
+import { BAD_REQUEST, OK } from "../constants/http";
 import { Role } from "../types";
 import { addTimeForLesson, completeLesson, getCourseProgress, getLessonProgress } from "@/services/lessonProgress.service";
 import {
@@ -8,6 +8,7 @@ import {
   LessonIdParamSchema,
   GetCourseProgressSchema,
 } from "../validators/lessonProgress.schemas";
+import appAssert from "@/utils/appAssert";
 
 // GET /lesson-progress/lesson/:lessonId - Lấy tiến độ 1 bài học
 export const getLessonProgressController = catchErrors(async (req, res) => {
@@ -16,7 +17,7 @@ export const getLessonProgressController = catchErrors(async (req, res) => {
     studentId: req.query.studentId,
   });
   
-  const requesterId = req.userId?.toString();
+  const requesterId = req.userId;
   const requesterRole = req.role as Role;
 
   const result = await getLessonProgress(validated.lessonId, requesterId, requesterRole, validated.studentId);
@@ -32,16 +33,12 @@ export const addTimeForLessonController = catchErrors(async (req, res) => {
   
   // Check if body exists and has incSeconds
   if (!req.body || req.body.incSeconds === undefined) {
-    return res.status(400).json({
-      success: false,
-      message: "Request body is required with incSeconds field",
-      data: null,
-    });
+    appAssert(false, BAD_REQUEST, "Request body is required with incSeconds field");
   }
   
   const validatedBody = AddTimeForLessonBodySchema.parse(req.body);
   
-  const requesterId = req.userId?.toString();
+  const requesterId = req.userId;
   const requesterRole = req.role as Role;
 
   const result = await addTimeForLesson(validatedParams.lessonId, validatedBody.incSeconds, requesterId, requesterRole);
@@ -55,7 +52,7 @@ export const addTimeForLessonController = catchErrors(async (req, res) => {
 export const completeLessonController = catchErrors(async (req, res) => {
   const validatedParams = LessonIdParamSchema.parse({ lessonId: req.params.lessonId });
   
-  const requesterId = req.userId?.toString();
+  const requesterId = req.userId;
   const requesterRole = req.role as Role;
 
   const result = await completeLesson(validatedParams.lessonId, requesterId, requesterRole);
@@ -70,12 +67,20 @@ export const getCourseProgressController = catchErrors(async (req, res) => {
   const validated = GetCourseProgressSchema.parse({
     courseId: req.params.courseId,
     studentId: req.query.studentId,
+    from: req.query.from,
+    to: req.query.to,
   });
   
-  const requesterId = req.userId?.toString();
+  const requesterId = req.userId;
   const requesterRole = req.role as Role;
 
-  const result = await getCourseProgress(validated.courseId, requesterId, requesterRole, validated.studentId);
+  const result = await getCourseProgress(
+    validated.courseId,
+    requesterId,
+    requesterRole,
+    validated.studentId,
+    { from: validated.from, to: validated.to }
+  );
   return res.success(OK, { 
     data: result, 
     message: "Get course progress successfully" 

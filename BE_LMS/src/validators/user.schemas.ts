@@ -4,6 +4,7 @@ export const listAllUsersSchema = z.object({
   role: z.string().optional(),
   email: email().optional(),
   username: z.string().optional(),
+  status: z.string().optional(),
   page: z
     .string()
     .optional()

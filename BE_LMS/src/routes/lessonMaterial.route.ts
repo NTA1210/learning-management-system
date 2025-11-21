@@ -1,43 +1,45 @@
 import { Router } from "express";
-
-import { 
-  listAllLessonMaterialsController, 
-  getLessonMaterialsByLessonController, 
-  getLessonMaterialByIdController, 
-  createLessonMaterialController, 
-  updateLessonMaterialController, 
+import {
+  listAllLessonMaterialsController,
+  getLessonMaterialsByLessonController,
+  getLessonMaterialByIdController,
+  createLessonMaterialController,
+  updateLessonMaterialController,
   deleteLessonMaterialController,
   downloadLessonMaterialController,
-  uploadLessonMaterialController
+  uploadLessonMaterialController,
+  deleteLessonMaterialFile,
 } from "../controller/lessonMaterial.controller";
-
 import authenticate from "@/middleware/authenticate";
-import { Role } from "../types";
 import authorize from "@/middleware/authorize";
+import { Role } from "../types";
 import upload from "@/config/multer";
-
 
 const lessonMaterialRoutes = Router();
 
-//prefix : /lesson-material
+// prefix: /lesson-material
 
-// GET /lesson-material/listAllMaterials - Liệt kê tài liệu (auth required)
-lessonMaterialRoutes.get("/listAllMaterials", authenticate, listAllLessonMaterialsController);
-// GET /lesson-material/byLesson/:lessonId - Lấy theo lessonId (auth required)
-lessonMaterialRoutes.get("/byLesson/:lessonId", authenticate, getLessonMaterialsByLessonController);
-// GET /lesson-material/getMaterialById/:id - Lấy chi tiết tài liệu (auth required)
-lessonMaterialRoutes.get("/getMaterialById/:id", authenticate, getLessonMaterialByIdController);
-// GET /lesson-material/download/:id - Chuẩn bị tải xuống (auth required)
-lessonMaterialRoutes.get("/download/:id", authenticate, downloadLessonMaterialController);
+// Protected routes (require authentication)
+// GET /lesson-material - List Lesson Material (search/lọc/phân trang)
+lessonMaterialRoutes.get("/", authenticate, listAllLessonMaterialsController);
+// GET /lesson-material/lesson/:lessonId - Lấy theo lessonId
+lessonMaterialRoutes.get("/lessons/:lessonId", authenticate, getLessonMaterialsByLessonController);
+// GET /lesson-material/id/:id - Chi tiết Lesson Material theo ID
+lessonMaterialRoutes.get("/:id", authenticate, getLessonMaterialByIdController);
+// GET /lesson-material/id/:id/download - Chuẩn bị tải xuống
+lessonMaterialRoutes.get("/:id/download", authenticate, downloadLessonMaterialController);
 
-// POST /lesson-material/createMaterial - Tạo tài liệu (teacher/admin)
-lessonMaterialRoutes.post("/createMaterial", authenticate, authorize(Role.TEACHER, Role.ADMIN), createLessonMaterialController);
-// POST /lesson-material/uploadMaterial - Upload file(s) tài liệu (teacher/admin)
+// Protected routes (require authentication + admin/teacher role)
+// POST /lesson-material - Tạo Lesson Material (Admin/Teacher only)
+lessonMaterialRoutes.post("/", authenticate, authorize(Role.TEACHER, Role.ADMIN), createLessonMaterialController);
+// POST /lesson-material/upload - Upload file(s) tài liệu (Admin/Teacher only)
 // Supports both single file (field: 'file') and multiple files (field: 'files')
-lessonMaterialRoutes.post("/uploadMaterial", authenticate, authorize(Role.TEACHER, Role.ADMIN), upload.any(), uploadLessonMaterialController);
-// PUT /lesson-material/updateMaterial/:id - Cập nhật tài liệu (teacher/admin)
-lessonMaterialRoutes.put("/updateMaterial/:id", authenticate, authorize(Role.TEACHER, Role.ADMIN), updateLessonMaterialController);
-// DELETE /lesson-material/deleteMaterial/:id - Xóa tài liệu (teacher/admin)
-lessonMaterialRoutes.delete("/deleteMaterial/:id", authenticate, authorize(Role.TEACHER, Role.ADMIN), deleteLessonMaterialController);
+lessonMaterialRoutes.post("/upload", authenticate, authorize(Role.TEACHER, Role.ADMIN), upload.any(), uploadLessonMaterialController);
+// PATCH /lesson-material/id/:id - Cập nhật theo ID (Admin/Teacher only)
+lessonMaterialRoutes.patch("/:id", authenticate, authorize(Role.TEACHER, Role.ADMIN), updateLessonMaterialController);
+// DELETE /lesson-material/id/:id - Xóa theo ID (Admin/Teacher only)
+lessonMaterialRoutes.delete("/:id", authenticate, authorize(Role.TEACHER, Role.ADMIN), deleteLessonMaterialController);
+// DELETE /lesson-material/id/:id/file - Xóa file tài liệu (Admin/Teacher only)
+lessonMaterialRoutes.delete("/:id/file", authenticate, authorize(Role.TEACHER, Role.ADMIN), deleteLessonMaterialFile);
 
-export default lessonMaterialRoutes;  
+export default lessonMaterialRoutes;

@@ -8,6 +8,6 @@ const userRoutes = Router();
 
 //prefix : /users
 userRoutes.get("/me", getUserHandler);
-userRoutes.get("/:courseId", getUserForCourseHandler);
+userRoutes.get("/", getUserForCourseHandler);
 
 export default userRoutes;

@@ -25,7 +25,6 @@ import {
   deleteLessonService,
   updateLessonService,
   getLessons,
-  getLessonsByCourse,
   getLessonById,
   CreateLessonParams
 } from "@/services/lesson.service";
@@ -60,11 +59,16 @@ describe("📚 Lesson Service Unit Tests", () => {
       role: Role.STUDENT,
     };
 
+    const teacherIdsArray = [teacherUser._id];
+    teacherIdsArray.includes = jest.fn((id: any) =>
+      teacherIdsArray.some((tid) => tid.toString() === id.toString())
+    );
+
     course = {
       _id: new mongoose.Types.ObjectId(),
       title: "Test Course",
       description: "Test course for lesson testing",
-      teacherIds: [teacherUser._id],
+      teacherIds: teacherIdsArray,
       isPublished: true,
     };
 
@@ -77,7 +81,7 @@ describe("📚 Lesson Service Unit Tests", () => {
         title: course.title,
         description: course.description,
         isPublished: course.isPublished,
-        teacherIds: course.teacherIds,
+        teacherIds: teacherIdsArray,
       },
       order: 1,
       publishedAt: new Date(),
@@ -349,6 +353,36 @@ describe("📚 Lesson Service Unit Tests", () => {
       expect(result).toHaveProperty('lessons');
     });
 
+    it("should mark teacher as having published access when not instructor", async () => {
+      const teacherCourses = [{ _id: course._id }];
+      const mockCourseQuery = {
+        select: jest.fn().mockResolvedValue(teacherCourses),
+      };
+      (CourseModel.find as jest.Mock).mockReturnValue(mockCourseQuery);
+
+      const publishedLesson = {
+        ...lesson,
+        courseId: {
+          ...lesson.courseId,
+          teacherIds: [new mongoose.Types.ObjectId()],
+        },
+      };
+
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([publishedLesson]),
+      };
+      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
+      (LessonModel.countDocuments as jest.Mock).mockResolvedValue(1);
+
+      const result = await getLessons({}, teacherUser._id.toString(), Role.TEACHER);
+
+      expect(result.lessons[0].accessReason).toBe("published");
+    });
+
     it("should return only published lessons for student", async () => {
       const mockQuery = {
         populate: jest.fn().mockReturnThis(),
@@ -423,11 +457,161 @@ describe("📚 Lesson Service Unit Tests", () => {
       (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
       (LessonModel.countDocuments as jest.Mock).mockResolvedValue(1);
 
+      // getLessons sẽ validate courseId và gọi CourseModel.findById
+      (CourseModel.findById as jest.Mock).mockResolvedValue(course);
+
       const result = await getLessons({ courseId: course._id.toString() }, adminUser._id.toString(), Role.ADMIN);
 
       expect(LessonModel.find).toHaveBeenCalledWith(
         expect.objectContaining({ courseId: course._id.toString() })
       );
+    });
+
+    it("should allow enrolled student to filter by courseId", async () => {
+      (CourseModel.findById as jest.Mock).mockResolvedValue(course);
+      (EnrollmentModel.findOne as jest.Mock).mockResolvedValue({ _id: new mongoose.Types.ObjectId() });
+
+      const mockEnrollmentQuery = {
+        select: jest.fn().mockResolvedValue([{ courseId: course._id }]),
+      };
+      (EnrollmentModel.find as jest.Mock).mockReturnValue(mockEnrollmentQuery);
+
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([lesson]),
+      };
+      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
+      (LessonModel.countDocuments as jest.Mock).mockResolvedValue(1);
+
+      const result = await getLessons(
+        { page: 1, limit: 10, courseId: course._id.toString() },
+        studentUser._id.toString(),
+        Role.STUDENT
+      );
+
+      expect(result).toBeDefined();
+      expect(EnrollmentModel.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          studentId: studentUser._id.toString(),
+          courseId: course._id.toString(),
+        })
+      );
+    });
+
+    it("should throw error when student filters by courseId without enrollment", async () => {
+      (CourseModel.findById as jest.Mock).mockResolvedValue(course);
+      (EnrollmentModel.findOne as jest.Mock).mockResolvedValue(null);
+
+      const mockEnrollmentQuery = {
+        select: jest.fn().mockResolvedValue([{ courseId: course._id }]),
+      };
+      (EnrollmentModel.find as jest.Mock).mockReturnValue(mockEnrollmentQuery);
+
+      await expect(
+        getLessons(
+          { page: 1, limit: 10, courseId: course._id.toString() },
+          studentUser._id.toString(),
+          Role.STUDENT
+        )
+      ).rejects.toThrow("Not enrolled in this course");
+    });
+
+    it("should allow instructor teacher to filter by courseId", async () => {
+      const teacherIdsArray = [teacherUser._id];
+      teacherIdsArray.includes = jest.fn((id: any) =>
+        teacherIdsArray.some((tid) => tid.toString() === id.toString())
+      );
+      const instructorCourse = {
+        ...course,
+        teacherIds: teacherIdsArray,
+      };
+      (CourseModel.findById as jest.Mock).mockResolvedValue(instructorCourse);
+
+      const mockTeacherCourseQuery = {
+        select: jest.fn().mockResolvedValue([{ _id: course._id }]),
+      };
+      (CourseModel.find as jest.Mock).mockReturnValue(mockTeacherCourseQuery);
+
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([lesson]),
+      };
+      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
+      (LessonModel.countDocuments as jest.Mock).mockResolvedValue(1);
+
+      const result = await getLessons(
+        { page: 1, limit: 10, courseId: course._id.toString() },
+        teacherUser._id.toString(),
+        Role.TEACHER
+      );
+
+      expect(result).toBeDefined();
+      expect(CourseModel.findById).toHaveBeenCalledWith(course._id.toString());
+    });
+
+    it("should throw error when teacher filters by courseId without being instructor", async () => {
+      const otherCourse = {
+        ...course,
+        teacherIds: [new mongoose.Types.ObjectId()],
+      };
+      (CourseModel.findById as jest.Mock).mockResolvedValue(otherCourse);
+
+      await expect(
+        getLessons(
+          { page: 1, limit: 10, courseId: course._id.toString() },
+          teacherUser._id.toString(),
+          Role.TEACHER
+        )
+      ).rejects.toThrow("Not instructor of this course");
+    });
+
+    it("should filter lessons by publishedAt date", async () => {
+      const publishedDate = new Date("2024-03-01");
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([lesson]),
+      };
+      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
+      (LessonModel.countDocuments as jest.Mock).mockResolvedValue(1);
+
+      const result = await getLessons({ publishedAt: publishedDate }, adminUser._id.toString(), Role.ADMIN);
+
+      expect(result).toBeDefined();
+      expect(LessonModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({ publishedAt: publishedDate })
+      );
+    });
+
+    it("should mark student without enrollment as not having access to unpublished lessons", async () => {
+      const mockEnrollmentQuery = {
+        select: jest.fn().mockResolvedValue([]),
+      };
+      (EnrollmentModel.find as jest.Mock).mockReturnValue(mockEnrollmentQuery);
+      (EnrollmentModel.findOne as jest.Mock).mockResolvedValue(null);
+
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([{ ...lesson, publishedAt: null }]),
+      };
+      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
+      (LessonModel.countDocuments as jest.Mock).mockResolvedValue(1);
+
+      const result = await getLessons({ page: 1, limit: 10 }, studentUser._id.toString(), Role.STUDENT);
+
+      expect(result.lessons[0].hasAccess).toBe(false);
+      expect(result.lessons[0].accessReason).toBe("not_enrolled");
     });
 
     it("should filter lessons by order", async () => {
@@ -483,86 +667,27 @@ describe("📚 Lesson Service Unit Tests", () => {
         expect.objectContaining({ $text: { $search: "test" } })
       );
     });
-  });
 
-  describe("getLessonsByCourse", () => {
-    it("should return lessons by course for admin", async () => {
-      (CourseModel.findById as jest.Mock).mockResolvedValue(course);
-      
+    it("should apply createdAt range filters", async () => {
       const mockQuery = {
         populate: jest.fn().mockReturnThis(),
         sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
         lean: jest.fn().mockResolvedValue([lesson]),
       };
-      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
+      (LessonModel.find as jest.Mock).mockImplementation((filter: any) => {
+        expect(filter.createdAt.$gte).toEqual(fromDate);
+        expect(filter.createdAt.$lte).toEqual(toDate);
+        return mockQuery;
+      });
+      (LessonModel.countDocuments as jest.Mock).mockResolvedValue(1);
 
-      const result = await getLessonsByCourse(course._id.toString(), adminUser._id.toString(), Role.ADMIN);
+      const fromDate = new Date("2024-02-01");
+      const toDate = new Date("2024-02-28");
+      const result = await getLessons({ page: 1, limit: 10, from: fromDate, to: toDate }, adminUser._id.toString(), Role.ADMIN);
 
-      expect(result).toBeDefined();
-      expect(Array.isArray(result)).toBe(true);
-      expect(result).toHaveLength(1);
-    });
-
-    it("should return lessons by course for course instructor", async () => {
-      (CourseModel.findById as jest.Mock).mockResolvedValue(course);
-      
-      const mockQuery = {
-        populate: jest.fn().mockReturnThis(),
-        sort: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([lesson]),
-      };
-      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
-
-      const result = await getLessonsByCourse(course._id.toString(), teacherUser._id.toString(), Role.TEACHER);
-
-      expect(result).toBeDefined();
-      expect(Array.isArray(result)).toBe(true);
-    });
-
-    it("should return only published lessons for student", async () => {
-      (CourseModel.findById as jest.Mock).mockResolvedValue(course);
-      
-      const mockQuery = {
-        populate: jest.fn().mockReturnThis(),
-        sort: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([lesson]),
-      };
-      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
-
-      const result = await getLessonsByCourse(course._id.toString(), studentUser._id.toString(), Role.STUDENT);
-
-      expect(result).toBeDefined();
-      expect(Array.isArray(result)).toBe(true);
-    });
-
-    it("should return only published lessons for teacher non-instructor", async () => {
-      const otherCourse = {
-        ...course,
-        teacherIds: [new mongoose.Types.ObjectId()], // Different teacher
-      };
-      (CourseModel.findById as jest.Mock).mockResolvedValue(otherCourse);
-      
-      const mockQuery = {
-        populate: jest.fn().mockReturnThis(),
-        sort: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([lesson]),
-      };
-      (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
-
-      const result = await getLessonsByCourse(course._id.toString(), teacherUser._id.toString(), Role.TEACHER);
-
-      expect(result).toBeDefined();
-      expect(LessonModel.find).toHaveBeenCalledWith(
-        expect.objectContaining({ publishedAt: { $exists: true, $ne: null } })
-      );
-    });
-
-    it("should throw error for invalid course ID", async () => {
-      (CourseModel.findById as jest.Mock).mockResolvedValue(null);
-
-      await expect(
-        getLessonsByCourse("invalid", adminUser._id.toString(), Role.ADMIN)
-      ).rejects.toThrow("Invalid course ID format");
+      expect(result.lessons).toHaveLength(1);
     });
   });
 
@@ -594,7 +719,28 @@ describe("📚 Lesson Service Unit Tests", () => {
 
       expect(result).toBeDefined();
       expect(result.title).toBe("Test Lesson");
-      // In unit mocks, teacher check uses ObjectId equality by reference; default to published
+      expect(result.accessReason).toBe("instructor");
+      expect(result.hasAccess).toBe(true);
+    });
+
+    it("should return lesson with published access for non-instructor teacher", async () => {
+      const publishedLesson = {
+        ...lesson,
+        courseId: {
+          ...lesson.courseId,
+          teacherIds: [new mongoose.Types.ObjectId()],
+        },
+        publishedAt: new Date(),
+      };
+      const mockQuery = {
+        populate: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue(publishedLesson),
+      };
+      (LessonModel.findById as jest.Mock).mockReturnValue(mockQuery);
+
+      const result = await getLessonById(lesson._id.toString(), teacherUser._id.toString(), Role.TEACHER);
+
+      expect(result).toBeDefined();
       expect(result.accessReason).toBe("published");
       expect(result.hasAccess).toBe(true);
     });

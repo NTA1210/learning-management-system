@@ -24,7 +24,7 @@ function calcProgressPercent(durationMinutes?: number | null, timeSpentSeconds?:
  */
 export const getLessonProgress = async (
   lessonId: string,
-  requesterId: string,
+  requesterId: mongoose.Types.ObjectId,
   requesterRole: Role,
   studentId?: string
 ) => {
@@ -69,7 +69,7 @@ export const getLessonProgress = async (
 export const addTimeForLesson = async (
   lessonId: string,
   incSeconds: number,
-  requesterId: string,
+  requesterId: mongoose.Types.ObjectId,
   requesterRole: Role
 ) => {
   appAssert(mongoose.Types.ObjectId.isValid(lessonId), NOT_FOUND, "Invalid lesson ID");
@@ -117,7 +117,7 @@ export const addTimeForLesson = async (
  */
 export const completeLesson = async (
   lessonId: string,
-  requesterId: string,
+  requesterId: mongoose.Types.ObjectId,
   requesterRole: Role
 ) => {
   appAssert(mongoose.Types.ObjectId.isValid(lessonId), NOT_FOUND, "Invalid lesson ID");
@@ -158,10 +158,12 @@ export const completeLesson = async (
  */
 export const getCourseProgress = async (
   courseId: string,
-  requesterId: string,
+  requesterId: mongoose.Types.ObjectId,
   requesterRole: Role,
-  studentId?: string
+  studentId?: string,
+  options?: { from?: Date; to?: Date }
 ) => {
+  const { from, to } = options || {};
   appAssert(mongoose.Types.ObjectId.isValid(courseId), NOT_FOUND, "Invalid course ID");
 
   const course = await CourseModel.findById(courseId).lean();
@@ -176,10 +178,29 @@ export const getCourseProgress = async (
     appAssert(isInstructor, FORBIDDEN, "Not authorized to view this course progress");
   }
 
-  const lessons = await LessonModel.find({ courseId, publishedAt: { $ne: null } }).sort({ order: 1 }).lean();
+  const lessonFilter: any = { courseId, publishedAt: { $ne: null } };
+  if (from || to) {
+    lessonFilter.createdAt = {};
+    if (from) lessonFilter.createdAt.$gte = from;
+    if (to) lessonFilter.createdAt.$lte = to;
+  }
+
+  const lessons = await LessonModel.find(lessonFilter).sort({ order: 1 }).lean();
   const lessonIds = lessons.map(l => l._id);
 
-  const progresses = await LessonProgressModel.find({ courseId, studentId: targetStudentId, lessonId: { $in: lessonIds } }).lean();
+  const progressFilter: any = {
+    courseId,
+    studentId: targetStudentId,
+    lessonId: { $in: lessonIds },
+  };
+
+  if (from || to) {
+    progressFilter.createdAt = {};
+    if (from) progressFilter.createdAt.$gte = from;
+    if (to) progressFilter.createdAt.$lte = to;
+  }
+
+  const progresses = await LessonProgressModel.find(progressFilter).lean();
   const progressMap = new Map(progresses.map(p => [p.lessonId.toString(), p]));
 
   const items = lessons.map(l => {

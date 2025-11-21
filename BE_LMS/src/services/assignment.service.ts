@@ -1,7 +1,11 @@
 import AssignmentModel from "../models/assignment.model";
 import CourseModel from "../models/course.model";
+import EnrollmentModel from "../models/enrollment.model";
+import mongoose from "mongoose";
 import appAssert from "../utils/appAssert";
-import { NOT_FOUND } from "../constants/http";
+import { NOT_FOUND, FORBIDDEN } from "../constants/http";
+import { EnrollmentStatus } from "../types/enrollment.type";
+import { Role } from "../types";
 
 export type ListAssignmentsParams = {
   page: number;
@@ -12,6 +16,8 @@ export type ListAssignmentsParams = {
   dueAfter?: Date;
   sortBy?: string;
   sortOrder?: string;
+  userId?: mongoose.Types.ObjectId;
+  userRole?: string;
 };
 
 export const listAssignments = async ({
@@ -23,6 +29,8 @@ export const listAssignments = async ({
   dueAfter,
   sortBy = "createdAt",
   sortOrder = "desc",
+  userId,
+  userRole,
 }: ListAssignmentsParams) => {
   // Build filter query
   const filter: any = {};
@@ -31,12 +39,49 @@ export const listAssignments = async ({
     filter.courseId = courseId;
   }
 
+  //neu là std,ktra enrollment status
+  if (userRole === Role.STUDENT && userId) {
+    if (courseId) {
+      const enrollment = await EnrollmentModel.findOne({
+        studentId: userId,
+        courseId: courseId,
+        status: EnrollmentStatus.APPROVED,
+      });
+      appAssert(
+        enrollment,
+        FORBIDDEN,
+        "You are not approved to access this course"
+      );
+    } else {
+      //nếu không có courseId, chỉ list assignments của các course mà student đã được approved
+      const approved = await EnrollmentModel.find({
+        studentId: userId,
+        status: EnrollmentStatus.APPROVED,
+      }).select("courseId");
+      const approvedCourseIds = approved.map((e: any) => e.courseId);
+      //nếu approved courses, return empty
+      if (!approvedCourseIds.length) {
+        return {
+          assignments: [],
+          pagination: { total: 0, page, limit, totalPages: 0, hasNextPage: false, hasPrevPage: false },
+        };
+      }
+      filter.courseId = { $in: approvedCourseIds };
+    }
+  }
+
   if (search) {
     filter.$or = [
       { title: { $regex: search, $options: "i" } },
       { description: { $regex: search, $options: "i" } },
     ];
   }
+  // lọc theo cratedAt
+  if (dueAfter || dueBefore) {
+  filter.createdAt = {};
+  if (dueAfter) filter.createdAt.$gte = dueAfter;
+  if (dueBefore) filter.createdAt.$lte = dueBefore;
+}
 
   if (dueBefore) {
     filter.dueDate = { ...filter.dueDate, $lte: dueBefore };
@@ -78,22 +123,36 @@ export const listAssignments = async ({
   };
 };
 
-export const getAssignmentById = async (assignmentId: string) => {
+export const getAssignmentById = async (assignmentId: string, userId?: mongoose.Types.ObjectId, userRole?: string) => {
   const assignment = await AssignmentModel.findById(assignmentId)
     .populate("courseId", "title code")
     .populate("createdBy", "username email fullname")
     .lean();
 
   appAssert(assignment, NOT_FOUND, "Assignment not found");
+
+  //nếu là học sinh,ktra enrollment status
+  if (userRole === Role.STUDENT && userId) {
+    const courseIdValue = (assignment as any).courseId?._id || (assignment as any).courseId;
+    const enrollment = await EnrollmentModel.findOne({
+      studentId: userId,
+      courseId: courseIdValue,
+      status: EnrollmentStatus.APPROVED,
+    });
+    appAssert(enrollment, FORBIDDEN, "You are not approved to access this course");
+  }
+
   return assignment;
 };
 
-export const createAssignment = async (data: any) => {
+export const createAssignment = async (data: any, userId?: mongoose.Types.ObjectId, userRole?: string) => {
   // Verify course exists
   const course = await CourseModel.findById(data.courseId);
   appAssert(course, NOT_FOUND, "Course not found");
 
-  const assignment = await AssignmentModel.create(data);
+  const createdBy = userId && (userId as any)._bsontype === 'ObjectID' ? userId : new mongoose.Types.ObjectId(userId as any);
+  const assignmentData = { ...data, createdBy };
+  const assignment = await AssignmentModel.create(assignmentData);
   return await AssignmentModel.findById(assignment._id)
     .populate("courseId", "title code")
     .populate("createdBy", "username email fullname")

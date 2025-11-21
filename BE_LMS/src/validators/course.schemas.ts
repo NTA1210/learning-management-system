@@ -1,55 +1,78 @@
 import z from "zod";
 import { CourseStatus } from "../types/course.type";
+import { datePreprocess } from "./helpers/date.schema";
 
 // Schema for listing courses with pagination and filters
-export const listCoursesSchema = z.object({
-  page: z
-    .string()
-    .optional()
-    .transform((val) => (val ? parseInt(val, 10) : 1))
-    .refine((val) => val > 0, { message: "Page must be greater than 0" }),
-  limit: z
-    .string()
-    .optional()
-    .transform((val) => (val ? parseInt(val, 10) : 10))
-    .refine((val) => val > 0 && val <= 100, {
-      message: "Limit must be between 1 and 100",
-    }),
-  search: z.string().optional(),
-  subjectId: z.string().optional(), // Filter by subject ID
-  teacherId: z.string().optional(), // Filter by teacher ID
-  isPublished: z
-    .string()
-    .optional()
-    .transform((val) => {
-      if (val === "true") return true;
-      if (val === "false") return false;
-      return undefined;
-    }),
-  status: z
-    .enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED])
-    .optional(), // Filter by status
-  // ✅ SOFT DELETE: Admin can view deleted courses
-  includeDeleted: z
-    .string()
-    .optional()
-    .transform((val) => {
-      if (val === "true") return true;
-      if (val === "false") return false;
-      return undefined;
-    }), // Admin only - show deleted courses
-  onlyDeleted: z
-    .string()
-    .optional()
-    .transform((val) => {
-      if (val === "true") return true;
-      return false;
-    }), // Admin only - show only deleted courses
-  sortBy: z
-    .enum(["createdAt", "title", "updatedAt", "startDate", "endDate", "deletedAt"])
-    .optional(),
-  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
-});
+export const listCoursesSchema = z
+  .object({
+    page: z
+      .string()
+      .optional()
+      .transform((val) => (val ? parseInt(val, 10) : 1))
+      .refine((val) => val > 0, { message: "Page must be greater than 0" }),
+    limit: z
+      .string()
+      .optional()
+      .transform((val) => (val ? parseInt(val, 10) : 10))
+      .refine((val) => val > 0 && val <= 100, {
+        message: "Limit must be between 1 and 100",
+      }),
+    search: z.string().optional(),
+    from: datePreprocess.optional(), // Date range start with validation
+    to: datePreprocess.optional(), // Date range end with validation
+    subjectId: z.string().optional(), // Filter by subject ID
+    teacherId: z.string().optional(), // Filter by teacher ID
+    isPublished: z
+      .string()
+      .optional()
+      .transform((val) => {
+        if (val === "true") return true;
+        if (val === "false") return false;
+        return undefined;
+      }),
+    status: z
+      .enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED])
+      .optional(), // Filter by status
+    // ✅ SOFT DELETE: Admin can view deleted courses
+    includeDeleted: z
+      .string()
+      .optional()
+      .transform((val) => {
+        if (val === "true") return true;
+        if (val === "false") return false;
+        return undefined;
+      }), // Admin only - show deleted courses
+    onlyDeleted: z
+      .string()
+      .optional()
+      .transform((val) => {
+        if (val === "true") return true;
+        return false;
+      }), // Admin only - show only deleted courses
+    sortBy: z
+      .enum([
+        "createdAt",
+        "title",
+        "updatedAt",
+        "startDate",
+        "endDate",
+        "deletedAt",
+      ])
+      .optional(),
+    sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
+  })
+  .refine(
+    (val) => {
+      if (val.from && val.to) {
+        return val.from.getTime() <= val.to.getTime();
+      }
+      return true;
+    },
+    {
+      message: "Start date must be before or equal to end date",
+      path: ["to"],
+    }
+  );
 
 export type ListCoursesQuery = z.infer<typeof listCoursesSchema>;
 
@@ -76,17 +99,27 @@ export const createCourseSchema = z
         if (!val) return CourseStatus.DRAFT;
         // Transform to lowercase to match enum values
         const normalized = val.toLowerCase();
-        if (normalized === "draft" || normalized === "ongoing" || normalized === "completed") {
+        if (
+          normalized === "draft" ||
+          normalized === "ongoing" ||
+          normalized === "completed"
+        ) {
           return normalized as CourseStatus;
         }
         return val;
       })
-      .pipe(z.enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED]))
+      .pipe(
+        z.enum([
+          CourseStatus.DRAFT,
+          CourseStatus.ONGOING,
+          CourseStatus.COMPLETED,
+        ])
+      )
       .default(CourseStatus.DRAFT),
     teacherIds: z
       .union([
-        z.array(z.string()), // Already array
         z.string().transform((val) => JSON.parse(val)), // Parse JSON string from multipart
+        z.array(z.string()), // Already array
       ])
       .pipe(z.array(z.string()).min(1, "At least one teacher is required")), // Required
     isPublished: z
@@ -98,10 +131,7 @@ export const createCourseSchema = z
       .default(false),
     // ✅ UNIVERSITY RULE: Capacity must be reasonable (10-500 students per class)
     capacity: z
-      .union([
-        z.number(),
-        z.string().transform((val) => parseInt(val, 10)),
-      ])
+      .union([z.number(), z.string().transform((val) => parseInt(val, 10))])
       .pipe(z.number().int().min(1).max(500))
       .optional(),
     enrollRequiresApproval: z
@@ -148,12 +178,24 @@ export const updateCourseSchema = z
         if (!val) return undefined;
         // Transform to lowercase to match enum values
         const normalized = val.toLowerCase();
-        if (normalized === "draft" || normalized === "ongoing" || normalized === "completed") {
+        if (
+          normalized === "draft" ||
+          normalized === "ongoing" ||
+          normalized === "completed"
+        ) {
           return normalized as CourseStatus;
         }
         return val;
       })
-      .pipe(z.enum([CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED]).optional()),
+      .pipe(
+        z
+          .enum([
+            CourseStatus.DRAFT,
+            CourseStatus.ONGOING,
+            CourseStatus.COMPLETED,
+          ])
+          .optional()
+      ),
     teacherIds: z
       .union([
         z.array(z.string()),
@@ -169,10 +211,7 @@ export const updateCourseSchema = z
       .optional(),
     // ✅ UNIVERSITY RULE: Capacity must be reasonable (10-500 students per class)
     capacity: z
-      .union([
-        z.number(),
-        z.string().transform((val) => parseInt(val, 10)),
-      ])
+      .union([z.number(), z.string().transform((val) => parseInt(val, 10))])
       .pipe(z.number().int().min(1).max(500))
       .optional(),
     enrollRequiresApproval: z

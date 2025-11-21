@@ -11,6 +11,7 @@ jest.mock("@/services/lessonMaterial.service", () => ({
   deleteLessonMaterial: jest.fn(),
   uploadLessonMaterial: jest.fn(),
   getMaterialForDownload: jest.fn(),
+  deleteFileOfMaterial: jest.fn(),
 }));
 
 jest.mock("@/utils/uploadFile", () => ({
@@ -37,6 +38,7 @@ import {
   deleteLessonMaterialController,
   uploadLessonMaterialController,
   downloadLessonMaterialController,
+  deleteLessonMaterialFile,
 } from "@/controller/lessonMaterial.controller";
 
 describe("📎 LessonMaterial Controller Unit Tests", () => {
@@ -88,7 +90,7 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
     (schemas.LessonMaterialsByLessonSchema.parse as jest.Mock).mockReturnValue({ lessonId });
     (service.getLessonMaterialsByLesson as jest.Mock).mockResolvedValue([{ _id: "m1" }]);
     await getLessonMaterialsByLessonController(req as Request, res as Response, next);
-      expect(service.getLessonMaterialsByLesson).toHaveBeenCalledWith(lessonId, req.userId.toString(), req.role);
+      expect(service.getLessonMaterialsByLesson).toHaveBeenCalledWith(lessonId, req.userId, req.role);
       expect(res.success).toHaveBeenCalledWith(200, {
         data: [{ _id: "m1" }],
         message: "Get lesson materials by lesson successfully"
@@ -123,7 +125,7 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
     (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockReturnValue({ id });
     (service.getLessonMaterialById as jest.Mock).mockResolvedValue({ _id: id });
     await getLessonMaterialByIdController(req as Request, res as Response, next);
-    expect(service.getLessonMaterialById).toHaveBeenCalledWith(id, req.userId.toString(), req.role);
+    expect(service.getLessonMaterialById).toHaveBeenCalledWith(id, req.userId, req.role);
       expect(res.success).toHaveBeenCalledWith(200, {
         data: { _id: id },
         message: "Get lesson material by id successfully"
@@ -158,7 +160,7 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
     (schemas.CreateLessonMaterialSchema.parse as jest.Mock).mockReturnValue(data);
     (service.createLessonMaterial as jest.Mock).mockResolvedValue({ _id: "1", ...data });
     await createLessonMaterialController(req as Request, res as Response, next);
-      expect(service.createLessonMaterial).toHaveBeenCalledWith(data, req.userId.toString(), req.role);
+      expect(service.createLessonMaterial).toHaveBeenCalledWith(data, req.userId, req.role);
       expect(res.success).toHaveBeenCalledWith(200, {
         data: { _id: "1", ...data },
         message: "Create lesson material successfully"
@@ -195,7 +197,7 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
     (schemas.UpdateLessonMaterialSchema.parse as jest.Mock).mockReturnValue({ title: "New" });
     (service.updateLessonMaterial as jest.Mock).mockResolvedValue({ _id: id, title: "New" });
     await updateLessonMaterialController(req as Request, res as Response, next);
-      expect(service.updateLessonMaterial).toHaveBeenCalledWith(id, { title: "New" }, req.userId.toString(), req.role);
+      expect(service.updateLessonMaterial).toHaveBeenCalledWith(id, { title: "New" }, req.userId, req.role);
       expect(res.success).toHaveBeenCalledWith(200, {
         data: { _id: id, title: "New" },
         message: "Update lesson material successfully"
@@ -245,7 +247,7 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
     (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockReturnValue({ id });
     (service.deleteLessonMaterial as jest.Mock).mockResolvedValue({ _id: id });
     await deleteLessonMaterialController(req as Request, res as Response, next);
-      expect(service.deleteLessonMaterial).toHaveBeenCalledWith(id, req.userId.toString(), req.role);
+      expect(service.deleteLessonMaterial).toHaveBeenCalledWith(id, req.userId, req.role);
       expect(res.success).toHaveBeenCalledWith(200, {
         data: { _id: id },
         message: "Delete lesson material successfully"
@@ -319,8 +321,9 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({
         success: false,
-        message: "No file uploaded"
+        message: "No file uploaded",
       });
+      expect(next).not.toHaveBeenCalled();
     });
 
     it("handles validation errors", async () => {
@@ -370,6 +373,35 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
       expect(res.success).toHaveBeenCalled();
     });
 
+    it("success flow uses empty originalName fallback", async () => {
+      const id = new mongoose.Types.ObjectId().toString();
+      req.params = { id };
+      (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockReturnValue({ id });
+      (service.getLessonMaterialById as jest.Mock).mockResolvedValue({ hasAccess: true });
+      const downloadPayload = { 
+        _id: id,
+        key: "files/a.pdf",
+        lessonId: new mongoose.Types.ObjectId(),
+        title: "Test",
+        note: "Note",
+        mimeType: "application/pdf",
+        size: 100,
+        uploadedBy: new mongoose.Types.ObjectId(),
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      (service.getMaterialForDownload as jest.Mock).mockResolvedValue(downloadPayload);
+
+      await downloadLessonMaterialController(req as Request, res as Response, next);
+
+      expect(res.success).toHaveBeenCalledWith(200, expect.objectContaining({
+        data: expect.objectContaining({
+          signedUrl: expect.anything(),
+          originalName: undefined,
+        }),
+      }));
+    });
+
     it("returns 403 when user has no access", async () => {
       const id = new mongoose.Types.ObjectId().toString();
       req.params = { id };
@@ -379,8 +411,9 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
       expect(res.status).toHaveBeenCalledWith(403);
       expect(res.json).toHaveBeenCalledWith({
         success: false,
-        message: "You don't have permission to download this material"
+        message: "You don't have permission to download this material",
       });
+      expect(next).not.toHaveBeenCalled();
     });
 
     it("returns 404 when material is manual (no file)", async () => {
@@ -397,8 +430,9 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.json).toHaveBeenCalledWith({
         success: false,
-        message: "This material does not have a file to download"
+        message: "This material does not have a file to download",
       });
+      expect(next).not.toHaveBeenCalled();
     });
 
     it("returns 404 when material has no key", async () => {
@@ -415,8 +449,9 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
       expect(res.status).toHaveBeenCalledWith(404);
       expect(res.json).toHaveBeenCalledWith({
         success: false,
-        message: "This material does not have a file to download"
+        message: "This material does not have a file to download",
       });
+      expect(next).not.toHaveBeenCalled();
     });
 
     it("handles validation errors", async () => {
@@ -447,6 +482,57 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
       const serviceError = new Error("Service error");
       (service.getMaterialForDownload as jest.Mock).mockRejectedValue(serviceError);
       await downloadLessonMaterialController(req as Request, res as Response, next);
+      expect(next).toHaveBeenCalledWith(serviceError);
+    });
+  });
+
+  describe("deleteLessonMaterialFile", () => {
+    it("works with valid material id", async () => {
+      const id = new mongoose.Types.ObjectId().toString();
+      req.params = { id };
+      (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockReturnValue({ id });
+      const mockResult = {
+        material: { _id: id, title: "Test Material" },
+        deletedKey: "files/test.pdf",
+        message: "File deleted successfully"
+      };
+      (service.deleteFileOfMaterial as jest.Mock).mockResolvedValue(mockResult);
+      await deleteLessonMaterialFile(req as Request, res as Response, next);
+      expect(service.deleteFileOfMaterial).toHaveBeenCalledWith(id, req.userId, req.role);
+      expect(res.success).toHaveBeenCalledWith(200, {
+        data: mockResult,
+        message: "Deleted file successfully"
+      });
+    });
+
+    it("handles invalid id parameter", async () => {
+      req.params = { id: "invalid" };
+      const validationError = new Error("Invalid material ID format");
+      (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockImplementation(() => {
+        throw validationError;
+      });
+      await deleteLessonMaterialFile(req as Request, res as Response, next);
+      expect(next).toHaveBeenCalledWith(validationError);
+    });
+
+    it("handles service errors", async () => {
+      const id = new mongoose.Types.ObjectId().toString();
+      req.params = { id };
+      (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockReturnValue({ id });
+      const serviceError = new Error("Material not found");
+      (service.deleteFileOfMaterial as jest.Mock).mockRejectedValue(serviceError);
+      await deleteLessonMaterialFile(req as Request, res as Response, next);
+      expect(next).toHaveBeenCalledWith(serviceError);
+    });
+
+    it("handles permission errors", async () => {
+      const id = new mongoose.Types.ObjectId().toString();
+      req.params = { id };
+      req.role = "STUDENT";
+      (schemas.LessonMaterialByIdSchema.parse as jest.Mock).mockReturnValue({ id });
+      const serviceError = new Error("Students cannot delete lesson material files");
+      (service.deleteFileOfMaterial as jest.Mock).mockRejectedValue(serviceError);
+      await deleteLessonMaterialFile(req as Request, res as Response, next);
       expect(next).toHaveBeenCalledWith(serviceError);
     });
   });

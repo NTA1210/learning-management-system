@@ -1,25 +1,26 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import {DashboardPage ,
-  StudentDashboardPage,
-  TeacherDashboardPage,
-  LandingPage,
-  NotFoundPage,
-  EmailVerifyPage,
-  ForgotPasswordPage,
-  ResetPasswordPage,
-  LoginPage,
-  RegisterPage,
-  CourseManagementPage,
-  CourseDetailPage,
-  ListAllLessonsPage,
-  AboutUsPage,
-  FAQPage,
-  AssignmentPage,
-  QuizManagementPage,
-  QuizCoursePage,
-  FeedbackPage,
-  MajorsSpecialistsPage,
-} from "../pages";
+      StudentDashboardPage,
+      TeacherDashboardPage,
+      LandingPage,
+      NotFoundPage,
+      EmailVerifyPage,
+      ForgotPasswordPage,
+      ResetPasswordPage,
+      LoginPage,
+      RegisterPage,
+      CourseManagementPage,
+      CourseDetailPage,
+      ListAllLessonsPage,
+      AboutUsPage,
+      FAQPage,
+      AssignmentPage,
+      QuizManagementPage,
+      QuizCoursePage,
+      FeedbackPage,
+      FeedbackListPage,
+      CurriculumPage,
+    } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
 import AssignmentDetailPage from "../pages/AssignmentDetailPage";
@@ -32,14 +33,14 @@ function AppRoutes() {
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-
+        
         {/* Course detail */}
         <Route path="/courses/:id" element={
           <ProtectedRoute>
             <CourseDetailPage />
           </ProtectedRoute>
         } />
-
+        
         {/* Auth routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -148,12 +149,18 @@ function AppRoutes() {
             <FeedbackPage />
           </ProtectedRoute>
         } />
-        {/* Majors & Specialists */}
-        <Route path="/majors-specialists" element={
+        <Route path="/help/feedback-list" element={
           <ProtectedRoute>
-            <MajorsSpecialistsPage />
+            <FeedbackListPage />
           </ProtectedRoute>
         } />
+        {/* Curriculum */}
+        <Route path="/curriculum" element={
+          <ProtectedRoute>
+            <CurriculumPage />
+          </ProtectedRoute>
+        } />
+
         {/* Not found */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

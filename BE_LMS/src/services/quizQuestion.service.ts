@@ -3,12 +3,21 @@ import { QuizModel, QuizQuestionModel, SubjectModel } from "@/models";
 import { ListParams } from "@/types/dto";
 import IQuizQuestion, { QuizQuestionType } from "@/types/quizQuestion.type";
 import appAssert from "@/utils/appAssert";
-import { prefixQuizQuestionImage } from "@/utils/filePrefix";
-import { removeFile, uploadFile } from "@/utils/uploadFile";
+import {
+  prefixExternalQuizQuestionImage,
+  prefixQuizQuestionImage,
+} from "@/utils/filePrefix";
+import {
+  getKeyFromPublicUrl,
+  removeFile,
+  removeFiles,
+  uploadFiles,
+} from "@/utils/uploadFile";
 import {
   ICreateQuizQuestionParams,
   IGetRandomQuestionsParams,
   IUpdateQuizQuestionParams,
+  TUploadImagesParams,
 } from "@/validators/quizQuestion.schemas";
 import mongoose, { FilterQuery } from "mongoose";
 import { parseStringPromise } from "xml2js";
@@ -23,39 +32,38 @@ import { create } from "xmlbuilder";
  * @returns Promise resolving to an array of imported questions.
  */
 export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
-  // 1️⃣ Convert buffer → string
+  const subject = await SubjectModel.findById(subjectId);
+  appAssert(subject, NOT_FOUND, "Subject not found");
+
   const xmlContent = xmlBuffer.toString("utf-8");
 
-  // 2️⃣ Parse XML → JSON
   const result = await parseStringPromise(xmlContent, {
     explicitArray: true,
     trim: true,
   });
+
   const questions = result.quiz?.question || [];
 
-  const importedQuestions = [];
-  const importedTypes = new Set<QuizQuestionType>();
+  const types = new Set<QuizQuestionType>();
+  const typeMap: Record<string, QuizQuestionType> = {
+    truefalse: QuizQuestionType.TRUE_FALSE,
+    multichoice: QuizQuestionType.MULTIPLE_CHOICE,
+    shortanswer: QuizQuestionType.FILL_BLANK,
+  };
+  const importedQuestions: Partial<IQuizQuestion>[] = [];
 
-  // 3️⃣ Duyệt từng câu hỏi
   for (const q of questions) {
     const typeAttr = q.$?.type || "mcq";
     if (typeAttr === "category") continue;
 
-    // Tên và text câu hỏi
     const questionName = q.name?.[0]?.text?.[0] || "Unnamed question";
     const questionText = q.questiontext?.[0]?.text?.[0] || "";
 
     // Loại câu hỏi
-    let type = QuizQuestionType.MCQ;
-    if (typeAttr === "truefalse") type = QuizQuestionType.TRUE_FALSE;
-    else if (typeAttr === "multichoice")
-      type = QuizQuestionType.MULTIPLE_CHOICE;
-    else if (typeAttr === "shortanswer") type = QuizQuestionType.FILL_BLANK;
+    const type = typeMap[typeAttr] || QuizQuestionType.MCQ;
 
-    // Kiem tra loai cau hoi
-    importedTypes.add(type);
+    types.add(type);
 
-    // Đáp án
     const answers = q.answer || [];
     const options: string[] = [];
     const correctOptions: number[] = [];
@@ -64,28 +72,31 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
       const text = ans.text?.[0] || "";
       const fraction = parseFloat(ans.$?.fraction || "0");
       options.push(text);
-      if (fraction > 0) correctOptions.push(1);
-      else correctOptions.push(0);
+      correctOptions.push(fraction > 0 ? 1 : 0);
     });
 
     // Tạo object câu hỏi
-    const newQuestion = new QuizQuestionModel({
-      subjectId,
+    const newQuestion = {
+      subjectId: new mongoose.Types.ObjectId(subjectId),
       text: questionText || questionName,
       type,
       options,
       correctOptions,
       points: parseFloat(q.defaultgrade?.[0] || "1"),
       explanation: "",
-    });
-
-    await newQuestion.save();
+    };
     importedQuestions.push(newQuestion);
   }
+
+  await QuizQuestionModel.deleteMany({ subjectId });
+  const quizzes = await QuizQuestionModel.insertMany(importedQuestions);
+
+  const importedTypes = Array.from(types);
+
   return {
-    data: importedQuestions,
+    data: quizzes,
     total: importedQuestions.length,
-    importedTypes: importedTypes,
+    importedTypes,
   };
 };
 
@@ -94,95 +105,87 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
  * @param quizQuestions Array of questions to export.
  * @returns Object containing XML string and total number of questions.
  */
-export const exportXMLFile = async (
-  quizQuestions: IQuizQuestion[],
-  subjectId: string
-) => {
+
+export const exportXMLFile = async (subjectId: string) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
+
+  const quizQuestions = await QuizQuestionModel.find({ subjectId }).lean();
+  appAssert(quizQuestions.length > 0, NOT_FOUND, "No questions found");
+
   const subjectCode = subject.code;
+  const types = new Set(quizQuestions.map((q) => q.type));
 
-  const root = create({ version: "1.0", encoding: "UTF-8" }).ele("quiz");
+  // root quiz
+  const root = create("quiz");
 
-  // --------------------
-  // 1️⃣ Add category question
-  // --------------------
-  const categoryQuestion = root
-    .com(`question: 0`)
-    .up()
-    .ele("question", { type: "category" });
-  categoryQuestion
+  // category question
+  const catQ = root.ele("question", { type: "category" });
+  catQ
     .ele("category")
     .ele("text")
-    .txt(`$subject$/top/Default for ${subjectCode}`);
-  categoryQuestion
+    .txt(`$course$/top/Default for ${subjectCode}`);
+  catQ
     .ele("info", { format: "moodle_auto_format" })
     .ele("text")
     .txt(
       `The default category for questions shared in context '${subjectCode}'.`
     );
-  categoryQuestion.ele("idnumber").txt("");
+  catQ.ele("idnumber").txt("");
 
-  // --------------------
-  // 2️⃣ Loop all quiz questions
-  // --------------------
-  const exportedTypes = new Set<QuizQuestionType>();
-
+  // add each quiz question
   quizQuestions.forEach((q, idx) => {
-    //Add types
-    exportedTypes.add(q.type);
+    // comment
+    root.com(`question: ${idx + 1}`);
 
-    // Add comment for question number
-    root.com(`question: ${idx + 1}`).up();
+    // always multichoice
+    const question = root.ele("question", { type: q.type });
 
-    // Create <question> element
-    const question = root.ele("question", { type: q.type || "multichoice" });
+    // name
+    question.ele("name").ele("text").dat(q.text.substring(0, 50));
 
-    // <name>
-    question.ele("name").ele("text").txt(q.text.substring(0, 50)); // truncate name if too long
+    // questiontext
+    question
+      .ele("questiontext", { format: "html" })
+      .ele("text")
+      .dat(`<p>${q.text}</p>`);
 
-    // <questiontext>
-    const questionText = question.ele("questiontext", { format: "html" });
-    questionText.ele("text").dat(`<p>${q.text}</p>`);
+    // generalfeedback
+    question.ele("generalfeedback", { format: "html" }).ele("text").dat("");
 
-    // <generalfeedback>
-    question.ele("generalfeedback", { format: "html" }).ele("text").txt("");
-
-    // Moodle grading info
+    // grading info
     question.ele("defaultgrade").txt("1.0000000");
     question.ele("penalty").txt("0.3333333");
     question.ele("hidden").txt("0");
     question.ele("idnumber").txt("");
 
-    // Extra fields (specific to multichoice)
+    // multichoice specific
     question.ele("single").txt("true");
     question.ele("shuffleanswers").txt("true");
     question.ele("answernumbering").txt("abc");
     question.ele("showstandardinstruction").txt("1");
 
-    // Feedback blocks
-    question.ele("correctfeedback", { format: "html" }).ele("text").txt("");
+    // feedback blocks
+    question.ele("correctfeedback", { format: "html" }).ele("text").dat("");
     question
       .ele("partiallycorrectfeedback", { format: "html" })
       .ele("text")
-      .txt("");
-    question.ele("incorrectfeedback", { format: "html" }).ele("text").txt("");
+      .dat("");
+    question.ele("incorrectfeedback", { format: "html" }).ele("text").dat("");
 
-    // <answer> blocks
-    if (q.options && q.options.length > 0) {
+    // answers
+    if (q.options && q.options.length) {
       q.options.forEach((opt: string, index: number) => {
         const fraction = q.correctOptions?.includes(index) ? "100" : "0";
         const ans = question.ele("answer", { fraction, format: "html" });
         ans.ele("text").dat(`<p>${opt}</p>`);
-        ans.ele("feedback", { format: "html" }).ele("text").txt("");
+        ans.ele("feedback", { format: "html" }).ele("text").dat("");
       });
     }
   });
 
-  // --------------------
-  // 3️⃣ Convert to string (pretty)
-  // --------------------
-  const xmlString = root.end({ format: "xml", prettyPrint: true } as any);
+  const xmlString = root.end({ prettyPrint: true, headless: false } as any);
+  const exportedTypes = Array.from(types);
   return { xmlString, total: quizQuestions.length, exportedTypes };
 };
 
@@ -217,14 +220,21 @@ export const getAllQuizQuestions = async ({
   type,
 }: Partial<IListQuizQuestionParams>) => {
   const query: FilterQuery<IQuizQuestion> = {};
+  const projection: any = {};
 
   if (subjectId) {
     const subject = await SubjectModel.findById(subjectId);
     appAssert(subject, NOT_FOUND, "Subject not found");
     query.subjectId = subjectId;
   }
+
   if (type) query.type = type;
-  if (search) query.$text = { $search: search };
+
+  // Nếu có search => dùng $text
+  if (search) {
+    query.$text = { $search: search };
+    projection.score = { $meta: "textScore" };
+  }
 
   if (from || to) {
     query.createdAt = {};
@@ -232,23 +242,36 @@ export const getAllQuizQuestions = async ({
     if (to) query.createdAt.$lte = to;
   }
 
-  // validate & limit input
   const _page = Math.max(1, page);
   const _limit = Math.min(Math.max(1, limit), 100);
   const sortDirection = sortOrder === "asc" ? 1 : -1;
 
-  const [data, total] = await Promise.all([
-    QuizQuestionModel.find(query)
-      .sort({ createdAt: sortDirection })
+  // Nếu có search, sort theo score trước, sau đó mới sort theo createdAt nếu muốn
+  let sortObj: any = { createdAt: sortDirection };
+  if (search) sortObj = { score: { $meta: "textScore" } };
+
+  const [rawData, total] = await Promise.all([
+    QuizQuestionModel.find(query, projection)
+      .sort(sortObj)
       .skip((_page - 1) * _limit)
-      .limit(_limit),
+      .limit(_limit)
+      .lean(),
     QuizQuestionModel.countDocuments(query),
   ]);
 
   const totalPages = Math.ceil(total / _limit);
-
+  const data = rawData.map((q) => {
+    return {
+      ...q,
+      images: q.images?.map((image) => ({ url: image, fromDB: true })),
+      isExternal: false,
+      isNew: false,
+      isDirty: false,
+      isDeleted: false,
+    };
+  });
   return {
-    data,
+    data, // mỗi document sẽ có thêm field "score" nếu search
     pagination: {
       totalItems: total,
       currentPage: _page,
@@ -261,11 +284,75 @@ export const getAllQuizQuestions = async ({
 };
 
 /**
+ * Handle image upload for quiz question.
+ * If deletedKeys is provided, it will remove the corresponding files.
+ * Then it will upload the new files and return the public URLs.
+ * @param files - Files to upload.
+ * @param subjectId - Subject ID for the quiz question.
+ * @param quizQuestionId - Quiz question ID for the files.
+ * @param deletedKeys - Optional array of file keys to delete.
+ * @returns An array of public URLs of the uploaded files.
+ */
+const handleImageUpload = async (
+  files: Express.Multer.File[],
+  subjectId: string,
+  quizQuestionId: string,
+  deletedKeys?: string[]
+) => {
+  for (const file of files) {
+    appAssert(
+      file.mimetype.startsWith("image/"),
+      BAD_REQUEST,
+      "File must be an image"
+    );
+  }
+
+  if (deletedKeys && deletedKeys.length > 0)
+    await removeFiles(deletedKeys.map((key) => getKeyFromPublicUrl(key)));
+  const prefix = prefixQuizQuestionImage(subjectId, quizQuestionId);
+  const result = await uploadFiles(files, prefix);
+
+  return result.map((image) => image.publicUrl);
+};
+
+/**
+ * Checks if a quiz question has a proper type.
+ * @param type - Type of the quiz question.
+ * @param correctOptions - Correct option indices of the quiz question.
+ * @throws BAD_REQUEST - If the question type is invalid.
+ * @returns - True if the question type is valid, false otherwise.
+ */
+export const checkProperQuestionType = (
+  type: QuizQuestionType,
+  correctOptions: number[],
+  message?: string
+) => {
+  const trueOptions: number = correctOptions.filter((q) => q === 1).length;
+
+  switch (type) {
+    case QuizQuestionType.MULTIPLE_CHOICE:
+      return appAssert(
+        trueOptions >= 1,
+        BAD_REQUEST,
+        message ||
+          "Multiple choice questions must have at least one correct option"
+      );
+
+    default:
+      return appAssert(
+        trueOptions === 1,
+        BAD_REQUEST,
+        message || "This question type must have only one correct option"
+      );
+  }
+};
+
+/**
  * Create a new quiz question.
  *
  * @param  subjectId - Subject ID
  * @param  text - Question text
- * @param  Express.Multer.File image - Question image
+ * @param  Express.Multer.File[] images - Question image
  * @param  type - Question type
  * @param  options - Question options
  * @param  correctOptions - Correct option indices
@@ -276,7 +363,7 @@ export const getAllQuizQuestions = async ({
 export const createQuizQuestion = async ({
   subjectId,
   text,
-  image,
+  images,
   type,
   options,
   correctOptions,
@@ -285,6 +372,12 @@ export const createQuizQuestion = async ({
 }: ICreateQuizQuestionParams) => {
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
+
+  //check questions type
+  checkProperQuestionType(
+    type || QuizQuestionType.MULTIPLE_CHOICE,
+    correctOptions
+  );
 
   // 1️⃣ Tạo question trước
   const newQuizQuestion = await QuizQuestionModel.create({
@@ -298,19 +391,18 @@ export const createQuizQuestion = async ({
   });
 
   // 2️⃣ Nếu có ảnh, upload và cập nhật sau
-  if (image) {
+  if (images && images.length > 0) {
     try {
-      const questionPrefix = prefixQuizQuestionImage(
+      const imageFiles = await handleImageUpload(
+        images,
         subjectId,
         newQuizQuestion.id
       );
-      const { publicUrl, key } = await uploadFile(image, questionPrefix);
+
       await QuizQuestionModel.findByIdAndUpdate(newQuizQuestion._id, {
-        image: publicUrl,
-        key,
+        images: imageFiles,
       });
-      newQuizQuestion.image = publicUrl;
-      newQuizQuestion.key = key;
+      newQuizQuestion.images = imageFiles;
     } catch (error) {
       await QuizQuestionModel.findByIdAndDelete(newQuizQuestion._id);
       throw error;
@@ -322,6 +414,7 @@ export const createQuizQuestion = async ({
 /**
  * Update an existing quiz question.
  * Allow admin to update a question.
+ * Kiem tra options va correctOptions khi update có trùng length khong
  * @param  params - Parameters to update a quiz question.
  * @param  params.quizQuestionId - ID of the quiz question to update.
  * @param  params.subjectId - ID of the subject to update the question for.
@@ -338,44 +431,73 @@ export const updateQuizQuestion = async ({
   quizQuestionId,
   subjectId,
   text,
-  image,
+  images,
   type,
   options,
   correctOptions,
   points = 1,
   explanation,
+  deletedKeys,
 }: IUpdateQuizQuestionParams) => {
+  // 1️⃣ Lấy quiz question
   const quizQuestion = await QuizQuestionModel.findById(quizQuestionId);
   appAssert(quizQuestion, NOT_FOUND, "Question not found");
 
-  const subject = await SubjectModel.findById(subjectId);
-  appAssert(subject, NOT_FOUND, "Subject not found");
-
-  let publicUrl = quizQuestion.image;
-  let key = quizQuestion.key;
-  // 2️⃣ Nếu có ảnh, upload và cập nhật sau
-  if (image) {
-    if (quizQuestion.image) {
-      if (quizQuestion.key) await removeFile(quizQuestion.key);
-    }
-    const questionPrefix = prefixQuizQuestionImage(subjectId, quizQuestionId);
-    const result = await uploadFile(image, questionPrefix);
-    publicUrl = result.publicUrl;
-    key = result.key;
+  // 2️⃣ Kiểm tra subject nếu có
+  if (subjectId) {
+    const subject = await SubjectModel.findById(subjectId);
+    appAssert(subject, NOT_FOUND, "Subject not found");
   }
 
+  //check questions type
+  checkProperQuestionType(
+    type || quizQuestion.type,
+    correctOptions || quizQuestion.correctOptions
+  );
+
+  // 3️⃣ Validate options & correctOptions
+  const finalOptions = options ?? quizQuestion.options;
+  const finalCorrectOptions = correctOptions ?? quizQuestion.correctOptions;
+
+  appAssert(
+    finalOptions.length === finalCorrectOptions.length,
+    BAD_REQUEST,
+    "Options and correct options must have the same length"
+  );
+
+  // 4️⃣ Xử lý ảnh: loại bỏ deletedKeys
+  let imagesRemaining = quizQuestion.images || [];
+  if (deletedKeys && deletedKeys.length > 0) {
+    imagesRemaining = imagesRemaining.filter(
+      (img) => !deletedKeys.includes(img)
+    );
+  }
+
+  // 5️⃣ Upload ảnh mới nếu có
+  if (images && images.length > 0) {
+    const uploaded = await handleImageUpload(
+      images,
+      subjectId?.toString() || quizQuestion.subjectId.toString(),
+      quizQuestionId,
+      deletedKeys
+    );
+
+    // ✅ Cập nhật mảng ảnh
+    imagesRemaining = imagesRemaining.concat(uploaded);
+  }
+
+  // 6️⃣ Update quiz question
   const updatedQuizQuestion = await QuizQuestionModel.findByIdAndUpdate(
     quizQuestionId,
     {
-      subjectId,
+      subjectId: subjectId || quizQuestion.subjectId,
       text,
       type,
-      options,
-      correctOptions,
+      options: finalOptions,
+      correctOptions: finalCorrectOptions,
       points,
       explanation,
-      image: publicUrl,
-      key,
+      images: imagesRemaining,
     },
     { new: true }
   );
@@ -397,7 +519,7 @@ export const deleteQuizQuestion = async (quizQuestionId: string) => {
 
   const isInActiveQuiz = await QuizModel.exists({
     isCompleted: false,
-    questionIds: { $in: [new mongoose.Types.ObjectId(quizQuestionId)] }, // ✅ dùng $in cho rõ
+    questionIds: { $in: [new mongoose.Types.ObjectId(quizQuestionId)] },
   });
 
   appAssert(
@@ -407,8 +529,9 @@ export const deleteQuizQuestion = async (quizQuestionId: string) => {
   );
 
   await QuizQuestionModel.findByIdAndDelete(quizQuestionId);
-  if (question.image) {
-    if (question.key) await removeFile(question.key);
+  if (question.images && question.images.length > 0) {
+    const keys = question.images.map((image) => getKeyFromPublicUrl(image));
+    await removeFiles(keys);
   }
 
   return question;
@@ -427,7 +550,7 @@ export const deleteMultipleQuizQuestions = async (ids: string[]) => {
   // Kiem tra xem cac ID cua cau hoi co ton tai khong
   const questions = await QuizQuestionModel.find({
     _id: { $in: ids },
-  });
+  }).lean();
   appAssert(
     questions.length === ids.length,
     BAD_REQUEST,
@@ -449,11 +572,13 @@ export const deleteMultipleQuizQuestions = async (ids: string[]) => {
   // Xóa thật (hoặc soft delete)
   await QuizQuestionModel.deleteMany({ _id: { $in: ids } });
 
-  for (const question of questions) {
-    if (question.image) {
-      if (question.key) await removeFile(question.key);
-    }
-  }
+  const fileKeys: string[] = questions.flatMap((q) =>
+    q.images && q.images.length > 0
+      ? [...q.images.map((i) => getKeyFromPublicUrl(i))]
+      : []
+  );
+
+  await removeFiles(fileKeys);
 
   return { message: "Deleted successfully" };
 };
@@ -465,10 +590,63 @@ export const getRandomQuestions = async ({
   const subject = await SubjectModel.findById(subjectId);
   appAssert(subject, NOT_FOUND, "Subject not found");
 
-  const questions = await QuizQuestionModel.aggregate([
-    { $match: { subjectId } },
+  const questions = await QuizQuestionModel.aggregate<IQuizQuestion>([
+    { $match: { subjectId: subject._id } },
     { $sample: { size: count } },
   ]);
 
-  return questions;
+  const questionTypes = new Set(questions.map((q) => q.type));
+
+  const data = questions.map((q) => {
+    return {
+      ...q,
+      images: q.images?.map((image) => ({ url: image, fromDB: true })),
+      isExternal: false,
+      isNew: false,
+      isDirty: false,
+      isDeleted: false,
+    };
+  });
+
+  return {
+    data,
+    total: questions.length,
+    questionTypes: Array.from(questionTypes),
+  };
+};
+
+/**
+ * Upload images for quiz question.
+ * Only images are allowed to be uploaded.
+ * @param  quizId - ID of the quiz to upload images for.
+ * @param images - Express.Multer.File[] - Images to upload.
+ * @returns Promise<string[]> - An array of public URLs of the uploaded images.
+ */
+export const uploadImages = async ({ quizId, images }: TUploadImagesParams) => {
+  for (const file of images) {
+    appAssert(
+      file.mimetype.startsWith("image/"),
+      BAD_REQUEST,
+      "File must be an image"
+    );
+  }
+
+  const prefix = prefixExternalQuizQuestionImage(quizId);
+  const result = await uploadFiles(images, prefix);
+  return result.map((image) => {
+    return {
+      url: image.publicUrl,
+      fromDB: false,
+    };
+  });
+};
+
+/**
+ * Delete images by their public URLs.
+ * @param  publicUrl - An array of public URLs of the images to delete.
+ * @returns  - A promise resolving to an object with a message property.
+ */
+export const deleteImage = async (publicUrl: string) => {
+  await removeFile(getKeyFromPublicUrl(publicUrl));
+  return true;
 };

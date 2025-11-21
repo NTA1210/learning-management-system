@@ -12,12 +12,16 @@ export interface Category {
   description?: string;
 }
 
+import type { Subject } from "./subject";
+
 export interface Course {
   _id: string;
   title: string;
   code: string;
   description: string;
+  logo?: string;
   category?: Category;
+  subjectId?: Subject | string | null;
   teachers: Teacher[];
   isPublished: boolean;
   capacity: number;

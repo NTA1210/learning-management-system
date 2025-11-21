@@ -1,19 +1,46 @@
 import z from "zod";
+import ListParams from "@/types/dto/listParams.dto";
+import { datePreprocess } from "./helpers/date.schema";
+import { listParamsSchema } from "./listParams.schema";
 
 // Material types enum (only original types)
 const MaterialTypeEnum = z.enum(["pdf", "video", "ppt", "link", "other"]);
 
+type LessonMaterialQueryFilters = ListParams & {
+  title?: string;
+  type?: z.infer<typeof MaterialTypeEnum>;
+  size?: number;
+  uploadedBy?: string;
+  lessonId?: string;
+  from?: Date;
+  to?: Date;
+};
+
 // Query schema for filtering materials
-export const LessonMaterialQuerySchema = z.object({
-  title: z.string().optional(),
-  type: MaterialTypeEnum.optional(),
-  size: z.coerce.number().int().positive().optional(),
-  uploadedBy: z.string().optional(),
-  lessonId: z.string().min(1).optional(),
-  search: z.string().optional(), // For full-text search
-  page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(10),
-});
+export const LessonMaterialQuerySchema = (listParamsSchema
+  .extend({
+    title: z.string().optional(),
+    type: MaterialTypeEnum.optional(),
+    size: z.coerce.number().int().positive().optional(),
+    uploadedBy: z.string().optional(),
+    lessonId: z.string().min(1).optional(),
+    createdAt: datePreprocess.optional(),
+    updatedAt: datePreprocess.optional(),
+    from: datePreprocess.optional(),
+    to: datePreprocess.optional(),
+  })
+  .refine(
+    (val) => {
+      if (val.from && val.to) {
+        return val.from.getTime() <= val.to.getTime();
+      }
+      return true;
+    },
+    {
+      message: "From date must be less than or equal to To date",
+      path: ["to"],
+    }
+  )) satisfies z.ZodType<LessonMaterialQueryFilters>;
 
 // Schema for creating lesson material
 // Note: uploadedBy is automatically set from auth, type is only for filtering
@@ -47,6 +74,8 @@ export const UploadMaterialSchema = z.object({
   title: z.string().min(1, "Title is required").max(255, "Title too long"),
   type: MaterialTypeEnum.default("other"),
 });
+
+
 
 // Export types
 export type LessonMaterialQueryParams = z.infer<typeof LessonMaterialQuerySchema>;
