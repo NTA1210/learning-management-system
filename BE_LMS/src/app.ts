@@ -3,6 +3,8 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import { Role } from "./types";
 import { uploadFile } from "./utils/uploadFile";
+import "./models/semester.model"; // ✅ Register Semester model
+
 
 //config
 import upload from "./config/multer";

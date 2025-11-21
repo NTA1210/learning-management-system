@@ -1,6 +1,9 @@
 import mongoose from "mongoose";
 
-export type NotificationRecipientType = "user" | "course" | "all";
+export enum NotificationRecipientType {
+  USER = "user",
+  SYSTEM = "system"
+}
 
 export default interface INotification extends mongoose.Document {
   title: string;
