@@ -1,12 +1,7 @@
 import { CREATED, OK } from '@/constants/http';
-import { createQuiz, deleteQuiz, getQuizzes, updateQuiz } from '@/services/quiz.service';
+import { createQuiz, deleteQuiz, updateQuiz } from '@/services/quiz.service';
 import { catchErrors } from '@/utils/asyncHandler';
-import {
-  updateQuizSchema,
-  createQuizSchema,
-  quizIdSchema,
-  getQuizzesSchema,
-} from '@/validators/quiz.schemas';
+import { updateQuizSchema, createQuizSchema, quizIdSchema } from '@/validators/quiz.schemas';
 
 // POST /quizzes - Create a new quiz
 export const createQuizHandler = catchErrors(async (req, res) => {
@@ -45,18 +40,5 @@ export const deleteQuizHandler = catchErrors(async (req, res) => {
 
   return res.success(OK, {
     message: 'Quiz deleted successfully',
-  });
-});
-
-// GET /quizzes - Get all quizzes
-export const getQuizzesHandler = catchErrors(async (req, res) => {
-  const role = req.role;
-  const userId = req.userId;
-  const input = getQuizzesSchema.parse({ ...req.query, courseId: req.query.courseId });
-  const data = await getQuizzes(input, role);
-
-  return res.success(OK, {
-    data,
-    message: 'Quizzes retrieved successfully',
   });
 });
