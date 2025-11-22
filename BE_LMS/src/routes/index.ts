@@ -1,3 +1,4 @@
+
 export {default as assignmentRoutes} from "./assignment.route";
 export {default as authRoutes} from "./auth.route";
 export {default as courseRoutes} from "./course.route";
