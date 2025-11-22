@@ -18,7 +18,7 @@ export const createSemesterHandler = catchErrors(async (req, res) => {
   const data = await createSemester(input);
   return res.success(CREATED, {
     data,
-    message: 'Semesters retrieved successfully',
+    message: 'Semesters created successfully',
   });
 });
 
