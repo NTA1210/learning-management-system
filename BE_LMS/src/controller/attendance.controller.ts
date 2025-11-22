@@ -21,6 +21,10 @@ import {
   getStudentAttendanceHistory,
   getStudentAttendanceStats,
   listAttendances,
+  markAttendance,
+  updateAttendance,
+  deleteAttendance,
+  generateLessonAttendanceTemplate,
 } from "@/services/attendance.service";
 
 
@@ -112,5 +116,62 @@ export const studentStatsController = catchErrors(async (req, res) => {
     data: result,
     message: "Student attendance stats generated",
   });
+});
+
+/**
+ * API: Teacher/Admin đánh dấu attendance cho course theo nghiệp vụ 1.
+ */
+export const markAttendanceController = catchErrors(async (req, res) => {
+  const payload = markAttendanceSchema.parse(req.body);
+  const result = await markAttendance(payload, req.userId, req.role);
+
+  return res.success(CREATED, {
+    data: result,
+    message: "Attendance recorded",
+  });
+})
+/**
+ * API: Teacher/Admin cập nhật attendance theo nghiệp vụ 2/3.
+ */
+export const updateAttendanceController = catchErrors(async (req, res) => {
+  const { attendanceId } = AttendanceIdParamSchema.parse(req.params);
+  const payload = updateAttendanceSchema.parse(req.body);
+  const result = await updateAttendance(attendanceId, payload, req.userId, req.role);
+
+  return res.success(OK, {
+    data: result,
+    message: "Attendance updated",
+  });
+});
+
+/**
+ * API: Admin delete attendance (Teacher chỉ delete same-day) theo nghiệp vụ 3.
+ */
+export const deleteAttendanceController = catchErrors(async (req, res) => {
+  const { attendanceId } = AttendanceIdParamSchema.parse(req.params);
+  const result = await deleteAttendance(attendanceId, req.userId, req.role);
+
+  return res.success(OK, {
+    data: result,
+    message: "Attendance deleted",
+  });
+});
+/**
+ * API: Tạo attendance template theo lesson (nghiệp vụ 5).
+ */
+export const lessonTemplateController = catchErrors(async (req, res) => {
+  const { lessonId } = LessonIdParamSchema.parse(req.params);
+  const payload = lessonTemplateSchema.parse(req.body);
+  const result = await generateLessonAttendanceTemplate(
+    lessonId,
+    payload,
+    req.userId,
+    req.role
+  );
+
+  return res.success(CREATED, {
+    data: result,
+    message: "Attendance template generated",
+  });
 });
 

@@ -6,6 +6,10 @@ import {
   selfAttendanceHistoryController,
   studentAttendanceHistoryController,
   studentStatsController,
+  markAttendanceController,
+  lessonTemplateController,
+  updateAttendanceController,
+  deleteAttendanceController,
 } from "@/controller/attendance.controller";
 import authorize from "@/middleware/authorize";
 import { Role } from "@/types";
@@ -46,3 +50,25 @@ attendanceRoutes.get(
 
 export default attendanceRoutes;
 
+// Nghiệp vụ 1: Teacher/Admin đánh dấu attendance
+attendanceRoutes.post("/", authorize(Role.TEACHER, Role.ADMIN), markAttendanceController);
+// Nghiệp vụ 5: Tạo template attendance theo lesson/schedule
+attendanceRoutes.post(
+  "/lessons/:lessonId/template",
+  authorize(Role.TEACHER, Role.ADMIN),
+  lessonTemplateController
+);
+
+// Nghiệp vụ 2/3: Update attendance
+attendanceRoutes.patch(
+  "/:attendanceId",
+  authorize(Role.TEACHER, Role.ADMIN),
+  updateAttendanceController
+);
+
+// Nghiệp vụ 3: Admin delete (Teacher same-day delete)
+attendanceRoutes.delete(
+  "/:attendanceId",
+  authorize(Role.ADMIN, Role.TEACHER),
+  deleteAttendanceController
+);

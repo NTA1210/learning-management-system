@@ -15,112 +15,20 @@ import {
   StudentHistoryInput,
 } from '@/validators/attendance.schemas';
 
+import{
+  normalizeDateOnly,
+  daysDiffFromToday,  
+  assertDateWithinCourseSchedule,
+  clampDateRangeToCourse,
+  buildDateRangeFilter,
+  ensureAttendanceManagePermission,
+  verifyStudentsBelongToCourse,  
+} from './helpers/attendaceHelpers';
+
 const MAX_BACKDATE_DAYS = 7;
 const REASON_REQUIRED_AFTER_DAYS = 1;
 
-const normalizeDateOnly = (value: Date) => {
-  const normalized = new Date(value);
-  normalized.setHours(0, 0, 0, 0);
-  return normalized;
-};
 
-const daysDiffFromToday = (value: Date) => {
-  const today = normalizeDateOnly(new Date());
-  const target = normalizeDateOnly(value);
-  const diffMs = today.getTime() - target.getTime();
-  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
-};
-
-const ensureCourseExists = async (courseId: string) => {
-  const course = await CourseModel.findById(courseId);
-  appAssert(course, NOT_FOUND, 'Course not found');
-  return course;
-};
-
-const assertInstructorAccess = (course: any, userId: mongoose.Types.ObjectId | string) => {
-  const targetId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
-  const isInstructor = (course.teacherIds || []).some((id: mongoose.Types.ObjectId) =>
-    id.equals(targetId)
-  );
-  appAssert(isInstructor, FORBIDDEN, 'Teacher not assigned to this course');
-  return true;
-};
-
-const ensureAttendanceManagePermission = async (
-  courseId: string,
-  actorId: mongoose.Types.ObjectId,
-  role: Role
-) => {
-  const course = await ensureCourseExists(courseId);
-  if (role === Role.ADMIN) {
-    return course;
-  }
-  appAssert(role === Role.TEACHER, FORBIDDEN, 'Not authorized');
-  assertInstructorAccess(course, actorId);
-  return course;
-};
-
-const assertDateWithinCourseSchedule = (
-  course: { startDate: Date; endDate: Date },
-  targetDate: Date
-) => {
-  const normalizedStart = normalizeDateOnly(course.startDate);
-  const normalizedEnd = normalizeDateOnly(course.endDate);
-  const normalizedTarget = normalizeDateOnly(targetDate);
-
-  appAssert(
-    normalizedTarget >= normalizedStart && normalizedTarget <= normalizedEnd,
-    BAD_REQUEST,
-    'Attendance date must fall within course schedule'
-  );
-};
-
-const clampDateRangeToCourse = (
-  course: { startDate: Date; endDate: Date },
-  from?: Date,
-  to?: Date
-) => {
-  const normalizedStart = normalizeDateOnly(course.startDate);
-  const normalizedEnd = normalizeDateOnly(course.endDate);
-  const normalizedFrom = from ? normalizeDateOnly(from) : normalizedStart;
-  const normalizedTo = to ? normalizeDateOnly(to) : normalizedEnd;
-
-  const clampedFrom = normalizedFrom < normalizedStart ? normalizedStart : normalizedFrom;
-  const clampedTo = normalizedTo > normalizedEnd ? normalizedEnd : normalizedTo;
-
-  appAssert(clampedFrom <= clampedTo, BAD_REQUEST, 'Date range must overlap with course schedule');
-
-  return { from: clampedFrom, to: clampedTo };
-};
-
-const verifyStudentsBelongToCourse = async (
-  courseId: string,
-  studentIds: mongoose.Types.ObjectId[]
-) => {
-  if (!studentIds.length) return;
-
-  const enrollments = await EnrollmentModel.find({
-    courseId,
-    studentId: { $in: studentIds },
-    status: EnrollmentStatus.APPROVED,
-  }).select('studentId');
-
-  const enrolledSet = new Set(enrollments.map((item) => item.studentId.toString()));
-  const missing = studentIds.filter((id) => !enrolledSet.has(id.toString()));
-  appAssert(missing.length === 0, BAD_REQUEST, 'Student not enrolled in course');
-};
-
-const buildDateRangeFilter = (from?: Date, to?: Date) => {
-  if (!from && !to) return undefined;
-  const range: Record<string, Date> = {};
-  if (from) range.$gte = normalizeDateOnly(from);
-  if (to) {
-    const end = normalizeDateOnly(to);
-    end.setHours(23, 59, 59, 999);
-    range.$lte = end;
-  }
-  return range;
-};
 
 const buildAttendanceFilter = async (
   params: ListAttendanceInput,
@@ -667,5 +575,232 @@ export const getStudentAttendanceStats = async (
     longestAbsentStreak: computeLongestAbsentStreak(
       records as { status: AttendanceStatus; date: Date }[]
     ),
+  };
+};
+
+/**
+ * Nghiệp vụ 1: Teacher/Admin đánh dấu điểm danh cho học viên trong một khóa học.
+ * - Chỉ instructor của course hoặc admin mới được thao tác.
+ * - Không cho phép ghi nhận ngày tương lai, enforce 1 record/student-course-date.
+ * - Tự động upsert trạng thái cho danh sách student truyền vào.
+ */
+export const markAttendance = async (
+  payload: MarkAttendanceInput,
+  actorId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  const { courseId, date, entries } = payload;
+  const normalizedDate = normalizeDateOnly(date);
+
+  appAssert(!isDateInFuture(normalizedDate), BAD_REQUEST, "Cannot mark future date");
+
+  const course = await ensureAttendanceManagePermission(courseId, actorId, role);
+  assertDateWithinCourseSchedule(
+    course as { startDate: Date; endDate: Date },
+    normalizedDate
+  );
+
+  const courseObjectId = new mongoose.Types.ObjectId(courseId);
+  const studentIdMap = new Map<string, mongoose.Types.ObjectId>();
+
+  entries.forEach((entry) => {
+    if (!studentIdMap.has(entry.studentId)) {
+      studentIdMap.set(entry.studentId, new mongoose.Types.ObjectId(entry.studentId));
+    }
+  });
+
+  const studentObjectIds = Array.from(studentIdMap.values());
+  await verifyStudentsBelongToCourse(courseId, studentObjectIds);
+
+  const operations = entries.map((entry) => {
+    const studentObjectId = studentIdMap.get(entry.studentId)!;
+    return {
+      updateOne: {
+        filter: {
+          courseId: courseObjectId,
+          studentId: studentObjectId,
+          date: normalizedDate,
+        },
+        update: {
+          $set: {
+            status: entry.status,
+            markedBy: actorId,
+          },
+          $setOnInsert: {
+            courseId: courseObjectId,
+            studentId: studentObjectId,
+            date: normalizedDate,
+          },
+        },
+        upsert: true,
+      },
+    };
+  });
+
+  await AttendanceModel.bulkWrite(operations, { ordered: false });
+
+  const records = await AttendanceModel.find({
+    courseId: courseObjectId,
+    studentId: { $in: studentObjectIds },
+    date: normalizedDate,
+  })
+    .populate("studentId", "fullname username email")
+    .populate("markedBy", "fullname email role")
+    .lean();
+
+  return {
+    message: "Attendance marked successfully",
+    records,
+    summary: summarizeStatuses(records),
+  };
+};
+
+/**
+ * Nghiệp vụ 2 & 3: Teacher/Admin cập nhật lại attendance với giới hạn thời gian.
+ * - Admin được sửa bất kỳ lúc nào; Teacher chỉ sửa trong tối đa 7 ngày, sau 1 ngày phải có reason.
+ * - Ghi nhận người sửa cuối (markedBy) và trả về bản ghi populate.
+ */
+export const updateAttendance = async (
+  attendanceId: string,
+  data: UpdateAttendanceInput,
+  actorId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  const attendance = await AttendanceModel.findById(attendanceId);
+  appAssert(attendance, NOT_FOUND, "Attendance not found");
+
+  const course = await ensureAttendanceManagePermission(
+    attendance.courseId.toString(),
+    actorId,
+    role
+  );
+  assertDateWithinCourseSchedule(
+    course as { startDate: Date; endDate: Date },
+    attendance.date
+  );
+  
+  const oldStatus = attendance.status as AttendanceStatus;
+  const newStatus = data.status || oldStatus;
+  
+  enforceTeacherEditWindow(
+    attendance.date,
+    role,
+    oldStatus,
+    newStatus,
+    data.reason
+  );
+
+  if (data.status) {
+    attendance.status = data.status;
+  }
+  attendance.markedBy = actorId;
+
+  await attendance.save();
+
+  return AttendanceModel.findById(attendanceId)
+    .populate("studentId", "fullname username email")
+    .populate("markedBy", "fullname email role")
+    .lean();
+};
+
+/**
+ * Nghiệp vụ 3: Admin quản lý attendance (delete bất kỳ) và Teacher delete cùng ngày.
+ * - Kiểm tra quyền theo course, Teacher chỉ xóa record của chính khóa trong ngày hiện tại.
+ */
+export const deleteAttendance = async (
+  attendanceId: string,
+  actorId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  appAssert(role === Role.ADMIN || role === Role.TEACHER, FORBIDDEN, "Not authorized");
+
+  const attendance = await AttendanceModel.findById(attendanceId);
+  appAssert(attendance, NOT_FOUND, "Attendance not found");
+
+  const course = await ensureAttendanceManagePermission(
+    attendance.courseId.toString(),
+    actorId,
+    role
+  );
+  assertDateWithinCourseSchedule(
+    course as { startDate: Date; endDate: Date },
+    attendance.date
+  );
+
+  if (role === Role.TEACHER) {
+    const diff = daysDiffFromToday(attendance.date);
+    appAssert(diff === 0, FORBIDDEN, "Teachers can delete only same-day records");
+  }
+
+  await attendance.deleteOne();
+  return { deleted: true };
+};
+
+/**
+ * Nghiệp vụ 5: Tự động tạo attendance template theo lesson/schedule.
+ * - Khi lesson publish hoặc teacher yêu cầu, tạo record "notyet" mặc định cho từng student.
+ */
+export const generateLessonAttendanceTemplate = async (
+  lessonId: string,
+  options: { lessonDate?: Date; force?: boolean },
+  actorId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  const lesson = await LessonModel.findById(lessonId);
+  appAssert(lesson, NOT_FOUND, "Lesson not found");
+
+  const course = await ensureAttendanceManagePermission(
+    lesson.courseId.toString(),
+    actorId,
+    role
+  );
+
+  const baseDate = normalizeDateOnly(
+    options.lessonDate || lesson.publishedAt || new Date()
+  );
+
+  if (!lesson.publishedAt && !options.force && role !== Role.ADMIN) {
+    appAssert(false, BAD_REQUEST, "Lesson is not published yet");
+  }
+
+  appAssert(!isDateInFuture(baseDate), BAD_REQUEST, "Cannot create template for future date");
+  assertDateWithinCourseSchedule(
+    course as { startDate: Date; endDate: Date },
+    baseDate
+  );
+
+  const enrollments = await EnrollmentModel.find({
+    courseId: lesson.courseId,
+    status: EnrollmentStatus.APPROVED,
+  }).select("studentId");
+
+  appAssert(enrollments.length > 0, NOT_FOUND, "No approved students in this course");
+
+  const operations = enrollments.map((enrollment) => ({
+    updateOne: {
+      filter: {
+        courseId: lesson.courseId,
+        studentId: enrollment.studentId,
+        date: baseDate,
+      },
+      update: {
+        $setOnInsert: {
+          courseId: lesson.courseId,
+          studentId: enrollment.studentId,
+          date: baseDate,
+          status: AttendanceStatus.NOTYET,
+        },
+      },
+      upsert: true,
+    },
+  }));
+
+  const result = await AttendanceModel.bulkWrite(operations, { ordered: false });
+
+  return {
+    created: result.upsertedCount ?? 0,
+    skipped: enrollments.length - (result.upsertedCount ?? 0),
+    totalStudents: enrollments.length,
+    date: baseDate,
   };
 };
