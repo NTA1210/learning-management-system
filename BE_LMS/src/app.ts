@@ -20,6 +20,7 @@ import { authenticate, authorize, customResponse, errorHandler, } from "./middle
 import {
     announcementRoutes,
     assignmentRoutes,
+    attendanceRoutes,
     authRoutes,
     courseInviteRoutes,
     courseRoutes,
@@ -104,7 +105,7 @@ export const createApp = () => {
     app.use("/quizzes", quizRoutes);
     app.use("/notifications", authenticate, notificationRoutes);
     app.use("/quiz-attempts", authenticate, quizAttemptRoutes);
-
+    app.use("/attendances",authenticate,attendanceRoutes);
     //error handler
     app.use(errorHandler);
 

@@ -2,7 +2,7 @@ import { BAD_REQUEST, FORBIDDEN, NOT_FOUND } from '@/constants/http';
 import { CourseModel, QuizModel } from '@/models';
 import { IQuiz, Role } from '@/types';
 import appAssert from '@/utils/appAssert';
-import { CreateQuiz, GetQuizzes, UpdateQuiz } from '@/validators/quiz.schemas';
+import { CreateQuiz, UpdateQuiz } from '@/validators/quiz.schemas';
 import { checkProperQuestionType } from './quizQuestion.service';
 import { TImage } from '@/models/quiz.model';
 import { getKeyFromPublicUrl, removeFiles } from '@/utils/uploadFile';
