@@ -1,6 +1,7 @@
 import {
   createQuizHandler,
   deleteQuizHandler,
+  getStatisticByQuizIdHandler,
   updateQuizHandler,
 } from '@/controller/quiz.controller';
 import { authenticate, authorize } from '@/middleware';
@@ -13,5 +14,11 @@ const quizRoutes = Router();
 quizRoutes.post('/', authenticate, authorize(Role.TEACHER, Role.ADMIN), createQuizHandler);
 quizRoutes.put('/:quizId', authenticate, authorize(Role.TEACHER, Role.ADMIN), updateQuizHandler);
 quizRoutes.delete('/:quizId', authenticate, authorize(Role.TEACHER, Role.ADMIN), deleteQuizHandler);
+quizRoutes.get(
+  '/:quizId/statistics',
+  authenticate,
+  authorize(Role.TEACHER, Role.ADMIN),
+  getStatisticByQuizIdHandler
+);
 
 export default quizRoutes;

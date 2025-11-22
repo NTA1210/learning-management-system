@@ -1,5 +1,5 @@
 import { CREATED, OK } from '@/constants/http';
-import { createQuiz, deleteQuiz, updateQuiz } from '@/services/quiz.service';
+import { createQuiz, deleteQuiz, getStatisticByQuizId, updateQuiz } from '@/services/quiz.service';
 import { catchErrors } from '@/utils/asyncHandler';
 import { updateQuizSchema, createQuizSchema, quizIdSchema } from '@/validators/quiz.schemas';
 
@@ -40,5 +40,19 @@ export const deleteQuizHandler = catchErrors(async (req, res) => {
 
   return res.success(OK, {
     message: 'Quiz deleted successfully',
+  });
+});
+
+//GET /quizzes/:quizId/statistics
+export const getStatisticByQuizIdHandler = catchErrors(async (req, res) => {
+  const quizId = quizIdSchema.parse(req.params.quizId);
+  const userId = req.userId;
+  const role = req.role;
+
+  const data = await getStatisticByQuizId(quizId, userId, role);
+
+  return res.success(OK, {
+    data,
+    message: 'Statistic retrieved successfully',
   });
 });
