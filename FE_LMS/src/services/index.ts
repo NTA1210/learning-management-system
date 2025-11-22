@@ -8,6 +8,7 @@ export * from './enrollmentService';
 export * from './feedbackService';
 export * from './quizQuestionService';
 export * from './subjectService';
+export * from './quizService';
 
 // storage keys
 const USER_STORAGE_KEY = 'lms:user';
