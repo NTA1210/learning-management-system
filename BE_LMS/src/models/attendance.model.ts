@@ -20,12 +20,11 @@ const AttendanceSchema = new mongoose.Schema<IAttendance>(
         status: {
             type: String,
             enum: [
+                AttendanceStatus.NOTYET,
                 AttendanceStatus.PRESENT,
                 AttendanceStatus.ABSENT,
-                AttendanceStatus.LATE,
-                AttendanceStatus.EXCUSED,
             ],
-            default: AttendanceStatus.ABSENT,
+            default: AttendanceStatus.NOTYET,
         },
         markedBy: {type: mongoose.Schema.Types.ObjectId, ref: "User"},
     },

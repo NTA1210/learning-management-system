@@ -10,10 +10,9 @@ export const objectIdSchema = z
   .regex(/^[0-9a-fA-F]{24}$/, "Invalid MongoDB ObjectId");
 
 export const attendanceStatusSchema = z.enum([
+  AttendanceStatus.NOTYET,
   AttendanceStatus.PRESENT,
   AttendanceStatus.ABSENT,
-  AttendanceStatus.LATE,
-  AttendanceStatus.EXCUSED,
 ] as const);
 
 /* ----------------------------------------------------

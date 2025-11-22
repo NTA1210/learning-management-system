@@ -17,7 +17,6 @@ import {
 
 const MAX_BACKDATE_DAYS = 7;
 const REASON_REQUIRED_AFTER_DAYS = 1;
-const LATE_THRESHOLD_FOR_ALERT = 3;
 
 const normalizeDateOnly = (value: Date) => {
   const normalized = new Date(value);
@@ -177,10 +176,10 @@ const getSortObject = (sortBy?: string, sortOrder?: string): Record<string, Sort
 const summarizeStatuses = (records: any[]) => {
   const summary = {
     total: records.length,
+    [AttendanceStatus.NOTYET]: 0,
     [AttendanceStatus.PRESENT]: 0,
     [AttendanceStatus.ABSENT]: 0,
-    [AttendanceStatus.LATE]: 0,
-    [AttendanceStatus.EXCUSED]: 0,
+
   };
 
   records.forEach((record) => {
@@ -190,10 +189,23 @@ const summarizeStatuses = (records: any[]) => {
   return summary;
 };
 
-const enforceTeacherEditWindow = (targetDate: Date, role: Role, reason?: string) => {
+
+
+const enforceTeacherEditWindow = (
+  targetDate: Date,
+  role: Role,
+  oldStatus?: AttendanceStatus,
+  newStatus?: AttendanceStatus,
+  reason?: string
+) => {
   if (role === Role.ADMIN) return;
   const diffDays = daysDiffFromToday(targetDate);
   appAssert(diffDays <= MAX_BACKDATE_DAYS, FORBIDDEN, 'Cannot modify attendance older than 7 days');
+
+  // Require reason when changing from ABSENT to PRESENT
+  if (oldStatus === AttendanceStatus.ABSENT && newStatus === AttendanceStatus.PRESENT) {
+    appAssert(!!reason, BAD_REQUEST, "Reason is required when changing from ABSENT to PRESENT");
+  }
 
   if (diffDays > REASON_REQUIRED_AFTER_DAYS) {
     appAssert(!!reason, BAD_REQUEST, 'Reason is required for late updates');
@@ -247,10 +259,9 @@ export const listAttendances = async (
     },
     {
       total: 0,
+      [AttendanceStatus.NOTYET]: 0,
       [AttendanceStatus.PRESENT]: 0,
       [AttendanceStatus.ABSENT]: 0,
-      [AttendanceStatus.LATE]: 0,
-      [AttendanceStatus.EXCUSED]: 0,
     }
   );
 
@@ -520,10 +531,9 @@ export const getCourseAttendanceStats = async (
     if (!statsByStudent[id]) {
       statsByStudent[id] = {
         counts: {
+          [AttendanceStatus.NOTYET]: 0,
           [AttendanceStatus.PRESENT]: 0,
           [AttendanceStatus.ABSENT]: 0,
-          [AttendanceStatus.LATE]: 0,
-          [AttendanceStatus.EXCUSED]: 0,
         },
         total: 0,
         longestAbsentStreak: 0,
@@ -543,13 +553,19 @@ export const getCourseAttendanceStats = async (
   const threshold = params.threshold ?? 20;
 
   const studentStats = Object.entries(statsByStudent).map(([studentId, data]) => {
-    const attended =
-      data.counts[AttendanceStatus.PRESENT] +
-      data.counts[AttendanceStatus.LATE] +
-      data.counts[AttendanceStatus.EXCUSED];
-    const attendanceRate = data.total ? Number(((attended / data.total) * 100).toFixed(2)) : 0;
-    const absentRate = data.total
-      ? Number(((data.counts[AttendanceStatus.ABSENT] / data.total) * 100).toFixed(2))
+
+    // Only count records that have been marked (not NOTYET)
+    const markedCount = data.counts[AttendanceStatus.PRESENT] + data.counts[AttendanceStatus.ABSENT];
+    const attended = data.counts[AttendanceStatus.PRESENT];
+    
+    // Attendance rate: PRESENT / (PRESENT + ABSENT), excluding NOTYET
+    const attendanceRate = markedCount > 0
+      ? Number(((attended / markedCount) * 100).toFixed(2))
+      : 0;
+    
+    // Absent rate: ABSENT / (PRESENT + ABSENT), excluding NOTYET
+    const absentRate = markedCount > 0
+      ? Number(((data.counts[AttendanceStatus.ABSENT] / markedCount) * 100).toFixed(2))
       : 0;
 
     return {
@@ -557,33 +573,34 @@ export const getCourseAttendanceStats = async (
       student: studentMap[studentId] || null,
       counts: data.counts,
       totalSessions: data.total,
+      markedSessions: markedCount,
       attendanceRate,
       absentRate,
       longestAbsentStreak: data.longestAbsentStreak,
       alerts: {
         highAbsence: absentRate >= threshold,
-        lateTooOften: data.counts[AttendanceStatus.LATE] >= LATE_THRESHOLD_FOR_ALERT,
       },
     };
   });
 
-  const totalSessions = Object.values(statsByStudent).reduce((acc, curr) => acc + curr.total, 0);
+
+  // Calculate class attendance rate based on marked records only (excluding NOTYET)
+  const markedRecords = records.filter(
+    (record) => record.status === AttendanceStatus.PRESENT || record.status === AttendanceStatus.ABSENT
+  );
+  const presentRecords = records.filter(
+    (record) => record.status === AttendanceStatus.PRESENT
+  );
 
   const classAttendanceRate =
-    totalSessions === 0
+    markedRecords.length === 0
       ? 0
       : Number(
-          (
-            (records.filter((record) => record.status !== AttendanceStatus.ABSENT).length /
-              totalSessions) *
-            100
-          ).toFixed(2)
+
+          ((presentRecords.length / markedRecords.length) * 100).toFixed(2)
         );
 
   const studentsAtRisk = studentStats.filter((stat) => stat.alerts.highAbsence);
-  const oftenLateStudents = studentStats.filter(
-    (stat) => stat.counts[AttendanceStatus.LATE] >= LATE_THRESHOLD_FOR_ALERT
-  );
 
   return {
     courseId,
@@ -591,7 +608,6 @@ export const getCourseAttendanceStats = async (
     totalRecords: records.length,
     classAttendanceRate,
     studentsAtRisk,
-    oftenLateStudents,
     studentStats,
     threshold,
   };
@@ -628,12 +644,17 @@ export const getStudentAttendanceStats = async (
 
   const counts = summarizeStatuses(records);
   const total = records.length;
-  const attended =
-    counts[AttendanceStatus.PRESENT] +
-    counts[AttendanceStatus.LATE] +
-    counts[AttendanceStatus.EXCUSED];
+  
+  // Only count records that have been marked (not NOTYET)
+  const markedCount = counts[AttendanceStatus.PRESENT] + counts[AttendanceStatus.ABSENT];
+  const attended = counts[AttendanceStatus.PRESENT];
 
   const studentInfo = await UserModel.findById(studentId).select('fullname username email').lean();
+
+  // Attendance rate: PRESENT / (PRESENT + ABSENT), excluding NOTYET
+  const attendanceRate = markedCount > 0
+    ? Number(((attended / markedCount) * 100).toFixed(2))
+    : 0;
 
   return {
     courseId,
@@ -641,7 +662,8 @@ export const getStudentAttendanceStats = async (
     student: studentInfo,
     counts,
     total,
-    attendanceRate: total ? Number(((attended / total) * 100).toFixed(2)) : 0,
+    markedSessions: markedCount,
+    attendanceRate,
     longestAbsentStreak: computeLongestAbsentStreak(
       records as { status: AttendanceStatus; date: Date }[]
     ),
