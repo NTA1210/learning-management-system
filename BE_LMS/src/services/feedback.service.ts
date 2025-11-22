@@ -170,10 +170,7 @@ export const listFeedbacks = async (
     );
   }
 
-  const results = await Promise.all(promises);
-  const feedbacks = results[0];
-  const total = results[1];
-  const stats = (type || targetId) ? results[2] : [];
+  const [feedbacks, total, stats] = await Promise.all(promises);
 
   let averageRating = undefined;
   if ((type || targetId) && stats.length > 0) {
