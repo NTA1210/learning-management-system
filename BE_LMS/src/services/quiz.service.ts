@@ -19,6 +19,7 @@ import {
   calculateMedian,
   calculateRank,
   findMinMax,
+  isTeacherOfCourse,
   standardDeviation,
 } from './helpers/quizHelpers';
 
@@ -49,8 +50,7 @@ export const createQuiz = async (
 
   //check whether user is teacher of course
   if (role === Role.TEACHER) {
-    const isTeacherOfCourse = course.teacherIds.some((teacherId) => teacherId.equals(userId));
-    appAssert(isTeacherOfCourse, FORBIDDEN, 'You are not a teacher of this course');
+    isTeacherOfCourse(course, userId);
   }
 
   //check endTime > startTime
@@ -89,18 +89,30 @@ export const createQuiz = async (
  * @throws  If no questions provided
  * @returns  Updated quiz
  */
-export const updateQuiz = async ({
-  quizId,
-  courseId,
-  title,
-  description,
-  startTime,
-  endTime,
-  shuffleQuestions,
-  snapshotQuestions,
-}: UpdateQuiz) => {
-  const quiz = await QuizModel.findById(quizId);
+export const updateQuiz = async (
+  {
+    quizId,
+    title,
+    description,
+    startTime,
+    endTime,
+    shuffleQuestions,
+    snapshotQuestions,
+  }: UpdateQuiz,
+  userId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId');
   appAssert(quiz, NOT_FOUND, 'Quiz not found');
+
+  //isTeacher of course
+  if (role === Role.TEACHER) {
+    isTeacherOfCourse(quiz.courseId, userId);
+  }
+
+  //isOnGoing
+  const isOnGoing = quiz.startTime.getTime() <= Date.now() && quiz.endTime.getTime() >= Date.now();
+  appAssert(!isOnGoing, BAD_REQUEST, 'Cannot update a quiz that is on going');
 
   let deletedImages: string[] = [];
   const map = new Map<string, number>();
@@ -179,7 +191,6 @@ export const updateQuiz = async ({
 
   quiz.title = title ?? quiz.title;
   quiz.description = description ?? quiz.description;
-  quiz.courseId = new mongoose.Types.ObjectId(courseId ?? quiz.courseId);
   quiz.startTime = startTime ?? quiz.startTime;
   quiz.endTime = endTime ?? quiz.endTime;
   quiz.shuffleQuestions = shuffleQuestions ?? quiz.shuffleQuestions;
@@ -200,15 +211,21 @@ export const updateQuiz = async ({
 export const deleteQuiz = async ({
   quizId,
   userId,
+  role,
 }: {
   quizId: string;
   userId: mongoose.Types.ObjectId;
+  role: Role;
 }) => {
-  const quiz = await QuizModel.findById(quizId);
+  const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId');
   appAssert(quiz, NOT_FOUND, 'Quiz not found');
 
+  //isTeacher of course
+  if (role === Role.TEACHER) {
+    isTeacherOfCourse(quiz.courseId, userId);
+  }
+  //isOnGoing
   const isOnGoing = quiz.startTime.getTime() <= Date.now() && quiz.endTime.getTime() >= Date.now();
-
   appAssert(isOnGoing, BAD_REQUEST, 'Cannot delete a quiz that is on going');
 
   quiz.deletedAt = new Date();
@@ -235,11 +252,10 @@ export const getStatisticByQuizId = async (
   appAssert(quiz, NOT_FOUND, 'Quiz not found');
 
   if (role === Role.TEACHER) {
-    const isTeacherOfCourse = quiz.courseId.teacherIds.some((teacherId) =>
-      teacherId.equals(userId)
-    );
-    appAssert(isTeacherOfCourse, FORBIDDEN, 'You are not a teacher of this course');
+    isTeacherOfCourse(quiz.courseId, userId);
   }
+
+  // count total student
   const totalStudents = await EnrollmentModel.find({
     courseId: quiz.courseId._id,
     status: EnrollmentStatus.APPROVED,
@@ -254,17 +270,24 @@ export const getStatisticByQuizId = async (
 
   const scoresArray = quizAttempt.map((attempt) => attempt.score);
 
+  // count submitted
   const submittedCount = quizAttempt.length;
 
+  // count average
   const averageScore = quizAttempt.length
     ? quizAttempt.reduce((total, attempt) => total + attempt.score, 0) / quizAttempt.length
     : 0;
 
+  // count median
   const medianScore = calculateMedian(scoresArray);
 
+  // count min max
   const minMax = findMinMax([...new Set(scoresArray)]);
+
+  // count standard deviation
   const standardDeviationScore = standardDeviation(scoresArray);
 
+  // count distribution
   const intervals = [
     { min: 0, max: 2, label: '0-2' },
     { min: 2, max: 4, label: '2-4' },
@@ -290,6 +313,7 @@ export const getStatisticByQuizId = async (
     };
   });
 
+  // count rank
   const students = calculateRank(quizAttempt);
 
   return {
