@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import LandingHeader from "../components/LandingHeader";
-import LandingFooter from "../components/LandingFooter";
+
 import { useTheme } from "../hooks/useTheme";
 import { courseService } from "../services";
 import type { Course } from "../types/course";
@@ -109,7 +108,40 @@ export default function CourseDetail() {
         color: isDarkMode ? "#ffffff" : "#0f172a",
       }}
     >
-      <LandingHeader />
+      <div
+        className="sticky top-0 z-40"
+        style={{
+          backgroundColor: isDarkMode ? "#0f172a" : "#ffffff",
+          borderBottom: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
+        }}
+      >
+        <div className="max-w-[1200px] mx-auto px-4 py-4 flex items-center justify-between">
+          <button
+            onClick={() => navigate(-1)}
+            className="px-3 py-2 rounded-lg hover:scale-105 transition"
+            style={{
+              backgroundColor: isDarkMode ? "#111827" : "#f3f4f6",
+              color: isDarkMode ? "#ffffff" : "#111827",
+            }}
+          >
+            Quay lại
+          </button>
+          <div className="flex items-center gap-3">
+            <span className="font-semibold truncate max-w-[300px]">
+              {course?.title ?? "Course Detail"}
+            </span>
+            {subject?.name && (
+              <span className="text-sm opacity-70">{subject.name}</span>
+            )}
+          </div>
+          <button
+            onClick={() => navigate("/register")}
+            className="bg-[#525fe1] text-white px-4 py-2 rounded-lg hover:opacity-90"
+          >
+            Đăng ký
+          </button>
+        </div>
+      </div>
 
       <div className="max-w-[1200px] mx-auto px-4 py-10">
         {loading ? (
@@ -430,27 +462,42 @@ export default function CourseDetail() {
                   )}
                 </div>
 
-                <div className="mt-4 flex gap-3">
-                  <button
-                    onClick={() => navigate("/register")}
-                    className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-5 py-2 rounded-lg hover:scale-105 transition"
-                  >
-                    Đăng ký học
-                  </button>
-                  <button
-                    onClick={() => navigate(-1)}
-                    className="bg-[#eaedff] text-[#1c1c1c] font-semibold px-5 py-2 rounded-lg hover:scale-105 transition"
-                  >
-                    Quay lại
-                  </button>
-                </div>
+
               </div>
             </div>
           </>
         )}
       </div>
 
-      <LandingFooter />
+      <div className="fixed bottom-4 left-0 right-0 pointer-events-none">
+        <div className="max-w-[1200px] mx-auto px-4">
+          <div
+            className="pointer-events-auto rounded-xl shadow-lg border flex items-center justify-between px-4 py-3"
+            style={{
+              backgroundColor: isDarkMode ? "#111827" : "#ffffff",
+              borderColor: isDarkMode ? "rgba(255,255,255,0.08)" : "#e5e7eb",
+            }}
+          >
+            <div className="truncate">
+              <span className="text-sm opacity-70">{course?.title}</span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => navigate("/register")}
+                className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition"
+              >
+                Đăng ký học
+              </button>
+              <button
+                onClick={() => navigate(-1)}
+                className="bg-[#eaedff] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition"
+              >
+                Quay lại
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

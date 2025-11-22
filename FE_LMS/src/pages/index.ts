@@ -20,3 +20,4 @@ export { default as AssignmentPage } from "./AssignmentPage";
 export { default as AssignmentDetailPage } from "./AssignmentDetailPage";
 export { default as QuizManagementPage } from "./QuizManagementPage";
 export { default as QuizCoursePage } from "./QuizCoursePage";
+export { default as EnrollmentsListPage } from "./EnrollmentsList";

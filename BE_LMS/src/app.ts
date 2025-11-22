@@ -13,11 +13,14 @@ import { OK } from './constants/http';
 import { APP_ORIGIN } from './constants/env';
 
 //middleware
+
 import { authenticate, authorize, customResponse, errorHandler } from './middleware';
 
 //routes
 import {
+  announcementRoutes,
   assignmentRoutes,
+  attendanceRoutes,
   authRoutes,
   courseInviteRoutes,
   courseRoutes,
@@ -75,7 +78,7 @@ export const createApp = () => {
   //auth routes
   app.use('/auth', authRoutes);
 
-  //public routes
+  //routes
   app.use('/courses', courseRoutes);
   app.use('/assignments', assignmentRoutes);
   app.use('/submissions', submissionRoutes);
@@ -86,8 +89,7 @@ export const createApp = () => {
   app.use('/specialists', specialistPublicRoutes);
   app.use('/forums', forumPublicRoutes);
   app.use('/schedules', scheduleRoutes);
-
-  //protected routes
+  app.use('/announcements', authenticate, announcementRoutes);
   app.use('/users', authenticate, userRoutes);
   app.use('/sessions', authenticate, authorize(Role.ADMIN), sessionRoutes);
   app.use('/enrollments', authenticate, enrollmentRoutes);
@@ -101,6 +103,7 @@ export const createApp = () => {
   app.use('/quizzes', quizRoutes);
   app.use('/notifications', authenticate, notificationRoutes);
   app.use('/quiz-attempts', authenticate, quizAttemptRoutes);
+  app.use('/attendances', authenticate, attendanceRoutes);
 
   //error handler
   app.use(errorHandler);
