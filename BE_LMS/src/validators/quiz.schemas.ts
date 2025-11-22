@@ -76,7 +76,6 @@ export type CreateQuiz = z.infer<typeof createQuizSchema>;
 export const updateQuizSchema = z
   .object({
     quizId: z.string().length(24, 'Invalid quiz ID'),
-    courseId: courseIdSchema.optional(),
     title: z.string().min(1).max(255).optional(),
     description: z.string().optional(),
     startTime: datePreprocess.optional(),

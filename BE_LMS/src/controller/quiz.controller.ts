@@ -23,8 +23,10 @@ export const updateQuizHandler = catchErrors(async (req, res) => {
     ...req.body,
     quizId: req.params.quizId,
   });
+  const userId = req.userId;
+  const role = req.role;
 
-  const data = await updateQuiz(input);
+  const data = await updateQuiz(input, userId, role);
 
   return res.success(CREATED, {
     data,
@@ -36,7 +38,9 @@ export const updateQuizHandler = catchErrors(async (req, res) => {
 export const deleteQuizHandler = catchErrors(async (req, res) => {
   const quizId = quizIdSchema.parse(req.params.quizId);
   const userId = req.userId;
-  await deleteQuiz({ quizId, userId });
+  const role = req.role;
+
+  await deleteQuiz({ quizId, userId, role });
 
   return res.success(OK, {
     message: 'Quiz deleted successfully',
