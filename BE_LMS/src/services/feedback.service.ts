@@ -145,7 +145,7 @@ export const listFeedbacks = async (
   sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
   // Execute query
-  const [feedbacks, total] = await Promise.all([
+  const promises: any[] = [
     FeedbackModel.find(query)
       .populate("userId", "username email fullname avatar_url")
       .populate("targetId", "username email fullname avatar_url role")
@@ -154,10 +154,37 @@ export const listFeedbacks = async (
       .limit(limit)
       .lean(),
     FeedbackModel.countDocuments(query),
-  ]);
+  ];
+
+  // If filtering by type or targetId, calculate average rating
+  if (type || targetId) {
+    const avgQuery: any = {};
+    if (type) avgQuery.type = type;
+    if (targetId) avgQuery.targetId = new Types.ObjectId(targetId);
+
+    promises.push(
+      FeedbackModel.aggregate([
+        { $match: avgQuery },
+        { $group: { _id: null, avgRating: { $avg: "$rating" } } },
+      ])
+    );
+  }
+
+  const results = await Promise.all(promises);
+  const feedbacks = results[0];
+  const total = results[1];
+  const stats = (type || targetId) ? results[2] : [];
+
+  let averageRating = undefined;
+  if ((type || targetId) && stats.length > 0) {
+    averageRating = Math.round(stats[0].avgRating * 10) / 10;
+  } else if (type || targetId) {
+    averageRating = 0;
+  }
 
   return {
     feedbacks,
+    averageRating,
     pagination: {
       total,
       page,
@@ -252,7 +279,7 @@ export const getFeedbacksByTarget = async (
 
   const skip = (page - 1) * limit;
 
-  const [feedbacks, total] = await Promise.all([
+  const [feedbacks, total, stats] = await Promise.all([
     FeedbackModel.find({ targetId })
       .populate("userId", "username email fullname avatar_url")
       .sort({ createdAt: -1 })
@@ -260,13 +287,14 @@ export const getFeedbacksByTarget = async (
       .limit(limit)
       .lean(),
     FeedbackModel.countDocuments({ targetId }),
+    FeedbackModel.aggregate([
+      { $match: { targetId: new Types.ObjectId(targetId) } },
+      { $group: { _id: null, avgRating: { $avg: "$rating" } } },
+    ]),
   ]);
 
   // Calculate average rating
-  const avgRating =
-    feedbacks.length > 0
-      ? feedbacks.reduce((sum, f) => sum + f.rating, 0) / feedbacks.length
-      : 0;
+  const avgRating = stats.length > 0 ? stats[0].avgRating : 0;
 
   return {
     feedbacks,
