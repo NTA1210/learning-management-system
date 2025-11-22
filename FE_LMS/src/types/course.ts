@@ -22,9 +22,15 @@ export interface Course {
   logo?: string;
   category?: Category;
   subjectId?: Subject | string | null;
-  teachers: Teacher[];
+  teachers?: Teacher[];
+  teacherIds?: Teacher[];
   isPublished: boolean;
   capacity: number;
+  status?: 'ongoing' | 'draft' | 'completed';
+  startDate?: string;
+  endDate?: string;
+  semesterId?: string;
+  enrollRequiresApproval?: boolean;
   createdAt: string;
   updatedAt: string;
   __v: number;

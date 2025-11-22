@@ -9,11 +9,10 @@ interface SpecialistModalProps {
   title: string;
   formData: {
     name: string;
-    slug: string;
     description: string;
     majorId: string;
   };
-  onFormDataChange: (data: { name: string; slug: string; description: string; majorId: string }) => void;
+  onFormDataChange: (data: { name: string; description: string; majorId: string }) => void;
   majors: MajorNode[];
   submitLabel: string;
 }
@@ -61,21 +60,6 @@ const SpecialistModal: React.FC<SpecialistModalProps> = ({
               type="text"
               value={formData.name}
               onChange={(e) => onFormDataChange({ ...formData, name: e.target.value })}
-              className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
-              style={{
-                backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                color: darkMode ? '#ffffff' : '#000000',
-              }}
-              required
-            />
-          </div>
-          <div>
-            <label className="block mb-2 font-semibold" style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>Slug *</label>
-            <input
-              type="text"
-              value={formData.slug}
-              onChange={(e) => onFormDataChange({ ...formData, slug: e.target.value })}
               className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
               style={{
                 backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',

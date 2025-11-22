@@ -24,6 +24,16 @@ function formatDate(value: string, timezone?: string) {
   }
 }
 
+function getInitials(value?: string) {
+  if (!value) return "?";
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase())
+    .join("");
+}
+
 export default function FeedbackList() {
   const { darkMode } = useTheme();
   const { user } = useAuth();
@@ -37,6 +47,8 @@ export default function FeedbackList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<"system" | "teacher">("system");
 
   const fetchFeedbacks = async () => {
     setLoading(true);
@@ -55,7 +67,6 @@ export default function FeedbackList() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this feedback?")) return;
     setDeletingId(id);
     try {
       await feedbackService.deleteFeedback(id);
@@ -68,6 +79,16 @@ export default function FeedbackList() {
     }
   };
 
+  const closeDeleteModal = () => {
+    setConfirmDeleteId(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!confirmDeleteId) return;
+    await handleDelete(confirmDeleteId);
+    setConfirmDeleteId(null);
+  };
+
   useEffect(() => {
     void fetchFeedbacks();
   }, []);
@@ -76,17 +97,31 @@ export default function FeedbackList() {
     ? "Xem lại toàn bộ phản hồi mà bạn đã gửi cho hệ thống."
     : "Review the latest suggestions from learners and spot trends quickly.";
 
+  const filteredFeedbacks = useMemo(() => {
+    return feedbacks.filter((fb) => {
+      if (activeFilter === "teacher") {
+        return fb.type === "teacher";
+      }
+      return fb.type === "system";
+    });
+  }, [feedbacks, activeFilter]);
+
   const summary = useMemo(() => {
-    if (!feedbacks.length) return null;
-    const count = feedbacks.length;
+    if (!filteredFeedbacks.length) return null;
+    const count = filteredFeedbacks.length;
     const average =
-      feedbacks.reduce((acc, fb) => acc + (fb.rating || 0), 0) / Math.max(count, 1);
-    const byType = feedbacks.reduce<Record<string, number>>((acc, fb) => {
+      filteredFeedbacks.reduce((acc, fb) => acc + (fb.rating || 0), 0) / Math.max(count, 1);
+    const byType = filteredFeedbacks.reduce<Record<string, number>>((acc, fb) => {
       acc[fb.type] = (acc[fb.type] || 0) + 1;
       return acc;
     }, {});
     return { count, average: Number(average.toFixed(1)), byType };
-  }, [feedbacks]);
+  }, [filteredFeedbacks]);
+
+  const filterOptions = [
+    { value: "system", label: "System", helper: "Platform related" },
+    { value: "teacher", label: "Lecturer", helper: "Lecturer related" },
+  ] as const;
 
   return (
     <div
@@ -188,6 +223,80 @@ export default function FeedbackList() {
             .pulse-button:hover::after {
               opacity: 1;
             }
+            .click-animate {
+              position: relative;
+              overflow: hidden;
+              transition: transform 200ms ease, box-shadow 200ms ease;
+            }
+            .click-animate:hover {
+              transform: translateY(-1px);
+            }
+            .click-animate:active {
+              transform: translateY(1px) scale(0.98);
+            }
+            .click-animate::after {
+              content: "";
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              width: 0;
+              height: 0;
+              background: radial-gradient(circle, rgba(255,255,255,0.8) 10%, transparent 60%);
+              transform: translate(-50%, -50%);
+              opacity: 0;
+            }
+            .click-animate:active::after {
+              animation: ripple 500ms ease-out;
+            }
+            @keyframes ripple {
+              0% {
+                width: 0;
+                height: 0;
+                opacity: 0.35;
+              }
+              100% {
+                width: 260px;
+                height: 260px;
+                opacity: 0;
+              }
+            }
+            @keyframes deleteGlow {
+              0% { box-shadow: 0 0 0 rgba(248,113,113,0.45); }
+              70% { box-shadow: 0 0 18px rgba(248,113,113,0.5); }
+              100% { box-shadow: 0 0 0 rgba(248,113,113,0); }
+            }
+            .delete-button {
+              animation: deleteGlow 2.2s ease-in-out infinite;
+            }
+            @keyframes modalFade {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            @keyframes modalScale {
+              from { opacity: 0; transform: translateY(12px) scale(0.96); }
+              to { opacity: 1; transform: translateY(0) scale(1); }
+            }
+            .modal-backdrop {
+              animation: modalFade 180ms ease-out forwards;
+            }
+            .modal-content {
+              animation: modalScale 220ms ease-out forwards;
+            }
+            @keyframes starPop {
+              0% { transform: scale(0.4); opacity: 0; }
+              70% { transform: scale(1.2); opacity: 1; }
+              100% { transform: scale(1); opacity: 1; }
+            }
+            .rating-star {
+              width: 18px;
+              height: 18px;
+              transform-origin: center;
+              opacity: 0.25;
+            }
+            .rating-star--active {
+              opacity: 1;
+              animation: starPop 380ms ease forwards;
+            }
           `}
         </style>
         <div className="max-w-5xl mx-auto">
@@ -208,28 +317,42 @@ export default function FeedbackList() {
                 {heroDescription}
               </p>
             </div>
-            <div className="flex gap-3 flex-wrap justify-end">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="px-4 py-2 rounded-xl font-semibold border transition-all hover:-translate-y-0.5 pulse-button relative"
-                style={{
-                  background: darkMode ? "rgba(30,41,59,0.75)" : "rgba(82,95,225,0.12)",
-                  color: darkMode ? "#e5e7eb" : "#4f46e5",
-                  borderColor: darkMode ? "rgba(148,163,184,0.4)" : "rgba(99,102,241,0.4)",
-                }}
-              >
-                Go back
-              </button>
+              <div className="flex gap-3 flex-wrap justify-end items-center">
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  className="px-3 py-2 rounded-full font-semibold border transition-all pulse-button relative click-animate flex items-center justify-center"
+                  style={{
+                    background: darkMode ? "rgba(30,41,59,0.85)" : "rgba(226,232,255,0.8)",
+                    color: darkMode ? "#e0e7ff" : "#4338ca",
+                    borderColor: darkMode ? "rgba(148,163,184,0.5)" : "rgba(99,102,241,0.35)",
+                    width: "48px",
+                    height: "40px",
+                  }}
+                  aria-label="Go back"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="w-4 h-4"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
               {canCreateFeedback && (
                 <button
                   type="button"
                   onClick={() => navigate("/help/feedback")}
-                  className="px-4 py-2 rounded-xl font-semibold border border-transparent transition-all hover:-translate-y-0.5"
+                  className="px-4 py-2 rounded-xl font-semibold border border-transparent transition-all hover:-translate-y-0.5 click-animate"
+
                   style={{
-                    background: darkMode ? "#1f2937" : "#eef2ff",
-                    color: darkMode ? "#e5e7eb" : "#4338ca",
+                    background: "linear-gradient(135deg, #525fe1 0%, #7c3aed 100%)",
+                    color: "#fff",
                   }}
+                
                 >
                   Create new feedback
                 </button>
@@ -237,10 +360,11 @@ export default function FeedbackList() {
               <button
                 type="button"
                 onClick={() => void fetchFeedbacks()}
-                className="px-4 py-2 rounded-xl font-semibold border border-transparent transition-all hover:-translate-y-0.5"
+                className="px-4 py-2 rounded-xl font-semibold border border-transparent transition-all hover:-translate-y-0.5 click-animate"
+
                 style={{
-                  background: "linear-gradient(135deg, #525fe1 0%, #7c3aed 100%)",
-                  color: "#fff",
+                  background: darkMode ? "#1f2937" : "#eef2ff",
+                  color: darkMode ? "#e5e7eb" : "#4338ca",
                 }}
                 disabled={loading}
               >
@@ -248,6 +372,71 @@ export default function FeedbackList() {
               </button>
             </div>
           </div>
+
+          <section
+            className="rounded-2xl shadow-lg p-6 mb-6 fade-up"
+            style={{
+              animationDelay: "90ms",
+              background: darkMode ? "rgba(17, 24, 39, 0.8)" : "#fff",
+              border: "1px solid rgba(148, 163, 184, 0.2)",
+            }}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold" style={{ color: darkMode ? "#cbd5f5" : "#0f172a" }}>
+                  Feedback and reviews
+                </p>
+                <p className="text-xs" style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}>
+                  Choose a response type
+                </p>
+              </div>
+                    <span className="text-xs px-3 py-1 rounded-full" style={{ background: darkMode ? "rgba(59,130,246,0.15)" : "rgba(59,130,246,0.12)", color: darkMode ? "#bfdbfe" : "#1d4ed8" }}>
+                Showing {activeFilter === "system" ? "System" : "Lecturer"} feedback
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+              {filterOptions.map((option) => {
+                const isActive = activeFilter === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setActiveFilter(option.value)}
+                            className="text-left rounded-2xl border px-4 py-3 transition-all focus:outline-none click-animate"
+                    style={{
+                      borderColor: isActive
+                        ? "rgba(59,130,246,0.5)"
+                        : darkMode
+                          ? "rgba(148,163,184,0.3)"
+                          : "rgba(148,163,184,0.5)",
+                      background: isActive
+                        ? "linear-gradient(135deg, rgba(59,130,246,0.15), rgba(14,165,233,0.1))"
+                        : darkMode
+                          ? "rgba(15,23,42,0.7)"
+                          : "rgba(248,250,252,0.9)",
+                      boxShadow: isActive ? "0 12px 30px rgba(59,130,246,0.15)" : "none",
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-4 h-4 rounded-full border flex items-center justify-center"
+                        style={{
+                          borderColor: isActive ? "#2563eb" : "rgba(148,163,184,0.7)",
+                          background: isActive ? "#2563eb" : "transparent",
+                        }}
+                      >
+                        {isActive && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                      </span>
+                      <span className="font-semibold">{option.label}</span>
+                    </div>
+                    <p className="text-xs mt-1" style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}>
+                      {option.helper}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
 
           {summary && (
             <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 fade-up" style={{ animationDelay: "120ms" }}>
@@ -315,17 +504,19 @@ export default function FeedbackList() {
               </div>
             )}
 
-            {!loading && feedbacks.length === 0 && (
+            {!loading && filteredFeedbacks.length === 0 && (
               <div className="text-center py-12">
                 <p className="text-lg font-semibold">No feedback yet.</p>
                 <p className="text-sm mt-2" style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}>
-                  {isStudent ? "Bạn chưa gửi phản hồi nào. Hãy chia sẻ trải nghiệm của bạn khi sẵn sàng." : "Be the first one to share your experience with us."}
+                  {activeFilter === "system"
+                    ? "Chưa có phản hồi hệ thống nào trong nhóm này."
+                    : "Chưa có phản hồi dành cho giảng viên trong nhóm này."}
                 </p>
                 {canCreateFeedback && (
                   <button
                     type="button"
                     onClick={() => navigate("/help/feedback")}
-                    className="mt-4 px-4 py-2 rounded-xl font-semibold border border-transparent transition-all hover:-translate-y-0.5"
+                    className="mt-4 px-4 py-2 rounded-xl font-semibold border border-transparent transition-all hover:-translate-y-0.5 click-animate"
                     style={{
                       background: darkMode ? "#1f2937" : "#eef2ff",
                       color: darkMode ? "#e5e7eb" : "#4338ca",
@@ -338,77 +529,167 @@ export default function FeedbackList() {
             )}
 
             {!loading &&
-              feedbacks.map((fb, index) => (
+              filteredFeedbacks.map((fb, index) => (
                 <article
                   key={fb._id}
-                  className="rounded-2xl p-4 border transition hover:-translate-y-0.5 fade-up"
+                  className="rounded-3xl p-5 border transition hover:-translate-y-0.5 fade-up"
                   style={{
                     animationDelay: `${220 + index * 60}ms`,
-                    borderColor: darkMode ? "rgba(148,163,184,0.2)" : "rgba(148,163,184,0.4)",
-                    background: darkMode ? "rgba(15,23,42,0.9)" : "#fff",
+                    borderColor: darkMode ? "rgba(148,163,184,0.2)" : "rgba(226,232,240,0.8)",
+                    background: darkMode ? "rgba(15,23,42,0.95)" : "#fff",
+                    boxShadow: "0 12px 35px rgba(15,23,42,0.08)",
                   }}
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide" style={{ color: "#7c3aed" }}>
-                        {fb.type}
-                      </p>
-                      <h3 className="text-lg font-semibold mt-1 text-red-700">{fb.title}</h3>
+                  <div className="flex items-start gap-4">
+                    <div
+                      className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-semibold"
+                      style={{
+                        background: "linear-gradient(135deg, #fde68a, #f59e0b)",
+                        color: "#78350f",
+                      }}
+                    >
+                      {getInitials(fb.userId?.fullname || fb.userId?.username)}
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <div className="rating-pill flex items-center gap-1 text-sm font-semibold">
-                        <span>{fb.rating}/5</span>
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          fill="#fde047"
-                          stroke="#f59e0b"
-                          className="w-4 h-4"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="1.5"
-                            d="M11.48 3.499a.562.562 0 011.04 0l2.012 5.111a.563.563 0 00.475.354l5.518.403c.499.036.701.663.322.988l-4.204 3.57a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0l-4.725 2.885a.562.562 0 01-.84-.61l1.285-5.386a.563.563 0 00-.182-.557l-4.204-3.57a.563.563 0 01.322-.988l5.518-.403a.563.563 0 00.475-.354l2.012-5.11z"
-                          />
-                        </svg>
-                      </div>
-                      <p className="text-xs" style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}>
-                        {formatDate(fb.createdAt, meta?.timezone)}
-                      </p>
-                      {isAdmin && (
-                        <button
-                          type="button"
-                          onClick={() => void handleDelete(fb._id)}
-                          disabled={deletingId === fb._id}
-                          className="text-xs px-3 py-1 rounded-full border transition-all"
+                    <div className="flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-base font-semibold">
+                          {fb.userId?.fullname || fb.userId?.username || "Người dùng ẩn danh"}
+                        </h3>
+                        <span
+                          className="px-3 py-0.5 rounded-full text-xs font-semibold"
                           style={{
-                            borderColor: "rgba(248,113,113,0.4)",
-                            color: "#dc2626",
-                            opacity: deletingId === fb._id ? 0.6 : 1,
+                            background: "rgba(16,185,129,0.15)",
+                            color: "#0f766e",
                           }}
                         >
-                          {deletingId === fb._id ? "Deleting..." : "Delete"}
-                        </button>
-                      )}
+                          {fb.type === "teacher" ? "Lecturer" : "System"}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: 5 }).map((_, starIndex) => {
+                            const active = starIndex < Math.round(fb.rating ?? 0);
+                            return (
+                              <svg
+                                key={starIndex}
+                                viewBox="0 0 24 24"
+                                className={`rating-star ${active ? "rating-star--active" : ""}`}
+                                style={{ animationDelay: `${starIndex * 90}ms` }}
+                                fill={active ? "#fbbf24" : "none"}
+                                stroke="#f59e0b"
+                                strokeWidth="1.5"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M11.48 3.499a.562.562 0 011.04 0l2.012 5.111a.563.563 0 00.475.354l5.518.403c.499.036.701.663.322.988l-4.204 3.57a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0l-4.725 2.885a.562.562 0 01-.84-.61l1.285-5.386a.563.563 0 00-.182-.557l-4.204-3.57a.563.563 0 01.322-.988l5.518-.403a.563.563 0 00.475-.354l2.012-5.11z"
+                                />
+                              </svg>
+                            );
+                          })}
+                        </div>
+                        <span className="text-sm font-semibold" style={{ color: darkMode ? "#f8fafc" : "#0f172a" }}>
+                          {fb.rating}/5
+                        </span>
+                        <span className="text-xs" style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}>
+                          {formatDate(fb.createdAt, meta?.timezone)}
+                        </span>
+                      </div>
                     </div>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(fb._id)}
+                        disabled={deletingId === fb._id}
+                        className="text-xs px-3 py-1 rounded-full border transition-all click-animate delete-button"
+                        style={{
+                          borderColor: "rgba(248,113,113,0.4)",
+                          color: "#dc2626",
+                          opacity: deletingId === fb._id ? 0.6 : 1,
+                        }}
+                      >
+                        {deletingId === fb._id ? "Deleting..." : "Delete"}
+                      </button>
+                    )}
                   </div>
-                  <p className="text-sm mt-3" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+                  <p className="text-sm mt-3 leading-relaxed" style={{ color: darkMode ? "#cbd5e1" : "#0f172a" }}>
                     {fb.description}
                   </p>
                   <div className="flex flex-wrap items-center gap-3 mt-4 text-xs info-line">
-                    <span className="info-chip">
-                      Submitted by:{" "}
-                      <strong style={{ color: darkMode ? "#fff" : "#1e40af" }}>
-                        {fb.userId?.fullname || fb.userId?.username}
-                      </strong>
-                    </span>
                     <span className="info-chip">Email: {fb.userId?.email}</span>
-                    {fb.size !== undefined && <span className="info-chip">Attachment size: {fb.size} KB</span>}
                   </div>
                 </article>
               ))}
-          </section>
+            </section>
+
+            {confirmDeleteId && (
+              <div className="fixed inset-0 z-40 flex items-center justify-center modal-backdrop">
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    backgroundColor: darkMode
+                      ? "rgba(164, 176, 204, 0.2)"
+                      : "rgba(181, 191, 213, 0.1)",
+                    backdropFilter: "blur(4px)",
+                  }}
+                  onClick={closeDeleteModal}
+                />
+                <div
+                  className="relative z-50 max-w-sm w-full mx-4 rounded-3xl shadow-2xl modal-content"
+                  style={{
+                    background: darkMode ? "#020617" : "#ecfeff",
+                    border: darkMode
+                      ? "1px solid rgba(148, 163, 184, 0.4)"
+                      : "1px solid rgba(59, 130, 246, 0.35)",
+                  }}
+                >
+                  <div className="px-6 py-5">
+                    <p className="text-xs uppercase tracking-wide mb-1" style={{ color: "#0f766e" }}>
+                      Confirm delete
+                    </p>
+                    <h2 className="text-lg font-semibold mb-2">
+                      Are you sure you want to delete this feedback?
+                    </h2>
+                    <p
+                      className="text-xs mb-5"
+                      style={{ color: darkMode ? "#9ca3af" : "#64748b" }}
+                    >
+                      This action cannot be undone. The selected feedback will be permanently
+                      removed.
+                    </p>
+                    <div className="flex justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={closeDeleteModal}
+                        className="px-4 py-2 rounded-full font-semibold border text-sm transition-all click-animate"
+                        style={{
+                          background: darkMode ? "rgba(15,23,42,0.9)" : "#e0f2fe",
+                          color: darkMode ? "#e5e7eb" : "#0f172a",
+                          borderColor: darkMode
+                            ? "rgba(148,163,184,0.5)"
+                            : "rgba(59,130,246,0.45)",
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void confirmDelete()}
+                        disabled={deletingId === confirmDeleteId}
+                        className="px-6 py-2 rounded-full font-semibold text-sm relative overflow-hidden pulse-button transition-all click-animate"
+                        style={{
+                          background: "linear-gradient(135deg, #0f766e, #022c22)",
+                          color: "#f9fafb",
+                          opacity: deletingId === confirmDeleteId ? 0.7 : 1,
+                        }}
+                      >
+                        {deletingId === confirmDeleteId ? "Deleting..." : "OK"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
           {pagination && (
             <div className="mt-6 text-sm flex flex-wrap items-center gap-4" style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}>

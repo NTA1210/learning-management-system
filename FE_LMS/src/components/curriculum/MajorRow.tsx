@@ -1,70 +1,128 @@
 import React from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Info } from "lucide-react";
 import { useTheme } from "../../hooks/useTheme";
 import ActionMenu from "./ActionMenu";
 import SpecialistRow from "./SpecialistRow";
-import type { MajorNode } from "../../types/curriculum";
+import InfoCard from "./InfoCard";
+import type { MajorNode, SpecialistNode, SubjectNode } from "../../types/curriculum";
 
 interface MajorRowProps {
   major: MajorNode;
   isExpanded: boolean;
-  isSelected: boolean;
   onToggle: () => void;
-  onSelect: () => void;
   onLoadSpecialists: () => void;
   openActionMenu: string | null;
   onActionMenuToggle: (id: string) => void;
   onActionMenuClose: () => void;
   onAddSpecialist: () => void;
+  onEditMajor: () => void;
+  onDeleteMajor: () => void;
   expandedSpecialists: Set<string>;
   expandedSubjects: Set<string>;
   onToggleSpecialist: (specialistId: string) => void;
   onToggleSubject: (specialistId: string, subjectId: string) => void;
   onLoadSubjects: (specialistId: string) => void;
   onLoadCourses: (specialistId: string, subjectId: string) => void;
+  onAddSubject: (specialist: SpecialistNode) => void;
+  onEditSubject: (specialist: SpecialistNode, subject: SubjectNode) => void;
+  onDeleteSubject: (specialist: SpecialistNode, subject: SubjectNode) => void;
   onEditSpecialist: (specialistId: string) => void;
   onDeleteSpecialist: (specialistId: string) => void;
+  // Course CRUD props
+  onAddCourse?: (subject: SubjectNode, major: MajorNode, specialist: SpecialistNode) => void;
+  onEditCourse?: (course: any, subject: SubjectNode, major: MajorNode, specialist: SpecialistNode) => void;
+  onDeleteCourse?: (course: any, subject: SubjectNode, major: MajorNode, specialist: SpecialistNode) => void;
+  // Info card props
+  onShowInfo?: (type: "major" | "specialist" | "subject" | "course", data: any, element: HTMLElement) => void;
+  openInfoId?: string | null;
+  onCloseInfo?: () => void;
+  // Drag and Drop props
+  onDragStart: (type: 'specialist' | 'subject', id: string, data: any) => void;
+  onDragEnd: () => void;
+  onDragOver: (e: React.DragEvent, targetType: 'major' | 'specialist', targetId: string) => void;
+  onDragLeave: () => void;
+  onDrop: (e: React.DragEvent, targetType: 'major' | 'specialist', targetId: string) => void;
+  draggedItem: { type: 'specialist' | 'subject'; id: string; data: any } | null;
+  dropTarget: { type: 'major' | 'specialist'; id: string } | null;
+  isDragging: boolean;
+  pendingMoves: Array<{
+    id: string;
+    type: 'specialist' | 'subject';
+    itemName: string;
+    itemCode?: string;
+    fromId: string;
+    fromName: string;
+    toId: string;
+    toName: string;
+    timestamp: number;
+  }>;
 }
 
 const MajorRow: React.FC<MajorRowProps> = ({
   major,
   isExpanded,
-  isSelected,
   onToggle,
-  onSelect,
   onLoadSpecialists,
   openActionMenu,
   onActionMenuToggle,
   onActionMenuClose,
   onAddSpecialist,
+  onEditMajor,
+  onDeleteMajor,
   expandedSpecialists,
   expandedSubjects,
   onToggleSpecialist,
   onToggleSubject,
   onLoadSubjects,
   onLoadCourses,
+  onAddSubject,
+  onEditSubject,
+  onDeleteSubject,
   onEditSpecialist,
   onDeleteSpecialist,
+  onAddCourse,
+  onEditCourse,
+  onDeleteCourse,
+  onShowInfo,
+  openInfoId,
+  onCloseInfo,
+  // Drag and Drop props
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  draggedItem,
+  dropTarget,
+  isDragging,
+  pendingMoves,
 }) => {
   const { darkMode } = useTheme();
   const specialistList = major.specialists || [];
+
+  const isDropTarget = dropTarget?.type === 'major' && dropTarget.id === major._id;
+  const canAcceptDrop = draggedItem?.type === 'specialist';
 
   return (
     <>
       {/* Major row */}
       <tr
         style={{
-          backgroundColor: darkMode ? "#1f2937" : "#ffffff",
+          backgroundColor: isDropTarget && canAcceptDrop 
+            ? (darkMode ? "#065f46" : "#d1fae5") 
+            : (darkMode ? "#1f2937" : "#ffffff"),
           borderBottom: `1px solid ${darkMode ? "#374151" : "#e5e7eb"}`,
+          border: isDropTarget && canAcceptDrop 
+            ? `2px dashed ${darkMode ? "#10b981" : "#059669"}` 
+            : undefined,
+          display: openInfoId === `major-${major._id}` ? "none" : "table-row",
         }}
+        onDragOver={canAcceptDrop ? (e) => onDragOver(e, 'major', major._id) : undefined}
+        onDragLeave={canAcceptDrop ? onDragLeave : undefined}
+        onDrop={canAcceptDrop ? (e) => onDrop(e, 'major', major._id) : undefined}
       >
         <td style={{ padding: "12px 16px" }}>
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={onSelect}
-            style={{ width: "16px", height: "16px", cursor: "pointer" }}
-          />
+
         </td>
         <td style={{ padding: "12px 16px" }}>
           <div className="flex items-center gap-3">
@@ -83,13 +141,22 @@ const MajorRow: React.FC<MajorRowProps> = ({
               {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             </button>
             <div>
-              <p style={{ fontWeight: 600, color: darkMode ? "#ffffff" : "#111827", fontSize: "14px" }}>{major.name}</p>
-              <p style={{ color: darkMode ? "#9ca3af" : "#6b7280", fontSize: "12px" }}>{major.slug}</p>
+              <div className="flex items-center gap-2">
+                <p style={{ fontWeight: 600, color: darkMode ? "#ffffff" : "#111827", fontSize: "14px", margin: 0 }}>{major.name}</p>
+                <div
+                  style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    backgroundColor: "#10b981",
+                    flexShrink: 0,
+                  }}
+                  title="Active"
+                />
+              </div>
+              <p style={{ color: darkMode ? "#9ca3af" : "#6b7280", fontSize: "12px", margin: "2px 0 0 0" }}>{major.description || "-"}</p>
             </div>
           </div>
-        </td>
-        <td style={{ padding: "12px 16px", color: darkMode ? "#9ca3af" : "#6b7280", fontSize: "14px" }}>
-          {major.description || "-"}
         </td>
         <td style={{ padding: "12px 16px", color: darkMode ? "#9ca3af" : "#6b7280", fontSize: "14px" }}>
           {major.updatedAt ? new Date(major.updatedAt).toLocaleDateString("en-GB") : "-"}
@@ -97,30 +164,61 @@ const MajorRow: React.FC<MajorRowProps> = ({
         <td style={{ padding: "12px 16px", color: darkMode ? "#9ca3af" : "#6b7280", fontSize: "14px" }}>
           {major.createdAt ? new Date(major.createdAt).toLocaleDateString("en-GB") : "-"}
         </td>
-        <td style={{ padding: "12px 16px" }}>
-          <div className="flex items-center gap-2">
-            <div
-              style={{
-                width: "8px",
-                height: "8px",
-                borderRadius: "50%",
-                backgroundColor: "#10b981",
-              }}
-            />
-            <span style={{ color: darkMode ? "#9ca3af" : "#6b7280", fontSize: "14px" }}>Active</span>
-          </div>
+        <td style={{ padding: "12px 16px", textAlign: "center", color: darkMode ? "#9ca3af" : "#6b7280", fontSize: "14px" }}>
+          -
+        </td>
+        <td style={{ padding: "12px 16px", color: darkMode ? "#9ca3af" : "#6b7280", fontSize: "14px" }}>
+          -
         </td>
         <td style={{ padding: "12px 16px", textAlign: "center" }}>
-          <ActionMenu
-            isOpen={openActionMenu === `major-${major._id}`}
-            onToggle={() => onActionMenuToggle(`major-${major._id}`)}
-            onClose={onActionMenuClose}
-            type="major"
-            onAddSpecialist={onAddSpecialist}
-            onReload={onLoadSpecialists}
-          />
+          <div className="flex items-center justify-center gap-2">
+            <button
+              onClick={(e) => {
+                if (onShowInfo) {
+                  onShowInfo("major", major, e.currentTarget);
+                }
+              }}
+              className="p-1 rounded hover:bg-opacity-20 transition-colors"
+              style={{
+                color: darkMode ? "#9ca3af" : "#6b7280",
+                cursor: "pointer",
+              }}
+              title="Show details"
+            >
+              <Info size={16} />
+            </button>
+            <ActionMenu
+              isOpen={openActionMenu === `major-${major._id}`}
+              onToggle={() => onActionMenuToggle(`major-${major._id}`)}
+              onClose={onActionMenuClose}
+              type="major"
+              onAddSpecialist={onAddSpecialist}
+              onReload={onLoadSpecialists}
+              onEdit={onEditMajor}
+              onDelete={onDeleteMajor}
+            />
+          </div>
         </td>
       </tr>
+
+      {/* Info row */}
+      {openInfoId === `major-${major._id}` && (
+        <InfoCard
+          type="major"
+          data={major}
+          onClose={onCloseInfo || (() => {})}
+          paddingLeft={56}
+          openActionMenu={openActionMenu}
+          onActionMenuToggle={onActionMenuToggle}
+          onActionMenuClose={onActionMenuClose}
+          onEdit={onEditMajor}
+          onDelete={onDeleteMajor}
+          onAddSpecialist={onAddSpecialist}
+          onReload={onLoadSpecialists}
+          showDragHandle={false}
+          showTreeBranches={false}
+        />
+      )}
 
       {/* Specialist rows */}
       {isExpanded && (
@@ -174,9 +272,29 @@ const MajorRow: React.FC<MajorRowProps> = ({
                       onActionMenuClose={onActionMenuClose}
                       onEdit={() => onEditSpecialist(specialist._id)}
                       onDelete={() => onDeleteSpecialist(specialist._id)}
+                      onAddSubject={() => onAddSubject(specialist)}
                       expandedSubjects={expandedSubjects}
                       onToggleSubject={(specialistId, subjectId) => onToggleSubject(specialistId, subjectId)}
                       onLoadCourses={(subjectId) => onLoadCourses(specialist._id, subjectId)}
+                      onEditSubject={(subjectId) => onEditSubject(specialist, subjectId)}
+                      onDeleteSubject={(subjectId) => onDeleteSubject(specialist, subjectId)}
+                      onAddCourse={(subject, major, specialist) => onAddCourse?.(subject, major, specialist)}
+                      onEditCourse={(course, subject, major, specialist) => onEditCourse?.(course, subject, major, specialist)}
+                      onDeleteCourse={(course, subject, major, specialist) => onDeleteCourse?.(course, subject, major, specialist)}
+                      onShowInfo={onShowInfo}
+                      openInfoId={openInfoId}
+                      onCloseInfo={onCloseInfo}
+                      // Drag and Drop props
+                      onDragStart={onDragStart}
+                      onDragEnd={onDragEnd}
+                      onDragOver={onDragOver}
+                      onDragLeave={onDragLeave}
+                      onDrop={onDrop}
+                      draggedItem={draggedItem}
+                      dropTarget={dropTarget}
+                      isDragging={isDragging}
+                      pendingMoves={pendingMoves}
+                      major={major}
                     />
                   );
                 })

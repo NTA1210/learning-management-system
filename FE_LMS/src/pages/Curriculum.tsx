@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import { specialistService, majorService, subjectService, courseService } from "../services";
+import { generateSlug } from "../utils/slug";
 import type { Specialist } from "../types/specialist";
 import type { MajorNode, SpecialistNode, SubjectNode } from "../types/curriculum";
 import Navbar from "../components/Navbar.tsx";
@@ -10,6 +11,10 @@ import { Plus } from "lucide-react";
 import SearchFilters from "../components/curriculum/SearchFilters";
 import MajorRow from "../components/curriculum/MajorRow";
 import SpecialistModal from "../components/curriculum/SpecialistModal";
+import MajorModal from "../components/curriculum/MajorModal";
+import SubjectModal from "../components/curriculum/SubjectModal";
+import CourseModal from "../components/curriculum/CourseModal";
+import PendingChangesDialog from "../components/curriculum/PendingChangesDialog";
 
 const Curriculum: React.FC = () => {
   const { darkMode } = useTheme();
@@ -21,7 +26,6 @@ const Curriculum: React.FC = () => {
   const [expandedMajors, setExpandedMajors] = useState<Set<string>>(new Set());
   const [expandedSpecialists, setExpandedSpecialists] = useState<Set<string>>(new Set());
   const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
-  const [selectedMajors, setSelectedMajors] = useState<Set<string>>(new Set());
   const [contentPaddingLeft, setContentPaddingLeft] = useState(window.innerWidth >= 640 ? 93 : 0);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageLimit, setPageLimit] = useState(25);
@@ -32,19 +36,133 @@ const Curriculum: React.FC = () => {
   useEffect(() => {
     majorsRef.current = majors;
   }, [majors]);
+
+  // Drag and Drop state
+  const [draggedItem, setDraggedItem] = useState<{
+    type: 'specialist' | 'subject';
+    id: string;
+    data: any;
+  } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{
+    type: 'major' | 'specialist';
+    id: string;
+  } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Pending moves state with change history
+  interface PendingMove {
+    id: string;
+    type: 'specialist' | 'subject';
+    itemName: string;
+    itemCode?: string;
+    fromId: string;
+    fromName: string;
+    toId: string;
+    toName: string;
+    timestamp: number;
+  }
+
+  const [pendingMoves, setPendingMoves] = useState<PendingMove[]>([]);
+  const [moveHistory, setMoveHistory] = useState<PendingMove[]>([]); // For undo/redo
+  const [historyIndex, setHistoryIndex] = useState(-1);
   
-  // CRUD states
+  // Major CRUD state
+  const [showMajorModal, setShowMajorModal] = useState(false);
+  const [editingMajorId, setEditingMajorId] = useState<string | null>(null);
+  const [majorFormData, setMajorFormData] = useState({
+    name: "",
+    description: "",
+  });
+
+  // Specialist CRUD states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingSpecialist, setEditingSpecialist] = useState<Specialist | null>(null);
   const [openActionMenu, setOpenActionMenu] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    slug: "",
     description: "",
     majorId: "",
   });
 
+  // Subject CRUD states
+  type SubjectFormState = {
+    name: string;
+    code: string;
+    credits: number | "";
+    description: string;
+    isActive: boolean;
+  };
+
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
+  const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
+  const [subjectContext, setSubjectContext] = useState<{
+    majorId: string;
+    specialistId: string;
+    specialistName: string;
+  } | null>(null);
+  const [subjectFormData, setSubjectFormData] = useState<SubjectFormState>({
+    name: "",
+    code: "",
+    credits: 3,
+    description: "",
+    isActive: true,
+  });
+
+  // Course modal state
+  interface CourseFormState {
+    title: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+    teacherIds: string[];
+    status: 'ongoing' | 'draft' | 'completed';
+    isPublished: boolean;
+    capacity: number;
+    enrollRequiresApproval: boolean;
+    semesterId?: string;
+    logo?: File | null;
+  }
+
+  const [showCourseModal, setShowCourseModal] = useState(false);
+  const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
+  const [courseContext, setCourseContext] = useState<{
+    majorId: string;
+    specialistId: string;
+    subjectId: string;
+    subjectName: string;
+  } | null>(null);
+  const [courseFormData, setCourseFormData] = useState<CourseFormState>({
+    title: "",
+    description: "",
+    startDate: "",
+    endDate: "",
+    teacherIds: [],
+    status: 'draft',
+    isPublished: false,
+    capacity: 50,
+    enrollRequiresApproval: true,
+    semesterId: undefined,
+    logo: null,
+  });
+
+  // Info card state - track which row's info is open by ID
+  const [openInfoId, setOpenInfoId] = useState<string | null>(null);
+
+  const handleShowInfo = (type: "major" | "specialist" | "subject" | "course", data: any) => {
+    const id = `${type}-${data._id}`;
+    if (openInfoId === id) {
+      // If clicking the same row, close it
+      setOpenInfoId(null);
+    } else {
+      // Open new info row
+      setOpenInfoId(id);
+    }
+  };
+
+  const handleCloseInfo = () => {
+    setOpenInfoId(null);
+  };
 
   const changePageLimit = (limit: number) => {
     setPageLimit(limit);
@@ -410,17 +528,6 @@ const Curriculum: React.FC = () => {
     }
   };
 
-  const toggleMajorSelection = (majorId: string) => {
-    setSelectedMajors(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(majorId)) {
-        newSet.delete(majorId);
-      } else {
-        newSet.add(majorId);
-      }
-      return newSet;
-    });
-  };
 
   // CRUD Handlers
   const handleCreateSpecialist = async (e: React.FormEvent) => {
@@ -428,12 +535,12 @@ const Curriculum: React.FC = () => {
     try {
       await specialistService.createSpecialist({
         name: formData.name,
-        slug: formData.slug,
+        slug: generateSlug(formData.name),
         description: formData.description,
         majorId: formData.majorId || undefined,
       });
       setShowCreateModal(false);
-      setFormData({ name: "", slug: "", description: "", majorId: "" });
+      setFormData({ name: "", description: "", majorId: "" });
       await fetchData();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create specialist");
@@ -446,13 +553,12 @@ const Curriculum: React.FC = () => {
     try {
       await specialistService.updateSpecialist(editingSpecialist._id, {
         name: formData.name,
-        slug: formData.slug,
         description: formData.description,
         majorId: formData.majorId || undefined,
       });
       setShowEditModal(false);
       setEditingSpecialist(null);
-      setFormData({ name: "", slug: "", description: "", majorId: "" });
+      setFormData({ name: "", description: "", majorId: "" });
       await fetchData();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to update specialist");
@@ -478,7 +584,6 @@ const Curriculum: React.FC = () => {
     setEditingSpecialist(specialist);
     setFormData({
       name: specialist.name,
-      slug: specialist.slug,
       description: specialist.description,
       majorId: specialist.majorId?._id || "",
     });
@@ -486,6 +591,709 @@ const Curriculum: React.FC = () => {
         setOpenActionMenu(null);
       }
     };
+
+  const openCreateMajorModal = () => {
+    setEditingMajorId(null);
+    setMajorFormData({ name: "", description: "" });
+    setShowMajorModal(true);
+  };
+
+  const openEditMajorModal = (major: MajorNode) => {
+    setEditingMajorId(major._id);
+    setMajorFormData({
+      name: major.name || "",
+      description: major.description || "",
+    });
+    setShowMajorModal(true);
+    setOpenActionMenu(null);
+  };
+
+  const handleMajorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingMajorId) {
+        await majorService.updateMajor(editingMajorId, {
+          name: majorFormData.name,
+          description: majorFormData.description || undefined,
+        });
+      } else {
+        await majorService.createMajor({
+          name: majorFormData.name,
+          slug: generateSlug(majorFormData.name),
+          description: majorFormData.description || undefined,
+        });
+      }
+      setShowMajorModal(false);
+      setEditingMajorId(null);
+      setMajorFormData({ name: "", description: "" });
+      await fetchData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save major");
+    }
+  };
+
+  const handleDeleteMajor = async (majorId: string) => {
+    if (!confirm("Are you sure you want to delete this major?")) return;
+    try {
+      await majorService.deleteMajor(majorId);
+      setOpenActionMenu(null);
+      await fetchData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete major");
+    }
+  };
+
+  const openCreateSubjectModal = (major: MajorNode, specialist: SpecialistNode) => {
+    setEditingSubjectId(null);
+    setSubjectContext({
+      majorId: major._id,
+      specialistId: specialist._id,
+      specialistName: specialist.name,
+    });
+    setSubjectFormData({
+      name: "",
+      code: "",
+      credits: 3,
+      description: "",
+      isActive: true,
+    });
+    setShowSubjectModal(true);
+    setOpenActionMenu(null);
+  };
+
+  const openEditSubjectModal = (
+    major: MajorNode,
+    specialist: SpecialistNode,
+    subject: SubjectNode
+  ) => {
+    setEditingSubjectId(subject._id);
+    setSubjectContext({
+      majorId: major._id,
+      specialistId: specialist._id,
+      specialistName: specialist.name,
+    });
+    setSubjectFormData({
+      name: subject.name || "",
+      code: subject.code || "",
+      credits: subject.credits ?? "",
+      description: subject.description || "",
+      isActive: subject.isActive ?? true,
+    });
+    setShowSubjectModal(true);
+    setOpenActionMenu(null);
+  };
+
+  const handleSubjectSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!subjectContext) return;
+    const context = subjectContext;
+    try {
+      if (editingSubjectId) {
+        const updatePayload = {
+          name: subjectFormData.name,
+          code: subjectFormData.code,
+          credits:
+            subjectFormData.credits === "" ? undefined : Number(subjectFormData.credits),
+          description: subjectFormData.description || undefined,
+          specialistIds: [context.specialistId],
+          isActive: subjectFormData.isActive,
+        };
+        await subjectService.updateSubject(editingSubjectId, updatePayload);
+      } else {
+        const createPayload = {
+          name: subjectFormData.name,
+          code: subjectFormData.code,
+          slug: generateSlug(subjectFormData.name),
+          credits:
+            subjectFormData.credits === "" ? undefined : Number(subjectFormData.credits),
+          description: subjectFormData.description || undefined,
+          specialistIds: [context.specialistId],
+          isActive: subjectFormData.isActive,
+        };
+        await subjectService.createSubject(createPayload);
+      }
+      setShowSubjectModal(false);
+      setEditingSubjectId(null);
+      setSubjectContext(null);
+      setSubjectFormData({
+        name: "",
+        code: "",
+        credits: 3,
+        description: "",
+        isActive: true,
+      });
+      await loadSubjectsForSpecialist(context.majorId, context.specialistId, true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save subject");
+    }
+  };
+
+  const handleDeleteSubject = async (majorId: string, specialistId: string, subjectId: string) => {
+    if (!confirm("Are you sure you want to delete this subject?")) return;
+    try {
+      await subjectService.deleteSubject(subjectId);
+      setOpenActionMenu(null);
+      await loadSubjectsForSpecialist(majorId, specialistId, true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete subject");
+    }
+  };
+
+  // Course CRUD handlers
+  const openCreateCourseModal = (subject: SubjectNode, major: MajorNode, specialist: SpecialistNode) => {
+    setEditingCourseId(null);
+    setCourseContext({
+      majorId: major._id,
+      specialistId: specialist._id,
+      subjectId: subject._id,
+      subjectName: subject.name,
+    });
+    setCourseFormData({
+      title: "",
+      description: "",
+      startDate: "",
+      endDate: "",
+      teacherIds: [],
+      status: 'draft',
+      isPublished: false,
+      capacity: 50,
+      enrollRequiresApproval: true,
+      semesterId: undefined,
+      logo: null,
+    });
+    setShowCourseModal(true);
+    setOpenActionMenu(null);
+  };
+
+  const openEditCourseModal = (course: any, subject: SubjectNode, major: MajorNode, specialist: SpecialistNode) => {
+    setEditingCourseId(course._id);
+    setCourseContext({
+      majorId: major._id,
+      specialistId: specialist._id,
+      subjectId: subject._id,
+      subjectName: subject.name,
+    });
+    
+    // Format dates to YYYY-MM-DD
+    const formatDate = (dateStr: string | undefined) => {
+      if (!dateStr) return "";
+      const date = new Date(dateStr);
+      return date.toISOString().split('T')[0];
+    };
+
+    // Extract teacher IDs
+    const teacherIds = course.teacherIds 
+      ? course.teacherIds.map((t: any) => typeof t === 'string' ? t : t._id)
+      : course.teachers
+      ? course.teachers.map((t: any) => t._id)
+      : [];
+
+    setCourseFormData({
+      title: course.title || "",
+      description: course.description || "",
+      startDate: formatDate(course.startDate),
+      endDate: formatDate(course.endDate),
+      teacherIds: teacherIds,
+      status: course.status || 'draft',
+      isPublished: course.isPublished || false,
+      capacity: course.capacity || 50,
+      enrollRequiresApproval: course.enrollRequiresApproval ?? true,
+      semesterId: course.semesterId ? (typeof course.semesterId === 'string' ? course.semesterId : course.semesterId._id) : undefined,
+      logo: null,
+    });
+    setShowCourseModal(true);
+    setOpenActionMenu(null);
+  };
+
+  const handleCourseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!courseContext) return;
+    const context = courseContext;
+    
+    try {
+      setLoading(true);
+      if (editingCourseId) {
+        const updatePayload = {
+          subjectId: context.subjectId,
+          title: courseFormData.title,
+          description: courseFormData.description || undefined,
+          startDate: courseFormData.startDate,
+          endDate: courseFormData.endDate,
+          teacherIds: courseFormData.teacherIds,
+          status: courseFormData.status,
+          isPublished: courseFormData.isPublished,
+          capacity: courseFormData.capacity,
+          enrollRequiresApproval: courseFormData.enrollRequiresApproval,
+          semesterId: courseFormData.semesterId,
+          logo: courseFormData.logo || undefined,
+        };
+        await courseService.updateCourse(editingCourseId, updatePayload);
+      } else {
+        const createPayload = {
+          subjectId: context.subjectId,
+          title: courseFormData.title,
+          slug: generateSlug(courseFormData.title),
+          description: courseFormData.description || undefined,
+          startDate: courseFormData.startDate,
+          endDate: courseFormData.endDate,
+          teacherIds: courseFormData.teacherIds,
+          status: courseFormData.status,
+          isPublished: courseFormData.isPublished,
+          capacity: courseFormData.capacity,
+          enrollRequiresApproval: courseFormData.enrollRequiresApproval,
+          semesterId: courseFormData.semesterId,
+          logo: courseFormData.logo || undefined,
+        };
+        await courseService.createCourse(createPayload);
+      }
+      
+      setShowCourseModal(false);
+      setEditingCourseId(null);
+      setCourseContext(null);
+      setCourseFormData({
+        title: "",
+        description: "",
+        startDate: "",
+        endDate: "",
+        teacherIds: [],
+        status: 'draft',
+        isPublished: false,
+        capacity: 50,
+        enrollRequiresApproval: true,
+        semesterId: undefined,
+        logo: null,
+      });
+      
+      // Reload courses for the subject
+      await loadCoursesForSubject(context.majorId, context.specialistId, context.subjectId, true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save course");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCourse = async (course: any, subject: SubjectNode, major: MajorNode, specialist: SpecialistNode) => {
+    if (!confirm("Are you sure you want to delete this course?")) return;
+    try {
+      setLoading(true);
+      await courseService.deleteCourse(course._id);
+      setOpenActionMenu(null);
+      await loadCoursesForSubject(major._id, specialist._id, subject._id, true);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete course");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Drag and Drop handlers
+  const handleDragStart = (type: 'specialist' | 'subject', id: string, data: any) => {
+    setDraggedItem({ type, id, data });
+    setIsDragging(true);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+    setDropTarget(null);
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent, targetType: 'major' | 'specialist', targetId: string) => {
+    e.preventDefault();
+    if (!draggedItem) return;
+
+    // Validate drop target
+    const isValidDrop = 
+      (draggedItem.type === 'specialist' && targetType === 'major') ||
+      (draggedItem.type === 'subject' && targetType === 'specialist');
+
+    if (isValidDrop) {
+      setDropTarget({ type: targetType, id: targetId });
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDropTarget(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetType: 'major' | 'specialist', targetId: string) => {
+    e.preventDefault();
+    if (!draggedItem) return;
+
+    // Handle specialist move to major
+    if (draggedItem.type === 'specialist' && targetType === 'major') {
+      const specialist = draggedItem.data;
+      const currentMajorId = typeof specialist.majorId === 'object' 
+        ? specialist.majorId?._id 
+        : specialist.majorId;
+      
+      if (currentMajorId && currentMajorId !== targetId) {
+        // Find source and target major names
+        const sourceMajor = majors.find(m => m._id === currentMajorId);
+        const targetMajor = majors.find(m => m._id === targetId);
+        
+        if (sourceMajor && targetMajor) {
+          const newMove: PendingMove = {
+            id: specialist._id,
+            type: 'specialist',
+            itemName: specialist.name,
+            fromId: currentMajorId,
+            fromName: sourceMajor.name,
+            toId: targetId,
+            toName: targetMajor.name,
+            timestamp: Date.now(),
+          };
+
+          // Remove any existing move for this item
+          setPendingMoves(prev => prev.filter(m => m.id !== specialist._id && m.type !== 'specialist'));
+          setPendingMoves(prev => [...prev, newMove]);
+          
+          // Optimistic update: move specialist in UI immediately
+          applyOptimisticMove(newMove);
+        }
+      }
+    }
+    
+    // Handle subject move to specialist
+    else if (draggedItem.type === 'subject' && targetType === 'specialist') {
+      const subject = draggedItem.data;
+      const currentSpecialistIds = subject.specialistIds || [];
+      
+      if (!currentSpecialistIds.includes(targetId)) {
+        // Find source specialist and target specialist
+        let sourceSpecialist: any = null;
+        let sourceMajor: any = null;
+        
+        for (const major of majors) {
+          for (const specialist of major.specialists || []) {
+            if (currentSpecialistIds.includes(specialist._id)) {
+              sourceSpecialist = specialist;
+              sourceMajor = major;
+              break;
+            }
+          }
+          if (sourceSpecialist) break;
+        }
+
+        // Find target specialist
+        let targetSpecialist: any = null;
+        let targetMajor: any = null;
+        for (const major of majors) {
+          const specialist = major.specialists?.find(s => s._id === targetId);
+          if (specialist) {
+            targetSpecialist = specialist;
+            targetMajor = major;
+            break;
+          }
+        }
+
+        if (sourceSpecialist && targetSpecialist && sourceMajor && targetMajor) {
+          const newMove: PendingMove = {
+            id: subject._id,
+            type: 'subject',
+            itemName: subject.name,
+            itemCode: subject.code,
+            fromId: sourceSpecialist._id,
+            fromName: sourceSpecialist.name,
+            toId: targetId,
+            toName: targetSpecialist.name,
+            timestamp: Date.now(),
+          };
+
+          // Remove any existing move for this item
+          setPendingMoves(prev => prev.filter(m => m.id !== subject._id && m.type !== 'subject'));
+          setPendingMoves(prev => [...prev, newMove]);
+          
+          // Optimistic update: move subject in UI immediately
+          applyOptimisticMove(newMove);
+        }
+      }
+    }
+
+    handleDragEnd();
+  };
+
+  // Optimistic update: show item in new location immediately
+  const applyOptimisticMove = (move: PendingMove) => {
+    if (move.type === 'specialist') {
+      // Find and move specialist to new major
+      setMajors(prev => {
+        const newMajors = prev.map(major => {
+          // Remove from source major
+          if (major._id === move.fromId) {
+            return {
+              ...major,
+              specialists: (major.specialists || []).filter(s => s._id !== move.id),
+            };
+          }
+          // Add to target major
+          if (major._id === move.toId) {
+            const specialist = prev
+              .flatMap(m => m.specialists || [])
+              .find(s => s._id === move.id);
+            
+            if (specialist) {
+              const updatedSpecialist = {
+                ...specialist,
+                majorId: typeof specialist.majorId === 'object' 
+                  ? { ...specialist.majorId, _id: move.toId }
+                  : move.toId,
+              } as SpecialistNode;
+              return {
+                ...major,
+                specialists: [...(major.specialists || []), updatedSpecialist],
+              };
+            }
+          }
+          return major;
+        });
+        return newMajors;
+      });
+    } else if (move.type === 'subject') {
+      // Find and move subject to new specialist
+      setMajors(prev => {
+        const newMajors = prev.map(major => {
+          const updatedSpecialists = (major.specialists || []).map(specialist => {
+            // Remove from source specialist
+            if (specialist._id === move.fromId) {
+              return {
+                ...specialist,
+                subjects: (specialist.subjects || []).filter(sub => sub._id !== move.id),
+              };
+            }
+            // Add to target specialist
+            if (specialist._id === move.toId) {
+              const subject = prev
+                .flatMap(m => m.specialists || [])
+                .flatMap(s => s.subjects || [])
+                .find(sub => sub._id === move.id);
+              
+              if (subject) {
+                const updatedSubject = {
+                  ...subject,
+                  specialistIds: [move.toId],
+                };
+                return {
+                  ...specialist,
+                  subjects: [...(specialist.subjects || []), updatedSubject],
+                };
+              }
+            }
+            return specialist;
+          });
+          return {
+            ...major,
+            specialists: updatedSpecialists,
+          };
+        });
+        return newMajors;
+      });
+    }
+  };
+
+  // Pending moves handlers
+  const discardPendingMoves = () => {
+    // Revert all optimistic updates
+    pendingMoves.forEach(move => revertOptimisticMove(move));
+    setPendingMoves([]);
+    setMoveHistory([]);
+    setHistoryIndex(-1);
+    // Refresh data to get original state
+    fetchData();
+  };
+
+  const removePendingMove = (moveId: string, moveType: 'specialist' | 'subject') => {
+    const move = pendingMoves.find(m => m.id === moveId && m.type === moveType);
+    if (!move) return;
+
+    // Revert optimistic update for this specific move
+    revertOptimisticMove(move);
+    
+    // Remove from pending moves
+    setPendingMoves(prev => prev.filter(m => !(m.id === moveId && m.type === moveType)));
+  };
+
+  const revertOptimisticMove = (move: PendingMove) => {
+    if (move.type === 'specialist') {
+      // Revert specialist move
+      setMajors(prev => {
+        const newMajors = prev.map(major => {
+          // Remove from target major
+          if (major._id === move.toId) {
+            return {
+              ...major,
+              specialists: (major.specialists || []).filter(s => s._id !== move.id),
+            };
+          }
+          // Add back to source major
+          if (major._id === move.fromId) {
+            const specialist = prev
+              .flatMap(m => m.specialists || [])
+              .find(s => s._id === move.id);
+            
+            if (specialist) {
+              const revertedSpecialist = {
+                ...specialist,
+                majorId: typeof specialist.majorId === 'object' 
+                  ? { ...specialist.majorId, _id: move.fromId }
+                  : move.fromId,
+              } as SpecialistNode;
+              return {
+                ...major,
+                specialists: [...(major.specialists || []), revertedSpecialist],
+              };
+            }
+          }
+          return major;
+        });
+        return newMajors;
+      });
+    } else if (move.type === 'subject') {
+      // Revert subject move
+      setMajors(prev => {
+        const newMajors = prev.map(major => {
+          const updatedSpecialists = (major.specialists || []).map(specialist => {
+            // Remove from target specialist
+            if (specialist._id === move.toId) {
+              return {
+                ...specialist,
+                subjects: (specialist.subjects || []).filter(sub => sub._id !== move.id),
+              };
+            }
+            // Add back to source specialist
+            if (specialist._id === move.fromId) {
+              const subject = prev
+                .flatMap(m => m.specialists || [])
+                .flatMap(s => s.subjects || [])
+                .find(sub => sub._id === move.id);
+              
+              if (subject) {
+                const revertedSubject = {
+                  ...subject,
+                  specialistIds: [move.fromId],
+                };
+                return {
+                  ...specialist,
+                  subjects: [...(specialist.subjects || []), revertedSubject],
+                };
+              }
+            }
+            return specialist;
+          });
+          return {
+            ...major,
+            specialists: updatedSpecialists,
+          };
+        });
+        return newMajors;
+      });
+    }
+  };
+
+  const undoLastMove = () => {
+    if (pendingMoves.length === 0) return;
+    
+    const lastMove = pendingMoves[pendingMoves.length - 1];
+    revertOptimisticMove(lastMove);
+    
+    // Add to history for redo
+    setMoveHistory(prev => [...prev, lastMove]);
+    setHistoryIndex(prev => prev + 1);
+    
+    // Remove from pending
+    setPendingMoves(prev => prev.slice(0, -1));
+  };
+
+  const redoLastMove = () => {
+    if (historyIndex < 0 || historyIndex >= moveHistory.length) return;
+    
+    const moveToRedo = moveHistory[historyIndex];
+    applyOptimisticMove(moveToRedo);
+    
+    // Add back to pending
+    setPendingMoves(prev => [...prev, moveToRedo]);
+    
+    // Remove from history
+    setMoveHistory(prev => prev.slice(0, -1));
+    setHistoryIndex(prev => prev - 1);
+  };
+
+  const applyPendingMoves = async () => {
+    try {
+      setLoading(true);
+
+      // Track affected majors (source and target)
+      const affectedMajorIds = new Set<string>();
+
+      // Apply specialist moves
+      const specialistMoves = pendingMoves.filter(m => m.type === 'specialist');
+      for (const move of specialistMoves) {
+        affectedMajorIds.add(move.fromId);
+        affectedMajorIds.add(move.toId);
+        await specialistService.updateSpecialist(move.id, { majorId: move.toId });
+      }
+
+      // Apply subject moves - need to find majors for specialists
+      const subjectMoves = pendingMoves.filter(m => m.type === 'subject');
+      for (const move of subjectMoves) {
+        // Find majors for source and target specialists
+        for (const major of majors) {
+          const sourceSpec = major.specialists?.find(s => s._id === move.fromId);
+          const targetSpec = major.specialists?.find(s => s._id === move.toId);
+          if (sourceSpec) affectedMajorIds.add(major._id);
+          if (targetSpec) affectedMajorIds.add(major._id);
+        }
+        await subjectService.updateSubject(move.id, {
+          specialistIds: [move.toId],
+        });
+      }
+
+      // Store which majors were expanded before refresh
+      const previouslyExpandedMajors = new Set(expandedMajors);
+      const previouslyExpandedSpecialists = new Set(expandedSpecialists);
+      
+      // Clear pending moves
+      setPendingMoves([]);
+      setMoveHistory([]);
+      setHistoryIndex(-1);
+      
+      // Refresh the entire tree
+      await fetchData();
+      
+      // Use a small delay to ensure state is updated, then refresh expanded nodes
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // Reload specialists and subjects for affected majors that were expanded
+      for (const majorId of affectedMajorIds) {
+        if (previouslyExpandedMajors.has(majorId)) {
+          // Ensure the major is expanded
+          if (!expandedMajors.has(majorId)) {
+            setExpandedMajors(prev => new Set([...prev, majorId]));
+          }
+          
+          // Force reload specialists
+          await loadSpecialistsForMajor(majorId, true);
+          
+          // Get the updated major with fresh specialists
+          const updatedMajor = majorsRef.current.find(m => m._id === majorId);
+          
+          // Reload subjects for expanded specialists
+          if (updatedMajor?.specialists) {
+            for (const specialist of updatedMajor.specialists) {
+              if (previouslyExpandedSpecialists.has(specialist._id)) {
+                await loadSubjectsForSpecialist(majorId, specialist._id, true);
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to apply move changes");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -553,11 +1361,21 @@ const Curriculum: React.FC = () => {
                 <div className="flex gap-3">
                   <button
                     className="px-4 py-2 rounded-lg text-white flex items-center transition-all duration-200"
+                    style={{ backgroundColor: darkMode ? '#2563eb' : '#3b82f6' }}
+                    onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#1d4ed8' : '#2563eb'}
+                    onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#2563eb' : '#3b82f6'}
+                    onClick={openCreateMajorModal}
+                  >
+                    <Plus size={18} className="mr-2" />
+                    Create Major
+                  </button>
+                  <button
+                    className="px-4 py-2 rounded-lg text-white flex items-center transition-all duration-200"
                     style={{ backgroundColor: darkMode ? '#059669' : '#10b981' }}
                     onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#047857' : '#059669'}
                     onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#059669' : '#10b981'}
                     onClick={() => {
-                      setFormData({ name: "", slug: "", description: "", majorId: "" });
+                      setFormData({ name: "", description: "", majorId: "" });
                       setShowCreateModal(true);
                     }}
                   >
@@ -578,6 +1396,7 @@ const Curriculum: React.FC = () => {
                   </button>
                 </div>
               </div>
+
 
               {/* Search and Filter Controls */}
               <SearchFilters
@@ -640,22 +1459,7 @@ const Curriculum: React.FC = () => {
                             color: darkMode ? '#d1d5db' : '#374151',
                             width: '40px'
                           }}>
-                            <input
-                              type="checkbox"
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedMajors(new Set(majors.map(g => g._id)));
-                                } else {
-                                  setSelectedMajors(new Set());
-                                }
-                              }}
-                              checked={majors.length > 0 && majors.every(g => selectedMajors.has(g._id))}
-                              style={{
-                                width: '16px',
-                                height: '16px',
-                                cursor: 'pointer',
-                              }}
-                            />
+
                           </th>
                           <th style={{ 
                             padding: '12px 16px', 
@@ -664,16 +1468,7 @@ const Curriculum: React.FC = () => {
                             fontSize: '14px',
                             color: darkMode ? '#d1d5db' : '#374151',
                           }}>
-                            Major / Specialist Name
-                          </th>
-                          <th style={{ 
-                            padding: '12px 16px', 
-                            textAlign: 'left', 
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            color: darkMode ? '#d1d5db' : '#374151',
-                          }}>
-                            Description
+                            Curriculum Tree
                           </th>
                           <th style={{ 
                             padding: '12px 16px', 
@@ -697,13 +1492,23 @@ const Curriculum: React.FC = () => {
                           </th>
                           <th style={{ 
                             padding: '12px 16px', 
+                            textAlign: 'center', 
+                            fontWeight: 600,
+                            fontSize: '14px',
+                            color: darkMode ? '#d1d5db' : '#374151',
+                            width: '80px'
+                          }}>
+                            Credits
+                          </th>
+                          <th style={{ 
+                            padding: '12px 16px', 
                             textAlign: 'left', 
                             fontWeight: 600,
                             fontSize: '14px',
                             color: darkMode ? '#d1d5db' : '#374151',
-                            width: '100px'
+                            width: '150px'
                           }}>
-                            Status
+                            Prerequisites
                           </th>
                           <th style={{ 
                             padding: '12px 16px', 
@@ -727,32 +1532,52 @@ const Curriculum: React.FC = () => {
                         ) : (
                           majors.map((major) => {
                             const isExpanded = expandedMajors.has(major._id);
-                            const isSelected = selectedMajors.has(major._id);
 
                             return (
                               <MajorRow
                                 key={major._id}
                                 major={major}
                                 isExpanded={isExpanded}
-                                isSelected={isSelected}
                                 onToggle={() => toggleMajor(major._id)}
-                                onSelect={() => toggleMajorSelection(major._id)}
                                 onLoadSpecialists={() => loadSpecialistsForMajor(major._id, true)}
                                 openActionMenu={openActionMenu}
                                 onActionMenuToggle={(id) => setOpenActionMenu(openActionMenu === id ? null : id)}
                                 onActionMenuClose={() => setOpenActionMenu(null)}
                                 onAddSpecialist={() => {
-                                  setFormData({ name: "", slug: "", description: "", majorId: major._id });
+                                  setFormData({ name: "", description: "", majorId: major._id });
                                   setShowCreateModal(true);
                                 }}
+                                onEditMajor={() => openEditMajorModal(major)}
+                                onDeleteMajor={() => handleDeleteMajor(major._id)}
                                 expandedSpecialists={expandedSpecialists}
                                 expandedSubjects={expandedSubjects}
                                 onToggleSpecialist={(specialistId) => toggleSpecialist(major._id, specialistId)}
                                 onToggleSubject={(specialistId, subjectId) => toggleSubject(major._id, specialistId, subjectId)}
                                 onLoadSubjects={(specialistId) => loadSubjectsForSpecialist(major._id, specialistId)}
                                 onLoadCourses={(specialistId, subjectId) => loadCoursesForSubject(major._id, specialistId, subjectId)}
+                                onAddSubject={(specialist) => openCreateSubjectModal(major, specialist)}
+                                onEditSubject={(specialist, subject) => openEditSubjectModal(major, specialist, subject)}
+                                onDeleteSubject={(specialist, subject) =>
+                                  handleDeleteSubject(major._id, specialist._id, subject._id)
+                                }
                                 onEditSpecialist={openEditModal}
                                 onDeleteSpecialist={handleDeleteSpecialist}
+                                onAddCourse={(subject, major, specialist) => openCreateCourseModal(subject, major, specialist)}
+                                onEditCourse={(course, subject, major, specialist) => openEditCourseModal(course, subject, major, specialist)}
+                                onDeleteCourse={(course, subject, major, specialist) => handleDeleteCourse(course, subject, major, specialist)}
+                                onShowInfo={handleShowInfo}
+                                openInfoId={openInfoId}
+                                onCloseInfo={handleCloseInfo}
+                                // Drag and Drop props
+                                onDragStart={handleDragStart}
+                                onDragEnd={handleDragEnd}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                                draggedItem={draggedItem}
+                                dropTarget={dropTarget}
+                                isDragging={isDragging}
+                                pendingMoves={pendingMoves}
                               />
                             );
                           })
@@ -791,7 +1616,7 @@ const Curriculum: React.FC = () => {
           isOpen={showCreateModal}
           onClose={() => {
                 setShowCreateModal(false);
-                setFormData({ name: "", slug: "", description: "", majorId: "" });
+                setFormData({ name: "", description: "", majorId: "" });
           }}
           onSubmit={handleCreateSpecialist}
           title="Create New Specialist"
@@ -807,7 +1632,7 @@ const Curriculum: React.FC = () => {
           onClose={() => {
                 setShowEditModal(false);
                 setEditingSpecialist(null);
-                setFormData({ name: "", slug: "", description: "", majorId: "" });
+                setFormData({ name: "", description: "", majorId: "" });
           }}
           onSubmit={handleEditSpecialist}
           title="Edit Specialist"
@@ -815,6 +1640,84 @@ const Curriculum: React.FC = () => {
           onFormDataChange={setFormData}
           majors={majors}
           submitLabel="Update"
+        />
+
+        <MajorModal
+          isOpen={showMajorModal}
+          title={editingMajorId ? "Edit Major" : "Create Major"}
+          submitLabel={editingMajorId ? "Update" : "Create"}
+          formData={majorFormData}
+          onFormDataChange={setMajorFormData}
+          onSubmit={handleMajorSubmit}
+          onClose={() => {
+            setShowMajorModal(false);
+            setEditingMajorId(null);
+            setMajorFormData({ name: "", description: "" });
+          }}
+        />
+
+        <SubjectModal
+          isOpen={showSubjectModal}
+          title={editingSubjectId ? "Edit Subject" : "Create Subject"}
+          submitLabel={editingSubjectId ? "Update" : "Create"}
+          specialistName={subjectContext?.specialistName}
+          formData={subjectFormData}
+          onFormDataChange={(data) => setSubjectFormData(data)}
+          onSubmit={handleSubjectSubmit}
+          onClose={() => {
+            setShowSubjectModal(false);
+            setEditingSubjectId(null);
+            setSubjectContext(null);
+            setSubjectFormData({
+              name: "",
+              code: "",
+              credits: 3,
+              description: "",
+              isActive: true,
+            });
+          }}
+        />
+
+        <CourseModal
+          isOpen={showCourseModal}
+          title={editingCourseId ? "Edit Course" : "Create Course"}
+          submitLabel={editingCourseId ? "Update" : "Create"}
+          subjectName={courseContext?.subjectName}
+          subjectId={courseContext?.subjectId || ""}
+          formData={courseFormData}
+          onFormDataChange={(data) => setCourseFormData(data)}
+          onSubmit={handleCourseSubmit}
+          onClose={() => {
+            setShowCourseModal(false);
+            setEditingCourseId(null);
+            setCourseContext(null);
+            setCourseFormData({
+              title: "",
+              description: "",
+              startDate: "",
+              endDate: "",
+              teacherIds: [],
+              status: 'draft',
+              isPublished: false,
+              capacity: 50,
+              enrollRequiresApproval: true,
+              semesterId: undefined,
+              logo: null,
+            });
+          }}
+        />
+
+        {/* Sticky Pending Changes Dialog */}
+        <PendingChangesDialog
+          pendingMoves={pendingMoves}
+          onApply={applyPendingMoves}
+          onDiscard={discardPendingMoves}
+          onRemoveMove={removePendingMove}
+          onUndo={undoLastMove}
+          onRedo={redoLastMove}
+          canUndo={pendingMoves.length > 0}
+          canRedo={historyIndex >= 0 && historyIndex < moveHistory.length}
+          loading={loading}
         />
       </div>
     </>

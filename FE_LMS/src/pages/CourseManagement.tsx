@@ -2,18 +2,16 @@ import React, { useState, useEffect } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import { courseService, enrollmentService } from "../services";
+import { userService } from "../services/userService";
 import type { Course } from "../types/course";
 import type { CourseFilters } from "../services/courseService";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
+import CreateCourseForm from "../components/CreateCourseForm.tsx";
 import { Search, Trash } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-// Constant: Subject options for course creation
-const SUBJECT_OPTIONS = [
-  { label: 'Introduction to JavaScript', id: '690ca6e23f693bc2ef752c9c' },
-  { label: 'UI/UX Design Fundamentals', id: '690ca6e23f693bc2ef752c9d' },
-];
+ 
 
 
 const CourseManagement: React.FC = () => {
@@ -37,18 +35,15 @@ const CourseManagement: React.FC = () => {
   const [currentTeacherId, setCurrentTeacherId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: "",
-    code: "",
     subjectId: "",
     description: "",
-    logo: "",
     startDate: "",
     endDate: "",
+    teacherIds: "",
     isPublished: false,
     enrollRequiresApproval: true,
-    capacity: 0,
+    capacity: 50,
     status: "draft",
-    metaLevel: "",
-    metaDuration: "",
   });
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailCourse, setDetailCourse] = useState<Course | null>(null);
@@ -64,7 +59,6 @@ const CourseManagement: React.FC = () => {
   const [enrollLimit, setEnrollLimit] = useState(10);
   const [enrollTotal, setEnrollTotal] = useState(0);
   const [enrollLoading, setEnrollLoading] = useState(false);
-  // Animation state for modal
   const [modalAnim, setModalAnim] = useState<'enter'|'leave'|'none'>('none');
   const [contentPaddingLeft, setContentPaddingLeft] = useState(window.innerWidth >= 640 ? 93 : 0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -72,13 +66,7 @@ const CourseManagement: React.FC = () => {
   const [totalCourses, setTotalCourses] = useState(0);
   const [sortOption, setSortOption] = useState<'name_asc' | 'name_desc' | 'date_asc' | 'date_desc'>('date_desc');
 
-  function openDetail(course: Course) {
-    setDetailCourse(course);
-    setShowDetailModal(true);
-    setModalAnim('enter');
-    // fetch enrollments for this course
-    fetchEnrollments(course._id, 1, enrollLimit);
-  }
+
   function closeModal() {
     setModalAnim('leave');
   }
@@ -102,65 +90,48 @@ const CourseManagement: React.FC = () => {
   // Check if teacher can edit a specific course
   const canTeacherEditCourse = (course: Course) => {
     if (isAdmin) return true;
-    if (isTeacher) {
-      // Use user._id directly (more reliable than currentTeacherId which might not be loaded yet)
-      const teacherId = user?._id || currentTeacherId;
-      if (teacherId) {
-        // Teacher can only edit courses they are assigned to
-        return course.teachers.some(teacher => teacher._id === teacherId);
-      }
+    if (isTeacher && currentTeacherId) {
+      return course.teachers.some(teacher => teacher._id === currentTeacherId);
     }
     return false;
   };
 
-  // Check if teacher can delete a specific course
   const canTeacherDeleteCourse = (course: Course) => {
     if (isAdmin) return true;
-    if (isTeacher) {
-      // Use user._id directly (more reliable than currentTeacherId which might not be loaded yet)
-      const teacherId = user?._id || currentTeacherId;
-      if (teacherId) {
-        // Teacher can delete courses they are assigned to
-        return course.teachers.some(teacher => teacher._id === teacherId);
-      }
+    if (isTeacher && currentTeacherId) {
+      // Teacher can delete courses they are assigned to
+      return course.teachers.some(teacher => teacher._id === currentTeacherId);
     }
     return false;
   };
 
   useEffect(() => {
     fetchCourses();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fetch teacher ID when component loads
-  useEffect(() => {
-    if (isTeacher) {
-      getTeacherIdFromAPI().then(teacherId => {
-        setCurrentTeacherId(teacherId);
-      });
-    }
-  }, [isTeacher]);
 
-  // Helper function to get teacher ID from API
-  const getTeacherIdFromAPI = async () => {
+
+  // Fetch teachers list from users API (role = teacher)
+  const fetchTeachers = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_BASE_API}/users/me`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (response.ok) {
-        const userData = await response.json();
-        return userData._id;
-      }
-    } catch (error) {
-      console.error('Error fetching user from API:', error);
+      const { users } = await userService.getUsers({ role: "teacher", limit: 50 });
+      const normalized = (Array.isArray(users) ? users : []).map(u => ({
+        _id: u._id,
+        username: u.username,
+        email: (u as any)?.email ?? ""
+      }));
+      setAvailableTeachers(normalized);
+    } catch (e) {
+      console.error("Failed to load teachers", e);
+      setAvailableTeachers([]);
     }
-    return null;
   };
+
+  useEffect(() => {
+    fetchTeachers();
+  }, []);
+
+  
 
   const changePageLimit = (limit: number) => {
     setPageLimit(limit);
@@ -193,30 +164,18 @@ const CourseManagement: React.FC = () => {
         if ('total' in result.pagination)
           setTotalCourses(result.pagination.total as number);
       }
-      // Extract unique categories and teachers from courses
+      // Extract unique categories from courses
       const categories = new Map<string, { _id: string; name: string }>();
-      const teachers = new Map<string, { _id: string; username: string; email: string }>();
-      
       (Array.isArray(result.courses) ? result.courses : []).forEach(course => {
         const cat = course.category;
         if (cat && cat._id && !categories.has(cat._id)) {
           categories.set(cat._id, { _id: cat._id, name: cat.name });
         }
-
-        const courseTeachers = Array.isArray(course.teachers) ? course.teachers : [];
-        courseTeachers.forEach(teacher => {
-          if (teacher && teacher._id && !teachers.has(teacher._id)) {
-            teachers.set(teacher._id, {
-              _id: teacher._id,
-              username: teacher.username ?? "",
-              email: teacher.email ?? ""
-            });
-          }
-        });
       });
       
       setAvailableCategories(Array.from(categories.values()));
-      setAvailableTeachers(Array.from(teachers.values()));
+      // NOTE: KHÔNG ghi đè availableTeachers ở đây.
+      // availableTeachers được load từ API /users?role=teacher trong fetchTeachers()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to fetch courses");
     } finally {
@@ -262,101 +221,37 @@ const CourseManagement: React.FC = () => {
     setEditingCourse(course);
     setFormData({
       title: "",
-      code: "",
       subjectId: "",
       description: "",
-      logo: "",
       startDate: "",
       endDate: "",
+      teacherIds: "",
       isPublished: false,
       enrollRequiresApproval: true,
-      capacity: 0,
-      status: "draft",
-      metaLevel: "",
-      metaDuration: "", 
+      capacity: 50,
+      status: "draft", 
     });
     setSelectedTeachers(course.teachers.map(t => t._id));
     setCategorySearchTerm(course.category?.name || "");
     setShowEditModal(true);
   };
-  console.log('courses', courses);
-  const handleCreateCourse = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate according to new schema
-
-
-    try {
-      // If teacher is creating course, add their ID from state
-      let teachersToAssign = selectedTeachers;
-      if (isTeacher && currentTeacherId && !teachersToAssign.includes(currentTeacherId)) {
-        teachersToAssign = [...teachersToAssign, currentTeacherId];
-      }
-
-      const payload = {
-        title: formData.title,
-        description: formData.description,
-        subjectId: formData.subjectId,
-        startDate: formData.startDate || undefined,
-        endDate: formData.endDate || undefined,
-        status: formData.status,
-        teacherIds: '69099fd7e974ab828624f093',
-        isPublished: formData.isPublished,
-        capacity: formData.capacity,
-        enrollRequiresApproval: formData.enrollRequiresApproval,
-        meta: {
-          level: formData.metaLevel,
-          duration: formData.metaDuration,
-        },
-        logo: formData.logo || undefined,
-      };
-
-      // Send to API with relaxed typing
-      await courseService.createCourse(payload as any);
-
-      setShowCreateModal(false);
-      setFormData({
-        title: "",
-        code: "",
-        subjectId: "",
-        description: "",
-        logo: "",
-        startDate: "",
-        endDate: "",
-        isPublished: false,
-        enrollRequiresApproval: true,
-        capacity: 0,
-        status: "draft",
-        metaLevel: "",
-        metaDuration: "",
-      });
-      setSelectedTeachers([]);
-      setTeacherSearchTerm("");
-      setCategorySearchTerm("");
-      setShowCategoryDropdown(false);
-      await fetchCourses();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to create course");
-    }
-  };
+  
 
   const handleUpdateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCourse) return;
     
-    // For teachers, they are automatically assigned, so we don't need to check selectedTeachers.length
-    const hasTeachers = isTeacher ? true : selectedTeachers.length > 0;
     
 
     
     try {
       await courseService.updateCourse(editingCourse._id, {
         title: formData.title,
-        code: formData.code,
         description: formData.description,
         isPublished: formData.isPublished,
         capacity: formData.capacity,
         teachers: selectedTeachers,
+
       });
       setShowEditModal(false);
       setEditingCourse(null);
@@ -950,7 +845,6 @@ const CourseManagement: React.FC = () => {
         </main>
       </div>
 
-      {/* Create Course Modal */}
       {showCreateModal && (
         <div 
           className={`fixed inset-0 z-[9999] p-4 flex items-center justify-center transition-all duration-300 bg-black/40 ${modalAnim === 'enter' ? 'modal-fade-enter' : modalAnim === 'leave' ? 'modal-fade-leave' : ''}`}
@@ -969,7 +863,7 @@ const CourseManagement: React.FC = () => {
           >
             <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid #eee' }}>
               <h3 className="text-xl font-semibold" style={{ color: darkMode ? '#ffffff' : '#111827' }}>
-                Create Course
+                Create New Course
               </h3>
               <button
                 onClick={() => {
@@ -980,291 +874,21 @@ const CourseManagement: React.FC = () => {
                 className="px-3 py-1 rounded-lg text-sm"
                 style={{ backgroundColor: darkMode ? '#1f2937' : '#f3f4f6', color: darkMode ? '#e5e7eb' : '#111827' }}
               >
-                Close
+                Đóng
               </button>
             </div>
-
-            <form onSubmit={handleCreateCourse} className="px-6 py-6">
-              {/* General */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    Title *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={e => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                    placeholder="Advanced React Development"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    Subject ID
-                  </label>
-                  <select
-                    value={formData.subjectId ?? ''}
-                    onChange={e => setFormData({ ...formData, subjectId: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                    required
-                  >
-                    <option value="" disabled>Chọn môn học</option>
-                    {SUBJECT_OPTIONS.map(opt => (
-                      <option key={opt.id} value={opt.id}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    Logo URL or Path
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.logo}
-                    onChange={e => setFormData({ ...formData, logo: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                    placeholder="https://storage.../logo.jpg"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    Description
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={e => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border h-24"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                    placeholder="Learn advanced React patterns..."
-                  />
-                </div>
-              </div>
-
-              {/* Schedule */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={e => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    End Date
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={e => setFormData({ ...formData, endDate: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    Capacity
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={formData.capacity}
-                    onChange={e => setFormData({ ...formData, capacity: Number(e.target.value) })}
-                    className="w-full px-4 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                    placeholder="50"
-                  />
-                </div>
-              </div>
-
-              {/* Instructors */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium mb-3" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                  Select Teachers * ({isTeacher && user?._id ? 1 : selectedTeachers.length} selected)
-                  {isTeacher && (
-                    <span className="text-xs text-blue-500 ml-2">
-                      (You are automatically assigned as the teacher)
-                    </span>
-                  )}
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {(isTeacher
-                    ? availableTeachers.filter(t => t._id === currentTeacherId)
-                    : availableTeachers
-                  ).map(t => {
-                    const checked = selectedTeachers.includes(t._id);
-                    return (
-                      <label key={t._id} className="flex items-center gap-3 px-3 py-2 rounded-lg border cursor-pointer"
-                        style={{
-                          backgroundColor: darkMode ? 'rgba(31,41,55,0.6)' : '#ffffff',
-                          borderColor: darkMode ? 'rgba(75,85,99,0.3)' : '#e5e7eb',
-                          color: darkMode ? '#e5e7eb' : '#111827'
-                        }}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(e) => {
-                            setSelectedTeachers(prev =>
-                              e.target.checked ? [...prev, t._id] : prev.filter(id => id !== t._id)
-                            );
-                          }}
-                          disabled={isTeacher && t._id === currentTeacherId}
-                        />
-                        <div className="flex flex-col">
-                          <span className="font-medium">{t.username}</span>
-                          <span className="text-xs opacity-70">{t.email}</span>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Meta & Publish */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    Status
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={e => setFormData({ ...formData, status: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="active">Active</option>
-                    <option value="archived">Archived</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    Meta Level
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.metaLevel}
-                    onChange={e => setFormData({ ...formData, metaLevel: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                    placeholder="intermediate"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    Meta Duration
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.metaDuration}
-                    onChange={e => setFormData({ ...formData, metaDuration: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                    placeholder="6 months"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <label className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={formData.isPublished}
-                    onChange={e => setFormData({ ...formData, isPublished: e.target.checked })}
-                  />
-                  <span style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>Published</span>
-                </label>
-                <label className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={formData.enrollRequiresApproval}
-                    onChange={e => setFormData({ ...formData, enrollRequiresApproval: e.target.checked })}
-                  />
-                  <span style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>Enroll requires approval</span>
-                </label>
-              </div>
-
-              <div className="flex justify-end gap-3 px-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setCategorySearchTerm("");
-                    setShowCategoryDropdown(false);
-                  }}
-                  className="px-4 py-2 rounded-lg"
-                  style={{ backgroundColor: darkMode ? '#1f2937' : '#e5e7eb', color: darkMode ? '#e5e7eb' : '#111827' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-lg text-white font-medium transition-all duration-200"
-                  style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#5b21b6' : '#4338ca';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#4c1d95' : '#4f46e5';
-                  }}
-                >
-                  Create
-                </button>
-              </div>
-            </form>
+            <CreateCourseForm
+              darkMode={darkMode}
+              onClose={() => {
+                setShowCreateModal(false);
+                setCategorySearchTerm("");
+                setShowCategoryDropdown(false);
+              }}
+              onCreated={async () => {
+                await fetchCourses();
+              }}
+              presetTeacherId={isTeacher && currentTeacherId ? currentTeacherId : undefined}
+            />
           </div>
         </div>
       )}
@@ -1314,20 +938,7 @@ const CourseManagement: React.FC = () => {
                     required
                   />
                 </div>
-                <div>
-                  <label className="block mb-2 font-semibold">Code</label>
-                  <input
-                    type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                  />
-                </div>
+        
                 <div>
                   <label className="block mb-2 font-semibold">Capacity</label>
                   <input
@@ -1711,4 +1322,3 @@ const CourseManagement: React.FC = () => {
 };
 
 export default CourseManagement;
-

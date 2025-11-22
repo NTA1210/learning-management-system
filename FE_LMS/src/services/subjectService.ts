@@ -24,6 +24,19 @@ export interface SubjectListResponse {
   };
 }
 
+export interface CreateSubjectData {
+  name: string;
+  code: string;
+  slug: string;
+  credits?: number;
+  description?: string;
+  specialistIds?: string[];
+  prerequisites?: string[];
+  isActive?: boolean;
+}
+
+export interface UpdateSubjectData extends Partial<CreateSubjectData> {}
+
 export const subjectService = {
   // Get all subjects with optional filters
   getAllSubjects: async (filters?: SubjectFilters): Promise<SubjectListResponse> => {
@@ -72,6 +85,23 @@ export const subjectService = {
       throw new Error("Subject not found in response");
     }
     return response.data;
+  },
+
+  // Create subject
+  createSubject: async (data: CreateSubjectData): Promise<Subject> => {
+    const response = await http.post<Subject>("/subjects", data);
+    return response.data;
+  },
+
+  // Update subject by ID
+  updateSubject: async (subjectId: string, data: UpdateSubjectData): Promise<Subject> => {
+    const response = await http.patch<Subject>(`/subjects/${subjectId}`, data);
+    return response.data;
+  },
+
+  // Delete subject by ID
+  deleteSubject: async (subjectId: string): Promise<void> => {
+    await http.del(`/subjects/${subjectId}`);
   },
 };
 

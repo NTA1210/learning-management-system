@@ -6,10 +6,12 @@ interface ActionMenuProps {
   isOpen: boolean;
   onToggle: () => void;
   onClose: () => void;
-  type: 'major' | 'specialist';
+  type: "major" | "specialist" | "subject" | "course";
   onEdit?: () => void;
   onDelete?: () => void;
   onAddSpecialist?: () => void;
+  onAddSubject?: () => void;
+  onAddCourse?: () => void;
   onReload?: () => void;
 }
 
@@ -21,6 +23,8 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
   onEdit,
   onDelete,
   onAddSpecialist,
+  onAddSubject,
+  onAddCourse,
   onReload,
 }) => {
   const { darkMode } = useTheme();
@@ -65,10 +69,10 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
             borderRadius: "8px",
             boxShadow: darkMode ? "0 4px 6px rgba(0,0,0,0.3)" : "0 4px 6px rgba(0,0,0,0.1)",
             zIndex: 1000,
-            minWidth: type === 'major' ? "180px" : "150px",
+            minWidth: type === "major" ? "190px" : "160px",
           }}
         >
-          {type === 'major' && onAddSpecialist && (
+          {type === "major" && onAddSpecialist && (
             <button
               className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
               style={{ color: darkMode ? "#d1d5db" : "#374151", fontSize: "14px" }}
@@ -81,7 +85,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
               Add Specialist
             </button>
           )}
-          {type === 'major' && onReload && (
+          {type === "major" && onReload && (
             <button
               className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
               style={{ color: darkMode ? "#d1d5db" : "#374151", fontSize: "14px" }}
@@ -93,7 +97,46 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
               ⟳ Reload Specialists
             </button>
           )}
-          {type === 'specialist' && onEdit && (
+          {type === "major" && onEdit && (
+            <button
+              className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
+              style={{ color: darkMode ? "#d1d5db" : "#374151", fontSize: "14px" }}
+              onClick={() => {
+                onEdit();
+                onClose();
+              }}
+            >
+              <Edit size={16} />
+              Edit Major
+            </button>
+          )}
+          {type === "major" && onDelete && (
+            <button
+              className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
+              style={{ color: darkMode ? "#fca5a5" : "#dc2626", fontSize: "14px" }}
+              onClick={() => {
+                onDelete();
+                onClose();
+              }}
+            >
+              <Trash2 size={16} />
+              Delete Major
+            </button>
+          )}
+          {type === "specialist" && onAddSubject && (
+            <button
+              className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
+              style={{ color: darkMode ? "#d1d5db" : "#374151", fontSize: "14px" }}
+              onClick={() => {
+                onAddSubject();
+                onClose();
+              }}
+            >
+              <Plus size={16} />
+              Add Subject
+            </button>
+          )}
+          {type === "specialist" && onEdit && (
             <button
               className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
               style={{
@@ -109,7 +152,7 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
               Edit
             </button>
           )}
-          {type === 'specialist' && onDelete && (
+          {type === "specialist" && onDelete && (
             <button
               className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
               style={{
@@ -123,6 +166,71 @@ const ActionMenu: React.FC<ActionMenuProps> = ({
             >
               <Trash2 size={16} />
               Delete
+            </button>
+          )}
+          {type === "subject" && onAddCourse && (
+            <button
+              className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
+              style={{ color: darkMode ? "#d1d5db" : "#374151", fontSize: "14px" }}
+              onClick={() => {
+                onAddCourse();
+                onClose();
+              }}
+            >
+              <Plus size={16} />
+              Add Course
+            </button>
+          )}
+          {type === "subject" && onEdit && (
+            <button
+              className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
+              style={{ color: darkMode ? "#d1d5db" : "#374151", fontSize: "14px" }}
+              onClick={() => {
+                onEdit();
+                onClose();
+              }}
+            >
+              <Edit size={16} />
+              Edit Subject
+            </button>
+          )}
+          {type === "subject" && onDelete && (
+            <button
+              className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
+              style={{ color: darkMode ? "#fca5a5" : "#dc2626", fontSize: "14px" }}
+              onClick={() => {
+                onDelete();
+                onClose();
+              }}
+            >
+              <Trash2 size={16} />
+              Delete Subject
+            </button>
+          )}
+          {type === "course" && onEdit && (
+            <button
+              className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
+              style={{ color: darkMode ? "#d1d5db" : "#374151", fontSize: "14px" }}
+              onClick={() => {
+                onEdit();
+                onClose();
+              }}
+            >
+              <Edit size={16} />
+              Edit Course
+            </button>
+          )}
+          {type === "course" && onDelete && (
+            <button
+              className="w-full text-left px-4 py-2 hover:bg-opacity-20 transition-colors flex items-center gap-2"
+              style={{ color: darkMode ? "#fca5a5" : "#dc2626", fontSize: "14px" }}
+              onClick={() => {
+                onDelete();
+                onClose();
+              }}
+            >
+              <Trash2 size={16} />
+              Delete Course
             </button>
           )}
         </div>

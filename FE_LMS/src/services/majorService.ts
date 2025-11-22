@@ -9,6 +9,17 @@ export interface MajorFilters {
   sortOrder?: "asc" | "desc";
 }
 
+export interface CreateMajorData {
+  name: string;
+  slug: string;
+  description?: string;
+}
+
+export interface UpdateMajorData {
+  name?: string;
+  description?: string;
+}
+
 export const majorService = {
   // Get all majors with optional filters
   getAllMajors: async (filters?: MajorFilters): Promise<{ majors: Major[]; pagination: unknown }> => {
@@ -34,8 +45,25 @@ export const majorService = {
 
   // Get a single major by ID
   getMajorById: async (id: string): Promise<Major> => {
-    const response = await http.get<Major>(`/majors/${id}`);
+    const response = await http.get<Major>(`/majors/id/${id}`);
     return response.data;
+  },
+
+  // Create a new major
+  createMajor: async (data: CreateMajorData): Promise<Major> => {
+    const response = await http.post<Major>("/majors", data);
+    return response.data;
+  },
+
+  // Update an existing major by ID
+  updateMajor: async (id: string, data: UpdateMajorData): Promise<Major> => {
+    const response = await http.patch<Major>(`/majors/id/${id}`, data);
+    return response.data;
+  },
+
+  // Delete a major by ID
+  deleteMajor: async (id: string): Promise<void> => {
+    await http.del(`/majors/id/${id}`);
   },
 };
 

@@ -53,7 +53,6 @@ export default function CourseDetail() {
         setLoading(true);
         const data = await courseService.getCourseById(id);
         if (mounted) {
-          // nới lỏng kiểu để gán các field từ backend thực tế
           const anyData = data as unknown as ApiCourse;
           setCourse(anyData);
           setError("");
@@ -143,7 +142,7 @@ export default function CourseDetail() {
               onClick={() => navigate(-1)}
               className="bg-[#525fe1] text-white px-5 py-2 rounded-lg hover:scale-105 transition"
             >
-              Quay lại
+              Back
             </button>
           </div>
         ) : !course ? (

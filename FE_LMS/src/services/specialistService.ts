@@ -10,7 +10,6 @@ export interface CreateSpecialistData {
 
 export interface UpdateSpecialistData {
   name?: string;
-  slug?: string;
   description?: string;
   majorId?: string;
   isActive?: boolean;
