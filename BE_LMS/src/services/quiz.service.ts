@@ -1,12 +1,12 @@
-import { BAD_REQUEST, FORBIDDEN, NOT_FOUND } from "@/constants/http";
-import { CourseModel, QuizModel } from "@/models";
-import { IQuiz, Role } from "@/types";
-import appAssert from "@/utils/appAssert";
-import { CreateQuiz, GetQuizzes, UpdateQuiz } from "@/validators/quiz.schemas";
-import { checkProperQuestionType } from "./quizQuestion.service";
-import { TImage } from "@/models/quiz.model";
-import { getKeyFromPublicUrl, removeFiles } from "@/utils/uploadFile";
-import mongoose from "mongoose";
+import { BAD_REQUEST, FORBIDDEN, NOT_FOUND } from '@/constants/http';
+import { CourseModel, QuizModel } from '@/models';
+import { IQuiz, Role } from '@/types';
+import appAssert from '@/utils/appAssert';
+import { CreateQuiz, GetQuizzes, UpdateQuiz } from '@/validators/quiz.schemas';
+import { checkProperQuestionType } from './quizQuestion.service';
+import { TImage } from '@/models/quiz.model';
+import { getKeyFromPublicUrl, removeFiles } from '@/utils/uploadFile';
+import mongoose from 'mongoose';
 
 /**
  * Create a new quiz.
@@ -27,17 +27,20 @@ export const createQuiz = async (
     // questionIds,
     snapshotQuestions,
   }: CreateQuiz,
-  userId: mongoose.Types.ObjectId
+  userId: mongoose.Types.ObjectId,
+  role: Role
 ): Promise<IQuiz> => {
   const course = await CourseModel.findById(courseId);
-  appAssert(course, NOT_FOUND, "Course not found");
+  appAssert(course, NOT_FOUND, 'Course not found');
+
+  //check whether user is teacher of course
+  if (role === Role.TEACHER) {
+    const isTeacherOfCourse = course.teacherIds.some((teacherId) => teacherId.equals(userId));
+    appAssert(isTeacherOfCourse, FORBIDDEN, 'You are not a teacher of this course');
+  }
 
   //check endTime > startTime
-  appAssert(
-    startTime < endTime,
-    BAD_REQUEST,
-    "Start time must be before end time"
-  );
+  appAssert(startTime < endTime, BAD_REQUEST, 'Start time must be before end time');
 
   if (snapshotQuestions && snapshotQuestions.length > 0) {
     for (let question of snapshotQuestions) {
@@ -83,7 +86,7 @@ export const updateQuiz = async ({
   snapshotQuestions,
 }: UpdateQuiz) => {
   const quiz = await QuizModel.findById(quizId);
-  appAssert(quiz, NOT_FOUND, "Quiz not found");
+  appAssert(quiz, NOT_FOUND, 'Quiz not found');
 
   let deletedImages: string[] = [];
   const map = new Map<string, number>();
@@ -98,9 +101,7 @@ export const updateQuiz = async ({
       );
   }
 
-  const updated = snapshotQuestions.filter(
-    (q) => q.isDirty && !q.isNew && !q.isDeleted
-  );
+  const updated = snapshotQuestions.filter((q) => q.isDirty && !q.isNew && !q.isDeleted);
   const added = snapshotQuestions.filter((q) => q.isNew && !q.isDeleted);
   const deleted = snapshotQuestions.filter((q) => q.isDeleted && !q.isNew);
 
@@ -125,10 +126,7 @@ export const updateQuiz = async ({
     // Xóa ảnh
     deletedImages.push(
       ...oldImages
-        .filter(
-          (img: TImage) =>
-            !newImages.some((newImg) => newImg.url === img.url) && !img.fromDB
-        )
+        .filter((img: TImage) => !newImages.some((newImg) => newImg.url === img.url) && !img.fromDB)
         .map((img: TImage) => img.url)
     );
   }
@@ -163,7 +161,7 @@ export const updateQuiz = async ({
     await removeFiles(deletedImages.map((img) => getKeyFromPublicUrl(img)));
   }
 
-  console.log("Deleted : ", deletedImages.length);
+  console.log('Deleted : ', deletedImages.length);
 
   quiz.title = title ?? quiz.title;
   quiz.description = description ?? quiz.description;
@@ -193,94 +191,15 @@ export const deleteQuiz = async ({
   userId: mongoose.Types.ObjectId;
 }) => {
   const quiz = await QuizModel.findById(quizId);
-  appAssert(quiz, NOT_FOUND, "Quiz not found");
+  appAssert(quiz, NOT_FOUND, 'Quiz not found');
 
-  const isOnGoing =
-    quiz.startTime.getTime() <= Date.now() &&
-    quiz.endTime.getTime() >= Date.now();
+  const isOnGoing = quiz.startTime.getTime() <= Date.now() && quiz.endTime.getTime() >= Date.now();
 
-  appAssert(isOnGoing, BAD_REQUEST, "Cannot delete a quiz that is on going");
+  appAssert(isOnGoing, BAD_REQUEST, 'Cannot delete a quiz that is on going');
 
   quiz.deletedAt = new Date();
   quiz.deletedBy = userId;
   await quiz.save();
 
   return quiz;
-};
-
-/**
- * Get quizzes based on the provided parameters.
- * @param input - Parameters to get quizzes.
- * @param role - Role of the user.
- * @param userId - ID of the user, required for students.
- * @returns A list of quizzes filtered based on the provided parameters.
- * @throws If the course is not found.
- * @throws If the user is not a teacher of the course.
- * @throws If courseId is not provided for students.
- */
-export const getQuizzes = async (
-  input: GetQuizzes,
-  role: string,
-  userId?: mongoose.Types.ObjectId
-) => {
-  const { courseId, isPublished, isCompleted, isDeleted } = input;
-  const filter: any = {};
-  if (courseId) {
-    const course = await CourseModel.findById(courseId);
-    appAssert(course, NOT_FOUND, "Course not found");
-
-    if (role === Role.TEACHER) {
-      const isTeacherOfCourse = course.teacherIds.some((teacherId) =>
-        teacherId.equals(userId)
-      );
-      appAssert(
-        isTeacherOfCourse,
-        FORBIDDEN,
-        "You are not a teacher of this course"
-      );
-    }
-
-    filter.courseId = courseId;
-
-    if (role === Role.STUDENT) {
-      filter.isPublished = true;
-      filter.deletedAt = { $exists: false };
-    } else {
-      if (isPublished !== undefined) {
-        filter.isPublished = isPublished;
-      }
-      if (isDeleted !== undefined) {
-        if (isDeleted) {
-          filter.deletedAt = { $exists: true };
-        } else {
-          filter.deletedAt = { $exists: false };
-        }
-      }
-      if (isCompleted !== undefined) {
-        filter.endTime = isCompleted
-          ? { $lte: new Date() }
-          : { $gt: new Date() };
-      }
-    }
-  } else {
-    if (role === Role.STUDENT) {
-      appAssert(userId, FORBIDDEN, "courseId is required");
-    }
-  }
-
-  const quizzes = await QuizModel.find(filter).sort({ createdAt: -1 }).lean();
-
-  for (let quiz of quizzes) {
-    if (quiz.endTime.getTime() < Date.now()) {
-      (quiz as any).isCompleted = true;
-    } else {
-      (quiz as any).isCompleted = false;
-    }
-
-    if (quiz.deletedAt) {
-      (quiz as any).isDeleted = true;
-    }
-  }
-
-  return quizzes;
 };

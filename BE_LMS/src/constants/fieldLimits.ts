@@ -1,0 +1,2 @@
+export const RECOMMENDED_CLASS_LIMIT = 35;
+export const ACTUAL_MAX_CLASS_LIMIT = 50;

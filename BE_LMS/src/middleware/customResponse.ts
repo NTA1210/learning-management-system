@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { IApiResponse } from "../types/apiResponse.type";
+import { IApiResponse } from "../types/dto/apiResponse.type";
 import { nowLocal, nowTZone } from "../utils/time";
 
 const customResponse = (req: Request, res: Response, next: NextFunction) => {
