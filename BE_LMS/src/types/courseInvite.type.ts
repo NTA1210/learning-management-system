@@ -5,7 +5,7 @@ export default interface ICourseInvite
   tokenHash: string; // SHA256 hash của token gốc
   courseId: mongoose.Types.ObjectId;
   createdBy: mongoose.Types.ObjectId; // Teacher/Admin tạo link
-  invitedEmail: string;
+  invitedEmails: string[];
   maxUses: number | null; // null = không giới hạn
   usedCount: number;
   expiresAt: Date;
