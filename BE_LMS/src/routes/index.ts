@@ -1,3 +1,4 @@
+export { default as announcementRoutes } from './announcement.route';
 export { default as assignmentRoutes } from './assignment.route';
 export { default as authRoutes } from './auth.route';
 export { default as courseRoutes } from './course.route';
@@ -19,3 +20,4 @@ export { default as quizRoutes } from './quiz.route';
 export { default as subjectRoutes } from './subject.route';
 export { default as scheduleRoutes } from './schedule.route';
 export { default as attendanceRoutes } from './attendance.route';
+export { default as quizAttemptRoutes } from './quizAttempt.route';
