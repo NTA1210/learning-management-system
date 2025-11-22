@@ -16,3 +16,4 @@ export { default as LessonFormModal } from './lessons/LessonFormModal';
 export { default as LessonSummary } from './materials/LessonSummary';
 export { default as MaterialCard } from './materials/MaterialCard';
 export { default as MaterialFormModal } from './materials/MaterialFormModal';
+export { default as AverageRating } from './AverageRating';
