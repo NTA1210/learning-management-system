@@ -89,20 +89,8 @@ export const createCourseInvite = async (
 
   const inviteLink = `${APP_ORIGIN}/courses/join?token=${token}`;
 
-  //Gửi email (Song song)
-  for (const email of uniqueEmails) {
-    const { error } = await sendMail({
-      to: email,
-      ...getCourseInviteTemplate(inviteLink, course.title),
-    });
-
-    if (error) {
-      console.error(`Failed to send invite to ${email}`, error);
-    }
-
-    // Delay 500ms (hoặc 1000ms tùy giới hạn) giữa các lần gửi
-    await new Promise((resolve) => setTimeout(resolve, 500));
-  }
+  // Gửi email background theo lô (Batch)
+  void sendInvitesWithBatch(uniqueEmails, inviteLink, course.title);
 
   return {
     invite,
@@ -110,6 +98,55 @@ export const createCourseInvite = async (
     invitedCount: uniqueEmails.length
   };
 };
+// Helper function để gửi email invite 
+const sendCourseInviteEmail = async (
+  email: string,
+  inviteLink: string,
+  courseTitle: string
+) => {
+  try {
+    const { error } = await sendMail({
+      to: email,
+      ...getCourseInviteTemplate(inviteLink, courseTitle),
+    });
+
+    if (error) {
+      console.error(`Failed to send invite to ${email}`, error);
+    }
+  } catch (err) {
+    console.error(`Error when sending invite to ${email}`, err);
+  }
+};
+
+// Helper: Sleep function
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Helper: Gửi email theo lô (Batch)
+const sendInvitesWithBatch = async (
+  emails: string[],
+  inviteLink: string,
+  courseTitle: string
+) => {
+  const BATCH_SIZE = 2;      // Mỗi lô gửi 2 email song song
+  const BATCH_DELAY = 700;   // Nghỉ 700ms giữa các lô
+
+  for (let i = 0; i < emails.length; i += BATCH_SIZE) {
+    const batch = emails.slice(i, i + BATCH_SIZE);
+
+    // Gửi 1 lô song song
+    await Promise.all(
+      batch.map((email) =>
+        sendCourseInviteEmail(email, inviteLink, courseTitle)
+      )
+    );
+
+    // Nếu chưa phải lô cuối thì nghỉ chút
+    if (i + BATCH_SIZE < emails.length) {
+      await sleep(BATCH_DELAY);
+    }
+  }
+};
+
 
 /**
  * Yêu cầu nghiệp vụ:
