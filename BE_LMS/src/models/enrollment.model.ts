@@ -1,34 +1,30 @@
-import mongoose from "mongoose";
-import { IEnrollment } from "../types";
-import {
-  EnrollmentMethod,
-  EnrollmentRole,
-  EnrollmentStatus,
-} from "../types/enrollment.type";
+import mongoose from 'mongoose';
+import { IEnrollment } from '../types';
+import { EnrollmentMethod, EnrollmentRole, EnrollmentStatus } from '../types/enrollment.type';
 
 const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
   {
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
       index: true,
     },
     courseId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Course",
+      ref: 'Course',
       required: true,
       index: true,
     },
     status: {
       type: String,
       enum: [
-        EnrollmentStatus.PENDING, //enrollment chưa được duyệt vào nhóm
-        EnrollmentStatus.APPROVED, //enrollment đa được duyệt vào nhóm
-        EnrollmentStatus.REJECTED, //enrollment bị từ chối duyệt vào nhóm
-        EnrollmentStatus.CANCELLED, // student hủy enrollment
-        EnrollmentStatus.DROPPED, // student bị đánh rớt khóa học
-        EnrollmentStatus.COMPLETED, // student hoàn thành khóa học
+        EnrollmentStatus.PENDING,
+        EnrollmentStatus.APPROVED,
+        EnrollmentStatus.REJECTED,
+        EnrollmentStatus.CANCELLED,
+        EnrollmentStatus.DROPPED,
+        EnrollmentStatus.COMPLETED,
       ],
       default: EnrollmentStatus.PENDING,
     },
@@ -44,12 +40,12 @@ const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
     },
     role: {
       type: String,
-      enum: [EnrollmentRole.STUDENT, EnrollmentRole.AUDITOR],
+      enum: EnrollmentRole,
       default: EnrollmentRole.STUDENT,
     },
     respondedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
     },
     respondedAt: { type: Date },
     note: { type: String },
@@ -65,14 +61,11 @@ const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
 );
 
 //indexes
+// One student can only enroll in one class per course (not multiple classes of same course)
 EnrollmentSchema.index({ studentId: 1, courseId: 1 }, { unique: true });
 EnrollmentSchema.index({ studentId: 1, courseId: 1, status: 1 });
 EnrollmentSchema.index({ studentId: 1, status: 1 });
 
-const EnrollmentModel = mongoose.model<IEnrollment>(
-  "Enrollment",
-  EnrollmentSchema,
-  "enrollments"
-);
+const EnrollmentModel = mongoose.model<IEnrollment>('Enrollment', EnrollmentSchema, 'enrollments');
 
 export default EnrollmentModel;

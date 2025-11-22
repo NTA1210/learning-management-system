@@ -1,8 +1,6 @@
-import mongoose from "mongoose";
-import { AttemptStatus, IQuestionAnswer, IQuiz, IQuizAttempt } from "../types";
-import QuizModel from "./quiz.model";
-import appAssert from "../utils/appAssert";
-import { NOT_FOUND } from "../constants/http";
+import mongoose from 'mongoose';
+import { AttemptStatus, IQuestionAnswer, IQuiz, IQuizAttempt } from '../types';
+import { Answer } from '@/validators/quizAttempt.schemas';
 
 const QuestionAnswerSchema = new mongoose.Schema<IQuestionAnswer>(
   {
@@ -18,85 +16,93 @@ const QuizAttemptSchema = new mongoose.Schema<IQuizAttempt>(
   {
     quizId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Quiz",
+      ref: 'Quiz',
       required: true,
       index: true,
     },
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
       index: true,
     },
     startedAt: { type: Date, default: Date.now },
     submittedAt: { type: Date },
-    durationSeconds: { type: Number },
+    durationSeconds: { type: Number, default: 0 },
     answers: {
       type: [QuestionAnswerSchema],
       default: [],
     },
-    score: { type: Number },
+    score: { type: Number, default: 0 },
     status: {
       type: String,
-      enum: [
-        AttemptStatus.COMPLETED,
-        AttemptStatus.IN_PROGRESS,
-        AttemptStatus.SUBMITTED,
-        AttemptStatus.ABANDONED,
-      ],
+      enum: AttemptStatus,
       default: AttemptStatus.IN_PROGRESS,
     },
     ipAddress: { type: String },
     userAgent: { type: String },
+    rank: { type: Number },
   },
   { timestamps: true }
 );
 
 //Indexes
 QuizAttemptSchema.index({ quizId: 1, studentId: 1, startAt: -1 });
+QuizAttemptSchema.index({ quizId: 1, studentId: 1 }, { unique: true });
 QuizAttemptSchema.index({ studentId: 1, status: 1 });
 QuizAttemptSchema.index({ quizId: 1, submittedAt: -1 });
 
 /** 🔥 Method chấm điểm */
-QuizAttemptSchema.methods.grade = async function () {
+QuizAttemptSchema.methods.grade = async function (answers: Answer[], quiz: IQuiz) {
   const attempt = this as IQuizAttempt;
-
-  const quiz = await QuizModel.findById(attempt.quizId);
-  appAssert(quiz, NOT_FOUND, "Quiz not found");
-
   let totalScore = 0;
 
   // Duyệt qua từng câu trả lời
-  attempt.answers!.forEach((ans) => {
+  answers!.forEach((ans) => {
     const question = quiz.snapshotQuestions.find(
-      (q: any) => q._id.toString() === ans.questionId.toString()
+      (q: any) => q.id.toString() === ans.questionId.toString()
     );
 
     if (!question) return;
 
     // So sánh mảng: người dùng chọn == đáp án đúng
-    const isCorrect =
-      JSON.stringify(ans.answer) === JSON.stringify(question.correctOptions);
+    const isCorrect = JSON.stringify(ans.answer) === JSON.stringify(question.correctOptions);
 
     ans.correct = isCorrect;
     ans.pointsEarned = isCorrect ? question.points : 0;
 
     if (isCorrect) totalScore += question.points;
   });
+  const totalQuestions = quiz.snapshotQuestions.length;
+  const totalQuizScore = quiz.snapshotQuestions.reduce((total, q) => total + q.points, 0);
+  const scorePercentage = (totalScore / totalQuizScore) * 10;
 
-  attempt.score = totalScore;
-  attempt.status = AttemptStatus.COMPLETED;
+  attempt.score = scorePercentage;
+  attempt.status = AttemptStatus.SUBMITTED;
   attempt.submittedAt = new Date();
+  attempt.answers = answers;
+  attempt.durationSeconds = (attempt.submittedAt.getTime() - attempt.startedAt.getTime()) / 1000;
+
+  const failedQuestions = answers.filter((a) => !a.correct).length;
+  const passedQuestions = answers.filter((a) => a.correct).length;
 
   await attempt.save();
-  return { totalScore, answers: attempt.answers };
+  return {
+    totalQuestions,
+    totalScore,
+    totalQuizScore,
+    scorePercentage,
+    failedQuestions,
+    passedQuestions,
+    answers,
+  };
 };
 
 QuizAttemptSchema.index({ quizId: 1, studentId: 1 });
 const QuizAttemptModel = mongoose.model<IQuizAttempt>(
-  "QuizAttempt",
+  'QuizAttempt',
   QuizAttemptSchema,
-  "quizAttempts"
+  'quizAttempts'
 );
 
 export default QuizAttemptModel;

@@ -1,12 +1,27 @@
-import { BAD_REQUEST, FORBIDDEN, NOT_FOUND } from "@/constants/http";
-import { CourseModel, QuizModel } from "@/models";
-import { IQuiz, Role } from "@/types";
-import appAssert from "@/utils/appAssert";
-import { CreateQuiz, GetQuizzes, UpdateQuiz } from "@/validators/quiz.schemas";
-import { checkProperQuestionType } from "./quizQuestion.service";
-import { TImage } from "@/models/quiz.model";
-import { getKeyFromPublicUrl, removeFiles } from "@/utils/uploadFile";
-import mongoose from "mongoose";
+import { BAD_REQUEST, FORBIDDEN, NOT_FOUND } from '@/constants/http';
+import { CourseModel, EnrollmentModel, QuizAttemptModel, QuizModel } from '@/models';
+import {
+  AttemptStatus,
+  EnrollmentStatus,
+  ICourse,
+  IQuiz,
+  IQuizAttempt,
+  IUser,
+  Role,
+} from '@/types';
+import appAssert from '@/utils/appAssert';
+import { CreateQuiz, UpdateQuiz } from '@/validators/quiz.schemas';
+import { checkProperQuestionType } from './quizQuestion.service';
+import { TImage } from '@/models/quiz.model';
+import { getKeyFromPublicUrl, removeFiles } from '@/utils/uploadFile';
+import mongoose from 'mongoose';
+import {
+  calculateMedian,
+  calculateRank,
+  findMinMax,
+  isTeacherOfCourse,
+  standardDeviation,
+} from './helpers/quizHelpers';
 
 /**
  * Create a new quiz.
@@ -27,17 +42,19 @@ export const createQuiz = async (
     // questionIds,
     snapshotQuestions,
   }: CreateQuiz,
-  userId: mongoose.Types.ObjectId
+  userId: mongoose.Types.ObjectId,
+  role: Role
 ): Promise<IQuiz> => {
   const course = await CourseModel.findById(courseId);
-  appAssert(course, NOT_FOUND, "Course not found");
+  appAssert(course, NOT_FOUND, 'Course not found');
+
+  //check whether user is teacher of course
+  if (role === Role.TEACHER) {
+    isTeacherOfCourse(course, userId);
+  }
 
   //check endTime > startTime
-  appAssert(
-    startTime < endTime,
-    BAD_REQUEST,
-    "Start time must be before end time"
-  );
+  appAssert(startTime < endTime, BAD_REQUEST, 'Start time must be before end time');
 
   if (snapshotQuestions && snapshotQuestions.length > 0) {
     for (let question of snapshotQuestions) {
@@ -72,18 +89,30 @@ export const createQuiz = async (
  * @throws  If no questions provided
  * @returns  Updated quiz
  */
-export const updateQuiz = async ({
-  quizId,
-  courseId,
-  title,
-  description,
-  startTime,
-  endTime,
-  shuffleQuestions,
-  snapshotQuestions,
-}: UpdateQuiz) => {
-  const quiz = await QuizModel.findById(quizId);
-  appAssert(quiz, NOT_FOUND, "Quiz not found");
+export const updateQuiz = async (
+  {
+    quizId,
+    title,
+    description,
+    startTime,
+    endTime,
+    shuffleQuestions,
+    snapshotQuestions,
+  }: UpdateQuiz,
+  userId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId');
+  appAssert(quiz, NOT_FOUND, 'Quiz not found');
+
+  //isTeacher of course
+  if (role === Role.TEACHER) {
+    isTeacherOfCourse(quiz.courseId, userId);
+  }
+
+  //isOnGoing
+  const isOnGoing = quiz.startTime.getTime() <= Date.now() && quiz.endTime.getTime() >= Date.now();
+  appAssert(!isOnGoing, BAD_REQUEST, 'Cannot update a quiz that is on going');
 
   let deletedImages: string[] = [];
   const map = new Map<string, number>();
@@ -98,9 +127,7 @@ export const updateQuiz = async ({
       );
   }
 
-  const updated = snapshotQuestions.filter(
-    (q) => q.isDirty && !q.isNew && !q.isDeleted
-  );
+  const updated = snapshotQuestions.filter((q) => q.isDirty && !q.isNew && !q.isDeleted);
   const added = snapshotQuestions.filter((q) => q.isNew && !q.isDeleted);
   const deleted = snapshotQuestions.filter((q) => q.isDeleted && !q.isNew);
 
@@ -125,10 +152,7 @@ export const updateQuiz = async ({
     // Xóa ảnh
     deletedImages.push(
       ...oldImages
-        .filter(
-          (img: TImage) =>
-            !newImages.some((newImg) => newImg.url === img.url) && !img.fromDB
-        )
+        .filter((img: TImage) => !newImages.some((newImg) => newImg.url === img.url) && !img.fromDB)
         .map((img: TImage) => img.url)
     );
   }
@@ -163,11 +187,10 @@ export const updateQuiz = async ({
     await removeFiles(deletedImages.map((img) => getKeyFromPublicUrl(img)));
   }
 
-  console.log("Deleted : ", deletedImages.length);
+  console.log('Deleted : ', deletedImages.length);
 
   quiz.title = title ?? quiz.title;
   quiz.description = description ?? quiz.description;
-  quiz.courseId = new mongoose.Types.ObjectId(courseId ?? quiz.courseId);
   quiz.startTime = startTime ?? quiz.startTime;
   quiz.endTime = endTime ?? quiz.endTime;
   quiz.shuffleQuestions = shuffleQuestions ?? quiz.shuffleQuestions;
@@ -188,18 +211,22 @@ export const updateQuiz = async ({
 export const deleteQuiz = async ({
   quizId,
   userId,
+  role,
 }: {
   quizId: string;
   userId: mongoose.Types.ObjectId;
+  role: Role;
 }) => {
-  const quiz = await QuizModel.findById(quizId);
-  appAssert(quiz, NOT_FOUND, "Quiz not found");
+  const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId');
+  appAssert(quiz, NOT_FOUND, 'Quiz not found');
 
-  const isOnGoing =
-    quiz.startTime.getTime() <= Date.now() &&
-    quiz.endTime.getTime() >= Date.now();
-
-  appAssert(isOnGoing, BAD_REQUEST, "Cannot delete a quiz that is on going");
+  //isTeacher of course
+  if (role === Role.TEACHER) {
+    isTeacherOfCourse(quiz.courseId, userId);
+  }
+  //isOnGoing
+  const isOnGoing = quiz.startTime.getTime() <= Date.now() && quiz.endTime.getTime() >= Date.now();
+  appAssert(isOnGoing, BAD_REQUEST, 'Cannot delete a quiz that is on going');
 
   quiz.deletedAt = new Date();
   quiz.deletedBy = userId;
@@ -209,78 +236,94 @@ export const deleteQuiz = async ({
 };
 
 /**
- * Get quizzes based on the provided parameters.
- * @param input - Parameters to get quizzes.
- * @param role - Role of the user.
- * @param userId - ID of the user, required for students.
- * @returns A list of quizzes filtered based on the provided parameters.
- * @throws If the course is not found.
- * @throws If the user is not a teacher of the course.
- * @throws If courseId is not provided for students.
+ * Get the statistic of a quiz.
+ * @param  quizId - ID of the quiz to get statistic.
+ * @param  userId - ID of the user who is getting the statistic.
+ * @throws  If the quiz is not found.
+ * @throws  If the user is not a teacher of the course.
+ * @returns  An object containing the total number of students, the number of submitted quizzes, the average score, the median score, the minimum and maximum score, the standard deviation score, the distribution of scores and the rank of students.
  */
-export const getQuizzes = async (
-  input: GetQuizzes,
-  role: string,
-  userId?: mongoose.Types.ObjectId
+export const getStatisticByQuizId = async (
+  quizId: string,
+  userId: mongoose.Types.ObjectId,
+  role: Role
 ) => {
-  const { courseId, isPublished, isCompleted, isDeleted } = input;
-  const filter: any = {};
-  if (courseId) {
-    const course = await CourseModel.findById(courseId);
-    appAssert(course, NOT_FOUND, "Course not found");
+  const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId').lean();
+  appAssert(quiz, NOT_FOUND, 'Quiz not found');
 
-    if (role === Role.TEACHER) {
-      const isTeacherOfCourse = course.teacherIds.some((teacherId) =>
-        teacherId.equals(userId)
-      );
-      appAssert(
-        isTeacherOfCourse,
-        FORBIDDEN,
-        "You are not a teacher of this course"
-      );
-    }
-
-    filter.courseId = courseId;
-
-    if (role === Role.STUDENT) {
-      filter.isPublished = true;
-      filter.deletedAt = { $exists: false };
-    } else {
-      if (isPublished !== undefined) {
-        filter.isPublished = isPublished;
-      }
-      if (isDeleted !== undefined) {
-        if (isDeleted) {
-          filter.deletedAt = { $exists: true };
-        } else {
-          filter.deletedAt = { $exists: false };
-        }
-      }
-      if (isCompleted !== undefined) {
-        filter.endTime = isCompleted
-          ? { $lte: new Date() }
-          : { $gt: new Date() };
-      }
-    }
-  } else {
-    if (role === Role.STUDENT) {
-      appAssert(userId, FORBIDDEN, "courseId is required");
-    }
+  if (role === Role.TEACHER) {
+    isTeacherOfCourse(quiz.courseId, userId);
   }
 
-  const quizzes = await QuizModel.find(filter).sort({ createdAt: -1 }).lean();
+  // count total student
+  const totalStudents = await EnrollmentModel.find({
+    courseId: quiz.courseId._id,
+    status: EnrollmentStatus.APPROVED,
+  }).countDocuments();
 
-  for (let quiz of quizzes) {
-    if (quiz.endTime.getTime() < Date.now()) {
-      (quiz as any).isCompleted = true;
-    } else {
-      (quiz as any).isCompleted = false;
-    }
+  const quizAttempt = await QuizAttemptModel.find({
+    quizId: quiz._id,
+    status: AttemptStatus.SUBMITTED,
+  })
+    .populate<{ studentId: IUser }>('studentId', 'id username email fullname')
+    .lean<(IQuizAttempt & { studentId: IUser })[]>();
 
-    if (quiz.deletedAt) {
-      (quiz as any).isDeleted = true;
-    }
-  }
+  const scoresArray = quizAttempt.map((attempt) => attempt.score);
 
-  return quizzes;
+  // count submitted
+  const submittedCount = quizAttempt.length;
+
+  // count average
+  const averageScore = quizAttempt.length
+    ? quizAttempt.reduce((total, attempt) => total + attempt.score, 0) / quizAttempt.length
+    : 0;
+
+  // count median
+  const medianScore = calculateMedian(scoresArray);
+
+  // count min max
+  const minMax = findMinMax([...new Set(scoresArray)]);
+
+  // count standard deviation
+  const standardDeviationScore = standardDeviation(scoresArray);
+
+  // count distribution
+  const intervals = [
+    { min: 0, max: 2, label: '0-2' },
+    { min: 2, max: 4, label: '2-4' },
+    { min: 4, max: 6, label: '4-6' },
+    { min: 6, max: 8, label: '6-8' },
+    { min: 8, max: 10, label: '8-10' },
+  ];
+
+  const scoreDistribution = intervals.map((interval) => {
+    const count = scoresArray.filter(
+      (score) => score >= interval.min && score < interval.max
+    ).length;
+    return {
+      min: interval.min,
+      max: interval.max,
+      range: interval.label,
+      count,
+      percentage: `${
+        Number.isFinite(count / submittedCount)
+          ? ((count / submittedCount) * 100).toFixed(2)
+          : Number(0).toFixed(2)
+      }%`,
+    };
+  });
+
+  // count rank
+  const students = calculateRank(quizAttempt);
+
+  return {
+    totalStudents,
+    submittedCount,
+    averageScore,
+    medianScore,
+    minMax,
+    standardDeviationScore,
+    scoreDistribution,
+    students,
+  };
 };

@@ -1,9 +1,9 @@
-import { QuizQuestionType } from "@/types/quizQuestion.type";
-import mongoose from "mongoose";
-import z from "zod";
-import { datePreprocess } from "./helpers/date.schema";
+import { QuizQuestionType } from '@/types/quizQuestion.type';
+import mongoose from 'mongoose';
+import z from 'zod';
+import { datePreprocess } from './helpers/date.schema';
 
-export const courseIdSchema = z.string().length(24, "Invalid course ID");
+export const courseIdSchema = z.string().length(24, 'Invalid course ID');
 
 export const snapShotQuestion = z
   .object({
@@ -13,18 +13,18 @@ export const snapShotQuestion = z
       .default(() => new mongoose.Types.ObjectId().toString()),
     text: z.string(),
     type: z.enum(QuizQuestionType),
-    options: z.array(z.string()).min(2, "At least two options are required"),
+    options: z.array(z.string()).min(2, 'At least two options are required'),
     correctOptions: z
       .array(
         z.number().refine((v) => v === 0 || v === 1, {
-          message: "Correct option must be 0 or 1",
-          path: ["correctOptions"],
+          message: 'Correct option must be 0 or 1',
+          path: ['correctOptions'],
         })
       )
-      .min(1, "At least one correct option is required")
+      .min(1, 'At least one correct option is required')
       .refine((v) => v.includes(1), {
-        message: "At least one correct option is required",
-        path: ["correctOptions"],
+        message: 'At least one correct option is required',
+        path: ['correctOptions'],
       }),
     images: z
       .array(
@@ -42,8 +42,8 @@ export const snapShotQuestion = z
     isDirty: z.boolean().default(false),
   })
   .refine((val) => val.options.length === val.correctOptions.length, {
-    message: "Number of options and correct options must be equal",
-    path: ["correctOptions"],
+    message: 'Number of options and correct options must be equal',
+    path: ['correctOptions'],
   });
 
 export type SnapshotQuestion = z.infer<typeof snapShotQuestion>;
@@ -65,8 +65,8 @@ export const createQuizSchema = z
       return startTime < endTime;
     },
     {
-      message: "Start time must be before end time",
-      path: ["endTime"],
+      message: 'Start time must be before end time',
+      path: ['endTime'],
     }
   );
 
@@ -74,8 +74,7 @@ export type CreateQuiz = z.infer<typeof createQuizSchema>;
 
 export const updateQuizSchema = z
   .object({
-    quizId: z.string().length(24, "Invalid quiz ID"),
-    courseId: courseIdSchema.optional(),
+    quizId: z.string().length(24, 'Invalid quiz ID'),
     title: z.string().min(1).max(255).optional(),
     description: z.string().optional(),
     startTime: datePreprocess.optional(),
@@ -83,7 +82,7 @@ export const updateQuizSchema = z
     shuffleQuestions: z.boolean().optional(),
     snapshotQuestions: z
       .array(snapShotQuestion)
-      .min(1, "At least one question is required")
+      .min(1, 'At least one question is required')
       .optional()
       .default([]),
   })
@@ -95,20 +94,11 @@ export const updateQuizSchema = z
       return true;
     },
     {
-      message: "Start time must be before end time",
-      path: ["endTime"],
+      message: 'Start time must be before end time',
+      path: ['endTime'],
     }
   );
 
 export type UpdateQuiz = z.infer<typeof updateQuizSchema>;
 
-export const quizIdSchema = z.string().length(24, "Invalid quiz ID");
-
-export const getQuizzesSchema = z.object({
-  courseId: courseIdSchema.optional(),
-  isDeleted: z.boolean().optional(),
-  isCompleted: z.boolean().optional(),
-  isPublished: z.boolean().optional(),
-});
-
-export type GetQuizzes = z.infer<typeof getQuizzesSchema>;
+export const quizIdSchema = z.string().length(24, 'Invalid quiz ID');

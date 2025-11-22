@@ -1,11 +1,11 @@
 import mongoose from "mongoose";
-import IClassSchedule, {ScheduleStatus} from "../types/classSchedule.type";
+import ISchedule, {ScheduleStatus} from "../types/schedule.type";
 import {DayOfWeek} from "../types/timeSlot.type";
 
-const ClassScheduleSchema = new mongoose.Schema<IClassSchedule>({
-        classId: {
+const ScheduleSchema = new mongoose.Schema<ISchedule>({
+        courseId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: "Class",
+            ref: "Course",
             required: true,
             index: true,
         },
@@ -82,17 +82,17 @@ const ClassScheduleSchema = new mongoose.Schema<IClassSchedule>({
 
 // Indexes for efficient queries
 // Find schedules for a specific class
-ClassScheduleSchema.index({classId: 1, status: 1});
+ScheduleSchema.index({classId: 1, status: 1});
 
 // Find schedules for a specific teacher
-ClassScheduleSchema.index({teacherId: 1, status: 1});
+ScheduleSchema.index({teacherId: 1, status: 1});
 
 // Find schedules by day and time slot
-ClassScheduleSchema.index({dayOfWeek: 1, timeSlotId: 1, status: 1});
+ScheduleSchema.index({dayOfWeek: 1, timeSlotId: 1, status: 1});
 
 // Prevent double-booking: One teacher cannot teach 2 classes in the same slot
 // This unique index ensures no conflicts
-ClassScheduleSchema.index(
+ScheduleSchema.index(
     {teacherId: 1, dayOfWeek: 1, timeSlotId: 1, status: 1},
     {
         unique: true,
@@ -103,10 +103,10 @@ ClassScheduleSchema.index(
 );
 
 // Find pending requests for admin approval
-ClassScheduleSchema.index({status: 1, requestedAt: -1});
+ScheduleSchema.index({status: 1, requestedAt: -1});
 
 // Validation: Ensure effectiveTo is after effectiveFrom
-ClassScheduleSchema.pre("save", function (next) {
+ScheduleSchema.pre("save", function (next) {
     if (this.effectiveTo && this.effectiveTo <= this.effectiveFrom) {
         return next(
             new Error("Effective end date must be after effective start date")
@@ -115,11 +115,11 @@ ClassScheduleSchema.pre("save", function (next) {
     next();
 });
 
-const ClassScheduleModel = mongoose.model<IClassSchedule>(
+const ScheduleModel = mongoose.model<ISchedule>(
     "ClassSchedule",
-    ClassScheduleSchema,
+    ScheduleSchema,
     "classschedules"
 );
 
-export default ClassScheduleModel;
+export default ScheduleModel;
 

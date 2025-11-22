@@ -1,10 +1,10 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
+import IQuiz from './quiz.type';
 
-export const enum AttemptStatus {
-  IN_PROGRESS = "in_progress",
-  COMPLETED = "completed",
-  SUBMITTED = "submitted",
-  ABANDONED = "abandoned",
+export enum AttemptStatus {
+  IN_PROGRESS = 'in_progress',
+  SUBMITTED = 'submitted',
+  ABANDONED = 'abandoned',
 }
 
 export interface IQuestionAnswer {
@@ -19,13 +19,14 @@ export default interface IQuizAttempt extends mongoose.Document {
   studentId: mongoose.Types.ObjectId;
   startedAt: Date;
   submittedAt?: Date;
-  durationSeconds?: number;
+  durationSeconds: number;
   answers?: IQuestionAnswer[] | [];
-  score?: number;
+  score: number;
   status: AttemptStatus;
   ipAddress?: string;
   userAgent?: string;
   createdAt?: Date;
   updatedAt?: Date;
-  grade(): any;
+  rank?: number;
+  grade(answers: IQuestionAnswer[], quiz: IQuiz): any;
 }

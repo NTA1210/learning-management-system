@@ -1,18 +1,18 @@
-import mongoose from "mongoose";
-import { IAttendance } from "../types";
-import { AttendanceStatus } from "../types/attendance.type";
+import mongoose from 'mongoose';
+import { IAttendance } from '../types';
+import { AttendanceStatus } from '../types/attendance.type';
 
 const AttendanceSchema = new mongoose.Schema<IAttendance>(
   {
     courseId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Course",
+      ref: 'Course',
       required: true,
       index: true,
     },
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
       index: true,
     },
@@ -27,18 +27,12 @@ const AttendanceSchema = new mongoose.Schema<IAttendance>(
       ],
       default: AttendanceStatus.ABSENT,
     },
-    markedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    markedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );
 
-AttendanceSchema.index(
-  { courseId: 1, studentId: 1, date: 1 },
-  { unique: true }
-);
-const AttendanceModel = mongoose.model<IAttendance>(
-  "Attendance",
-  AttendanceSchema
-);
+AttendanceSchema.index({ courseId: 1, studentId: 1, date: 1 }, { unique: true });
+const AttendanceModel = mongoose.model<IAttendance>('Attendance', AttendanceSchema);
 
 export default AttendanceModel;

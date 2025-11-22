@@ -1,3 +1,4 @@
+import { NotificationRecipientType } from './../types/notification.type';
 import mongoose from "mongoose";
 import { INotification } from "../types";
 
@@ -10,7 +11,7 @@ const NotificationSchema = new mongoose.Schema<INotification>(
     recipientCourse: { type: mongoose.Schema.Types.ObjectId, ref: "Course" },
     recipientType: {
       type: String,
-      enum: ["user", "course", "all"],
+      enum: NotificationRecipientType,
       default: "user",
     },
     isRead: { type: Boolean, default: false },

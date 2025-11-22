@@ -2,55 +2,10 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
-import Navbar from "../components/Navbar.tsx";
-import Sidebar from "../components/Sidebar.tsx";
+import { Navbar, Sidebar, LessonSummary, MaterialCard, MaterialFormModal } from "../components";
 import { httpClient } from "../utils/http";
-import { ArrowLeft, Download, FileText, Video, Presentation, Link as LinkIcon, File, Eye, X, Minimize2, Maximize2, Trash, Pencil } from "lucide-react";
-
-interface Lesson {
-  _id: string;
-  title: string;
-  content: string;
-  order: number;
-  durationMinutes: number;
-  isPublished: boolean;
-  publishedAt?: string;
-  courseId: {
-    _id: string;
-    title: string;
-    description?: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-  hasAccess: boolean;
-  accessReason: string;
-}
-
-interface LessonMaterial {
-  _id: string;
-  lessonId: {
-    _id: string;
-    title: string;
-    courseId: string;
-  };
-  title: string;
-  note?: string;
-  originalName?: string;
-  mimeType?: string;
-  key?: string;
-  size?: number;
-  uploadedBy: {
-    _id: string;
-    email: string;
-    firstName?: string;
-    lastName?: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-  signedUrl?: string;
-  hasAccess: boolean;
-  accessReason: string;
-}
+import { ArrowLeft, Download, FileText, X, Minimize2, Maximize2 } from "lucide-react";
+import type { LessonSummary as LessonInfo, LessonMaterial, MaterialFormValues } from "../types/lessonMaterial";
 
 interface ApiResponse {
   success: boolean;
@@ -66,12 +21,28 @@ interface ApiResponse {
   };
 }
 
+type MaterialModalState =
+  | { mode: "create" }
+  | {
+      mode: "edit";
+      material: LessonMaterial;
+    }
+  | null;
+
+const defaultMaterialValues: MaterialFormValues = {
+  title: "",
+  note: "",
+  originalName: "",
+  mimeType: "",
+  size: 0,
+};
+
 const LessonMaterialDetailPage: React.FC = () => {
   const { lessonId } = useParams<{ lessonId: string }>();
   const navigate = useNavigate();
   const { darkMode } = useTheme();
   const { user } = useAuth();
-  const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [lesson, setLesson] = useState<LessonInfo | null>(null);
   const [materials, setMaterials] = useState<LessonMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [materialsLoading, setMaterialsLoading] = useState(true);
@@ -86,18 +57,7 @@ const LessonMaterialDetailPage: React.FC = () => {
   const [isResizing, setIsResizing] = useState(false);
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [resizeMode, setResizeMode] = useState<"horizontal" | "vertical" | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editingMaterial, setEditingMaterial] = useState<LessonMaterial | null>(null);
-  const [formData, setFormData] = useState({
-    title: "",
-    note: "",
-    originalName: "",
-    mimeType: "",
-    size: 0,
-  });
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [materialModal, setMaterialModal] = useState<MaterialModalState>(null);
 
   // >>> ADDED: refs & raf helpers for smooth resize
   const popupRef = React.useRef<HTMLDivElement | null>(null);
@@ -107,13 +67,19 @@ const LessonMaterialDetailPage: React.FC = () => {
   const resizingRef = React.useRef(false);
   // <<< ADDED
 
+  const scrubMessage = (message: string) => {
+    if (!message) return "";
+    const cleaned = message.replace(/https?:\/\/[^\s]+/g, "").trim();
+    return cleaned || "Something went wrong";
+  };
+
   const showSwalError = async (message: string) => {
     try {
       const Swal = (await import("sweetalert2")).default;
       await Swal.fire({
         icon: "error",
         title: "Error",
-        text: message,
+        text: scrubMessage(message),
         confirmButtonColor: darkMode ? "#4c1d95" : "#4f46e5",
         background: darkMode ? "#1f2937" : "#ffffff",
         color: darkMode ? "#ffffff" : "#1e293b",
@@ -129,7 +95,7 @@ const LessonMaterialDetailPage: React.FC = () => {
         },
       });
     } catch {
-      alert(message);
+      alert(scrubMessage(message));
     }
   };
 
@@ -139,7 +105,7 @@ const LessonMaterialDetailPage: React.FC = () => {
       const result = await Swal.fire({
         icon: "warning",
         title: "Confirm",
-        text: message,
+        text: scrubMessage(message),
         showCancelButton: true,
         confirmButtonColor: darkMode ? "#dc2626" : "#ef4444",
         cancelButtonColor: darkMode ? "#4b5563" : "#6b7280",
@@ -160,7 +126,7 @@ const LessonMaterialDetailPage: React.FC = () => {
       });
       return result.isConfirmed;
     } catch {
-      return confirm(message);
+      return confirm(scrubMessage(message));
     }
   };
 
@@ -170,7 +136,7 @@ const LessonMaterialDetailPage: React.FC = () => {
       await Swal.fire({
         icon: "success",
         title: "Success",
-        text: message,
+        text: scrubMessage(message),
         confirmButtonColor: darkMode ? "#4c1d95" : "#4f46e5",
         background: darkMode ? "#1f2937" : "#ffffff",
         color: darkMode ? "#ffffff" : "#1e293b",
@@ -186,7 +152,7 @@ const LessonMaterialDetailPage: React.FC = () => {
         },
       });
     } catch {
-      alert(message);
+      alert(scrubMessage(message));
     }
   };
 
@@ -410,33 +376,6 @@ const LessonMaterialDetailPage: React.FC = () => {
     }
   };
 
-  const getFileIcon = (mimeType?: string) => {
-    if (!mimeType) return <File size={24} />;
-    
-    if (mimeType.includes('pdf')) return <FileText size={24} />;
-    if (mimeType.includes('video')) return <Video size={24} />;
-    if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return <Presentation size={24} />;
-    if (mimeType.includes('link')) return <LinkIcon size={24} />;
-    return <File size={24} />;
-  };
-
-  const formatFileSize = (bytes?: number) => {
-    if (!bytes) return "Unknown size";
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
 
   const handleView = async (material: LessonMaterial) => {
     if (!material.hasAccess) {
@@ -665,42 +604,11 @@ const LessonMaterialDetailPage: React.FC = () => {
   const canCreate = isAdmin || isTeacher;
 
   const handleCreate = () => {
-    setFormData({
-      title: "",
-      note: "",
-      originalName: "",
-      mimeType: "",
-      size: 0,
-    });
-    setSelectedFile(null);
-    setShowCreateModal(true);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      // Auto-fill form data from file
-      setFormData(prev => ({
-        ...prev,
-        originalName: file.name,
-        mimeType: file.type || "",
-        size: file.size,
-        title: prev.title || file.name.replace(/\.[^/.]+$/, ""), // Use filename without extension as default title
-      }));
-    }
+    setMaterialModal({ mode: "create" });
   };
 
   const handleEdit = (material: LessonMaterial) => {
-    setEditingMaterial(material);
-    setFormData({
-      title: material.title,
-      note: material.note || "",
-      originalName: material.originalName || "",
-      mimeType: material.mimeType || "",
-      size: material.size || 0,
-    });
-    setShowEditModal(true);
+    setMaterialModal({ mode: "edit", material });
   };
 
   const handleDelete = async (materialId: string) => {
@@ -724,94 +632,74 @@ const LessonMaterialDetailPage: React.FC = () => {
     }
   };
 
-  const handleCreateMaterial = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!lessonId) return;
-    
-    try {
-      if (selectedFile) {
-        // Upload file using FormData
-        const formDataToSend = new FormData();
-        formDataToSend.append('file', selectedFile);
-        formDataToSend.append('lessonId', lessonId);
-        formDataToSend.append('title', formData.title);
-        if (formData.note) {
-          formDataToSend.append('note', formData.note);
-        }
-        // Determine type from mimeType
-        let materialType = 'other';
-        if (formData.mimeType) {
-          if (formData.mimeType.includes('pdf')) materialType = 'pdf';
-          else if (formData.mimeType.includes('video')) materialType = 'video';
-          else if (formData.mimeType.includes('presentation') || formData.mimeType.includes('powerpoint')) materialType = 'ppt';
-          else if (formData.mimeType.includes('link')) materialType = 'link';
-        }
-        formDataToSend.append('type', materialType);
-
-        await httpClient.post("/lesson-materials/upload", formDataToSend, {
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-      } else {
-        // Create material without file
-        await httpClient.post("/lesson-material/createMaterial", {
-          lessonId,
-          ...formData,
-        }, {
-          withCredentials: true,
-        });
-      }
-      
-      await showSwalSuccess("Material created successfully");
-      setShowCreateModal(false);
-      setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      setFormData({
-        title: "",
-        note: "",
-        originalName: "",
-        mimeType: "",
-        size: 0,
-      });
-      await fetchMaterials();
-    } catch (err) {
-      console.error("Error creating material:", err);
-      let errorMessage = "Failed to create material";
-      if (err && typeof err === 'object' && 'response' in err) {
-        const axiosError = err as { response?: { data?: { message?: string } }; message?: string };
-        errorMessage = axiosError.response?.data?.message || axiosError.message || errorMessage;
-      }
-      await showSwalError(errorMessage);
+  const getMaterialInitialValues = (): MaterialFormValues => {
+    if (materialModal?.mode === "edit" && materialModal.material) {
+      const material = materialModal.material;
+      return {
+        title: material.title,
+        note: material.note || "",
+        originalName: material.originalName || "",
+        mimeType: material.mimeType || "",
+        size: material.size || 0,
+      };
     }
+    return defaultMaterialValues;
   };
 
-  const handleUpdateMaterial = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingMaterial) return;
-    
+  const handleMaterialSubmit = async (values: MaterialFormValues, file?: File | null) => {
+    if (!lessonId) return;
+
     try {
-      await httpClient.patch(`/lesson-materials/${editingMaterial._id}`, formData, {
-        withCredentials: true,
-      });
-      await showSwalSuccess("Material updated successfully");
-      setShowEditModal(false);
-      setEditingMaterial(null);
-      setFormData({
-        title: "",
-        note: "",
-        originalName: "",
-        mimeType: "",
-        size: 0,
-      });
+      if (materialModal?.mode === "create") {
+        if (file) {
+          const formDataToSend = new FormData();
+          formDataToSend.append("file", file);
+          formDataToSend.append("lessonId", lessonId);
+          formDataToSend.append("title", values.title);
+          if (values.note) {
+            formDataToSend.append("note", values.note);
+          }
+          let materialType = "other";
+          if (values.mimeType) {
+            if (values.mimeType.includes("pdf")) materialType = "pdf";
+            else if (values.mimeType.includes("video")) materialType = "video";
+            else if (values.mimeType.includes("presentation") || values.mimeType.includes("powerpoint")) materialType = "ppt";
+            else if (values.mimeType.includes("link")) materialType = "link";
+          }
+          formDataToSend.append("type", materialType);
+
+          await httpClient.post("/lesson-materials/upload", formDataToSend, {
+            withCredentials: true,
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          });
+        } else {
+          await httpClient.post(
+            "/lesson-material/createMaterial",
+            {
+              lessonId,
+              ...values,
+            },
+            {
+              withCredentials: true,
+            }
+          );
+        }
+        await showSwalSuccess("Material created successfully");
+      } else if (materialModal?.mode === "edit" && materialModal.material) {
+        await httpClient.patch(`/lesson-materials/${materialModal.material._id}`, values, {
+          withCredentials: true,
+        });
+        await showSwalSuccess("Material updated successfully");
+      }
+
+      setMaterialModal(null);
       await fetchMaterials();
     } catch (err) {
-      console.error("Error updating material:", err);
-      let errorMessage = "Failed to update material";
-      if (err && typeof err === 'object' && 'response' in err) {
+      console.error("Error saving material:", err);
+      let errorMessage = "Failed to save material";
+      if (err && typeof err === "object" && "response" in err) {
         const axiosError = err as { response?: { data?: { message?: string } }; message?: string };
         errorMessage = axiosError.response?.data?.message || axiosError.message || errorMessage;
       }
@@ -869,76 +757,7 @@ const LessonMaterialDetailPage: React.FC = () => {
                   {error}
                 </div>
               ) : lesson ? (
-                <div
-                  className="rounded-lg shadow-md overflow-hidden mb-6 p-6"
-                  style={{
-                    backgroundColor: darkMode ? "rgba(31, 41, 55, 0.8)" : "rgba(255, 255, 255, 0.9)",
-                    border: darkMode ? "1px solid rgba(75, 85, 99, 0.3)" : "1px solid rgba(229, 231, 235, 0.5)",
-                  }}
-                >
-                  <div className="mb-3">
-                    <span
-                      className="inline-block px-3 py-1 text-xs font-semibold rounded-full"
-                      style={{
-                        backgroundColor: darkMode ? "rgba(99, 102, 241, 0.2)" : "rgba(99, 102, 241, 0.1)",
-                        color: darkMode ? "#a5b4fc" : "#6366f1",
-                      }}
-                    >
-                      {lesson.courseId.title}
-                    </span>
-                  </div>
-                  <h1
-                    className="text-3xl font-bold mb-4"
-                    style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
-                  >
-                    {lesson.title}
-                  </h1>
-                  {lesson.content && (
-                    <p
-                      className="text-base mb-4 whitespace-pre-wrap"
-                      style={{ color: darkMode ? "#d1d5db" : "#6b7280" }}
-                    >
-                      {lesson.content}
-                    </p>
-                  )}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t" style={{ borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "rgba(229, 231, 235, 0.5)" }}>
-                    <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Duration: {formatDuration(lesson.durationMinutes)}
-                    </div>
-                    <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                      </svg>
-                      Order: {lesson.order}
-                    </div>
-                    <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
-                      {lesson.hasAccess ? (
-                        <span
-                          className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded"
-                          style={{
-                            backgroundColor: darkMode ? "rgba(34, 197, 94, 0.2)" : "rgba(34, 197, 94, 0.1)",
-                            color: darkMode ? "#86efac" : "#16a34a",
-                          }}
-                        >
-                          Accessible
-                        </span>
-                      ) : (
-                        <span
-                          className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded"
-                          style={{
-                            backgroundColor: darkMode ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.1)",
-                            color: darkMode ? "#fca5a5" : "#dc2626",
-                          }}
-                        >
-                          No Access
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <LessonSummary lesson={lesson} darkMode={darkMode} formatDuration={formatDuration} />
               ) : null}
 
               <div className="flex items-center justify-between mb-4">
@@ -1003,174 +822,16 @@ const LessonMaterialDetailPage: React.FC = () => {
             ) : (
               <div className="space-y-4">
                 {materials.map((material) => (
-                  <div
+                  <MaterialCard
                     key={material._id}
-                    className="rounded-lg shadow-md overflow-hidden transition-all duration-200 hover:shadow-lg"
-                    style={{
-                      backgroundColor: darkMode ? "rgba(31, 41, 55, 0.8)" : "rgba(255, 255, 255, 0.9)",
-                      border: darkMode ? "1px solid rgba(75, 85, 99, 0.3)" : "1px solid rgba(229, 231, 235, 0.5)",
-                    }}
-                  >
-                    <div className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center mb-3">
-                            <div
-                              className="p-2 rounded-lg mr-3"
-                              style={{
-                                backgroundColor: darkMode ? "rgba(99, 102, 241, 0.2)" : "rgba(99, 102, 241, 0.1)",
-                                color: darkMode ? "#a5b4fc" : "#6366f1",
-                              }}
-                            >
-                              {getFileIcon(material.mimeType)}
-                            </div>
-                            <div className="flex-1">
-                              <h3
-                                className="text-xl font-semibold mb-1"
-                                style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
-                              >
-                                {material.title}
-                              </h3>
-                              {material.originalName && (
-                                <p
-                                  className="text-sm mb-2"
-                                  style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
-                                >
-                                  {material.originalName}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          {material.note && (
-                            <p
-                              className="text-sm mb-4"
-                              style={{ color: darkMode ? "#d1d5db" : "#6b7280" }}
-                            >
-                              {material.note}
-                            </p>
-                          )}
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
-                              <span className="font-semibold mr-2">Size:</span>
-                              {formatFileSize(material.size)}
-                            </div>
-                            <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
-                              <span className="font-semibold mr-2">Type:</span>
-                              {material.mimeType || "N/A"}
-                            </div>
-                            <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
-                              <span className="font-semibold mr-2">Uploaded by:</span>
-                              {material.uploadedBy.email}
-                            </div>
-                            <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
-                              <span className="font-semibold mr-2">Created:</span>
-                              {formatDate(material.createdAt)}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center pt-4 border-t" style={{ borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "rgba(229, 231, 235, 0.5)" }}>
-                            {material.hasAccess ? (
-                              <span
-                                className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded mr-3"
-                                style={{
-                                  backgroundColor: darkMode ? "rgba(34, 197, 94, 0.2)" : "rgba(34, 197, 94, 0.1)",
-                                  color: darkMode ? "#86efac" : "#16a34a",
-                                }}
-                              >
-                                Accessible ({material.accessReason})
-                              </span>
-                            ) : (
-                              <span
-                                className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded mr-3"
-                                style={{
-                                  backgroundColor: darkMode ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.1)",
-                                  color: darkMode ? "#fca5a5" : "#dc2626",
-                                }}
-                              >
-                                No Access
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="ml-4 flex items-center gap-2 flex-wrap">
-                          {material.hasAccess && (
-                            <>
-                              <button
-                                onClick={() => handleView(material)}
-                                className="px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-lg flex items-center"
-                                style={{
-                                  backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.15)' : 'rgba(99, 102, 241, 0.1)',
-                                  color: darkMode ? '#a5b4fc' : '#4f46e5',
-                                  border: darkMode ? '1px solid rgba(99, 102, 241, 0.35)' : '1px solid rgba(79, 70, 229, 0.25)',
-                                }}
-                              >
-                                <Eye size={18} className="mr-2" />
-                                View
-                              </button>
-                              <button
-                                onClick={() => handleDownload(material._id)}
-                                className="px-4 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg flex items-center"
-                                style={{ backgroundColor: darkMode ? '#059669' : '#10b981' }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = darkMode ? '#047857' : '#059669';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = darkMode ? '#059669' : '#10b981';
-                                }}
-                              >
-                                <Download size={18} className="mr-2" />
-                                Download
-                              </button>
-                            </>
-                          )}
-                          {canCreate && (
-                            <>
-                              <button
-                                onClick={() => handleEdit(material)}
-                                className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md flex items-center gap-2"
-                                style={{
-                                  backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff',
-                                  color: darkMode ? '#a5b4fc' : '#4f46e5'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = darkMode ? 'rgba(99, 102, 241, 0.3)' : '#e0e7ff';
-                                  e.currentTarget.style.transform = 'scale(1.05)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff';
-                                  e.currentTarget.style.transform = 'scale(1)';
-                                }}
-                              >
-                                <Pencil size={16} />
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDelete(material._id)}
-                                className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md flex items-center gap-2"
-                                style={{
-                                  backgroundColor: darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2',
-                                  color: darkMode ? '#fca5a5' : '#dc2626'
-                                }}
-                                onMouseEnter={(e) => {
-                                  e.currentTarget.style.backgroundColor = darkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca';
-                                  e.currentTarget.style.transform = 'scale(1.05)';
-                                }}
-                                onMouseLeave={(e) => {
-                                  e.currentTarget.style.backgroundColor = darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2';
-                                  e.currentTarget.style.transform = 'scale(1)';
-                                }}
-                              >
-                                <Trash size={16} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    material={material}
+                    darkMode={darkMode}
+                    canManage={canCreate}
+                    onView={handleView}
+                    onDownload={handleDownload}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
                 ))}
               </div>
             )}
@@ -1371,385 +1032,14 @@ const LessonMaterialDetailPage: React.FC = () => {
         </div>
       )}
 
-      {/* Create Material Modal */}
-      {showCreateModal && (
-        <div 
-          className="fixed inset-0 z-[9999] p-4 flex items-center justify-center transition-all duration-300 bg-black/40"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowCreateModal(false);
-              setSelectedFile(null);
-              setFormData({
-                title: "",
-                note: "",
-                originalName: "",
-                mimeType: "",
-                size: 0,
-              });
-            }
-          }}
-        >
-          <div
-            className="w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl"
-            style={{ backgroundColor: darkMode ? '#0b132b' : '#ffffff', border: '1px solid rgba(255,255,255,0.08)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid #eee' }}>
-              <h3 className="text-xl font-semibold" style={{ color: darkMode ? '#ffffff' : '#111827' }}>
-                Create Material
-              </h3>
-              <button
-                onClick={() => {
-                  setShowCreateModal(false);
-                  setSelectedFile(null);
-                  if (fileInputRef.current) {
-                    fileInputRef.current.value = '';
-                  }
-                  setFormData({
-                    title: "",
-                    note: "",
-                    originalName: "",
-                    mimeType: "",
-                    size: 0,
-                  });
-                }}
-                className="px-3 py-1 rounded-lg text-sm"
-                style={{ backgroundColor: darkMode ? '#1f2937' : '#f3f4f6', color: darkMode ? '#e5e7eb' : '#111827' }}
-              >
-                Close
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateMaterial} className="px-6 py-6" encType="multipart/form-data">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    File (Optional)
-                  </label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    onChange={handleFileChange}
-                    className="w-full px-4 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                    accept="*/*"
-                  />
-                  {selectedFile && (
-                    <div className="flex items-center justify-between mt-2 p-3 rounded-lg" style={{ backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.05)' }}>
-                      <p className="text-sm flex-1" style={{ color: darkMode ? '#a5b4fc' : '#6366f1' }}>
-                        <span className="font-medium">{selectedFile.name}</span> ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedFile(null);
-                          if (fileInputRef.current) {
-                            fileInputRef.current.value = '';
-                          }
-                          setFormData(prev => ({
-                            ...prev,
-                            originalName: "",
-                            mimeType: "",
-                            size: 0,
-                          }));
-                        }}
-                        className="ml-2 px-2 py-1 rounded text-sm"
-                        style={{
-                          backgroundColor: darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2',
-                          color: darkMode ? '#fca5a5' : '#dc2626'
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    Title *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={e => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                    placeholder="Material Title"
-                    required
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    Note
-                  </label>
-                  <textarea
-                    value={formData.note}
-                    onChange={e => setFormData({ ...formData, note: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border h-24"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                    placeholder="Optional note about this material..."
-                  />
-                </div>
-                {!selectedFile && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                        Original Name
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.originalName}
-                        onChange={e => setFormData({ ...formData, originalName: e.target.value })}
-                        className="w-full px-4 py-2 rounded-lg border"
-                        style={{
-                          backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                          borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                          color: darkMode ? '#ffffff' : '#000000',
-                        }}
-                        placeholder="filename.pdf"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                        MIME Type
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.mimeType}
-                        onChange={e => setFormData({ ...formData, mimeType: e.target.value })}
-                        className="w-full px-4 py-2 rounded-lg border"
-                        style={{
-                          backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                          borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                          color: darkMode ? '#ffffff' : '#000000',
-                        }}
-                        placeholder="application/pdf"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                        Size (bytes)
-                      </label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={formData.size}
-                        onChange={e => setFormData({ ...formData, size: Number(e.target.value) })}
-                        className="w-full px-4 py-2 rounded-lg border"
-                        style={{
-                          backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                          borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                          color: darkMode ? '#ffffff' : '#000000',
-                        }}
-                        placeholder="0"
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-3 px-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateModal(false);
-                    setSelectedFile(null);
-                    setFormData({
-                      title: "",
-                      note: "",
-                      originalName: "",
-                      mimeType: "",
-                      size: 0,
-                    });
-                  }}
-                  className="px-4 py-2 rounded-lg"
-                  style={{ backgroundColor: darkMode ? '#1f2937' : '#e5e7eb', color: darkMode ? '#e5e7eb' : '#111827' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-lg text-white font-medium transition-all duration-200"
-                  style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#5b21b6' : '#4338ca';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#4c1d95' : '#4f46e5';
-                  }}
-                >
-                  Create
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Material Modal */}
-      {showEditModal && editingMaterial && (
-        <div 
-          className="fixed inset-0 z-[9999] p-4 flex items-center justify-center transition-all duration-300 bg-black/40"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowEditModal(false);
-              setEditingMaterial(null);
-            }
-          }}
-        >
-          <div
-            className="w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl"
-            style={{ backgroundColor: darkMode ? '#0b132b' : '#ffffff', border: '1px solid rgba(255,255,255,0.08)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: darkMode ? '1px solid rgba(255,255,255,0.06)' : '1px solid #eee' }}>
-              <h3 className="text-xl font-semibold" style={{ color: darkMode ? '#ffffff' : '#111827' }}>
-                Edit Material
-              </h3>
-              <button
-                onClick={() => {
-                  setShowEditModal(false);
-                  setEditingMaterial(null);
-                }}
-                className="px-3 py-1 rounded-lg text-sm"
-                style={{ backgroundColor: darkMode ? '#1f2937' : '#f3f4f6', color: darkMode ? '#e5e7eb' : '#111827' }}
-              >
-                Close
-              </button>
-            </div>
-
-            <form onSubmit={handleUpdateMaterial} className="px-6 py-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    Title *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={e => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                    placeholder="Material Title"
-                    required
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    Note
-                  </label>
-                  <textarea
-                    value={formData.note}
-                    onChange={e => setFormData({ ...formData, note: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border h-24"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                    placeholder="Optional note about this material..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    Original Name
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.originalName}
-                    onChange={e => setFormData({ ...formData, originalName: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                    placeholder="filename.pdf"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    MIME Type
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.mimeType}
-                    onChange={e => setFormData({ ...formData, mimeType: e.target.value })}
-                    className="w-full px-4 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                    placeholder="application/pdf"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? '#cbd5e1' : '#374151' }}>
-                    Size (bytes)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={formData.size}
-                    onChange={e => setFormData({ ...formData, size: Number(e.target.value) })}
-                    className="w-full px-4 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
-                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                      color: darkMode ? '#ffffff' : '#000000',
-                    }}
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 px-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setEditingMaterial(null);
-                  }}
-                  className="px-4 py-2 rounded-lg"
-                  style={{ backgroundColor: darkMode ? '#1f2937' : '#e5e7eb', color: darkMode ? '#e5e7eb' : '#111827' }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-lg text-white font-medium transition-all duration-200"
-                  style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#5b21b6' : '#4338ca';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? '#4c1d95' : '#4f46e5';
-                  }}
-                >
-                  Update
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <MaterialFormModal
+        darkMode={darkMode}
+        isOpen={Boolean(materialModal)}
+        mode={materialModal?.mode === "edit" ? "edit" : "create"}
+        initialValues={getMaterialInitialValues()}
+        onClose={() => setMaterialModal(null)}
+        onSubmit={handleMaterialSubmit}
+      />
     </div>
   );
 };
