@@ -1,17 +1,11 @@
-import mongoose, { SortOrder } from "mongoose";
-import {
-  AttendanceModel,
-  CourseModel,
-  EnrollmentModel,
-  LessonModel,
-  UserModel,
-} from "@/models";
-import appAssert from "@/utils/appAssert";
-import { BAD_REQUEST, FORBIDDEN, NOT_FOUND } from "@/constants/http";
-import { Role } from "@/types";
-import { AttendanceStatus } from "@/types/attendance.type";
-import { EnrollmentStatus } from "@/types/enrollment.type";
-import { isDateInFuture } from "@/utils/date";
+import mongoose, { SortOrder } from 'mongoose';
+import { AttendanceModel, CourseModel, EnrollmentModel, LessonModel, UserModel } from '@/models';
+import appAssert from '@/utils/appAssert';
+import { BAD_REQUEST, FORBIDDEN, NOT_FOUND } from '@/constants/http';
+import { Role } from '@/types';
+import { AttendanceStatus } from '@/types/attendance.type';
+import { EnrollmentStatus } from '@/types/enrollment.type';
+import { isDateInFuture } from '@/utils/date';
 import {
   MarkAttendanceInput,
   UpdateAttendanceInput,
@@ -19,7 +13,7 @@ import {
   ExportAttendanceInput,
   CourseStatsInput,
   StudentHistoryInput,
-} from "@/validators/attendance.schemas";
+} from '@/validators/attendance.schemas';
 
 const MAX_BACKDATE_DAYS = 7;
 const REASON_REQUIRED_AFTER_DAYS = 1;
@@ -40,20 +34,16 @@ const daysDiffFromToday = (value: Date) => {
 
 const ensureCourseExists = async (courseId: string) => {
   const course = await CourseModel.findById(courseId);
-  appAssert(course, NOT_FOUND, "Course not found");
+  appAssert(course, NOT_FOUND, 'Course not found');
   return course;
 };
 
-const assertInstructorAccess = (
-  course: any,
-  userId: mongoose.Types.ObjectId | string
-) => {
-  const targetId =
-    typeof userId === "string" ? new mongoose.Types.ObjectId(userId) : userId;
+const assertInstructorAccess = (course: any, userId: mongoose.Types.ObjectId | string) => {
+  const targetId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
   const isInstructor = (course.teacherIds || []).some((id: mongoose.Types.ObjectId) =>
     id.equals(targetId)
   );
-  appAssert(isInstructor, FORBIDDEN, "Teacher not assigned to this course");
+  appAssert(isInstructor, FORBIDDEN, 'Teacher not assigned to this course');
   return true;
 };
 
@@ -66,7 +56,7 @@ const ensureAttendanceManagePermission = async (
   if (role === Role.ADMIN) {
     return course;
   }
-  appAssert(role === Role.TEACHER, FORBIDDEN, "Not authorized");
+  appAssert(role === Role.TEACHER, FORBIDDEN, 'Not authorized');
   assertInstructorAccess(course, actorId);
   return course;
 };
@@ -82,7 +72,7 @@ const assertDateWithinCourseSchedule = (
   appAssert(
     normalizedTarget >= normalizedStart && normalizedTarget <= normalizedEnd,
     BAD_REQUEST,
-    "Attendance date must fall within course schedule"
+    'Attendance date must fall within course schedule'
   );
 };
 
@@ -99,11 +89,7 @@ const clampDateRangeToCourse = (
   const clampedFrom = normalizedFrom < normalizedStart ? normalizedStart : normalizedFrom;
   const clampedTo = normalizedTo > normalizedEnd ? normalizedEnd : normalizedTo;
 
-  appAssert(
-    clampedFrom <= clampedTo,
-    BAD_REQUEST,
-    "Date range must overlap with course schedule"
-  );
+  appAssert(clampedFrom <= clampedTo, BAD_REQUEST, 'Date range must overlap with course schedule');
 
   return { from: clampedFrom, to: clampedTo };
 };
@@ -118,11 +104,11 @@ const verifyStudentsBelongToCourse = async (
     courseId,
     studentId: { $in: studentIds },
     status: EnrollmentStatus.APPROVED,
-  }).select("studentId");
+  }).select('studentId');
 
   const enrolledSet = new Set(enrollments.map((item) => item.studentId.toString()));
   const missing = studentIds.filter((id) => !enrolledSet.has(id.toString()));
-  appAssert(missing.length === 0, BAD_REQUEST, "Student not enrolled in course");
+  appAssert(missing.length === 0, BAD_REQUEST, 'Student not enrolled in course');
 };
 
 const buildDateRangeFilter = (from?: Date, to?: Date) => {
@@ -143,12 +129,10 @@ const buildAttendanceFilter = async (
   role: Role
 ) => {
   const filter: Record<string, any> = {};
-  let courseDateRange:
-    | {
-        from: Date;
-        to: Date;
-      }
-    | null = null;
+  let courseDateRange: {
+    from: Date;
+    to: Date;
+  } | null = null;
 
   if (params.courseId) {
     filter.courseId = new mongoose.Types.ObjectId(params.courseId);
@@ -159,7 +143,7 @@ const buildAttendanceFilter = async (
       params.to
     );
   } else {
-    appAssert(role === Role.ADMIN, BAD_REQUEST, "courseId is required unless you are an admin");
+    appAssert(role === Role.ADMIN, BAD_REQUEST, 'courseId is required unless you are an admin');
   }
 
   if (params.studentId) {
@@ -184,12 +168,9 @@ const buildAttendanceFilter = async (
   return filter;
 };
 
-const getSortObject = (
-  sortBy?: string,
-  sortOrder?: string
-): Record<string, SortOrder> => {
-  const sortField = sortBy || "date";
-  const order: SortOrder = sortOrder === "asc" ? 1 : -1;
+const getSortObject = (sortBy?: string, sortOrder?: string): Record<string, SortOrder> => {
+  const sortField = sortBy || 'date';
+  const order: SortOrder = sortOrder === 'asc' ? 1 : -1;
   return { [sortField]: order };
 };
 
@@ -209,25 +190,15 @@ const summarizeStatuses = (records: any[]) => {
   return summary;
 };
 
-
-const enforceTeacherEditWindow = (
-  targetDate: Date,
-  role: Role,
-  reason?: string
-) => {
+const enforceTeacherEditWindow = (targetDate: Date, role: Role, reason?: string) => {
   if (role === Role.ADMIN) return;
   const diffDays = daysDiffFromToday(targetDate);
-  appAssert(
-    diffDays <= MAX_BACKDATE_DAYS,
-    FORBIDDEN,
-    "Cannot modify attendance older than 7 days"
-  );
+  appAssert(diffDays <= MAX_BACKDATE_DAYS, FORBIDDEN, 'Cannot modify attendance older than 7 days');
 
   if (diffDays > REASON_REQUIRED_AFTER_DAYS) {
-    appAssert(!!reason, BAD_REQUEST, "Reason is required for late updates");
+    appAssert(!!reason, BAD_REQUEST, 'Reason is required for late updates');
   }
 };
-
 
 /**
  * Nghiệp vụ 3 & 7: Admin/Teacher xem danh sách attendance với filter, thống kê.
@@ -239,7 +210,7 @@ export const listAttendances = async (
   actorId: mongoose.Types.ObjectId,
   role: Role
 ) => {
-  appAssert(role !== Role.STUDENT, FORBIDDEN, "Not authorized");
+  appAssert(role !== Role.STUDENT, FORBIDDEN, 'Not authorized');
 
   const filter = await buildAttendanceFilter(params, actorId, role);
   const page = params.page;
@@ -252,16 +223,16 @@ export const listAttendances = async (
       .sort(sort)
       .skip(skip)
       .limit(limit)
-      .populate("studentId", "fullname username email")
-      .populate("courseId", "title code")
-      .populate("markedBy", "fullname email role")
+      .populate('studentId', 'fullname username email')
+      .populate('courseId', 'title code')
+      .populate('markedBy', 'fullname email role')
       .lean(),
     AttendanceModel.countDocuments(filter),
     AttendanceModel.aggregate([
       { $match: filter },
       {
         $group: {
-          _id: "$status",
+          _id: '$status',
           count: { $sum: 1 },
         },
       },
@@ -310,24 +281,20 @@ export const getStudentAttendanceHistory = async (
     appAssert(
       actorId.toString() === studentId,
       FORBIDDEN,
-      "Students can only view their own attendance"
+      'Students can only view their own attendance'
     );
   }
 
-  let dateRangeOverride:
-    | { from: Date; to: Date }
-    | null = null;
+  let dateRangeOverride: { from: Date; to: Date } | null = null;
 
   if (role === Role.TEACHER) {
-    appAssert(params.courseId, BAD_REQUEST, "courseId is required for teachers");
+    appAssert(params.courseId, BAD_REQUEST, 'courseId is required for teachers');
   }
 
   if (params.courseId && role !== Role.STUDENT) {
     const course = await ensureAttendanceManagePermission(params.courseId, actorId, role);
     if (role === Role.TEACHER) {
-      await verifyStudentsBelongToCourse(params.courseId, [
-        new mongoose.Types.ObjectId(studentId),
-      ]);
+      await verifyStudentsBelongToCourse(params.courseId, [new mongoose.Types.ObjectId(studentId)]);
     }
     dateRangeOverride = clampDateRangeToCourse(
       course as { startDate: Date; endDate: Date },
@@ -364,8 +331,8 @@ export const getStudentAttendanceHistory = async (
       .sort({ date: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("courseId", "title code")
-      .populate("markedBy", "fullname email role")
+      .populate('courseId', 'title code')
+      .populate('markedBy', 'fullname email role')
       .lean(),
     AttendanceModel.countDocuments(filter),
   ]);
@@ -393,9 +360,9 @@ export const getSelfAttendanceHistory = async (
 };
 
 const formatCsvValue = (value: string | Date | undefined | null) => {
-  if (value === undefined || value === null) return "";
+  if (value === undefined || value === null) return '';
   if (value instanceof Date) return value.toISOString();
-  if (typeof value === "string" && value.includes(",")) {
+  if (typeof value === 'string' && value.includes(',')) {
     return `"${value.replace(/"/g, '""')}"`;
   }
   return value;
@@ -413,51 +380,53 @@ export const exportAttendanceReport = async (
   const filter = await buildAttendanceFilter(params, actorId, role);
 
   const records = await AttendanceModel.find(filter)
-    .populate("studentId", "fullname username email")
-    .populate("courseId", "title code")
-    .populate("markedBy", "fullname email role")
+    .populate('studentId', 'fullname username email')
+    .populate('courseId', 'title code')
+    .populate('markedBy', 'fullname email role')
     .sort({ date: 1 })
     .lean<any>();
 
   const summary = summarizeStatuses(records);
 
-  if (params.format === "json") {
+  if (params.format === 'json') {
     return {
-      format: "json",
+      format: 'json',
       summary,
       data: records,
     };
   }
 
   const header = [
-    "studentName",
-    "studentEmail",
-    "course",
-    "date",
-    "status",
-    "markedBy",
-    "markedByRole",
+    'studentName',
+    'studentEmail',
+    'course',
+    'date',
+    'status',
+    'markedBy',
+    'markedByRole',
   ];
 
   const csvRows = (records as Record<string, any>[]).map((record) => [
-    formatCsvValue(record.studentId?.fullname || record.studentId?.username || ""),
+    formatCsvValue(record.studentId?.fullname || record.studentId?.username || ''),
     formatCsvValue(record.studentId?.email),
     formatCsvValue(record.courseId?.title),
-    formatCsvValue(record.date instanceof Date ? record.date.toISOString().split("T")[0] : record.date),
+    formatCsvValue(
+      record.date instanceof Date ? record.date.toISOString().split('T')[0] : record.date
+    ),
     formatCsvValue(record.status),
     formatCsvValue(record.markedBy?.fullname || record.markedBy?.email),
     formatCsvValue(record.markedBy?.role),
   ]);
 
   const csv = [
-    header.join(","),
+    header.join(','),
     ...csvRows.map((row: (string | number | undefined)[]) =>
-      row.map((cell) => (cell === undefined ? "" : String(cell))).join(",")
+      row.map((cell) => (cell === undefined ? '' : String(cell))).join(',')
     ),
-  ].join("\n");
+  ].join('\n');
 
   return {
-    format: "csv",
+    format: 'csv',
     summary,
     csv,
     total: records.length,
@@ -497,7 +466,7 @@ const mapStudentInfo = async (studentIds: mongoose.Types.ObjectId[]) => {
   }
 
   const users = await UserModel.find({ _id: { $in: uniqueIds } })
-    .select("fullname username email")
+    .select('fullname username email')
     .lean();
 
   return users.reduce<Record<string, any>>((acc, user) => {
@@ -529,7 +498,7 @@ export const getCourseAttendanceStats = async (
   if (dateFilter) filter.date = dateFilter;
 
   const records = await AttendanceModel.find(filter)
-    .select("studentId status date")
+    .select('studentId status date')
     .sort({ date: 1 })
     .lean();
 
@@ -565,9 +534,7 @@ export const getCourseAttendanceStats = async (
   });
 
   Object.entries(statsByStudent).forEach(([studentId, data]) => {
-    const studentRecords = records.filter(
-      (record) => record.studentId.toString() === studentId
-    );
+    const studentRecords = records.filter((record) => record.studentId.toString() === studentId);
     data.longestAbsentStreak = computeLongestAbsentStreak(
       studentRecords as { status: AttendanceStatus; date: Date }[]
     );
@@ -580,9 +547,7 @@ export const getCourseAttendanceStats = async (
       data.counts[AttendanceStatus.PRESENT] +
       data.counts[AttendanceStatus.LATE] +
       data.counts[AttendanceStatus.EXCUSED];
-    const attendanceRate = data.total
-      ? Number(((attended / data.total) * 100).toFixed(2))
-      : 0;
+    const attendanceRate = data.total ? Number(((attended / data.total) * 100).toFixed(2)) : 0;
     const absentRate = data.total
       ? Number(((data.counts[AttendanceStatus.ABSENT] / data.total) * 100).toFixed(2))
       : 0;
@@ -602,19 +567,14 @@ export const getCourseAttendanceStats = async (
     };
   });
 
-  const totalSessions = Object.values(statsByStudent).reduce(
-    (acc, curr) => acc + curr.total,
-    0
-  );
+  const totalSessions = Object.values(statsByStudent).reduce((acc, curr) => acc + curr.total, 0);
 
   const classAttendanceRate =
     totalSessions === 0
       ? 0
       : Number(
           (
-            (records.filter(
-              (record) => record.status !== AttendanceStatus.ABSENT
-            ).length /
+            (records.filter((record) => record.status !== AttendanceStatus.ABSENT).length /
               totalSessions) *
             100
           ).toFixed(2)
@@ -650,9 +610,7 @@ export const getStudentAttendanceStats = async (
 ) => {
   const course = await ensureAttendanceManagePermission(courseId, actorId, role);
 
-  await verifyStudentsBelongToCourse(courseId, [
-    new mongoose.Types.ObjectId(studentId),
-  ]);
+  await verifyStudentsBelongToCourse(courseId, [new mongoose.Types.ObjectId(studentId)]);
 
   const filter: Record<string, any> = {
     courseId: new mongoose.Types.ObjectId(courseId),
@@ -666,9 +624,7 @@ export const getStudentAttendanceStats = async (
   const dateFilter = buildDateRangeFilter(from, to);
   if (dateFilter) filter.date = dateFilter;
 
-  const records = await AttendanceModel.find(filter)
-    .sort({ date: 1 })
-    .lean();
+  const records = await AttendanceModel.find(filter).sort({ date: 1 }).lean();
 
   const counts = summarizeStatuses(records);
   const total = records.length;
@@ -677,9 +633,7 @@ export const getStudentAttendanceStats = async (
     counts[AttendanceStatus.LATE] +
     counts[AttendanceStatus.EXCUSED];
 
-  const studentInfo = await UserModel.findById(studentId)
-    .select("fullname username email")
-    .lean();
+  const studentInfo = await UserModel.findById(studentId).select('fullname username email').lean();
 
   return {
     courseId,
@@ -693,4 +647,3 @@ export const getStudentAttendanceStats = async (
     ),
   };
 };
-
