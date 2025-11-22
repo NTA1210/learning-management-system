@@ -1,12 +1,26 @@
 import { BAD_REQUEST, FORBIDDEN, NOT_FOUND } from '@/constants/http';
-import { CourseModel, QuizModel } from '@/models';
-import { IQuiz, Role } from '@/types';
+import { CourseModel, EnrollmentModel, QuizAttemptModel, QuizModel } from '@/models';
+import {
+  AttemptStatus,
+  EnrollmentStatus,
+  ICourse,
+  IQuiz,
+  IQuizAttempt,
+  IUser,
+  Role,
+} from '@/types';
 import appAssert from '@/utils/appAssert';
-import { CreateQuiz, GetQuizzes, UpdateQuiz } from '@/validators/quiz.schemas';
+import { CreateQuiz, UpdateQuiz } from '@/validators/quiz.schemas';
 import { checkProperQuestionType } from './quizQuestion.service';
 import { TImage } from '@/models/quiz.model';
 import { getKeyFromPublicUrl, removeFiles } from '@/utils/uploadFile';
 import mongoose from 'mongoose';
+import {
+  calculateMedian,
+  calculateRank,
+  findMinMax,
+  standardDeviation,
+} from './helpers/quizHelpers';
 
 /**
  * Create a new quiz.
@@ -202,4 +216,90 @@ export const deleteQuiz = async ({
   await quiz.save();
 
   return quiz;
+};
+
+/**
+ * Get the statistic of a quiz.
+ * @param  quizId - ID of the quiz to get statistic.
+ * @param  userId - ID of the user who is getting the statistic.
+ * @throws  If the quiz is not found.
+ * @throws  If the user is not a teacher of the course.
+ * @returns  An object containing the total number of students, the number of submitted quizzes, the average score, the median score, the minimum and maximum score, the standard deviation score, the distribution of scores and the rank of students.
+ */
+export const getStatisticByQuizId = async (
+  quizId: string,
+  userId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId').lean();
+  appAssert(quiz, NOT_FOUND, 'Quiz not found');
+
+  if (role === Role.TEACHER) {
+    const isTeacherOfCourse = quiz.courseId.teacherIds.some((teacherId) =>
+      teacherId.equals(userId)
+    );
+    appAssert(isTeacherOfCourse, FORBIDDEN, 'You are not a teacher of this course');
+  }
+  const totalStudents = await EnrollmentModel.find({
+    courseId: quiz.courseId._id,
+    status: EnrollmentStatus.APPROVED,
+  }).countDocuments();
+
+  const quizAttempt = await QuizAttemptModel.find({
+    quizId: quiz._id,
+    status: AttemptStatus.SUBMITTED,
+  })
+    .populate<{ studentId: IUser }>('studentId', 'id username email fullname')
+    .lean<(IQuizAttempt & { studentId: IUser })[]>();
+
+  const scoresArray = quizAttempt.map((attempt) => attempt.score);
+
+  const submittedCount = quizAttempt.length;
+
+  const averageScore = quizAttempt.length
+    ? quizAttempt.reduce((total, attempt) => total + attempt.score, 0) / quizAttempt.length
+    : 0;
+
+  const medianScore = calculateMedian(scoresArray);
+
+  const minMax = findMinMax([...new Set(scoresArray)]);
+  const standardDeviationScore = standardDeviation(scoresArray);
+
+  const intervals = [
+    { min: 0, max: 2, label: '0-2' },
+    { min: 2, max: 4, label: '2-4' },
+    { min: 4, max: 6, label: '4-6' },
+    { min: 6, max: 8, label: '6-8' },
+    { min: 8, max: 10, label: '8-10' },
+  ];
+
+  const scoreDistribution = intervals.map((interval) => {
+    const count = scoresArray.filter(
+      (score) => score >= interval.min && score < interval.max
+    ).length;
+    return {
+      min: interval.min,
+      max: interval.max,
+      range: interval.label,
+      count,
+      percentage: `${
+        Number.isFinite(count / submittedCount)
+          ? ((count / submittedCount) * 100).toFixed(2)
+          : Number(0).toFixed(2)
+      }%`,
+    };
+  });
+
+  const students = calculateRank(quizAttempt);
+
+  return {
+    totalStudents,
+    submittedCount,
+    averageScore,
+    medianScore,
+    minMax,
+    standardDeviationScore,
+    scoreDistribution,
+    students,
+  };
 };
