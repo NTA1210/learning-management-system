@@ -20,6 +20,7 @@ import {DashboardPage ,
       FeedbackPage,
       FeedbackListPage,
       EnrollmentsListPage,
+      CurriculumPage,
     } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -159,6 +160,12 @@ function AppRoutes() {
         <Route path="/enrollments-list" element={
           <ProtectedRoute>
             <EnrollmentsListPage />
+          </ProtectedRoute>
+        } />
+        {/* Curriculum */}
+        <Route path="/curriculum" element={
+          <ProtectedRoute>
+            <CurriculumPage />
           </ProtectedRoute>
         } />
 
