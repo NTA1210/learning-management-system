@@ -42,7 +42,8 @@ export const ensureAttendanceManagePermission = async (
   if (role === Role.ADMIN) {
     return course;
   }
-  appAssert(role === Role.TEACHER, FORBIDDEN, 'Not authorized');
+  // If not ADMIN, must be TEACHER (middleware already ensures this)
+  // Only need to verify teacher is assigned to this course
   assertInstructorAccess(course, actorId);
   return course;
 };
@@ -82,18 +83,21 @@ export const clampDateRangeToCourse = (
 
 export const verifyStudentsBelongToCourse = async (
   courseId: string,
-  studentIds: mongoose.Types.ObjectId[]
+  studentIds: string[]
 ) => {
   if (!studentIds.length) return;
 
+  // Convert string IDs to ObjectId for MongoDB query
+  const studentObjectIds = studentIds.map((id) => new mongoose.Types.ObjectId(id));
+
   const enrollments = await EnrollmentModel.find({
     courseId,
-    studentId: { $in: studentIds },
+    studentId: { $in: studentObjectIds },
     status: EnrollmentStatus.APPROVED,
   }).select('studentId');
 
   const enrolledSet = new Set(enrollments.map((item) => item.studentId.toString()));
-  const missing = studentIds.filter((id) => !enrolledSet.has(id.toString()));
+  const missing = studentIds.filter((id) => !enrolledSet.has(id));
   appAssert(missing.length === 0, BAD_REQUEST, 'Student not enrolled in course');
 };
 

@@ -213,7 +213,7 @@ export const getStudentAttendanceHistory = async (
   if (params.courseId && role !== Role.STUDENT) {
     const course = await ensureAttendanceManagePermission(params.courseId, actorId, role);
     if (role === Role.TEACHER) {
-      await verifyStudentsBelongToCourse(params.courseId, [new mongoose.Types.ObjectId(studentId)]);
+      await verifyStudentsBelongToCourse(params.courseId, [studentId]);
     }
     dateRangeOverride = clampDateRangeToCourse(
       course as { startDate: Date; endDate: Date },
@@ -534,7 +534,7 @@ export const getStudentAttendanceStats = async (
 ) => {
   const course = await ensureAttendanceManagePermission(courseId, actorId, role);
 
-  await verifyStudentsBelongToCourse(courseId, [new mongoose.Types.ObjectId(studentId)]);
+  await verifyStudentsBelongToCourse(courseId, [studentId]);
 
   const filter: Record<string, any> = {
     courseId: new mongoose.Types.ObjectId(courseId),
@@ -601,16 +601,15 @@ export const markAttendance = async (
   );
 
   const courseObjectId = new mongoose.Types.ObjectId(courseId);
-  const studentIdMap = new Map<string, mongoose.Types.ObjectId>();
+  
+  // Remove duplicate student IDs and verify they belong to course
+  const uniqueStudentIds = [...new Set(entries.map((entry) => entry.studentId))];
+  await verifyStudentsBelongToCourse(courseId, uniqueStudentIds);
 
-  entries.forEach((entry) => {
-    if (!studentIdMap.has(entry.studentId)) {
-      studentIdMap.set(entry.studentId, new mongoose.Types.ObjectId(entry.studentId));
-    }
-  });
-
-  const studentObjectIds = Array.from(studentIdMap.values());
-  await verifyStudentsBelongToCourse(courseId, studentObjectIds);
+  // Create map for quick ObjectId lookup during operations
+  const studentIdMap = new Map(
+    uniqueStudentIds.map((id) => [id, new mongoose.Types.ObjectId(id)])
+  );
 
   const operations = entries.map((entry) => {
     const studentObjectId = studentIdMap.get(entry.studentId)!;
@@ -621,7 +620,7 @@ export const markAttendance = async (
           studentId: studentObjectId,
           date: normalizedDate,
         },
-        update: {
+        update: { 
           $set: {
             status: entry.status,
             markedBy: actorId,
@@ -639,6 +638,7 @@ export const markAttendance = async (
 
   await AttendanceModel.bulkWrite(operations, { ordered: false });
 
+  const studentObjectIds = Array.from(studentIdMap.values());
   const records = await AttendanceModel.find({
     courseId: courseObjectId,
     studentId: { $in: studentObjectIds },

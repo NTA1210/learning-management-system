@@ -7,7 +7,7 @@ import {
   studentAttendanceHistoryController,
   studentStatsController,
   markAttendanceController,
-  lessonTemplateController,
+  // lessonTemplateController,
   updateAttendanceController,
   deleteAttendanceController,
 } from "@/controller/attendance.controller";
@@ -53,11 +53,11 @@ export default attendanceRoutes;
 // Nghiệp vụ 1: Teacher/Admin đánh dấu attendance
 attendanceRoutes.post("/", authorize(Role.TEACHER, Role.ADMIN), markAttendanceController);
 // Nghiệp vụ 5: Tạo template attendance theo lesson/schedule
-attendanceRoutes.post(
-  "/lessons/:lessonId/template",
-  authorize(Role.TEACHER, Role.ADMIN),
-  lessonTemplateController
-);
+// attendanceRoutes.post(
+//   "/lessons/:lessonId/template",
+//   authorize(Role.TEACHER, Role.ADMIN),
+//   lessonTemplateController
+// );
 
 // Nghiệp vụ 2/3: Update attendance
 attendanceRoutes.patch(

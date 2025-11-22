@@ -24,7 +24,7 @@ import {
   markAttendance,
   updateAttendance,
   deleteAttendance,
-  generateLessonAttendanceTemplate,
+  // generateLessonAttendanceTemplate,
 } from "@/services/attendance.service";
 
 
@@ -159,19 +159,19 @@ export const deleteAttendanceController = catchErrors(async (req, res) => {
 /**
  * API: Tạo attendance template theo lesson (nghiệp vụ 5).
  */
-export const lessonTemplateController = catchErrors(async (req, res) => {
-  const { lessonId } = LessonIdParamSchema.parse(req.params);
-  const payload = lessonTemplateSchema.parse(req.body);
-  const result = await generateLessonAttendanceTemplate(
-    lessonId,
-    payload,
-    req.userId,
-    req.role
-  );
+// export const lessonTemplateController = catchErrors(async (req, res) => {
+//   const { lessonId } = LessonIdParamSchema.parse(req.params);
+//   const payload = lessonTemplateSchema.parse(req.body);
+//   const result = await generateLessonAttendanceTemplate(
+//     lessonId,
+//     payload,
+//     req.userId,
+//     req.role
+//   );
 
-  return res.success(CREATED, {
-    data: result,
-    message: "Attendance template generated",
-  });
-});
+//   return res.success(CREATED, {
+//     data: result,
+//     message: "Attendance template generated",
+//   });
+// });
 
