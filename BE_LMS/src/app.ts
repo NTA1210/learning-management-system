@@ -34,9 +34,11 @@ import {
   majorProtectedRoutes,
   majorPublicRoutes,
   notificationRoutes,
+  quizAttemptRoutes,
   quizQuestionRoutes,
   quizRoutes,
   scheduleRoutes,
+  semesterRoutes,
   sessionRoutes,
   specialistProtectedRoutes,
   specialistPublicRoutes,
@@ -44,7 +46,6 @@ import {
   submissionRoutes,
   userRoutes,
 } from './routes';
-import quizAttemptRoutes from './routes/quizAttempt.route';
 
 export const createApp = () => {
   const app = express();
@@ -104,6 +105,7 @@ export const createApp = () => {
   app.use('/notifications', authenticate, notificationRoutes);
   app.use('/quiz-attempts', authenticate, quizAttemptRoutes);
   app.use('/attendances', authenticate, attendanceRoutes);
+  app.use('/semesters', semesterRoutes);
 
   //error handler
   app.use(errorHandler);

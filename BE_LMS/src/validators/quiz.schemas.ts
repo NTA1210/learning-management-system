@@ -2,7 +2,6 @@ import { QuizQuestionType } from '@/types/quizQuestion.type';
 import mongoose from 'mongoose';
 import z from 'zod';
 import { datePreprocess } from './helpers/date.schema';
-import { listParamsSchema } from './helpers/listParams.schema';
 
 export const courseIdSchema = z.string().length(24, 'Invalid course ID');
 
