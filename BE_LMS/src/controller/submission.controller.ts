@@ -71,7 +71,6 @@ export const getSubmissionStatusHandler = catchErrors(async (req, res) => {
 //get sub by Id, load file
 export const getSubmissionByIdHandler = catchErrors(async (req, res) => {
   const requesterId = req.userId;
-  appAssert(requesterId, BAD_REQUEST, "Missing user ID");
 
   const { submissionId } = submissionIdParamSchema.parse(req.params);
   const submission = await getSubmissionById(submissionId, requesterId, req.role);
