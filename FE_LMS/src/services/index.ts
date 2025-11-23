@@ -8,6 +8,7 @@ export * from './enrollmentService';
 export * from './feedbackService';
 export * from './quizQuestionService';
 export * from './subjectService';
+export * from './quizService';
 export * from './specialistService';
 export * from './majorService';
 export * from './userService';
