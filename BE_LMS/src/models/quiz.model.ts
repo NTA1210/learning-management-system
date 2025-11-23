@@ -50,7 +50,7 @@ const QuizSchema = new mongoose.Schema<IQuiz>(
       type: [SnapshotQuestionSchema],
       default: [],
     },
-    isPublished: { type: Boolean, default: false },
+    isPublished: { type: Boolean, default: true },
     deletedAt: { type: Date },
     deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

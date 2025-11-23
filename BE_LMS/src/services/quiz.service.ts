@@ -39,7 +39,7 @@ export const createQuiz = async (
     startTime,
     endTime,
     shuffleQuestions,
-    // questionIds,
+    isPublished,
     snapshotQuestions,
   }: CreateQuiz,
   userId: mongoose.Types.ObjectId,
@@ -73,6 +73,7 @@ export const createQuiz = async (
     startTime,
     endTime,
     shuffleQuestions,
+    isPublished,
     createdBy: userId,
     snapshotQuestions: [...snapshotQuestions],
   });
