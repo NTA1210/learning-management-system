@@ -7,7 +7,6 @@ import appAssert from "../utils/appAssert";
 import { NOT_FOUND, FORBIDDEN } from "../constants/http";
 import { EnrollmentStatus } from "../types/enrollment.type";
 import { Role } from "../types";
-import { createNotification } from "./notification.service";
 
 export type ListAssignmentsParams = {
   page: number;
@@ -178,20 +177,8 @@ export const createAssignment = async (data: any, userId?: mongoose.Types.Object
         courseId: data.courseId,
         authorId: createdBy as mongoose.Types.ObjectId,
       });
-
-      //gửi notification cho all students đã enroll vào course
-      await createNotification(
-        {
-          title: `New assignment: ${assignmentTitle}`,
-          message: `A new assignment has been posted${courseName}. Please review the details and get started.`,
-          recipientType: "course",
-          recipientCourse: data.courseId,
-        },
-        createdBy as mongoose.Types.ObjectId,
-        userRole
-      );
     } catch (error) {
-      console.error("Failed to send assignment announcement and notification", error);
+      console.error("Failed to create assignment announcement", error);
     }
   }
 
