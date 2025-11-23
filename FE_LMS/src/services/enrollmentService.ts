@@ -28,6 +28,7 @@ export interface StudentRef {
   username: string;
   email: string;
   fullname?: string;
+  avatar_url?: string;
 }
 
 export interface CourseRef {
