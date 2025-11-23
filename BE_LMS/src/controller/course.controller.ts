@@ -223,7 +223,9 @@ export const permanentDeleteCourseHandler = catchErrors(async (req, res) => {
 // GET /:courseId/quizzes - Get all quizzes
 export const getQuizzesHandler = catchErrors(async (req, res) => {
   const role = req.role;
-  const input = getQuizzesSchema.parse({ ...req.query, courseId: req.params.courseId });
+  const input = getQuizzesSchema.parse(
+    parseFormData({ ...req.query, courseId: req.params.courseId })
+  );
   const { quizzes, pagination } = await getQuizzes(input, role);
 
   return res.success(OK, {

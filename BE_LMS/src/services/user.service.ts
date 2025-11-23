@@ -145,7 +145,7 @@ export const updateUserProfile = async (
   if (userRole === Role.ADMIN) {
     if (status) user.status = status;
     if (isVerified) user.isVerified = isVerified;
-    if (specialistIds?.length) {
+    if (specialistIds && specialistIds.length) {
       const specialists = await SpecialistModel.find({
         _id: { $in: specialistIds },
       });
@@ -154,6 +154,7 @@ export const updateUserProfile = async (
     }
   }
 
-  await user.save();
-  return formatUserResponse(user.toObject(), userRole);
+  const updatedUser = await user.save();
+
+  return formatUserResponse(updatedUser.toObject(), userRole);
 };
