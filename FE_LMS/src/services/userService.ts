@@ -5,6 +5,7 @@ export interface UserListParams {
   page?: number;
   limit?: number;
   role?: string;
+  specialistIds?: string[];
 }
 
 export interface UserListPagination {

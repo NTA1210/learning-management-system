@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import http from "../utils/http";
+import http, { httpClient } from "../utils/http";
 import { subjectService } from "../services";
 import { userService } from "../services/userService";
 
@@ -43,14 +43,23 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
     const load = async () => {
       setError("");
       try {
-        const [subjectRes, teacherRes, semesterRes] = await Promise.all([
+        const [subjectsResult, teachersResult, semestersResult] = await Promise.allSettled([
           subjectService.getAllSubjects(),
-          userService.getUsers({ role: "teacher", limit: 50 }),
-          http.get("/semesters"),
+          userService.getUsers({ role: "teacher", specialistIds: currentSpecialistIds } as any),
+          httpClient.get("/semesters", { withCredentials: true }),
         ]);
-        setSubjects(subjectRes.data || []);
-        setTeachers(teacherRes.users || []);
-        setSemesters(Array.isArray((semesterRes as any)?.data) ? (semesterRes as any).data : []);
+        if (subjectsResult.status === "fulfilled") {
+          setSubjects(subjectsResult.value.data || []);
+          console.log("subjects", subjectsResult.value.data || []);
+        }
+        if (teachersResult.status === "fulfilled") {
+          setTeachers(teachersResult.value.users || []);
+        }
+        if (semestersResult.status === "fulfilled") {
+          const body: any = semestersResult.value.data;
+          const list = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
+          setSemesters(list);
+        }
       } catch (e: any) {
         setError(e?.message || "Không thể tải dữ liệu");
       }
@@ -76,20 +85,21 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
     }));
     if (name === "subjectId") {
       const selected = subjects.find(s => s._id === value) as any;
-      const specIds: string[] = Array.isArray(selected?.specialistIds)
+      const rawSpecIds = Array.isArray(selected?.specialistIds)
         ? selected.specialistIds
         : Array.isArray(selected?.specialists)
         ? (selected.specialists || []).map((s: any) => s?._id).filter(Boolean)
         : [selected?.specialistId || selected?.specialist?._id].filter(Boolean);
+      const specIds = rawSpecIds
+        .map((x: any) => (typeof x === "string" ? x : x?._id))
+        .filter((id: any) => typeof id === "string" && id);
       setCurrentSpecialistIds(specIds);
       void (async () => {
         try {
-          const params: any = { role: "teacher", limit: 50 };
-          const one = specIds.length === 1 ? specIds[0] : undefined;
-          if (one) params.specialistId = one;
+          const params: any = { role: "teacher",  specialistIds: specIds };
           const res = await userService.getUsers(params);
           setTeachers(res.users || []);
-        } catch (_e) { }
+        } catch (_e) {}
       })();
     }
   };
