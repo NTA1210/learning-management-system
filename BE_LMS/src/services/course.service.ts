@@ -367,7 +367,7 @@ export const createCourse = async (
     const invalidTeachers: string[] = [];
 
     for (const teacher of teachers) {
-      const teacherSpecialistIds = teacher.specialistIds?.map((id) => id.toString()) || [];
+      const teacherSpecialistIds = teacher.specialistIds?.map((id: any) => id.toString()) || [];
 
       // Admin can bypass specialist check -> REMOVED: Admin must also have specialization
       // if (teacher.role === Role.ADMIN) {
@@ -613,7 +613,7 @@ export const updateCourse = async (
       const invalidTeachers: string[] = [];
 
       for (const teacher of teachers) {
-        const teacherSpecialistIds = teacher.specialistIds?.map((id) => id.toString()) || [];
+        const teacherSpecialistIds = teacher.specialistIds?.map((id: any) => id.toString()) || [];
 
         // Admin can bypass specialist check -> REMOVED: Admin must also have specialization
         // if (teacher.role === Role.ADMIN) {
