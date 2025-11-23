@@ -37,7 +37,7 @@ export const snapShotQuestion = z
     points: z.number().positive().optional().default(1),
     explanation: z.string().optional(),
     isExternal: z.boolean().default(true),
-    isNew: z.boolean().default(true),
+    isNewQuestion: z.boolean().default(true),
     isDeleted: z.boolean().default(false),
     isDirty: z.boolean().default(false),
   })

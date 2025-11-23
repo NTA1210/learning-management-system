@@ -1,6 +1,6 @@
-import { IFeedback } from "@/types";
-import { FeedbackType } from "@/types/feedback.type";
-import mongoose from "mongoose";
+import { IFeedback } from '@/types';
+import { FeedbackType } from '@/types/feedback.type';
+import mongoose from 'mongoose';
 
 const feedbackSchema = new mongoose.Schema<IFeedback>(
   {
@@ -9,12 +9,12 @@ const feedbackSchema = new mongoose.Schema<IFeedback>(
       enum: FeedbackType,
       required: true,
     },
-    title: { type: String, required: true },
-    description: { type: String, required: true },
+    title: { type: String, required: true, trim: true },
+    description: { type: String, required: true, trim: true },
     rating: { type: Number, required: true },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     targetId: { type: mongoose.Schema.Types.ObjectId }, // có thể ref tới Teacher, Course …
@@ -28,7 +28,7 @@ const feedbackSchema = new mongoose.Schema<IFeedback>(
         validator: function (v) {
           return v <= 20 * 1024 * 1024;
         },
-        message: "File size must be <= 20MB",
+        message: 'File size must be <= 20MB',
       },
     },
   },
@@ -40,10 +40,6 @@ feedbackSchema.index({ userId: 1, createdAt: -1 });
 feedbackSchema.index({ targetId: 1, createdAt: -1 });
 feedbackSchema.index({ type: 1, createdAt: -1 });
 
-const FeedbackModel = mongoose.model<IFeedback>(
-  "Feedback",
-  feedbackSchema,
-  "feedbacks"
-);
+const FeedbackModel = mongoose.model<IFeedback>('Feedback', feedbackSchema, 'feedbacks');
 
 export default FeedbackModel;

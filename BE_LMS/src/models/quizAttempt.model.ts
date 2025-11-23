@@ -18,13 +18,11 @@ const QuizAttemptSchema = new mongoose.Schema<IQuizAttempt>(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Quiz',
       required: true,
-      index: true,
     },
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     startedAt: { type: Date, default: Date.now },
     submittedAt: { type: Date },
@@ -98,7 +96,6 @@ QuizAttemptSchema.methods.grade = async function (answers: Answer[], quiz: IQuiz
   };
 };
 
-QuizAttemptSchema.index({ quizId: 1, studentId: 1 });
 const QuizAttemptModel = mongoose.model<IQuizAttempt>(
   'QuizAttempt',
   QuizAttemptSchema,

@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 
 const SemesterSchema = new mongoose.Schema<ISemester>(
   {
-    name: { type: String },
+    name: { type: String, trim: true },
     year: { type: Number },
     type: {
       type: String,

@@ -1,27 +1,19 @@
-import { BAD_REQUEST, NOT_FOUND } from "@/constants/http";
-import { QuizModel, QuizQuestionModel, SubjectModel } from "@/models";
-import { ListParams } from "@/types/dto";
-import IQuizQuestion, { QuizQuestionType } from "@/types/quizQuestion.type";
-import appAssert from "@/utils/appAssert";
-import {
-  prefixExternalQuizQuestionImage,
-  prefixQuizQuestionImage,
-} from "@/utils/filePrefix";
-import {
-  getKeyFromPublicUrl,
-  removeFile,
-  removeFiles,
-  uploadFiles,
-} from "@/utils/uploadFile";
+import { BAD_REQUEST, NOT_FOUND } from '@/constants/http';
+import { QuizModel, QuizQuestionModel, SubjectModel } from '@/models';
+import { ListParams } from '@/types/dto';
+import IQuizQuestion, { QuizQuestionType } from '@/types/quizQuestion.type';
+import appAssert from '@/utils/appAssert';
+import { prefixExternalQuizQuestionImage, prefixQuizQuestionImage } from '@/utils/filePrefix';
+import { getKeyFromPublicUrl, removeFile, removeFiles, uploadFiles } from '@/utils/uploadFile';
 import {
   ICreateQuizQuestionParams,
   IGetRandomQuestionsParams,
   IUpdateQuizQuestionParams,
   TUploadImagesParams,
-} from "@/validators/quizQuestion.schemas";
-import mongoose, { FilterQuery } from "mongoose";
-import { parseStringPromise } from "xml2js";
-import { create } from "xmlbuilder";
+} from '@/validators/quizQuestion.schemas';
+import mongoose, { FilterQuery } from 'mongoose';
+import { parseStringPromise } from 'xml2js';
+import { create } from 'xmlbuilder';
 
 /**
  * Import questions from an XML file.
@@ -33,9 +25,9 @@ import { create } from "xmlbuilder";
  */
 export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
   const subject = await SubjectModel.findById(subjectId);
-  appAssert(subject, NOT_FOUND, "Subject not found");
+  appAssert(subject, NOT_FOUND, 'Subject not found');
 
-  const xmlContent = xmlBuffer.toString("utf-8");
+  const xmlContent = xmlBuffer.toString('utf-8');
 
   const result = await parseStringPromise(xmlContent, {
     explicitArray: true,
@@ -53,11 +45,11 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
   const importedQuestions: Partial<IQuizQuestion>[] = [];
 
   for (const q of questions) {
-    const typeAttr = q.$?.type || "mcq";
-    if (typeAttr === "category") continue;
+    const typeAttr = q.$?.type || 'mcq';
+    if (typeAttr === 'category') continue;
 
-    const questionName = q.name?.[0]?.text?.[0] || "Unnamed question";
-    const questionText = q.questiontext?.[0]?.text?.[0] || "";
+    const questionName = q.name?.[0]?.text?.[0] || 'Unnamed question';
+    const questionText = q.questiontext?.[0]?.text?.[0] || '';
 
     // Loại câu hỏi
     const type = typeMap[typeAttr] || QuizQuestionType.MCQ;
@@ -69,8 +61,8 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
     const correctOptions: number[] = [];
 
     answers.forEach((ans: any) => {
-      const text = ans.text?.[0] || "";
-      const fraction = parseFloat(ans.$?.fraction || "0");
+      const text = ans.text?.[0] || '';
+      const fraction = parseFloat(ans.$?.fraction || '0');
       options.push(text);
       correctOptions.push(fraction > 0 ? 1 : 0);
     });
@@ -82,8 +74,8 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
       type,
       options,
       correctOptions,
-      points: parseFloat(q.defaultgrade?.[0] || "1"),
-      explanation: "",
+      points: parseFloat(q.defaultgrade?.[0] || '1'),
+      explanation: '',
     };
     importedQuestions.push(newQuestion);
   }
@@ -108,30 +100,25 @@ export const importXMLFile = async (xmlBuffer: Buffer, subjectId: string) => {
 
 export const exportXMLFile = async (subjectId: string) => {
   const subject = await SubjectModel.findById(subjectId);
-  appAssert(subject, NOT_FOUND, "Subject not found");
+  appAssert(subject, NOT_FOUND, 'Subject not found');
 
   const quizQuestions = await QuizQuestionModel.find({ subjectId }).lean();
-  appAssert(quizQuestions.length > 0, NOT_FOUND, "No questions found");
+  appAssert(quizQuestions.length > 0, NOT_FOUND, 'No questions found');
 
   const subjectCode = subject.code;
   const types = new Set(quizQuestions.map((q) => q.type));
 
   // root quiz
-  const root = create("quiz");
+  const root = create('quiz');
 
   // category question
-  const catQ = root.ele("question", { type: "category" });
+  const catQ = root.ele('question', { type: 'category' });
+  catQ.ele('category').ele('text').txt(`$course$/top/Default for ${subjectCode}`);
   catQ
-    .ele("category")
-    .ele("text")
-    .txt(`$course$/top/Default for ${subjectCode}`);
-  catQ
-    .ele("info", { format: "moodle_auto_format" })
-    .ele("text")
-    .txt(
-      `The default category for questions shared in context '${subjectCode}'.`
-    );
-  catQ.ele("idnumber").txt("");
+    .ele('info', { format: 'moodle_auto_format' })
+    .ele('text')
+    .txt(`The default category for questions shared in context '${subjectCode}'.`);
+  catQ.ele('idnumber').txt('');
 
   // add each quiz question
   quizQuestions.forEach((q, idx) => {
@@ -139,47 +126,41 @@ export const exportXMLFile = async (subjectId: string) => {
     root.com(`question: ${idx + 1}`);
 
     // always multichoice
-    const question = root.ele("question", { type: q.type });
+    const question = root.ele('question', { type: q.type });
 
     // name
-    question.ele("name").ele("text").dat(q.text.substring(0, 50));
+    question.ele('name').ele('text').dat(q.text.substring(0, 50));
 
     // questiontext
-    question
-      .ele("questiontext", { format: "html" })
-      .ele("text")
-      .dat(`<p>${q.text}</p>`);
+    question.ele('questiontext', { format: 'html' }).ele('text').dat(`<p>${q.text}</p>`);
 
     // generalfeedback
-    question.ele("generalfeedback", { format: "html" }).ele("text").dat("");
+    question.ele('generalfeedback', { format: 'html' }).ele('text').dat('');
 
     // grading info
-    question.ele("defaultgrade").txt("1.0000000");
-    question.ele("penalty").txt("0.3333333");
-    question.ele("hidden").txt("0");
-    question.ele("idnumber").txt("");
+    question.ele('defaultgrade').txt('1.0000000');
+    question.ele('penalty').txt('0.3333333');
+    question.ele('hidden').txt('0');
+    question.ele('idnumber').txt('');
 
     // multichoice specific
-    question.ele("single").txt("true");
-    question.ele("shuffleanswers").txt("true");
-    question.ele("answernumbering").txt("abc");
-    question.ele("showstandardinstruction").txt("1");
+    question.ele('single').txt('true');
+    question.ele('shuffleanswers').txt('true');
+    question.ele('answernumbering').txt('abc');
+    question.ele('showstandardinstruction').txt('1');
 
     // feedback blocks
-    question.ele("correctfeedback", { format: "html" }).ele("text").dat("");
-    question
-      .ele("partiallycorrectfeedback", { format: "html" })
-      .ele("text")
-      .dat("");
-    question.ele("incorrectfeedback", { format: "html" }).ele("text").dat("");
+    question.ele('correctfeedback', { format: 'html' }).ele('text').dat('');
+    question.ele('partiallycorrectfeedback', { format: 'html' }).ele('text').dat('');
+    question.ele('incorrectfeedback', { format: 'html' }).ele('text').dat('');
 
     // answers
     if (q.options && q.options.length) {
       q.options.forEach((opt: string, index: number) => {
-        const fraction = q.correctOptions?.includes(index) ? "100" : "0";
-        const ans = question.ele("answer", { fraction, format: "html" });
-        ans.ele("text").dat(`<p>${opt}</p>`);
-        ans.ele("feedback", { format: "html" }).ele("text").dat("");
+        const fraction = q.correctOptions?.includes(index) ? '100' : '0';
+        const ans = question.ele('answer', { fraction, format: 'html' });
+        ans.ele('text').dat(`<p>${opt}</p>`);
+        ans.ele('feedback', { format: 'html' }).ele('text').dat('');
       });
     }
   });
@@ -215,7 +196,7 @@ export const getAllQuizQuestions = async ({
   search,
   from,
   to,
-  sortOrder = "desc",
+  sortOrder = 'desc',
   subjectId,
   type,
 }: Partial<IListQuizQuestionParams>) => {
@@ -224,7 +205,7 @@ export const getAllQuizQuestions = async ({
 
   if (subjectId) {
     const subject = await SubjectModel.findById(subjectId);
-    appAssert(subject, NOT_FOUND, "Subject not found");
+    appAssert(subject, NOT_FOUND, 'Subject not found');
     query.subjectId = subjectId;
   }
 
@@ -233,7 +214,7 @@ export const getAllQuizQuestions = async ({
   // Nếu có search => dùng $text
   if (search) {
     query.$text = { $search: search };
-    projection.score = { $meta: "textScore" };
+    projection.score = { $meta: 'textScore' };
   }
 
   if (from || to) {
@@ -244,11 +225,11 @@ export const getAllQuizQuestions = async ({
 
   const _page = Math.max(1, page);
   const _limit = Math.min(Math.max(1, limit), 100);
-  const sortDirection = sortOrder === "asc" ? 1 : -1;
+  const sortDirection = sortOrder === 'asc' ? 1 : -1;
 
   // Nếu có search, sort theo score trước, sau đó mới sort theo createdAt nếu muốn
   let sortObj: any = { createdAt: sortDirection };
-  if (search) sortObj = { score: { $meta: "textScore" } };
+  if (search) sortObj = { score: { $meta: 'textScore' } };
 
   const [rawData, total] = await Promise.all([
     QuizQuestionModel.find(query, projection)
@@ -265,7 +246,7 @@ export const getAllQuizQuestions = async ({
       ...q,
       images: q.images?.map((image) => ({ url: image, fromDB: true })),
       isExternal: false,
-      isNew: false,
+      isNewQuestion: false,
       isDirty: false,
       isDeleted: false,
     };
@@ -300,11 +281,7 @@ const handleImageUpload = async (
   deletedKeys?: string[]
 ) => {
   for (const file of files) {
-    appAssert(
-      file.mimetype.startsWith("image/"),
-      BAD_REQUEST,
-      "File must be an image"
-    );
+    appAssert(file.mimetype.startsWith('image/'), BAD_REQUEST, 'File must be an image');
   }
 
   if (deletedKeys && deletedKeys.length > 0)
@@ -334,15 +311,14 @@ export const checkProperQuestionType = (
       return appAssert(
         trueOptions >= 1,
         BAD_REQUEST,
-        message ||
-          "Multiple choice questions must have at least one correct option"
+        message || 'Multiple choice questions must have at least one correct option'
       );
 
     default:
       return appAssert(
         trueOptions === 1,
         BAD_REQUEST,
-        message || "This question type must have only one correct option"
+        message || 'This question type must have only one correct option'
       );
   }
 };
@@ -371,13 +347,10 @@ export const createQuizQuestion = async ({
   explanation,
 }: ICreateQuizQuestionParams) => {
   const subject = await SubjectModel.findById(subjectId);
-  appAssert(subject, NOT_FOUND, "Subject not found");
+  appAssert(subject, NOT_FOUND, 'Subject not found');
 
   //check questions type
-  checkProperQuestionType(
-    type || QuizQuestionType.MULTIPLE_CHOICE,
-    correctOptions
-  );
+  checkProperQuestionType(type || QuizQuestionType.MULTIPLE_CHOICE, correctOptions);
 
   // 1️⃣ Tạo question trước
   const newQuizQuestion = await QuizQuestionModel.create({
@@ -393,11 +366,7 @@ export const createQuizQuestion = async ({
   // 2️⃣ Nếu có ảnh, upload và cập nhật sau
   if (images && images.length > 0) {
     try {
-      const imageFiles = await handleImageUpload(
-        images,
-        subjectId,
-        newQuizQuestion.id
-      );
+      const imageFiles = await handleImageUpload(images, subjectId, newQuizQuestion.id);
 
       await QuizQuestionModel.findByIdAndUpdate(newQuizQuestion._id, {
         images: imageFiles,
@@ -441,19 +410,16 @@ export const updateQuizQuestion = async ({
 }: IUpdateQuizQuestionParams) => {
   // 1️⃣ Lấy quiz question
   const quizQuestion = await QuizQuestionModel.findById(quizQuestionId);
-  appAssert(quizQuestion, NOT_FOUND, "Question not found");
+  appAssert(quizQuestion, NOT_FOUND, 'Question not found');
 
   // 2️⃣ Kiểm tra subject nếu có
   if (subjectId) {
     const subject = await SubjectModel.findById(subjectId);
-    appAssert(subject, NOT_FOUND, "Subject not found");
+    appAssert(subject, NOT_FOUND, 'Subject not found');
   }
 
   //check questions type
-  checkProperQuestionType(
-    type || quizQuestion.type,
-    correctOptions || quizQuestion.correctOptions
-  );
+  checkProperQuestionType(type || quizQuestion.type, correctOptions || quizQuestion.correctOptions);
 
   // 3️⃣ Validate options & correctOptions
   const finalOptions = options ?? quizQuestion.options;
@@ -462,15 +428,13 @@ export const updateQuizQuestion = async ({
   appAssert(
     finalOptions.length === finalCorrectOptions.length,
     BAD_REQUEST,
-    "Options and correct options must have the same length"
+    'Options and correct options must have the same length'
   );
 
   // 4️⃣ Xử lý ảnh: loại bỏ deletedKeys
   let imagesRemaining = quizQuestion.images || [];
   if (deletedKeys && deletedKeys.length > 0) {
-    imagesRemaining = imagesRemaining.filter(
-      (img) => !deletedKeys.includes(img)
-    );
+    imagesRemaining = imagesRemaining.filter((img) => !deletedKeys.includes(img));
   }
 
   // 5️⃣ Upload ảnh mới nếu có
@@ -502,7 +466,7 @@ export const updateQuizQuestion = async ({
     { new: true }
   );
 
-  appAssert(updatedQuizQuestion, NOT_FOUND, "Question not found");
+  appAssert(updatedQuizQuestion, NOT_FOUND, 'Question not found');
 
   return updatedQuizQuestion;
 };
@@ -515,18 +479,14 @@ export const updateQuizQuestion = async ({
  */
 export const deleteQuizQuestion = async (quizQuestionId: string) => {
   const question = await QuizQuestionModel.findById(quizQuestionId);
-  appAssert(question, NOT_FOUND, "Question not found");
+  appAssert(question, NOT_FOUND, 'Question not found');
 
   const isInActiveQuiz = await QuizModel.exists({
     isCompleted: false,
     questionIds: { $in: [new mongoose.Types.ObjectId(quizQuestionId)] },
   });
 
-  appAssert(
-    !isInActiveQuiz,
-    BAD_REQUEST,
-    "Can't delete question in active quiz"
-  );
+  appAssert(!isInActiveQuiz, BAD_REQUEST, "Can't delete question in active quiz");
 
   await QuizQuestionModel.findByIdAndDelete(quizQuestionId);
   if (question.images && question.images.length > 0) {
@@ -545,17 +505,13 @@ export const deleteQuizQuestion = async (quizQuestionId: string) => {
  * @returns  - A success message.
  */
 export const deleteMultipleQuizQuestions = async (ids: string[]) => {
-  appAssert(ids.length > 0, BAD_REQUEST, "No question IDs provided");
+  appAssert(ids.length > 0, BAD_REQUEST, 'No question IDs provided');
 
   // Kiem tra xem cac ID cua cau hoi co ton tai khong
   const questions = await QuizQuestionModel.find({
     _id: { $in: ids },
   }).lean();
-  appAssert(
-    questions.length === ids.length,
-    BAD_REQUEST,
-    "Some question IDs are invalid"
-  );
+  appAssert(questions.length === ids.length, BAD_REQUEST, 'Some question IDs are invalid');
 
   // Kiểm tra xem có câu hỏi nào đang được sử dụng trong quiz chưa hoàn tất không
   const activeQuizzes = await QuizModel.find({
@@ -563,32 +519,23 @@ export const deleteMultipleQuizQuestions = async (ids: string[]) => {
     isCompleted: false,
   });
 
-  appAssert(
-    activeQuizzes.length === 0,
-    BAD_REQUEST,
-    "Some questions are in active quizzes"
-  );
+  appAssert(activeQuizzes.length === 0, BAD_REQUEST, 'Some questions are in active quizzes');
 
   // Xóa thật (hoặc soft delete)
   await QuizQuestionModel.deleteMany({ _id: { $in: ids } });
 
   const fileKeys: string[] = questions.flatMap((q) =>
-    q.images && q.images.length > 0
-      ? [...q.images.map((i) => getKeyFromPublicUrl(i))]
-      : []
+    q.images && q.images.length > 0 ? [...q.images.map((i) => getKeyFromPublicUrl(i))] : []
   );
 
   await removeFiles(fileKeys);
 
-  return { message: "Deleted successfully" };
+  return { message: 'Deleted successfully' };
 };
 
-export const getRandomQuestions = async ({
-  count = 10,
-  subjectId,
-}: IGetRandomQuestionsParams) => {
+export const getRandomQuestions = async ({ count = 10, subjectId }: IGetRandomQuestionsParams) => {
   const subject = await SubjectModel.findById(subjectId);
-  appAssert(subject, NOT_FOUND, "Subject not found");
+  appAssert(subject, NOT_FOUND, 'Subject not found');
 
   const questions = await QuizQuestionModel.aggregate<IQuizQuestion>([
     { $match: { subjectId: subject._id } },
@@ -602,7 +549,7 @@ export const getRandomQuestions = async ({
       ...q,
       images: q.images?.map((image) => ({ url: image, fromDB: true })),
       isExternal: false,
-      isNew: false,
+      isNewQuestion: false,
       isDirty: false,
       isDeleted: false,
     };
@@ -624,11 +571,7 @@ export const getRandomQuestions = async ({
  */
 export const uploadImages = async ({ quizId, images }: TUploadImagesParams) => {
   for (const file of images) {
-    appAssert(
-      file.mimetype.startsWith("image/"),
-      BAD_REQUEST,
-      "File must be an image"
-    );
+    appAssert(file.mimetype.startsWith('image/'), BAD_REQUEST, 'File must be an image');
   }
 
   const prefix = prefixExternalQuizQuestionImage(quizId);
