@@ -1,6 +1,7 @@
 import AssignmentModel from "../models/assignment.model";
 import CourseModel from "../models/course.model";
 import EnrollmentModel from "../models/enrollment.model";
+import AnnouncementModel from "../models/announcement.model";
 import mongoose from "mongoose";
 import appAssert from "../utils/appAssert";
 import { NOT_FOUND, FORBIDDEN } from "../constants/http";
@@ -159,20 +160,29 @@ export const createAssignment = async (data: any, userId?: mongoose.Types.Object
     .populate("createdBy", "username email fullname")
     .lean();
 
-  const shouldNotify =
+  const shouldAnnounce =
     (!!userRole && [Role.TEACHER, Role.ADMIN].includes(userRole)) &&
     !!data.courseId;
 
-  if (shouldNotify && userRole) {
-    const notificationTitle =
+  if (shouldAnnounce && userRole) {
+    const assignmentTitle =
       populatedAssignment?.title || data.title || "New assignment";
     const courseTitle = (course as any)?.title;
     const courseName = courseTitle ? ` for ${courseTitle}` : "";
 
     try {
+      //tạo announcement cho course
+      await AnnouncementModel.create({
+        title: `New assignment: ${assignmentTitle}`,
+        content: `A new assignment has been posted${courseName}. Please review the details and get started.`,
+        courseId: data.courseId,
+        authorId: createdBy as mongoose.Types.ObjectId,
+      });
+
+      //gửi notification cho all students đã enroll vào course
       await createNotification(
         {
-          title: `New assignment: ${notificationTitle}`,
+          title: `New assignment: ${assignmentTitle}`,
           message: `A new assignment has been posted${courseName}. Please review the details and get started.`,
           recipientType: "course",
           recipientCourse: data.courseId,
@@ -181,7 +191,7 @@ export const createAssignment = async (data: any, userId?: mongoose.Types.Object
         userRole
       );
     } catch (error) {
-      console.error("Failed to send assignment notification", error);
+      console.error("Failed to send assignment announcement and notification", error);
     }
   }
 
