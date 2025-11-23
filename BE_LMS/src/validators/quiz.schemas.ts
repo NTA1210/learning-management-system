@@ -1,7 +1,7 @@
 import { QuizQuestionType } from '@/types/quizQuestion.type';
 import mongoose from 'mongoose';
 import z from 'zod';
-import { datePreprocess, nonPastDateSchema } from './helpers/date.schema';
+import { nonPastDateSchema } from './helpers/date.schema';
 
 export const courseIdSchema = z.string().length(24, 'Invalid course ID');
 
@@ -53,7 +53,7 @@ export const createQuizSchema = z
     title: z.string().min(1).max(255),
     courseId: courseIdSchema,
     description: z.string().optional(),
-    startTime: datePreprocess.default(() => new Date()),
+    startTime: nonPastDateSchema.default(() => new Date()),
     endTime: nonPastDateSchema,
     shuffleQuestions: z.boolean().default(false),
     isPublished: z.boolean().default(true),
@@ -77,7 +77,7 @@ export const updateQuizSchema = z
     quizId: z.string().length(24, 'Invalid quiz ID'),
     title: z.string().min(1).max(255).optional(),
     description: z.string().optional(),
-    startTime: datePreprocess.optional(),
+    startTime: nonPastDateSchema.optional(),
     endTime: nonPastDateSchema.optional(),
     shuffleQuestions: z.boolean().optional(),
     snapshotQuestions: z
