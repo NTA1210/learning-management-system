@@ -1,10 +1,8 @@
-import mongoose from "mongoose";
-import z from "zod";
+import mongoose from 'mongoose';
+import z from 'zod';
 
-const quizIdSchema = z.string().length(24, "Invalid quiz ID");
-export const quizAttemptIdSchema = z
-  .string()
-  .length(24, "Invalid quiz attempt ID");
+const quizIdSchema = z.string().length(24, 'Invalid quiz ID');
+export const quizAttemptIdSchema = z.string().length(24, 'Invalid quiz attempt ID');
 
 export const enrollQuizSchema = z.object({
   quizId: quizIdSchema,
@@ -13,7 +11,6 @@ export const enrollQuizSchema = z.object({
 
 export type EnrollUserInfo = {
   userId: mongoose.Types.ObjectId;
-  role: string;
   userAgent?: string | string[];
   ip?: string | null;
 };
@@ -26,7 +23,7 @@ const answerSchema = z.object({
   questionId: z.string(),
   answer: z.array(
     z.number().refine((v) => v === 0 || v === 1, {
-      message: "Answer must be 0 or 1",
+      message: 'Answer must be 0 or 1',
     })
   ),
   correct: z.boolean().optional(),

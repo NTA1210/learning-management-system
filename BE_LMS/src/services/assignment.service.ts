@@ -1,6 +1,7 @@
 import AssignmentModel from "../models/assignment.model";
 import CourseModel from "../models/course.model";
 import EnrollmentModel from "../models/enrollment.model";
+import AnnouncementModel from "../models/announcement.model";
 import mongoose from "mongoose";
 import appAssert from "../utils/appAssert";
 import { NOT_FOUND, FORBIDDEN } from "../constants/http";
@@ -17,7 +18,7 @@ export type ListAssignmentsParams = {
   sortBy?: string;
   sortOrder?: string;
   userId?: mongoose.Types.ObjectId;
-  userRole?: string;
+  userRole?: Role;
 };
 
 export const listAssignments = async ({
@@ -145,7 +146,7 @@ export const getAssignmentById = async (assignmentId: string, userId?: mongoose.
   return assignment;
 };
 
-export const createAssignment = async (data: any, userId?: mongoose.Types.ObjectId, userRole?: string) => {
+export const createAssignment = async (data: any, userId?: mongoose.Types.ObjectId, userRole?: Role) => {
   // Verify course exists
   const course = await CourseModel.findById(data.courseId);
   appAssert(course, NOT_FOUND, "Course not found");
@@ -153,10 +154,35 @@ export const createAssignment = async (data: any, userId?: mongoose.Types.Object
   const createdBy = userId && (userId as any)._bsontype === 'ObjectID' ? userId : new mongoose.Types.ObjectId(userId as any);
   const assignmentData = { ...data, createdBy };
   const assignment = await AssignmentModel.create(assignmentData);
-  return await AssignmentModel.findById(assignment._id)
+  const populatedAssignment = await AssignmentModel.findById(assignment._id)
     .populate("courseId", "title code")
     .populate("createdBy", "username email fullname")
     .lean();
+
+  const shouldAnnounce =
+    (!!userRole && [Role.TEACHER, Role.ADMIN].includes(userRole)) &&
+    !!data.courseId;
+
+  if (shouldAnnounce && userRole) {
+    const assignmentTitle =
+      populatedAssignment?.title || data.title || "New assignment";
+    const courseTitle = (course as any)?.title;
+    const courseName = courseTitle ? ` for ${courseTitle}` : "";
+
+    try {
+      //tạo announcement cho course
+      await AnnouncementModel.create({
+        title: `New assignment: ${assignmentTitle}`,
+        content: `A new assignment has been posted${courseName}. Please review the details and get started.`,
+        courseId: data.courseId,
+        authorId: createdBy as mongoose.Types.ObjectId,
+      });
+    } catch (error) {
+      console.error("Failed to create assignment announcement", error);
+    }
+  }
+
+  return populatedAssignment;
 };
 
 export const updateAssignment = async (assignmentId: string, data: any) => {

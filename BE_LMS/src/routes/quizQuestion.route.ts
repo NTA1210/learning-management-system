@@ -1,4 +1,4 @@
-import upload from "@/config/multer";
+import upload from '@/config/multer';
 import {
   createQuizQuestionHandler,
   deleteImageHandler,
@@ -10,28 +10,43 @@ import {
   importXMLFileHandler,
   updateQuizQuestionByIdHandler,
   uploadImagesHandler,
-} from "@/controller/quizQuestion.controller";
-import { authorize } from "@/middleware";
-import { Role } from "@/types";
-import { Router } from "express";
+} from '@/controller/quizQuestion.controller';
+import { authorize } from '@/middleware';
+import { Role } from '@/types';
+import { Router } from 'express';
 
 const quizQuestionRoutes = Router();
 //prefix: /quiz-questions
 
-quizQuestionRoutes.post("/import", upload.single("file"), importXMLFileHandler);
-
-quizQuestionRoutes.get("/export/:subjectId", exportXMLFileHandler);
-quizQuestionRoutes.get("/", getAllQuizQuestionsHandler);
-quizQuestionRoutes.post("/", upload.array("files"), createQuizQuestionHandler);
+quizQuestionRoutes.post(
+  '/import',
+  authorize(Role.ADMIN),
+  upload.single('file'),
+  importXMLFileHandler
+);
+quizQuestionRoutes.get('/export/:subjectId', authorize(Role.ADMIN), exportXMLFileHandler);
+quizQuestionRoutes.get('/', authorize(Role.ADMIN), getAllQuizQuestionsHandler);
+quizQuestionRoutes.post(
+  '/',
+  authorize(Role.ADMIN),
+  upload.array('files'),
+  createQuizQuestionHandler
+);
 quizQuestionRoutes.put(
-  "/:quizQuestionId",
-  upload.array("files"),
+  '/:quizQuestionId',
+  authorize(Role.ADMIN),
+  upload.array('files'),
   updateQuizQuestionByIdHandler
 );
-quizQuestionRoutes.delete("/image", deleteImageHandler);
-quizQuestionRoutes.delete("/:quizQuestionId", deleteQuizQuestionByIdHandler);
-quizQuestionRoutes.delete("/", deleteMultiQuizQuestionByIdHandler);
-quizQuestionRoutes.get("/random", getRandomQuestionsHandler);
-quizQuestionRoutes.post("/images", upload.array("files"), uploadImagesHandler);
+quizQuestionRoutes.delete('/image', authorize(Role.ADMIN, Role.TEACHER), deleteImageHandler);
+quizQuestionRoutes.delete('/:quizQuestionId', authorize(Role.ADMIN), deleteQuizQuestionByIdHandler);
+quizQuestionRoutes.delete('/', authorize(Role.ADMIN), deleteMultiQuizQuestionByIdHandler);
+quizQuestionRoutes.get('/random', authorize(Role.ADMIN, Role.TEACHER), getRandomQuestionsHandler);
+quizQuestionRoutes.post(
+  '/images',
+  authorize(Role.ADMIN, Role.TEACHER),
+  upload.array('files'),
+  uploadImagesHandler
+);
 
 export default quizQuestionRoutes;

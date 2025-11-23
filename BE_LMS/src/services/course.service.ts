@@ -367,15 +367,15 @@ export const createCourse = async (
     const invalidTeachers: string[] = [];
 
     for (const teacher of teachers) {
-      const teacherSpecialistIds = teacher.specialistIds?.map((id) => id.toString()) || [];
+      const teacherSpecialistIds = teacher.specialistIds?.map((id: any) => id.toString()) || [];
 
-      // Admin can bypass specialist check
-      if (teacher.role === Role.ADMIN) {
-        continue;
-      }
+      // Admin can bypass specialist check -> REMOVED: Admin must also have specialization
+      // if (teacher.role === Role.ADMIN) {
+      //   continue;
+      // }
 
       // Check if teacher has at least one matching specialist
-      const hasMatchingSpecialist = teacherSpecialistIds.some((teacherSpecId) =>
+      const hasMatchingSpecialist = teacherSpecialistIds.some((teacherSpecId: string) =>
         subjectSpecialistIds.includes(teacherSpecId)
       );
 
@@ -553,46 +553,57 @@ export const updateCourse = async (
     if (data.endDate) data.endDate = endDate as any;
   }
 
-  // Validate teachers if provided
-  if (data.teacherIds) {
-    // ❌ FIX: Check duplicate teacherIds
-    const uniqueTeachers = new Set(data.teacherIds.map((id) => id.toString()));
-    appAssert(
-      uniqueTeachers.size === data.teacherIds.length,
-      BAD_REQUEST,
-      'Teacher list contains duplicate entries'
-    );
+  // Validate teachers if provided OR if subject is changing
+  if (data.teacherIds || data.subjectId) {
+    let teachers: any[] = [];
 
-    const teachers = await UserModel.find({
-      _id: { $in: data.teacherIds },
-    });
+    // If teachers are being updated, perform full validation on new teachers
+    if (data.teacherIds) {
+      // ❌ FIX: Check duplicate teacherIds
+      const uniqueTeachers = new Set(data.teacherIds.map((id) => id.toString()));
+      appAssert(
+        uniqueTeachers.size === data.teacherIds.length,
+        BAD_REQUEST,
+        'Teacher list contains duplicate entries'
+      );
 
-    appAssert(
-      teachers.length === data.teacherIds.length,
-      BAD_REQUEST,
-      'One or more teachers not found'
-    );
+      teachers = await UserModel.find({
+        _id: { $in: data.teacherIds },
+      });
 
-    const allAreTeachers = teachers.every((teacher) => {
-      return teacher.role === Role.TEACHER || teacher.role === Role.ADMIN;
-    });
+      appAssert(
+        teachers.length === data.teacherIds.length,
+        BAD_REQUEST,
+        'One or more teachers not found'
+      );
 
-    appAssert(allAreTeachers, BAD_REQUEST, 'All assigned users must have teacher or admin role');
+      const allAreTeachers = teachers.every((teacher) => {
+        return teacher.role === Role.TEACHER || teacher.role === Role.ADMIN;
+      });
 
-    // ❌ FIX: Check if teachers are active (not banned/inactive)
-    const allTeachersActive = teachers.every((teacher) => {
-      return teacher.status === UserStatus.ACTIVE;
-    });
+      appAssert(allAreTeachers, BAD_REQUEST, 'All assigned users must have teacher or admin role');
 
-    appAssert(
-      allTeachersActive,
-      BAD_REQUEST,
-      'Cannot assign inactive or banned teachers to course'
-    );
+      // ❌ FIX: Check if teachers are active (not banned/inactive)
+      const allTeachersActive = teachers.every((teacher) => {
+        return teacher.status === UserStatus.ACTIVE;
+      });
+
+      appAssert(
+        allTeachersActive,
+        BAD_REQUEST,
+        'Cannot assign inactive or banned teachers to course'
+      );
+    } else {
+      // If only subject is changing, we need to validate EXISTING teachers against NEW subject
+      teachers = await UserModel.find({
+        _id: { $in: course.teacherIds },
+      });
+    }
 
     // ✅ UNIVERSITY RULE: Validate teacher specialization matches subject
-    // Get subject to check specialization requirement
-    const courseSubject = await SubjectModel.findById(course.subjectId);
+    // Get effective subject (new one or existing one)
+    const subjectIdToCheck = data.subjectId || course.subjectId;
+    const courseSubject = await SubjectModel.findById(subjectIdToCheck);
     appAssert(courseSubject, NOT_FOUND, 'Course subject not found');
 
     const subjectSpecialistIds = courseSubject.specialistIds?.map((id) => id.toString()) || [];
@@ -602,15 +613,15 @@ export const updateCourse = async (
       const invalidTeachers: string[] = [];
 
       for (const teacher of teachers) {
-        const teacherSpecialistIds = teacher.specialistIds?.map((id) => id.toString()) || [];
+        const teacherSpecialistIds = teacher.specialistIds?.map((id: any) => id.toString()) || [];
 
-        // Admin can bypass specialist check
-        if (teacher.role === Role.ADMIN) {
-          continue;
-        }
+        // Admin can bypass specialist check -> REMOVED: Admin must also have specialization
+        // if (teacher.role === Role.ADMIN) {
+        //   continue;
+        // }
 
         // Check if teacher has at least one matching specialist
-        const hasMatchingSpecialist = teacherSpecialistIds.some((teacherSpecId) =>
+        const hasMatchingSpecialist = teacherSpecialistIds.some((teacherSpecId: string) =>
           subjectSpecialistIds.includes(teacherSpecId)
         );
 

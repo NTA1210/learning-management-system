@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import type { LessonFormValues } from "../../types/lesson";
+import SearchableSelect from "../common/SearchableSelect";
 
 interface LessonFormModalProps {
   darkMode: boolean;
@@ -98,27 +99,15 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
         <form onSubmit={handleSubmit} className="px-6 py-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
-                Course *
-              </label>
-              <select
+              <SearchableSelect
                 value={values.courseId}
-                onChange={(e) => setValues((prev) => ({ ...prev, courseId: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border"
-                style={{
-                  backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                  borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
-                  color: darkMode ? "#ffffff" : "#000000",
-                }}
+                options={courses}
+                placeholder="Select a course"
+                darkMode={darkMode}
+                onChange={(courseId) => setValues((prev) => ({ ...prev, courseId }))}
                 required
-              >
-                <option value="">Select a course</option>
-                {courses.map((course) => (
-                  <option key={course._id} value={course._id}>
-                    {course.title}
-                  </option>
-                ))}
-              </select>
+                label="Course"
+              />
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>

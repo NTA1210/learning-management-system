@@ -1,14 +1,14 @@
-import { ErrorRequestHandler, Response } from "express";
-import { BAD_REQUEST, INTERNAL_SERVER_ERROR } from "../constants/http";
-import z, { ZodError } from "zod";
-import AppError from "../utils/AppError";
-import { clearAuthCookies, REFRESH_PATH } from "../utils/cookies";
-import mongoose from "mongoose";
-import AppErrorCode from "../constants/appErrorCode";
+import { ErrorRequestHandler, Response } from 'express';
+import { BAD_REQUEST, INTERNAL_SERVER_ERROR } from '../constants/http';
+import z, { ZodError } from 'zod';
+import AppError from '../utils/AppError';
+import { clearAuthCookies, REFRESH_PATH } from '../utils/cookies';
+import mongoose from 'mongoose';
+import AppErrorCode from '../constants/appErrorCode';
 
 function handleZodError(res: Response, error: ZodError) {
   const errors = error.issues.map((err) => ({
-    path: err.path.join("."),
+    path: err.path.join('.'),
     message: err.message,
   }));
 
@@ -35,8 +35,23 @@ function handleCastError(res: Response, error: mongoose.Error.CastError) {
 
 function handleJSONParseError(res: Response) {
   return res.error(BAD_REQUEST, {
-    message: "Invalid JSON format",
+    message: 'Invalid JSON format',
     code: AppErrorCode.ValidationError,
+  });
+}
+
+function handleValidationMongooseError(res: Response, error: mongoose.Error.ValidationError) {
+  console.log('ValidationError');
+
+  return res.error(BAD_REQUEST, {
+    message: error.message,
+    code: AppErrorCode.ValidationError,
+  });
+}
+
+function handleMongoError(res: Response, error: mongoose.Error) {
+  return res.error(BAD_REQUEST, {
+    message: error.message,
   });
 }
 
@@ -59,12 +74,20 @@ const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
     return handleCastError(res, error);
   }
 
-  if (error.type === "entity.parse.failed") {
+  if (error instanceof mongoose.Error.ValidationError) {
+    return handleValidationMongooseError(res, error);
+  }
+
+  if (error instanceof mongoose.Error) {
+    return handleMongoError(res, error);
+  }
+
+  if (error.type === 'entity.parse.failed') {
     return handleJSONParseError(res);
   }
 
   return res.error(INTERNAL_SERVER_ERROR, {
-    message: "Internal server error",
+    message: 'Internal server error',
   });
 };
 
