@@ -54,8 +54,9 @@ export const userService = {
   getUsers: async (params?: UserListParams): Promise<UserListResult> => {
     const queryParams = new URLSearchParams();
     
-    if (params?.page) queryParams.append("page", String(params.page));
-    if (params?.limit) queryParams.append("limit", String(params.limit));
+    // Pass page and limit as quoted strings: "1" instead of 1
+    if (params?.page !== undefined) queryParams.append("page", `"${params.page}"`);
+    if (params?.limit !== undefined) queryParams.append("limit", `"${params.limit}"`);
     if (params?.role) queryParams.append("role", params.role);
     if (params?.isVerified !== undefined) {
       const isVerifiedValue = typeof params.isVerified === 'boolean' 
