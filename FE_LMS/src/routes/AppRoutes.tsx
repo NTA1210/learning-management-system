@@ -19,6 +19,7 @@ import {DashboardPage ,
       QuizManagementPage,
       QuizCreatePage,
       CourseQuizzesPage,
+      QuizQuestionsPage,
       FeedbackPage,
       FeedbackListPage,
       EnrollmentsListPage,
@@ -134,6 +135,11 @@ function AppRoutes() {
         <Route path="/quiz/:courseId" element={
           <ProtectedRoute>
             <CourseQuizzesPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/quiz/questions/:quizId" element={
+          <ProtectedRoute>
+            <QuizQuestionsPage />
           </ProtectedRoute>
         } />
         <Route path="/quizz" element={

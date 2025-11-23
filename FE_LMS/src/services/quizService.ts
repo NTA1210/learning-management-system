@@ -182,6 +182,85 @@ export const quizService = {
       pagination: response.pagination,
     };
   },
+
+  updateQuiz: async (quizId: string, payload: Partial<CreateQuizPayload> & { snapshotQuestions?: SnapshotQuestionPayload[] }): Promise<QuizResponse> => {
+    // Normalize snapshot questions if provided
+    const normalizedSnapshots = payload.snapshotQuestions
+      ? payload.snapshotQuestions.map(normalizeSnapshotForAPI)
+      : undefined;
+
+    const response = await http.put<QuizResponse>(`/quizzes/${quizId}`, {
+      ...payload,
+      snapshotQuestions: normalizedSnapshots,
+    });
+    return response.data;
+  },
+
+  /**
+   * Delete a question from quiz (mark as deleted in snapshotQuestions)
+   * @param quizId - Quiz ID
+   * @param questionId - Question ID to delete
+   * @returns Updated quiz
+   */
+  deleteQuestionById: async (quizId: string, questionId: string): Promise<QuizResponse> => {
+    // Get current quiz
+    const quiz = await quizService.getQuizById(quizId);
+    
+    // Mark question as deleted - ensure isNewQuestion is false for existing questions
+    const updatedQuestions = (quiz.snapshotQuestions || []).map((q) =>
+      q.id === questionId 
+        ? { ...q, isDeleted: true, isDirty: true, isNewQuestion: false } 
+        : q
+    );
+
+    // Update quiz with deleted question
+    return await quizService.updateQuiz(quizId, {
+      snapshotQuestions: updatedQuestions,
+    });
+  },
+
+  /**
+   * Update a question in quiz
+   * @param quizId - Quiz ID
+   * @param questionId - Question ID to update
+   * @param questionData - Updated question data
+   * @returns Updated quiz
+   */
+  updateQuestionById: async (
+    quizId: string, 
+    questionId: string, 
+    questionData: Partial<SnapshotQuestionPayload>
+  ): Promise<QuizResponse> => {
+    // Get current quiz
+    const quiz = await quizService.getQuizById(quizId);
+    
+    // Update the question - mark as dirty and not new
+    const updatedQuestions = (quiz.snapshotQuestions || []).map((q) =>
+      q.id === questionId 
+        ? { 
+            ...q, 
+            ...questionData,
+            isDirty: true, 
+            isNewQuestion: false,
+            isDeleted: false
+          } 
+        : q
+    );
+
+    // Update quiz with updated question
+    return await quizService.updateQuiz(quizId, {
+      snapshotQuestions: updatedQuestions,
+    });
+  },
+
+  /**
+   * Delete entire quiz
+   * @param quizId - Quiz ID to delete
+   * @returns Deleted quiz
+   */
+  deleteQuiz: async (quizId: string): Promise<void> => {
+    await http.del(`/quizzes/${quizId}`);
+  },
 };
 
 

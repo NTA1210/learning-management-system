@@ -1,26 +1,21 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
-import { useAuth } from "../hooks/useAuth";
-import { useTheme } from "../hooks/useTheme";
 import { quizService, courseService } from "../services";
-import type { QuizResponse, SnapshotQuestion } from "../services/quizService";
+import type { QuizResponse } from "../services/quizService";
 import type { Course } from "../types/course";
-import { Clock, Calendar, CheckCircle, XCircle, Eye, X } from "lucide-react";
+import { Clock, Calendar, CheckCircle, Eye, ArrowLeft, Trash2 } from "lucide-react";
 
 export default function CourseQuizzesPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { darkMode } = useTheme();
 
   const [course, setCourse] = useState<Course | null>(null);
   const [quizzes, setQuizzes] = useState<QuizResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedQuiz, setSelectedQuiz] = useState<QuizResponse | null>(null);
-  const [showQuestionsModal, setShowQuestionsModal] = useState(false);
+  const [deletingQuizId, setDeletingQuizId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!courseId) {
@@ -81,6 +76,30 @@ export default function CourseQuizzesPage() {
     });
   };
 
+  const handleDeleteQuiz = async (quizId: string) => {
+    if (!window.confirm("Are you sure you want to delete this quiz? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      setDeletingQuizId(quizId);
+      await quizService.deleteQuiz(quizId);
+      
+      // Refresh quizzes list
+      const result = await quizService.getQuizzesByCourseId(courseId!);
+      setQuizzes(result.data || []);
+    } catch (err) {
+      console.error("Failed to delete quiz:", err);
+      const message =
+        typeof err === "object" && err !== null && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Failed to delete quiz";
+      alert(message);
+    } finally {
+      setDeletingQuizId(null);
+    }
+  };
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
@@ -92,10 +111,11 @@ export default function CourseQuizzesPage() {
             <div className="mb-6">
               <button
                 onClick={() => navigate("/quizz")}
-                className="text-sm mb-4 hover:underline"
+                className="flex items-center gap-2 text-sm mb-4 hover:underline"
                 style={{ color: "var(--muted-text)" }}
               >
-                ← Back to Courses
+                <ArrowLeft className="w-4 h-4" />
+                Back to Courses
               </button>
               <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--heading-text)" }}>
                 {course ? course.title : "Loading..."}
@@ -192,20 +212,24 @@ export default function CourseQuizzesPage() {
                                   </span>
                                 )}
                                 <button
-                                  onClick={async () => {
-                                    try {
-                                      const quizDetails = await quizService.getQuizById(quiz._id);
-                                      setSelectedQuiz(quizDetails);
-                                      setShowQuestionsModal(true);
-                                    } catch (err) {
-                                      console.error("Failed to load quiz details:", err);
-                                    }
+                                  onClick={() => {
+                                    navigate(`/quiz/questions/${quiz._id}`);
                                   }}
                                   className="px-3 py-1 rounded text-xs font-medium flex items-center gap-1"
                                   style={{ backgroundColor: "#3b82f6", color: "#fff" }}
                                 >
                                   <Eye className="w-4 h-4" />
                                   View Questions
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteQuiz(quiz._id)}
+                                  disabled={deletingQuizId === quiz._id}
+                                  className="px-3 py-1 rounded text-xs font-medium flex items-center gap-1 disabled:opacity-50"
+                                  style={{ backgroundColor: "#ef4444", color: "#fff" }}
+                                  title="Delete quiz"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Delete
                                 </button>
                               </div>
                             </div>
@@ -220,95 +244,6 @@ export default function CourseQuizzesPage() {
           </div>
         </main>
       </div>
-
-      {/* Questions Modal */}
-      {showQuestionsModal && selectedQuiz && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <div
-            className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6"
-            style={{ backgroundColor: "var(--card-surface)", border: "1px solid var(--card-border)" }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold" style={{ color: "var(--heading-text)" }}>
-                {selectedQuiz.title} - Questions
-              </h2>
-              <button
-                onClick={() => {
-                  setShowQuestionsModal(false);
-                  setSelectedQuiz(null);
-                }}
-                className="p-2 rounded-lg hover:bg-gray-100"
-                style={{ color: "var(--muted-text)" }}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            {selectedQuiz.snapshotQuestions && selectedQuiz.snapshotQuestions.length > 0 ? (
-              <div className="space-y-4">
-                {selectedQuiz.snapshotQuestions
-                  .filter((q) => !q.isDeleted)
-                  .map((question, index) => (
-                    <div
-                      key={question.id || index}
-                      className="border rounded-xl p-4"
-                      style={{ borderColor: "var(--card-row-border)", backgroundColor: "var(--card-row-bg)" }}
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="font-semibold text-lg" style={{ color: "var(--heading-text)" }}>
-                          {index + 1}.
-                        </span>
-                        <div className="flex-1">
-                          <p className="mb-3" style={{ color: "var(--heading-text)" }}>
-                            {question.text}
-                          </p>
-                          {Array.isArray(question.options) && question.options.length > 0 && (
-                            <ul className="space-y-2">
-                              {question.options.map((opt, idx) => (
-                                <li
-                                  key={idx}
-                                  className={`text-sm ${
-                                    question.correctOptions?.[idx] === 1
-                                      ? "font-semibold text-emerald-600"
-                                      : ""
-                                  }`}
-                                  style={{
-                                    color:
-                                      question.correctOptions?.[idx] === 1
-                                        ? "#10b981"
-                                        : "var(--muted-text)",
-                                  }}
-                                >
-                                  {String.fromCharCode(65 + idx)}. {opt}
-                                  {question.correctOptions?.[idx] === 1 && (
-                                    <span className="ml-2 text-xs">✓ Correct</span>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                          {question.explanation && (
-                            <div className="mt-3 p-2 rounded" style={{ backgroundColor: "var(--card-surface)" }}>
-                              <p className="text-xs font-medium mb-1" style={{ color: "var(--muted-text)" }}>
-                                Explanation:
-                              </p>
-                              <p className="text-sm" style={{ color: "var(--heading-text)" }}>
-                                {question.explanation}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            ) : (
-              <p className="text-center py-8" style={{ color: "var(--muted-text)" }}>
-                No questions available.
-              </p>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
