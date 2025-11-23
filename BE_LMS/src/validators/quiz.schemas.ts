@@ -56,7 +56,7 @@ export const createQuizSchema = z
     startTime: datePreprocess.default(() => new Date()),
     endTime: nonPastDateSchema,
     shuffleQuestions: z.boolean().default(false),
-    // questionIds: z.array(z.string()).optional(),
+    isPublished: z.boolean().default(true),
     snapshotQuestions: z.array(snapShotQuestion).optional().default([]),
   })
   .refine(
