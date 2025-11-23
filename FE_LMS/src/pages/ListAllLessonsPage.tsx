@@ -223,7 +223,7 @@ const ListAllLessonsPage: React.FC = () => {
   const handleDelete = async (lessonId: string) => {
     const confirmed = await showSwalConfirm("Are you sure you want to delete this lesson?");
     if (!confirmed) return;
-
+    
     try {
       await httpClient.delete(`/lessons/${lessonId}`, { withCredentials: true });
       await showSwalSuccess("Lesson deleted successfully");
@@ -242,14 +242,14 @@ const ListAllLessonsPage: React.FC = () => {
   const closeModal = () => setModalState(null);
 
   const buildPayload = (values: LessonFormValues) => {
-    const payload: {
-      courseId: string;
-      title: string;
-      content?: string;
-      order?: number;
-      durationMinutes?: number;
-      publishedAt?: string;
-    } = {
+      const payload: {
+        courseId: string;
+        title: string;
+        content?: string;
+        order?: number;
+        durationMinutes?: number;
+        publishedAt?: string;
+      } = {
       courseId: values.courseId,
       title: values.title,
     };
@@ -291,7 +291,7 @@ const ListAllLessonsPage: React.FC = () => {
         await showSwalSuccess("Lesson created successfully");
       } else if (modalState?.mode === "edit" && modalState.lesson) {
         await httpClient.put(`/lessons/${modalState.lesson._id}`, payload, { withCredentials: true });
-        await showSwalSuccess("Lesson updated successfully");
+      await showSwalSuccess("Lesson updated successfully");
       }
       closeModal();
       await fetchLessons();
@@ -333,8 +333,8 @@ const ListAllLessonsPage: React.FC = () => {
                 Lesson Materials
               </h1>
               <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>Browse all available lessons across courses</p>
-            </div>
-
+                </div>
+                
             <ListToolbar
               darkMode={darkMode}
               searchPlaceholder="Search lessons..."
@@ -385,10 +385,10 @@ const ListAllLessonsPage: React.FC = () => {
                 <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>No lessons available at the moment.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                {lessons.map((lesson) => (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                  {lessons.map((lesson) => (
                   <LessonCard
-                    key={lesson._id}
+                      key={lesson._id}
                     lesson={lesson}
                     darkMode={darkMode}
                     canManage={canCreate}
@@ -396,8 +396,8 @@ const ListAllLessonsPage: React.FC = () => {
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                   />
-                ))}
-              </div>
+                  ))}
+                </div>
             )}
           </div>
         </main>
