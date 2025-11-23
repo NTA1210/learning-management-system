@@ -4,6 +4,7 @@ import {
   submitAssignment,
   resubmitAssignment,
   getSubmissionStatus,
+  getSubmissionById,
   listSubmissionsByAssignment,
   gradeSubmission,
   gradeSubmissionById,
@@ -12,7 +13,7 @@ import {
   getSubmissionReportByAssignment,
   getSubmissionReportByCourse,
 } from "../services/submission.service";
-import { submissionBodySchema, assignmentIdParamSchema, gradeSubmissionSchema } from "../validators/submission.schemas"; // Validate đầu vào
+import { submissionBodySchema, assignmentIdParamSchema, submissionIdParamSchema, gradeSubmissionSchema } from "../validators/submission.schemas"; // Validate đầu vào
 import appAssert from "../utils/appAssert";
 import { SubmissionReportQuery } from "../types/submission.type";
  
@@ -64,6 +65,20 @@ export const getSubmissionStatusHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     data: status,
     message: "Submission status retrieved successfully",
+  });
+});
+
+//get sub by Id, load file
+export const getSubmissionByIdHandler = catchErrors(async (req, res) => {
+  const studentId = req.userId;
+  appAssert(studentId, BAD_REQUEST, "Missing user ID");
+
+  const { submissionId } = submissionIdParamSchema.parse(req.params);
+  const submission = await getSubmissionById(submissionId, studentId);
+
+  return res.success(OK, {
+    data: submission,
+    message: "Submission retrieved successfully",
   });
 });
 

@@ -3,6 +3,7 @@ import {
     submitAssignmentHandler,
     resubmitAssignmentHandler,
     getSubmissionStatusHandler,
+    getSubmissionByIdHandler,
     listSubmissionsByAssignmentHandler,
     gradeSubmissionHandler,
     gradeSubmissionByIdHandler,
@@ -28,6 +29,9 @@ submissionRoutes.post("/", authenticate,upload.single("file"),submitAssignmentHa
 
 //sv nộp lại bài (khi được phép)
 submissionRoutes.put("/", authenticate, upload.single("file"),resubmitAssignmentHandler);
+
+//sv xem bài nộp theo submissionId
+submissionRoutes.get("/:submissionId", authenticate, getSubmissionByIdHandler);
 
 //sv xem trạng thái nộp bài
 submissionRoutes.get("/:assignmentId/status", authenticate, getSubmissionStatusHandler);

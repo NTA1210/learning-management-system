@@ -13,7 +13,7 @@ import {
 import IAssignment from "../types/assignment.type";
 import { UserModel } from "@/models";
 import { Role } from "@/types";
-import { uploadFile } from "@/utils/uploadFile";
+import { uploadFile, getSignedUrl } from "@/utils/uploadFile";
 import { prefixSubmission } from "@/utils/filePrefix";
 import { EnrollmentStatus } from "@/types/enrollment.type";
 import { createNotification } from "./notification.service";
@@ -141,6 +141,45 @@ export const getSubmissionStatus = async (
     submittedAt: submission.submittedAt,
   };
 };
+
+//get sub by Id,và load file
+export const getSubmissionById = async (
+  submissionId: string,
+  studentId: mongoose.Types.ObjectId
+) => {
+  const student = await UserModel.findOne({ _id: studentId, role: Role.STUDENT });
+  appAssert(student, NOT_FOUND, "Student not found");
+
+  const submission = await SubmissionModel.findById(submissionId)
+    .populate("assignmentId", "title dueDate allowLate maxScore")
+    .populate("gradedBy", "fullname email");
+
+  appAssert(submission, NOT_FOUND, "Submission not found");
+
+  const submissionStudentId = submission.studentId as mongoose.Types.ObjectId;
+  appAssert(
+    submissionStudentId.toString() === studentId.toString(),
+    BAD_REQUEST,
+    "You can only view your own submission"
+  );
+
+  //tajo presigned URL cho file
+  let publicURL: string | null = null;
+  if (submission.key) {
+    try {
+      publicURL = await getSignedUrl(submission.key, submission.originalName);
+    } catch (error) {
+      console.error("Failed to generate presigned URL", error);
+      //k throw error, chỉ để publicURL = null
+    }
+  }
+
+  return {
+    ...submission.toObject(),
+    publicURL,
+  };
+};
+
 //hàm bổ sung, ds bài nộp theo assignment cho GV
 export const listSubmissionsByAssignment = async (
   assignmentId: string,
@@ -325,9 +364,11 @@ export const listAllGradesByStudent = async (
   //     : null;
 
   //dữ liệu trả về
-  const grades = submissions.map((s) => {
+  const grades = submissions.map((s: any) => {
     const assignment = s.assignmentId as any;
+    const submissionId = s._id ? String(s._id) : null;
     return {
+      submissionId,
       courseName: assignment?.courseId?.title || "Unknown course",
       assignmentTitle: assignment?.title,
       maxScore: assignment?.maxScore ?? 10,
