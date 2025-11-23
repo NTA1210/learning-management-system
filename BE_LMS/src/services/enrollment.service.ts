@@ -3,6 +3,7 @@ import { NOT_FOUND, BAD_REQUEST, CONFLICT, UNAUTHORIZED, FORBIDDEN } from "../co
 import EnrollmentModel from "../models/enrollment.model";
 import CourseModel from "../models/course.model";
 import UserModel from "../models/user.model";
+import SubjectModel from "../models/subject.model";
 import appAssert from "../utils/appAssert";
 import { compareValue } from "../utils/bcrypt";
 import { CourseStatus } from "../types/course.type";
@@ -316,6 +317,37 @@ export const createEnrollment = async (data: {
     "Course is not available for enrollment. Only ongoing courses can be enrolled."
   );
 
+  //  Check prerequisites
+  // Lấy thông tin Subject của course hiện tại
+  const subject = await SubjectModel.findById(course.subjectId);
+  appAssert(subject, NOT_FOUND, "Subject of the course not found");
+
+  if (subject.prerequisites && subject.prerequisites.length > 0) {
+    for (const prerequisiteSubjectId of subject.prerequisites) {
+      // Tìm tất cả các khóa học thuộc môn điều kiện
+      const prerequisiteCourses = await CourseModel.find({
+        subjectId: prerequisiteSubjectId,
+      }).select("_id");
+      const prerequisiteCourseIds = prerequisiteCourses.map((c) => c._id);
+
+      // Kiểm tra xem student đã hoàn thành bất kỳ khóa học nào của môn điều kiện chưa
+      const hasCompletedPrerequisite = await EnrollmentModel.exists({
+        studentId,
+        status: EnrollmentStatus.COMPLETED,
+        courseId: { $in: prerequisiteCourseIds },
+      });
+
+      if (!hasCompletedPrerequisite) {
+        const prerequisiteSubject = await SubjectModel.findById(prerequisiteSubjectId);
+        appAssert(
+          false,
+          BAD_REQUEST,
+          `You must complete the prerequisite subject: ${prerequisiteSubject?.name || "Unknown"} before enrolling in this course.`
+        );
+      }
+    }
+  }
+
   // 2.1. Check password if course is password-protected
   if (course.enrollPasswordHash && method === EnrollmentMethod.SELF) {
     appAssert(password, BAD_REQUEST, "Password is required for this course");
@@ -363,7 +395,7 @@ export const createEnrollment = async (data: {
         const COOLDOWN_MINUTES = 30;
         const nextAllowedTime = new Date(existingEnrollment.updatedAt);
         nextAllowedTime.setMinutes(nextAllowedTime.getMinutes() + COOLDOWN_MINUTES);
-        
+
         if (new Date() < nextAllowedTime) {
           const remainingMinutes = Math.ceil((nextAllowedTime.getTime() - Date.now()) / 60000);
           appAssert(
@@ -506,13 +538,13 @@ export const updateEnrollment = async (
   // 2. Check course exists and not expired
   const course = enrollment.courseId as any;
   appAssert(course, NOT_FOUND, "Course not found");
-  
+
   appAssert(
     course.status !== CourseStatus.COMPLETED,
     BAD_REQUEST,
     "Cannot update enrollment for a completed course"
   );
-  
+
   const now = new Date();
   appAssert(
     new Date(course.endDate) > now,
@@ -524,7 +556,7 @@ export const updateEnrollment = async (
   const updateData: any = {};
   if (data.status !== undefined) {
     updateData.status = data.status;
-    
+
     // Tự động set timestamp khi status thay đổi
     if (data.status === EnrollmentStatus.APPROVED || data.status === EnrollmentStatus.REJECTED) {
       updateData.respondedAt = new Date();
@@ -599,13 +631,13 @@ export const updateSelfEnrollment = async (
   // 2. Check course exists and not expired
   const course = enrollment.courseId as any;
   appAssert(course, NOT_FOUND, "Course not found");
-  
+
   appAssert(
     course.status !== CourseStatus.COMPLETED,
     BAD_REQUEST,
     "Cannot cancel enrollment for a completed course"
   );
-  
+
   const now = new Date();
   appAssert(
     new Date(course.endDate) > now,
@@ -615,19 +647,19 @@ export const updateSelfEnrollment = async (
 
   // 3. Validate status - chỉ cho phép cancel khi đang PENDING hoặc APPROVED
   const cancellableStatuses = [EnrollmentStatus.PENDING, EnrollmentStatus.APPROVED];
-  
+
   appAssert(
     cancellableStatuses.includes(enrollment.status),
     BAD_REQUEST,
     enrollment.status === EnrollmentStatus.COMPLETED
       ? "Cannot cancel a completed course"
       : enrollment.status === EnrollmentStatus.DROPPED
-      ? "Cannot cancel this enrollment. You were dropped from this course by admin/teacher."
-      : enrollment.status === EnrollmentStatus.REJECTED
-      ? "Cannot cancel a rejected enrollment"
-      : enrollment.status === EnrollmentStatus.CANCELLED
-      ? "This enrollment is already cancelled"
-      : "Cannot cancel this enrollment"
+        ? "Cannot cancel this enrollment. You were dropped from this course by admin/teacher."
+        : enrollment.status === EnrollmentStatus.REJECTED
+          ? "Cannot cancel a rejected enrollment"
+          : enrollment.status === EnrollmentStatus.CANCELLED
+            ? "This enrollment is already cancelled"
+            : "Cannot cancel this enrollment"
   );
 
   // 4. Update status to CANCELLED
