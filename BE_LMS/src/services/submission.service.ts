@@ -1,8 +1,9 @@
 import SubmissionModel from "../models/submission.model";
 import AssignmentModel from "../models/assignment.model";
 import EnrollmentModel from "../models/enrollment.model";
+import CourseModel from "../models/course.model";
 import appAssert from "../utils/appAssert";
-import { NOT_FOUND, BAD_REQUEST } from "../constants/http";
+import { NOT_FOUND, BAD_REQUEST, FORBIDDEN } from "../constants/http";
 import mongoose from "mongoose";
 import {
   SubmissionStatus,
@@ -145,33 +146,51 @@ export const getSubmissionStatus = async (
 //get sub by Id,và load file
 export const getSubmissionById = async (
   submissionId: string,
-  studentId: mongoose.Types.ObjectId
+  requesterId: mongoose.Types.ObjectId,
+  requesterRole?: Role
 ) => {
-  const student = await UserModel.findOne({ _id: studentId, role: Role.STUDENT });
-  appAssert(student, NOT_FOUND, "Student not found");
-
   const submission = await SubmissionModel.findById(submissionId)
-    .populate("assignmentId", "title dueDate allowLate maxScore")
+    .populate("assignmentId", "title dueDate allowLate maxScore courseId")
     .populate("gradedBy", "fullname email");
 
   appAssert(submission, NOT_FOUND, "Submission not found");
 
   const submissionStudentId = submission.studentId as mongoose.Types.ObjectId;
-  appAssert(
-    submissionStudentId.toString() === studentId.toString(),
-    BAD_REQUEST,
-    "You can only view your own submission"
-  );
+
+  //nếu std
+  if (requesterRole === Role.STUDENT || !requesterRole) {
+    appAssert(
+      submissionStudentId.toString() === requesterId.toString(),
+      FORBIDDEN,
+      "You can only view your own submission"
+    );
+  }
+  //nếu teacher
+  else if (requesterRole === Role.TEACHER) {
+    const assignment = submission.assignmentId as any;
+    const courseId = assignment?.courseId;
+    appAssert(courseId, NOT_FOUND, "Course not found for this assignment");
+
+    const course = await CourseModel.findById(courseId);
+    appAssert(course, NOT_FOUND, "Course not found");
+
+    const teacherIds = course.teacherIds || [];
+    const isTeacherInCourse = teacherIds.some(
+      (teacherId: mongoose.Types.ObjectId) =>
+        teacherId.toString() === requesterId.toString()
+    );
+
+    appAssert(
+      isTeacherInCourse,
+      FORBIDDEN,
+      "You do not have permission to view submissions in this course"
+    );
+  }
 
   //tajo presigned URL cho file
   let publicURL: string | null = null;
   if (submission.key) {
-    try {
-      publicURL = await getSignedUrl(submission.key, submission.originalName);
-    } catch (error) {
-      console.error("Failed to generate presigned URL", error);
-      //k throw error, chỉ để publicURL = null
-    }
+    publicURL = await getSignedUrl(submission.key, submission.originalName);
   }
 
   return {
