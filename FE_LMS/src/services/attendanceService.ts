@@ -39,6 +39,61 @@ export interface StudentAttendanceResult {
   summary?: AttendanceSummary;
 }
 
+export interface CreateAttendanceData {
+  courseId: string;
+  date: string; // YYYY-MM-DD format
+  entries: Array<{
+    studentId: string;
+    status: "present" | "absent" | "late" | "excused";
+  }>;
+}
+
+export interface CreateAttendanceResponse {
+  success: boolean;
+  message: string;
+  data?: any;
+}
+
+export interface StudentAttendanceCounts {
+  present: number;
+  absent: number;
+  late: number;
+  excused: number;
+}
+
+export interface StudentAttendanceAlerts {
+  highAbsence: boolean;
+  lateTooOften: boolean;
+}
+
+export interface StudentAttendanceStat {
+  studentId: string;
+  student: {
+    _id: string;
+    username: string;
+    email: string;
+    fullname?: string;
+    avatar_url?: string;
+  };
+  counts: StudentAttendanceCounts;
+  totalSessions: number;
+  attendanceRate: number;
+  absentRate: number;
+  longestAbsentStreak: number;
+  alerts: StudentAttendanceAlerts;
+}
+
+export interface CourseAttendanceStats {
+  courseId: string;
+  totalStudents: number;
+  totalRecords: number;
+  classAttendanceRate: number;
+  studentsAtRisk: StudentAttendanceStat[];
+  oftenLateStudents: StudentAttendanceStat[];
+  studentStats: StudentAttendanceStat[];
+  threshold: number;
+}
+
 export const attendanceService = {
   getStudentAttendance: async (
     studentId: string,
@@ -57,6 +112,16 @@ export const attendanceService = {
       pagination: response.pagination,
       summary: response.summary,
     };
+  },
+
+  createAttendance: async (data: CreateAttendanceData): Promise<CreateAttendanceResponse> => {
+    const response = await http.post<CreateAttendanceResponse>("/attendances/", data);
+    return response;
+  },
+
+  getCourseStats: async (courseId: string): Promise<CourseAttendanceStats> => {
+    const response = await http.get<CourseAttendanceStats>(`/attendances/courses/${courseId}/stats`);
+    return response.data;
   },
 };
 
