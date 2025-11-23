@@ -22,15 +22,37 @@ export interface Course {
   logo?: string;
   category?: Category;
   subjectId?: Subject | string | null;
+  semesterId?: {
+    _id: string;
+    name: string;
+    type: string;
+    year: number;
+    startDate: string;
+    endDate: string;
+  } | string | null;
   teachers?: Teacher[];
-  teacherIds?: Teacher[];
+  teacherIds?: (Teacher | string)[] | null;
   isPublished: boolean;
   capacity: number;
   status?: 'ongoing' | 'draft' | 'completed';
   startDate?: string;
   endDate?: string;
-  semesterId?: string;
   enrollRequiresApproval?: boolean;
+  enrollPasswordHash?: string | null;
+  createdBy?: {
+    _id: string;
+    username: string;
+    email: string;
+    fullname?: string;
+  };
+  isDeleted?: boolean;
+  deletedAt?: string | null;
+  deletedBy?: {
+    _id: string;
+    username?: string;
+    email?: string;
+    fullname?: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
   __v: number;

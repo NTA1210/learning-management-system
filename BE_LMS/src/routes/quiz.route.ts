@@ -1,6 +1,7 @@
 import {
   createQuizHandler,
   deleteQuizHandler,
+  getQuizByIdHandler,
   getStatisticByQuizIdHandler,
   updateQuizHandler,
 } from '@/controller/quiz.controller';
@@ -13,6 +14,7 @@ const quizRoutes = Router();
 quizRoutes.post('/', createQuizHandler);
 quizRoutes.put('/:quizId', updateQuizHandler);
 quizRoutes.delete('/:quizId', deleteQuizHandler);
+quizRoutes.get('/:quizId', getQuizByIdHandler);
 quizRoutes.get('/:quizId/statistics', getStatisticByQuizIdHandler);
 
 export default quizRoutes;

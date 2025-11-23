@@ -10,6 +10,7 @@ import {DashboardPage ,
       LoginPage,
       RegisterPage,
       CourseManagementPage,
+      MyCoursesPage,
       CourseDetailPage,
       ListAllLessonsPage,
       AboutUsPage,
@@ -64,6 +65,11 @@ function AppRoutes() {
         <Route path="/courses" element={
           <ProtectedRoute>
             <CourseManagementPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/my-courses" element={
+          <ProtectedRoute requiredRole="student">
+            <MyCoursesPage />
           </ProtectedRoute>
         } />
         <Route path="/admin/dashboard" element={

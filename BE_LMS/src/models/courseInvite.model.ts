@@ -1,24 +1,22 @@
-import mongoose from "mongoose";
-import ICourseInvite from "../types/courseInvite.type";
-import { EMAIL_REGEX } from "@/constants/regex";
+import mongoose from 'mongoose';
+import ICourseInvite from '../types/courseInvite.type';
+import { EMAIL_REGEX } from '@/constants/regex';
 
 const CourseInviteSchema = new mongoose.Schema<ICourseInvite>(
   {
     tokenHash: {
       type: String,
       required: true,
-      unique: true,
-      index: true,
     },
     courseId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Course",
+      ref: 'Course',
       required: true,
       index: true,
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
     invitedEmails: {
@@ -64,10 +62,9 @@ CourseInviteSchema.index({ expiresAt: 1, isActive: 1 });
 CourseInviteSchema.index({ deletedAt: 1, courseId: 1 });
 
 const CourseInviteModel = mongoose.model<ICourseInvite>(
-  "CourseInvite",
+  'CourseInvite',
   CourseInviteSchema,
-  "course_invites"
+  'course_invites'
 );
 
 export default CourseInviteModel;
-

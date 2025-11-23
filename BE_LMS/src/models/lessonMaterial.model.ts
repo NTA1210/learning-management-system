@@ -1,16 +1,16 @@
-import mongoose from "mongoose";
-import { ILessonMaterial } from "../types";
+import mongoose from 'mongoose';
+import { ILessonMaterial } from '../types';
 
 const LessonMaterialSchema = new mongoose.Schema<ILessonMaterial>(
   {
     lessonId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Lesson",
+      ref: 'Lesson',
       required: true,
       index: true,
     },
-    title: { type: String },
-    note: { type: String },
+    title: { type: String, trim: true },
+    note: { type: String, trim: true },
     originalName: { type: String },
     mimeType: { type: String },
     key: { type: String }, // courses/courseId/lessonId/fileName
@@ -21,10 +21,10 @@ const LessonMaterialSchema = new mongoose.Schema<ILessonMaterial>(
         validator: function (v) {
           return v <= 20 * 1024 * 1024;
         },
-        message: "File size must be <= 20MB",
+        message: 'File size must be <= 20MB',
       },
     },
-    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
 );
@@ -35,9 +35,9 @@ LessonMaterialSchema.index({ uploadedBy: 1, uploadedAt: -1 });
 LessonMaterialSchema.index({ key: 1 }, { unique: true });
 
 const LessonMaterialModel = mongoose.model<ILessonMaterial>(
-  "LessonMaterial",
+  'LessonMaterial',
   LessonMaterialSchema,
-  "lessonMaterials"
+  'lessonMaterials'
 );
 
 export default LessonMaterialModel;

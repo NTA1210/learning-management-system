@@ -1,18 +1,18 @@
 import { NotificationRecipientType } from './../types/notification.type';
-import mongoose from "mongoose";
-import { INotification } from "../types";
+import mongoose from 'mongoose';
+import { INotification } from '../types';
 
 const NotificationSchema = new mongoose.Schema<INotification>(
   {
-    title: { type: String, required: true },
-    message: { type: String, required: true },
-    sender: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    recipientUser: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    recipientCourse: { type: mongoose.Schema.Types.ObjectId, ref: "Course" },
+    title: { type: String, required: true, trim: true },
+    message: { type: String, required: true, trim: true },
+    sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    recipientUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    recipientCourse: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
     recipientType: {
       type: String,
       enum: NotificationRecipientType,
-      default: "user",
+      default: 'user',
     },
     isRead: { type: Boolean, default: false },
     readAt: { type: Date },
@@ -20,7 +20,7 @@ const NotificationSchema = new mongoose.Schema<INotification>(
     isDeleted: { type: Boolean, default: false },
     deletedAt: { type: Date },
   },
-  { timestamps: { createdAt: "createdAt" } }
+  { timestamps: { createdAt: 'createdAt' } }
 );
 
 NotificationSchema.methods.markRead = function () {
@@ -38,9 +38,6 @@ NotificationSchema.index({
   isRead: 1,
   createdAt: -1,
 });
-const NotificationModel = mongoose.model<INotification>(
-  "Notification",
-  NotificationSchema
-);
+const NotificationModel = mongoose.model<INotification>('Notification', NotificationSchema);
 
 export default NotificationModel;
