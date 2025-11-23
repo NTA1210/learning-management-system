@@ -14,6 +14,8 @@ export interface FeedbackListParams {
   page?: number;
   limit?: number;
   type?: FeedbackType;
+  from?: string; // Date format: YYYY-MM-DD
+  to?: string; // Date format: YYYY-MM-DD
 }
 
 export interface FeedbackListResult {
