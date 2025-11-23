@@ -12,7 +12,7 @@ const UserSchema = new mongoose.Schema<IUser>(
       match: EMAIL_REGEX,
       trim: true,
     },
-    password: { type: String, required: true, minLength: 6, trim: true },
+    password: { type: String, required: true, minLength: 6 },
     role: { type: String, required: true, default: Role.STUDENT },
     fullname: { type: String, maxLength: 100, trim: true },
     phone_number: {
