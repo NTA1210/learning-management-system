@@ -9,7 +9,7 @@ export interface AttendanceRecord {
   };
   studentId: string;
   date: string;
-  status: "present" | "absent" | "late" | "excused";
+  status: "notyet" | "present" | "absent";
   markedBy?: {
     _id: string;
     email: string;
@@ -22,10 +22,9 @@ export interface AttendanceRecord {
 
 export interface AttendanceSummary {
   total: number;
+  notyet: number;
   present: number;
   absent: number;
-  late: number;
-  excused: number;
 }
 
 export interface StudentAttendanceResult {
@@ -44,8 +43,12 @@ export interface CreateAttendanceData {
   date: string; // YYYY-MM-DD format
   entries: Array<{
     studentId: string;
-    status: "present" | "absent" | "late" | "excused";
+    status: "present" | "absent";
   }>;
+}
+
+export interface UpdateAttendanceData {
+  status: "notyet" | "present" | "absent";
 }
 
 export interface CreateAttendanceResponse {
@@ -57,13 +60,11 @@ export interface CreateAttendanceResponse {
 export interface StudentAttendanceCounts {
   present: number;
   absent: number;
-  late: number;
-  excused: number;
+  notyet?: number;
 }
 
 export interface StudentAttendanceAlerts {
   highAbsence: boolean;
-  lateTooOften: boolean;
 }
 
 export interface StudentAttendanceStat {
@@ -89,9 +90,20 @@ export interface CourseAttendanceStats {
   totalRecords: number;
   classAttendanceRate: number;
   studentsAtRisk: StudentAttendanceStat[];
-  oftenLateStudents: StudentAttendanceStat[];
   studentStats: StudentAttendanceStat[];
   threshold: number;
+}
+
+export interface ExportAttendanceResponse {
+  format: string;
+  summary: {
+    total: number;
+    notyet: number;
+    present: number;
+    absent: number;
+  };
+  csv: string;
+  total: number;
 }
 
 export const attendanceService = {
@@ -121,6 +133,23 @@ export const attendanceService = {
 
   getCourseStats: async (courseId: string): Promise<CourseAttendanceStats> => {
     const response = await http.get<CourseAttendanceStats>(`/attendances/courses/${courseId}/stats`);
+    return response.data;
+  },
+
+  updateAttendance: async (
+    attendanceId: string,
+    data: UpdateAttendanceData
+  ): Promise<CreateAttendanceResponse> => {
+    const response = await http.patch<CreateAttendanceResponse>(`/attendances/${attendanceId}`, data);
+    return response;
+  },
+
+  deleteAttendance: async (attendanceId: string): Promise<void> => {
+    await http.del(`/attendances/${attendanceId}`);
+  },
+
+  exportAttendance: async (): Promise<ExportAttendanceResponse> => {
+    const response = await http.get<ExportAttendanceResponse>("/attendances/export");
     return response.data;
   },
 };

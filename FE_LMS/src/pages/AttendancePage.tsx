@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTheme } from "../hooks/useTheme";
+import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
+import AttendanceStatsOverview from "../components/attendance/AttendanceStatsOverview.tsx";
+import AttendanceForm from "../components/attendance/AttendanceForm.tsx";
+import AttendanceProgressIndicator from "../components/attendance/AttendanceProgressIndicator.tsx";
+import StudentAttendanceModal from "../components/attendance/StudentAttendanceModal.tsx";
 import { 
   semesterService, 
   courseService, 
@@ -11,12 +16,12 @@ import {
   type CourseAttendanceStats,
 } from "../services";
 import type { Course } from "../types/course";
-import { Calendar, Users, CheckCircle, XCircle, Clock, AlertCircle, Save, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
-
-type AttendanceStatus = "present" | "absent" | "late" | "excused";
+import { Users, Download } from "lucide-react";
+import { getCurrentDateUTC7 } from "../utils/dateUtils";
 
 export default function AttendancePage() {
   const { darkMode } = useTheme();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { semesterId, courseId } = useParams<{ semesterId?: string; courseId?: string }>();
 
@@ -27,28 +32,18 @@ export default function AttendancePage() {
   const [attendanceStats, setAttendanceStats] = useState<CourseAttendanceStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [attendanceDate, setAttendanceDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
-  );
-  const [studentAttendances, setStudentAttendances] = useState<Record<string, AttendanceStatus>>({});
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-
-  // Get current date in YYYY-MM-DD format
-  const getCurrentDate = () => {
-    return new Date().toISOString().split("T")[0];
-  };
-
-  // Check if date is today
-  const isToday = (date: string) => {
-    return date === getCurrentDate();
-  };
+  const [selectedStudent, setSelectedStudent] = useState<{ id: string; name: string } | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   // Find semester closest to current date
   const findClosestSemester = (semesters: Semester[]): Semester | null => {
     if (semesters.length === 0) return null;
     
     const now = new Date();
+    // Adjust to UTC+7
+    const nowUTC7 = new Date(now.getTime() + (7 * 60 * 60 * 1000));
     let closest: Semester | null = null;
     let minDiff = Infinity;
 
@@ -57,13 +52,13 @@ export default function AttendancePage() {
       const endDate = new Date(semester.endDate);
       
       // If current date is within semester range, prioritize it
-      if (now >= startDate && now <= endDate) {
+      if (nowUTC7 >= startDate && nowUTC7 <= endDate) {
         return semester;
       }
       
       // Otherwise, find the closest upcoming semester
-      const diff = Math.abs(startDate.getTime() - now.getTime());
-      if (diff < minDiff && startDate >= now) {
+      const diff = Math.abs(startDate.getTime() - nowUTC7.getTime());
+      if (diff < minDiff && startDate >= nowUTC7) {
         minDiff = diff;
         closest = semester;
       }
@@ -150,7 +145,6 @@ export default function AttendancePage() {
     const fetchAttendanceStats = async () => {
       if (!selectedCourse) {
         setAttendanceStats(null);
-        setStudentAttendances({});
         return;
       }
 
@@ -159,13 +153,6 @@ export default function AttendancePage() {
         setError(null);
         const stats = await attendanceService.getCourseStats(selectedCourse._id);
         setAttendanceStats(stats);
-        
-        // Initialize attendance statuses for today (default to present)
-        const initialAttendances: Record<string, AttendanceStatus> = {};
-        stats.studentStats.forEach(stat => {
-          initialAttendances[stat.studentId] = "present";
-        });
-        setStudentAttendances(initialAttendances);
       } catch (err: any) {
         setError(err.message || "Failed to fetch attendance stats");
         setAttendanceStats(null);
@@ -181,96 +168,73 @@ export default function AttendancePage() {
     setSelectedSemester(semester);
     setSelectedCourse(null);
     setAttendanceStats(null);
-    setStudentAttendances({});
     navigate(`/attendance/${semester._id}`);
   };
 
   const handleCourseClick = (course: Course) => {
     setSelectedCourse(course);
     navigate(`/attendance/${selectedSemester?._id}/${course._id}`);
-    // Reset date to today when selecting a course
-    setAttendanceDate(getCurrentDate());
   };
 
-  const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
-    setStudentAttendances(prev => ({
-      ...prev,
-      [studentId]: status,
-    }));
-  };
-
-  const handleSaveAttendance = async () => {
-    if (!selectedCourse || !attendanceDate) {
-      setError("Please select a course and date");
-      return;
-    }
-
-    // Only allow submission for current date
-    if (!isToday(attendanceDate)) {
-      setError("Attendance can only be submitted for today's date");
-      return;
-    }
-
-    const entries = Object.entries(studentAttendances).map(([studentId, status]) => ({
-      studentId,
-      status,
-    }));
-
-    if (entries.length === 0) {
-      setError("No students to mark attendance for");
-      return;
-    }
+  const handleSaveAttendance = async (entries: Array<{ studentId: string; status: "present" | "absent" }>) => {
+    if (!selectedCourse) return;
 
     try {
       setSaving(true);
       setError(null);
       await attendanceService.createAttendance({
         courseId: selectedCourse._id,
-        date: attendanceDate,
+        date: getCurrentDateUTC7(),
         entries,
       });
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
       
       // Refresh stats after saving
-      if (selectedCourse) {
-        const stats = await attendanceService.getCourseStats(selectedCourse._id);
-        setAttendanceStats(stats);
-      }
+      const stats = await attendanceService.getCourseStats(selectedCourse._id);
+      setAttendanceStats(stats);
     } catch (err: any) {
       setError(err.message || "Failed to save attendance");
+      throw err;
     } finally {
       setSaving(false);
     }
   };
 
-  const getStatusColor = (status: AttendanceStatus) => {
-    switch (status) {
-      case "present":
-        return "bg-green-500";
-      case "absent":
-        return "bg-red-500";
-      case "late":
-        return "bg-yellow-500";
-      case "excused":
-        return "bg-blue-500";
-      default:
-        return "bg-gray-500";
+  const handleExportCSV = async () => {
+    try {
+      setExporting(true);
+      setError(null);
+      const result = await attendanceService.exportAttendance();
+      
+      // Create blob and download
+      const blob = new Blob([result.csv], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `attendance_export_${getCurrentDateUTC7()}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (err: any) {
+      setError(err.message || "Failed to export attendance");
+    } finally {
+      setExporting(false);
     }
   };
 
-  const getStatusIcon = (status: AttendanceStatus) => {
-    switch (status) {
-      case "present":
-        return <CheckCircle className="w-5 h-5" />;
-      case "absent":
-        return <XCircle className="w-5 h-5" />;
-      case "late":
-        return <Clock className="w-5 h-5" />;
-      case "excused":
-        return <AlertCircle className="w-5 h-5" />;
-      default:
-        return null;
+  const handleStudentClick = (studentId: string, studentName: string) => {
+    setSelectedStudent({ id: studentId, name: studentName });
+  };
+
+  const handleAttendanceUpdate = async () => {
+    if (selectedCourse) {
+      const stats = await attendanceService.getCourseStats(selectedCourse._id);
+      setAttendanceStats(stats);
     }
   };
 
@@ -285,19 +249,44 @@ export default function AttendancePage() {
         <main className="flex-1 p-6 lg:p-8">
           <div className="max-w-7xl mx-auto">
             {/* Header */}
-            <div className="mb-6">
-              <h1
-                className="text-3xl font-bold mb-2"
-                style={{ color: darkMode ? "#ffffff" : "#1e293b" }}
-              >
-                Attendance Management
-              </h1>
-              <p
-                className="text-sm"
-                style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
-              >
-                Manage student attendance for courses
-              </p>
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h1
+                  className="text-3xl font-bold mb-2"
+                  style={{ color: darkMode ? "#ffffff" : "#1e293b" }}
+                >
+                  Attendance Management
+                </h1>
+                <p
+                  className="text-sm"
+                  style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+                >
+                  Manage student attendance for courses (UTC+7)
+                </p>
+              </div>
+              {user?.role === "admin" && (
+                <button
+                  onClick={handleExportCSV}
+                  disabled={exporting}
+                  className="px-4 py-2 rounded-lg font-medium transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: exporting ? "#94a3b8" : "#6366f1",
+                    color: "#ffffff",
+                  }}
+                >
+                  {exporting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Exporting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      <span>Export CSV</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
 
             {/* Error Message */}
@@ -310,7 +299,6 @@ export default function AttendancePage() {
                   color: "#ef4444",
                 }}
               >
-                <AlertCircle className="w-5 h-5" />
                 <span>{error}</span>
               </div>
             )}
@@ -325,8 +313,7 @@ export default function AttendancePage() {
                   color: "#22c55e",
                 }}
               >
-                <CheckCircle className="w-5 h-5" />
-                <span>Attendance saved successfully!</span>
+                <span>Operation completed successfully!</span>
               </div>
             )}
 
@@ -364,6 +351,15 @@ export default function AttendancePage() {
                   </button>
                 ))}
               </div>
+              {selectedSemester && (
+                <div className="mt-4">
+                  <AttendanceProgressIndicator
+                    startDate={selectedSemester.startDate}
+                    endDate={selectedSemester.endDate}
+                    label="Semester Progress"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Course Selection */}
@@ -433,6 +429,15 @@ export default function AttendancePage() {
                                 {course.subjectId.name}
                               </p>
                             )}
+                            {course.startDate && course.endDate && (
+                              <div className="mt-2">
+                                <AttendanceProgressIndicator
+                                  startDate={course.startDate}
+                                  endDate={course.endDate}
+                                  label=""
+                                />
+                              </div>
+                            )}
                           </div>
                         </div>
                       </button>
@@ -445,351 +450,15 @@ export default function AttendancePage() {
             {/* Attendance Stats and Form */}
             {selectedCourse && attendanceStats && (
               <div className="space-y-6">
-                {/* Stats Overview */}
-                <div
-                  className="p-6 rounded-lg"
-                  style={{
-                    backgroundColor: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
-                    border: darkMode
-                      ? "1px solid rgba(148, 163, 184, 0.1)"
-                      : "1px solid rgba(148, 163, 184, 0.2)",
-                  }}
-                >
-                  <h2
-                    className="text-xl font-semibold mb-4"
-                    style={{ color: darkMode ? "#ffffff" : "#1e293b" }}
-                  >
-                    Attendance Overview - {selectedCourse.title}
-                  </h2>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div
-                      className="p-4 rounded-lg"
-                      style={{
-                        backgroundColor: darkMode ? "rgba(15, 23, 42, 0.5)" : "rgba(248, 250, 252, 0.8)",
-                      }}
-                    >
-                      <p
-                        className="text-sm mb-1"
-                        style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
-                      >
-                        Total Students
-                      </p>
-                      <p
-                        className="text-2xl font-bold"
-                        style={{ color: darkMode ? "#ffffff" : "#1e293b" }}
-                      >
-                        {attendanceStats.totalStudents}
-                      </p>
-                    </div>
-                    <div
-                      className="p-4 rounded-lg"
-                      style={{
-                        backgroundColor: darkMode ? "rgba(15, 23, 42, 0.5)" : "rgba(248, 250, 252, 0.8)",
-                      }}
-                    >
-                      <p
-                        className="text-sm mb-1"
-                        style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
-                      >
-                        Class Attendance Rate
-                      </p>
-                      <p
-                        className="text-2xl font-bold flex items-center gap-2"
-                        style={{ 
-                          color: attendanceStats.classAttendanceRate >= 80 
-                            ? "#22c55e" 
-                            : attendanceStats.classAttendanceRate >= 60 
-                            ? "#eab308" 
-                            : "#ef4444" 
-                        }}
-                      >
-                        {attendanceStats.classAttendanceRate}%
-                        {attendanceStats.classAttendanceRate >= 80 ? (
-                          <TrendingUp className="w-5 h-5" />
-                        ) : (
-                          <TrendingDown className="w-5 h-5" />
-                        )}
-                      </p>
-                    </div>
-                    <div
-                      className="p-4 rounded-lg"
-                      style={{
-                        backgroundColor: darkMode ? "rgba(15, 23, 42, 0.5)" : "rgba(248, 250, 252, 0.8)",
-                      }}
-                    >
-                      <p
-                        className="text-sm mb-1"
-                        style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
-                      >
-                        Total Records
-                      </p>
-                      <p
-                        className="text-2xl font-bold"
-                        style={{ color: darkMode ? "#ffffff" : "#1e293b" }}
-                      >
-                        {attendanceStats.totalRecords}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Students at Risk */}
-                  {attendanceStats.studentsAtRisk.length > 0 && (
-                    <div className="mb-6">
-                      <div className="flex items-center gap-2 mb-3">
-                        <AlertTriangle className="w-5 h-5" style={{ color: "#ef4444" }} />
-                        <h3
-                          className="font-semibold"
-                          style={{ color: "#ef4444" }}
-                        >
-                          Students at Risk ({attendanceStats.studentsAtRisk.length})
-                        </h3>
-                      </div>
-                      <div className="space-y-2">
-                        {attendanceStats.studentsAtRisk.map((stat) => (
-                          <div
-                            key={stat.studentId}
-                            className="p-3 rounded-lg flex items-center justify-between"
-                            style={{
-                              backgroundColor: darkMode
-                                ? "rgba(239, 68, 68, 0.1)"
-                                : "rgba(239, 68, 68, 0.05)",
-                              border: "1px solid rgba(239, 68, 68, 0.3)",
-                            }}
-                          >
-                            <div className="flex items-center gap-3">
-                              {stat.student.avatar_url ? (
-                                <img
-                                  src={stat.student.avatar_url}
-                                  alt={stat.student.username}
-                                  className="w-8 h-8 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div
-                                  className="w-8 h-8 rounded-full flex items-center justify-center"
-                                  style={{ backgroundColor: "#6366f1" }}
-                                >
-                                  <span className="text-white text-xs font-semibold">
-                                    {stat.student.username.charAt(0).toUpperCase()}
-                                  </span>
-                                </div>
-                              )}
-                              <div>
-                                <p
-                                  className="font-medium text-sm"
-                                  style={{ color: darkMode ? "#ffffff" : "#1e293b" }}
-                                >
-                                  {stat.student.fullname || stat.student.username}
-                                </p>
-                                <p
-                                  className="text-xs"
-                                  style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
-                                >
-                                  Attendance: {stat.attendanceRate}% | Absent: {stat.counts.absent} times
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Mark Attendance Form */}
-                <div
-                  className="p-6 rounded-lg"
-                  style={{
-                    backgroundColor: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
-                    border: darkMode
-                      ? "1px solid rgba(148, 163, 184, 0.1)"
-                      : "1px solid rgba(148, 163, 184, 0.2)",
-                  }}
-                >
-                  <h2
-                    className="text-xl font-semibold mb-4"
-                    style={{ color: darkMode ? "#ffffff" : "#1e293b" }}
-                  >
-                    Mark Attendance - {selectedCourse.title}
-                  </h2>
-                  
-                  {/* Date Selection */}
-                  <div className="mb-4">
-                    <label
-                      className="block text-sm font-medium mb-2"
-                      style={{ color: darkMode ? "#e2e8f0" : "#475569" }}
-                    >
-                      <Calendar className="inline w-4 h-4 mr-2" />
-                      Attendance Date (Today Only)
-                    </label>
-                    <input
-                      type="date"
-                      value={attendanceDate}
-                      onChange={(e) => {
-                        const newDate = e.target.value;
-                        if (isToday(newDate)) {
-                          setAttendanceDate(newDate);
-                        }
-                      }}
-                      max={getCurrentDate()}
-                      className="px-4 py-2 rounded-lg border"
-                      style={{
-                        backgroundColor: darkMode ? "rgba(30, 41, 59, 0.8)" : "#ffffff",
-                        borderColor: darkMode
-                          ? "rgba(148, 163, 184, 0.3)"
-                          : "rgba(148, 163, 184, 0.3)",
-                        color: darkMode ? "#ffffff" : "#1e293b",
-                        opacity: isToday(attendanceDate) ? 1 : 0.6,
-                      }}
-                      disabled={!isToday(attendanceDate)}
-                    />
-                    {!isToday(attendanceDate) && (
-                      <p
-                        className="text-xs mt-1"
-                        style={{ color: "#ef4444" }}
-                      >
-                        Only today's date can be selected for attendance submission
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Students List with Stats */}
-                  <div className="space-y-2 mb-6">
-                    {attendanceStats.studentStats.map((stat) => {
-                      const student = stat.student;
-                      const currentStatus = studentAttendances[stat.studentId] || "present";
-                      
-                      return (
-                        <div
-                          key={stat.studentId}
-                          className="p-4 rounded-lg"
-                          style={{
-                            backgroundColor: darkMode
-                              ? "rgba(15, 23, 42, 0.5)"
-                              : "rgba(248, 250, 252, 0.8)",
-                            border: darkMode
-                              ? "1px solid rgba(148, 163, 184, 0.1)"
-                              : "1px solid rgba(148, 163, 184, 0.1)",
-                          }}
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3 flex-1">
-                              {student.avatar_url ? (
-                                <img
-                                  src={student.avatar_url}
-                                  alt={student.username}
-                                  className="w-10 h-10 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div
-                                  className="w-10 h-10 rounded-full flex items-center justify-center"
-                                  style={{ backgroundColor: "#6366f1" }}
-                                >
-                                  <span className="text-white font-semibold">
-                                    {student.username.charAt(0).toUpperCase()}
-                                  </span>
-                                </div>
-                              )}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <p
-                                    className="font-medium truncate"
-                                    style={{ color: darkMode ? "#ffffff" : "#1e293b" }}
-                                  >
-                                    {student.fullname || student.username}
-                                  </p>
-                                  {stat.alerts.highAbsence && (
-                                    <AlertTriangle className="w-4 h-4" style={{ color: "#ef4444" }} />
-                                  )}
-                                </div>
-                                <p
-                                  className="text-sm truncate"
-                                  style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
-                                >
-                                  {student.email}
-                                </p>
-                                <div className="flex items-center gap-4 mt-1">
-                                  <span
-                                    className="text-xs"
-                                    style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
-                                  >
-                                    Rate: <strong>{stat.attendanceRate}%</strong>
-                                  </span>
-                                  <span
-                                    className="text-xs"
-                                    style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
-                                  >
-                                    Sessions: {stat.totalSessions}
-                                  </span>
-                                  <span
-                                    className="text-xs"
-                                    style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
-                                  >
-                                    P:{stat.counts.present} A:{stat.counts.absent} L:{stat.counts.late} E:{stat.counts.excused}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                              {(["present", "absent", "late", "excused"] as AttendanceStatus[]).map((status) => (
-                                <button
-                                  key={status}
-                                  onClick={() => handleStatusChange(stat.studentId, status)}
-                                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1 ${
-                                    currentStatus === status
-                                      ? "ring-2 ring-indigo-500"
-                                      : ""
-                                  }`}
-                                  style={{
-                                    backgroundColor:
-                                      currentStatus === status
-                                        ? getStatusColor(status)
-                                        : darkMode
-                                        ? "rgba(148, 163, 184, 0.1)"
-                                        : "rgba(148, 163, 184, 0.1)",
-                                    color:
-                                      currentStatus === status
-                                        ? "#ffffff"
-                                        : darkMode
-                                        ? "#94a3b8"
-                                        : "#64748b",
-                                  }}
-                                >
-                                  {currentStatus === status && getStatusIcon(status)}
-                                  <span className="capitalize">{status}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Save Button */}
-                  <button
-                    onClick={handleSaveAttendance}
-                    disabled={saving}
-                    className="w-full py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{
-                      backgroundColor: saving ? "#94a3b8" : "#6366f1",
-                      color: "#ffffff",
-                    }}
-                  >
-                    {saving ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Saving...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Save className="w-5 h-5" />
-                        <span>Save Attendance</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                <AttendanceStatsOverview stats={attendanceStats} />
+                <AttendanceForm
+                  stats={attendanceStats.studentStats}
+                  courseId={selectedCourse._id}
+                  courseTitle={selectedCourse.title}
+                  onSave={handleSaveAttendance}
+                  onStudentClick={handleStudentClick}
+                  saving={saving}
+                />
               </div>
             )}
 
@@ -813,7 +482,18 @@ export default function AttendancePage() {
           </div>
         </main>
       </div>
+
+      {/* Student Attendance Modal */}
+      {selectedStudent && (
+        <StudentAttendanceModal
+          isOpen={!!selectedStudent}
+          onClose={() => setSelectedStudent(null)}
+          studentId={selectedStudent.id}
+          studentName={selectedStudent.name}
+          courseId={selectedCourse?._id}
+          onUpdate={handleAttendanceUpdate}
+        />
+      )}
     </div>
   );
 }
-
