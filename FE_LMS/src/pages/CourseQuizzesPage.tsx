@@ -6,6 +6,7 @@ import { quizService, courseService } from "../services";
 import type { QuizResponse } from "../services/quizService";
 import type { Course } from "../types/course";
 import { Clock, Calendar, CheckCircle, Eye, ArrowLeft, Trash2 } from "lucide-react";
+import QuizCoursePage from "./QuizCoursePage";
 
 export default function CourseQuizzesPage() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -16,6 +17,7 @@ export default function CourseQuizzesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingQuizId, setDeletingQuizId] = useState<string | null>(null);
+  const [isSubjectId, setIsSubjectId] = useState(false);
 
   useEffect(() => {
     if (!courseId) {
@@ -29,13 +31,34 @@ export default function CourseQuizzesPage() {
         setLoading(true);
         setError(null);
 
-        // Fetch course info
-        const courseData = await courseService.getCourseById(courseId);
-        setCourse(courseData);
+        // First, try to fetch as a course
+        try {
+          const courseData = await courseService.getCourseById(courseId);
+          setCourse(courseData);
 
-        // Fetch quizzes for this course (don't send isDeleted: false, let backend use default)
-        const result = await quizService.getQuizzesByCourseId(courseId);
-        setQuizzes(result.data || []);
+          // Fetch quizzes for this course (don't send isDeleted: false, let backend use default)
+          const result = await quizService.getQuizzesByCourseId(courseId);
+          setQuizzes(result.data || []);
+          setIsSubjectId(false);
+        } catch (courseErr: any) {
+          // If course not found (404), treat it as a subjectId and render QuizCoursePage
+          const status = courseErr?.response?.status;
+          const errorMessage = courseErr?.response?.data?.message || courseErr?.message || "";
+          const isNotFound = status === 404 || 
+                            errorMessage.toLowerCase().includes("not found") ||
+                            errorMessage.toLowerCase().includes("course not found");
+          
+          if (isNotFound) {
+            console.log("Course not found, treating as subjectId:", courseId);
+            setIsSubjectId(true);
+            setError(null); // Clear error since we'll render QuizCoursePage
+            setLoading(false); // Stop loading since we're switching to QuizCoursePage
+            return; // Exit early, don't throw error
+          } else {
+            // Some other error occurred (network, server error, etc.)
+            throw courseErr;
+          }
+        }
       } catch (err) {
         console.error("Failed to fetch course quizzes:", err);
         const message =
@@ -43,6 +66,7 @@ export default function CourseQuizzesPage() {
             ? String((err as { message?: string }).message)
             : "Failed to load quizzes";
         setError(message);
+        setIsSubjectId(false);
       } finally {
         setLoading(false);
       }
@@ -99,6 +123,11 @@ export default function CourseQuizzesPage() {
       setDeletingQuizId(null);
     }
   };
+
+  // If it's a subjectId, render QuizCoursePage instead
+  if (isSubjectId) {
+    return <QuizCoursePage />;
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">
