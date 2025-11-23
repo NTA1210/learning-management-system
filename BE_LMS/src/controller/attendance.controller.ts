@@ -13,6 +13,7 @@ import {
   selfHistoryQuerySchema,
   studentHistoryQuerySchema,
   updateAttendanceSchema,
+  sendAbsenceNotificationSchema,
 } from "@/validators/attendance.schemas";
 import {
   exportAttendanceReport,
@@ -24,6 +25,7 @@ import {
   markAttendance,
   updateAttendance,
   deleteAttendance,
+  sendAbsenceNotificationEmails,
   // generateLessonAttendanceTemplate,
 } from "@/services/attendance.service";
 
@@ -131,47 +133,78 @@ export const markAttendanceController = catchErrors(async (req, res) => {
   });
 })
 /**
- * API: Teacher/Admin cập nhật attendance theo nghiệp vụ 2/3.
- */
+ * API: Teacher/Admin cập nhật attendance theo nghiệp vụ 2/3.
+ * - Update 1 record: PATCH /attendances/:attendanceId
+ * - Update nhiều records: PATCH /attendances/:attendanceId với attendanceIds trong body
+ *   hoặc PATCH /attendances/bulk với attendanceIds trong body
+ */
 export const updateAttendanceController = catchErrors(async (req, res) => {
-  const { attendanceId } = AttendanceIdParamSchema.parse(req.params);
-  const payload = updateAttendanceSchema.parse(req.body);
-  const result = await updateAttendance(attendanceId, payload, req.userId, req.role);
+  const payload = updateAttendanceSchema.parse(req.body);
+  
+  // Nếu có attendanceIds trong body → update nhiều records
+  if (payload.attendanceIds && payload.attendanceIds.length > 0) {
+    const result = await updateAttendance(payload.attendanceIds, payload, req.userId, req.role);
+    return res.success(OK, {
+      data: result,
+      message: `Updated ${result.updated} attendance record(s)`,
+    });
+  }
+  
+  // Nếu không có attendanceIds trong body → update 1 record từ params
+  const { attendanceId } = AttendanceIdParamSchema.parse(req.params);
+  const result = await updateAttendance(attendanceId, payload, req.userId, req.role);
 
-  return res.success(OK, {
-    data: result,
-    message: "Attendance updated",
-  });
+  return res.success(OK, {
+    data: result,
+    message: "Attendance updated",
+  });
 });
 
 /**
- * API: Admin delete attendance (Teacher chỉ delete same-day) theo nghiệp vụ 3.
- */
+ * API: Admin delete attendance (Teacher chỉ delete same-day) theo nghiệp vụ 3.
+ */
 export const deleteAttendanceController = catchErrors(async (req, res) => {
-  const { attendanceId } = AttendanceIdParamSchema.parse(req.params);
-  const result = await deleteAttendance(attendanceId, req.userId, req.role);
+  const { attendanceId } = AttendanceIdParamSchema.parse(req.params);
+  const result = await deleteAttendance(attendanceId, req.userId, req.role);
 
-  return res.success(OK, {
-    data: result,
-    message: "Attendance deleted",
-  });
+  return res.success(OK, {
+    data: result,
+    message: "Attendance deleted",
+  });
 });
-/**
- * API: Tạo attendance template theo lesson (nghiệp vụ 5).
- */
-// export const lessonTemplateController = catchErrors(async (req, res) => {
-//   const { lessonId } = LessonIdParamSchema.parse(req.params);
-//   const payload = lessonTemplateSchema.parse(req.body);
-//   const result = await generateLessonAttendanceTemplate(
-//     lessonId,
-//     payload,
-//     req.userId,
-//     req.role
-//   );
 
-//   return res.success(CREATED, {
-//     data: result,
-//     message: "Attendance template generated",
-//   });
-// });
+/**
+ * API: Gửi email cảnh báo/false môn học cho học sinh vắng
+ * - Hỗ trợ gửi cho 1 học sinh hoặc nhiều học sinh (tối đa 100 học sinh/lần)
+ * - Admin/Teacher có thể gửi email cho học sinh trong course
+ * - Tự động kiểm tra số buổi vắng và gửi email phù hợp
+ * 
+ * Request body:
+ * {
+ *   "studentIds": ["studentId1"] // 1 học sinh
+ *   // hoặc
+ *   "studentIds": ["studentId1", "studentId2", "studentId3"] // nhiều học sinh
+ * }
+ */
+export const sendAbsenceNotificationController = catchErrors(async (req, res) => {
+  const { courseId } = CourseIdParamSchema.parse(req.params);
+  const payload = sendAbsenceNotificationSchema.parse(req.body);
+  const result = await sendAbsenceNotificationEmails(
+    courseId,
+    payload.studentIds,
+    req.userId,
+    req.role
+  );
+
+  const studentCount = payload.studentIds.length;
+  const message = studentCount === 1
+    ? `Sent ${result.success} email successfully, ${result.failed} failed`
+    : `Sent ${result.success} email(s) to ${studentCount} student(s), ${result.failed} failed`;
+
+  return res.success(OK, {
+    data: result,
+    message,
+  });
+});
+
 

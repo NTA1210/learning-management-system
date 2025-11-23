@@ -14,7 +14,6 @@ import {
   CourseStatsInput,
   StudentHistoryInput,
 } from '@/validators/attendance.schemas';
-
 import{
   normalizeDateOnly,
   daysDiffFromToday,  
@@ -22,11 +21,15 @@ import{
   clampDateRangeToCourse,
   buildDateRangeFilter,
   ensureAttendanceManagePermission,
-  verifyStudentsBelongToCourse,  
+  verifyStudentsBelongToCourse, 
+  countAbsentSessions,
+  sendAbsenceNotificationEmail,
+  updateSingleAttendanceRecord,
+  updateMultipleAttendanceRecords,
 } from './helpers/attendaceHelpers';
 
-const MAX_BACKDATE_DAYS = 7;
-const REASON_REQUIRED_AFTER_DAYS = 1;
+const MAX_EDIT_HOURS_FOR_TEACHER = 12; // Giáo viên chỉ có thể update trong 12 giờ kể từ lúc điểm danh
+const MAX_ABSENT_SESSIONS = 4; // Số buổi vắng tối đa cho phép
 
 
 
@@ -95,29 +98,6 @@ const summarizeStatuses = (records: any[]) => {
   });
 
   return summary;
-};
-
-
-
-const enforceTeacherEditWindow = (
-  targetDate: Date,
-  role: Role,
-  oldStatus?: AttendanceStatus,
-  newStatus?: AttendanceStatus,
-  reason?: string
-) => {
-  if (role === Role.ADMIN) return;
-  const diffDays = daysDiffFromToday(targetDate);
-  appAssert(diffDays <= MAX_BACKDATE_DAYS, FORBIDDEN, 'Cannot modify attendance older than 7 days');
-
-  // Require reason when changing from ABSENT to PRESENT
-  if (oldStatus === AttendanceStatus.ABSENT && newStatus === AttendanceStatus.PRESENT) {
-    appAssert(!!reason, BAD_REQUEST, "Reason is required when changing from ABSENT to PRESENT");
-  }
-
-  if (diffDays > REASON_REQUIRED_AFTER_DAYS) {
-    appAssert(!!reason, BAD_REQUEST, 'Reason is required for late updates');
-  }
 };
 
 /**
@@ -656,51 +636,90 @@ export const markAttendance = async (
 };
 
 /**
- * Nghiệp vụ 2 & 3: Teacher/Admin cập nhật lại attendance với giới hạn thời gian.
- * - Admin được sửa bất kỳ lúc nào; Teacher chỉ sửa trong tối đa 7 ngày, sau 1 ngày phải có reason.
- * - Ghi nhận người sửa cuối (markedBy) và trả về bản ghi populate.
+ * Nghiệp vụ: Gửi email cảnh báo/false môn học cho học sinh vắng
+ * - Hỗ trợ gửi cho 1 học sinh hoặc nhiều học sinh (tối đa 100 học sinh/lần)
+ * - Admin/Teacher có thể gửi email cho học sinh trong course
+ * - Tự động kiểm tra số buổi vắng và gửi email phù hợp:
+ *   + Nếu = 4 buổi vắng → Gửi email cảnh báo
+ *   + Nếu > 4 buổi vắng → Gửi email false môn học
+ *   + Nếu < 4 buổi vắng → Không gửi email (trả về error trong result)
  */
-export const updateAttendance = async (
-  attendanceId: string,
-  data: UpdateAttendanceInput,
+export const sendAbsenceNotificationEmails = async (
+  courseId: string,
+  studentIds: string[], // Có thể là 1 hoặc nhiều học sinh (tối đa 100)
   actorId: mongoose.Types.ObjectId,
   role: Role
 ) => {
-  const attendance = await AttendanceModel.findById(attendanceId);
-  appAssert(attendance, NOT_FOUND, "Attendance not found");
+  appAssert(studentIds.length > 0, BAD_REQUEST, "At least one student ID is required");
+  appAssert(studentIds.length <= 100, BAD_REQUEST, "Cannot send emails to more than 100 students at once");
 
-  const course = await ensureAttendanceManagePermission(
-    attendance.courseId.toString(),
-    actorId,
-    role
-  );
-  assertDateWithinCourseSchedule(
-    course as { startDate: Date; endDate: Date },
-    attendance.date
-  );
-  
-  const oldStatus = attendance.status as AttendanceStatus;
-  const newStatus = data.status || oldStatus;
-  
-  enforceTeacherEditWindow(
-    attendance.date,
-    role,
-    oldStatus,
-    newStatus,
-    data.reason
-  );
+  // Validate course và quyền:
+  // - ADMIN: có toàn quyền, có thể gửi email cho bất kỳ course nào
+  // - TEACHER: chỉ có thể gửi email cho course mà họ được assign (kiểm tra trong ensureAttendanceManagePermission)
+  const course = await ensureAttendanceManagePermission(courseId, actorId, role);
+  const courseObjectId = new mongoose.Types.ObjectId(courseId);
 
-  if (data.status) {
-    attendance.status = data.status;
-  }
-  attendance.markedBy = actorId;
+  // Validate studentIds
+  const validStudentIds = studentIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+  appAssert(validStudentIds.length === studentIds.length, BAD_REQUEST, "Invalid student ID format");
 
-  await attendance.save();
+  // Verify students belong to course
+  await verifyStudentsBelongToCourse(courseId, validStudentIds);
 
-  return AttendanceModel.findById(attendanceId)
-    .populate("studentId", "fullname username email")
-    .populate("markedBy", "fullname email role")
+  // Lấy thông tin học sinh
+  const students = await UserModel.find({
+    _id: { $in: validStudentIds.map((id) => new mongoose.Types.ObjectId(id)) },
+  })
+    .select("fullname email")
     .lean();
+
+  appAssert(students.length === validStudentIds.length, NOT_FOUND, "Some students not found");
+
+  // Gửi email cho từng học sinh
+  const results = await Promise.all(
+    students.map(async (student) => {
+      const studentId = student._id as mongoose.Types.ObjectId;
+      const absentCount = await countAbsentSessions(courseObjectId, studentId);
+      const emailResult = await sendAbsenceNotificationEmail(studentId, courseObjectId, absentCount);
+
+      return {
+        studentId: studentId.toString(),
+        studentName: student.fullname || student.email,
+        email: student.email,
+        absentCount,
+        ...emailResult,
+      };
+    })
+  );
+
+  const successCount = results.filter((r) => r.success).length;
+  const failedCount = results.filter((r) => !r.success).length;
+
+  return {
+    total: results.length,
+    success: successCount,
+    failed: failedCount,
+    results,
+  };
+};
+
+
+/**
+ * Nghiệp vụ 2 & 3: Teacher/Admin cập nhật lại attendance với giới hạn thời gian.
+ * - Có thể update 1 record (truyền string) hoặc nhiều records (truyền array).
+ * - Admin được sửa bất kỳ lúc nào; Teacher chỉ sửa trong 12 giờ kể từ lúc điểm danh.
+ * - Ghi nhận người sửa cuối (markedBy) và trả về bản ghi populate.
+ */
+export const updateAttendance = async (
+  attendanceId: string | string[],
+  data: UpdateAttendanceInput,
+  actorId: mongoose.Types.ObjectId,
+  role: Role
+): Promise<any> => {
+  const returnIdsOnly = data.returnIdsOnly ?? false;
+  return Array.isArray(attendanceId)
+    ? updateMultipleAttendanceRecords(attendanceId, data, actorId, role, returnIdsOnly)
+    : updateSingleAttendanceRecord(attendanceId, data, actorId, role);
 };
 
 /**
@@ -736,71 +755,4 @@ export const deleteAttendance = async (
   return { deleted: true };
 };
 
-/**
- * Nghiệp vụ 5: Tự động tạo attendance template theo lesson/schedule.
- * - Khi lesson publish hoặc teacher yêu cầu, tạo record "notyet" mặc định cho từng student.
- */
-export const generateLessonAttendanceTemplate = async (
-  lessonId: string,
-  options: { lessonDate?: Date; force?: boolean },
-  actorId: mongoose.Types.ObjectId,
-  role: Role
-) => {
-  const lesson = await LessonModel.findById(lessonId);
-  appAssert(lesson, NOT_FOUND, "Lesson not found");
 
-  const course = await ensureAttendanceManagePermission(
-    lesson.courseId.toString(),
-    actorId,
-    role
-  );
-
-  const baseDate = normalizeDateOnly(
-    options.lessonDate || lesson.publishedAt || new Date()
-  );
-
-  if (!lesson.publishedAt && !options.force && role !== Role.ADMIN) {
-    appAssert(false, BAD_REQUEST, "Lesson is not published yet");
-  }
-
-  appAssert(!isDateInFuture(baseDate), BAD_REQUEST, "Cannot create template for future date");
-  assertDateWithinCourseSchedule(
-    course as { startDate: Date; endDate: Date },
-    baseDate
-  );
-
-  const enrollments = await EnrollmentModel.find({
-    courseId: lesson.courseId,
-    status: EnrollmentStatus.APPROVED,
-  }).select("studentId");
-
-  appAssert(enrollments.length > 0, NOT_FOUND, "No approved students in this course");
-
-  const operations = enrollments.map((enrollment) => ({
-    updateOne: {
-      filter: {
-        courseId: lesson.courseId,
-        studentId: enrollment.studentId,
-        date: baseDate,
-      },
-      update: {
-        $setOnInsert: {
-          courseId: lesson.courseId,
-          studentId: enrollment.studentId,
-          date: baseDate,
-          status: AttendanceStatus.NOTYET,
-        },
-      },
-      upsert: true,
-    },
-  }));
-
-  const result = await AttendanceModel.bulkWrite(operations, { ordered: false });
-
-  return {
-    created: result.upsertedCount ?? 0,
-    skipped: enrollments.length - (result.upsertedCount ?? 0),
-    totalStudents: enrollments.length,
-    date: baseDate,
-  };
-};

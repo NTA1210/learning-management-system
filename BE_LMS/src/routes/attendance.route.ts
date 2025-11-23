@@ -10,6 +10,7 @@ import {
   // lessonTemplateController,
   updateAttendanceController,
   deleteAttendanceController,
+  sendAbsenceNotificationController,
 } from "@/controller/attendance.controller";
 import authorize from "@/middleware/authorize";
 import { Role } from "@/types";
@@ -47,18 +48,8 @@ attendanceRoutes.get(
   studentStatsController
 );
 
-
-export default attendanceRoutes;
-
 // Nghiệp vụ 1: Teacher/Admin đánh dấu attendance
 attendanceRoutes.post("/", authorize(Role.TEACHER, Role.ADMIN), markAttendanceController);
-// Nghiệp vụ 5: Tạo template attendance theo lesson/schedule
-// attendanceRoutes.post(
-//   "/lessons/:lessonId/template",
-//   authorize(Role.TEACHER, Role.ADMIN),
-//   lessonTemplateController
-// );
-
 // Nghiệp vụ 2/3: Update attendance
 attendanceRoutes.patch(
   "/:attendanceId",
@@ -68,7 +59,18 @@ attendanceRoutes.patch(
 
 // Nghiệp vụ 3: Admin delete (Teacher same-day delete)
 attendanceRoutes.delete(
-  "/:attendanceId",
-  authorize(Role.ADMIN, Role.TEACHER),
-  deleteAttendanceController
+  "/:attendanceId",
+  authorize(Role.ADMIN, Role.TEACHER),
+  deleteAttendanceController
 );
+
+// Gửi email cảnh báo/false môn học cho học sinh vắng
+attendanceRoutes.post(
+  "/courses/:courseId/send-absence-notifications",
+  authorize(Role.TEACHER, Role.ADMIN),
+  sendAbsenceNotificationController
+);
+
+export default attendanceRoutes;
+
+

@@ -12,4 +12,6 @@ export default interface IAttendance extends mongoose.Document {
     date: Date;
     status: AttendanceStatus;
     markedBy?: mongoose.Types.ObjectId;
+    createdAt?: Date;
+    updatedAt?: Date;
 }
