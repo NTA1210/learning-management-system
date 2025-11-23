@@ -14,114 +14,24 @@ import {
   CourseStatsInput,
   StudentHistoryInput,
 } from '@/validators/attendance.schemas';
+import{
+  normalizeDateOnly,
+  daysDiffFromToday,  
+  assertDateWithinCourseSchedule,
+  clampDateRangeToCourse,
+  buildDateRangeFilter,
+  ensureAttendanceManagePermission,
+  verifyStudentsBelongToCourse, 
+  countAbsentSessions,
+  sendAbsenceNotificationEmail,
+  updateSingleAttendanceRecord,
+  updateMultipleAttendanceRecords,
+} from './helpers/attendaceHelpers';
 
-const MAX_BACKDATE_DAYS = 7;
-const REASON_REQUIRED_AFTER_DAYS = 1;
-const LATE_THRESHOLD_FOR_ALERT = 3;
+const MAX_EDIT_HOURS_FOR_TEACHER = 12; // Giáo viên chỉ có thể update trong 12 giờ kể từ lúc điểm danh
+const MAX_ABSENT_SESSIONS = 4; // Số buổi vắng tối đa cho phép
 
-const normalizeDateOnly = (value: Date) => {
-  const normalized = new Date(value);
-  normalized.setHours(0, 0, 0, 0);
-  return normalized;
-};
 
-const daysDiffFromToday = (value: Date) => {
-  const today = normalizeDateOnly(new Date());
-  const target = normalizeDateOnly(value);
-  const diffMs = today.getTime() - target.getTime();
-  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
-};
-
-const ensureCourseExists = async (courseId: string) => {
-  const course = await CourseModel.findById(courseId);
-  appAssert(course, NOT_FOUND, 'Course not found');
-  return course;
-};
-
-const assertInstructorAccess = (course: any, userId: mongoose.Types.ObjectId | string) => {
-  const targetId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
-  const isInstructor = (course.teacherIds || []).some((id: mongoose.Types.ObjectId) =>
-    id.equals(targetId)
-  );
-  appAssert(isInstructor, FORBIDDEN, 'Teacher not assigned to this course');
-  return true;
-};
-
-const ensureAttendanceManagePermission = async (
-  courseId: string,
-  actorId: mongoose.Types.ObjectId,
-  role: Role
-) => {
-  const course = await ensureCourseExists(courseId);
-  if (role === Role.ADMIN) {
-    return course;
-  }
-  appAssert(role === Role.TEACHER, FORBIDDEN, 'Not authorized');
-  assertInstructorAccess(course, actorId);
-  return course;
-};
-
-const assertDateWithinCourseSchedule = (
-  course: { startDate: Date; endDate: Date },
-  targetDate: Date
-) => {
-  const normalizedStart = normalizeDateOnly(course.startDate);
-  const normalizedEnd = normalizeDateOnly(course.endDate);
-  const normalizedTarget = normalizeDateOnly(targetDate);
-
-  appAssert(
-    normalizedTarget >= normalizedStart && normalizedTarget <= normalizedEnd,
-    BAD_REQUEST,
-    'Attendance date must fall within course schedule'
-  );
-};
-
-const clampDateRangeToCourse = (
-  course: { startDate: Date; endDate: Date },
-  from?: Date,
-  to?: Date
-) => {
-  const normalizedStart = normalizeDateOnly(course.startDate);
-  const normalizedEnd = normalizeDateOnly(course.endDate);
-  const normalizedFrom = from ? normalizeDateOnly(from) : normalizedStart;
-  const normalizedTo = to ? normalizeDateOnly(to) : normalizedEnd;
-
-  const clampedFrom = normalizedFrom < normalizedStart ? normalizedStart : normalizedFrom;
-  const clampedTo = normalizedTo > normalizedEnd ? normalizedEnd : normalizedTo;
-
-  appAssert(clampedFrom <= clampedTo, BAD_REQUEST, 'Date range must overlap with course schedule');
-
-  return { from: clampedFrom, to: clampedTo };
-};
-
-const verifyStudentsBelongToCourse = async (
-  courseId: string,
-  studentIds: mongoose.Types.ObjectId[]
-) => {
-  if (!studentIds.length) return;
-
-  const enrollments = await EnrollmentModel.find({
-    courseId,
-    studentId: { $in: studentIds },
-    status: EnrollmentStatus.APPROVED,
-  }).select('studentId');
-
-  const enrolledSet = new Set(enrollments.map((item) => item.studentId.toString()));
-  const missing = studentIds.filter((id) => !enrolledSet.has(id.toString()));
-  appAssert(missing.length === 0, BAD_REQUEST, 'Student not enrolled in course');
-};
-
-const buildDateRangeFilter = (from?: Date, to?: Date) => {
-  if (!from && !to) return undefined;
-  const range: Record<string, Date> = {};
-  if (from) range.$gte = normalizeDateOnly(from);
-  if (to) {
-    const end = normalizeDateOnly(to);
-    end.setHours(23, 59, 59, 999);
-    range.$lte = end;
-  }
-  return range;
-};
 
 const buildAttendanceFilter = async (
   params: ListAttendanceInput,
@@ -177,10 +87,10 @@ const getSortObject = (sortBy?: string, sortOrder?: string): Record<string, Sort
 const summarizeStatuses = (records: any[]) => {
   const summary = {
     total: records.length,
+    [AttendanceStatus.NOTYET]: 0,
     [AttendanceStatus.PRESENT]: 0,
     [AttendanceStatus.ABSENT]: 0,
-    [AttendanceStatus.LATE]: 0,
-    [AttendanceStatus.EXCUSED]: 0,
+
   };
 
   records.forEach((record) => {
@@ -188,16 +98,6 @@ const summarizeStatuses = (records: any[]) => {
   });
 
   return summary;
-};
-
-const enforceTeacherEditWindow = (targetDate: Date, role: Role, reason?: string) => {
-  if (role === Role.ADMIN) return;
-  const diffDays = daysDiffFromToday(targetDate);
-  appAssert(diffDays <= MAX_BACKDATE_DAYS, FORBIDDEN, 'Cannot modify attendance older than 7 days');
-
-  if (diffDays > REASON_REQUIRED_AFTER_DAYS) {
-    appAssert(!!reason, BAD_REQUEST, 'Reason is required for late updates');
-  }
 };
 
 /**
@@ -247,10 +147,9 @@ export const listAttendances = async (
     },
     {
       total: 0,
+      [AttendanceStatus.NOTYET]: 0,
       [AttendanceStatus.PRESENT]: 0,
       [AttendanceStatus.ABSENT]: 0,
-      [AttendanceStatus.LATE]: 0,
-      [AttendanceStatus.EXCUSED]: 0,
     }
   );
 
@@ -294,7 +193,7 @@ export const getStudentAttendanceHistory = async (
   if (params.courseId && role !== Role.STUDENT) {
     const course = await ensureAttendanceManagePermission(params.courseId, actorId, role);
     if (role === Role.TEACHER) {
-      await verifyStudentsBelongToCourse(params.courseId, [new mongoose.Types.ObjectId(studentId)]);
+      await verifyStudentsBelongToCourse(params.courseId, [studentId]);
     }
     dateRangeOverride = clampDateRangeToCourse(
       course as { startDate: Date; endDate: Date },
@@ -520,10 +419,9 @@ export const getCourseAttendanceStats = async (
     if (!statsByStudent[id]) {
       statsByStudent[id] = {
         counts: {
+          [AttendanceStatus.NOTYET]: 0,
           [AttendanceStatus.PRESENT]: 0,
           [AttendanceStatus.ABSENT]: 0,
-          [AttendanceStatus.LATE]: 0,
-          [AttendanceStatus.EXCUSED]: 0,
         },
         total: 0,
         longestAbsentStreak: 0,
@@ -543,13 +441,19 @@ export const getCourseAttendanceStats = async (
   const threshold = params.threshold ?? 20;
 
   const studentStats = Object.entries(statsByStudent).map(([studentId, data]) => {
-    const attended =
-      data.counts[AttendanceStatus.PRESENT] +
-      data.counts[AttendanceStatus.LATE] +
-      data.counts[AttendanceStatus.EXCUSED];
-    const attendanceRate = data.total ? Number(((attended / data.total) * 100).toFixed(2)) : 0;
-    const absentRate = data.total
-      ? Number(((data.counts[AttendanceStatus.ABSENT] / data.total) * 100).toFixed(2))
+
+    // Only count records that have been marked (not NOTYET)
+    const markedCount = data.counts[AttendanceStatus.PRESENT] + data.counts[AttendanceStatus.ABSENT];
+    const attended = data.counts[AttendanceStatus.PRESENT];
+    
+    // Attendance rate: PRESENT / (PRESENT + ABSENT), excluding NOTYET
+    const attendanceRate = markedCount > 0
+      ? Number(((attended / markedCount) * 100).toFixed(2))
+      : 0;
+    
+    // Absent rate: ABSENT / (PRESENT + ABSENT), excluding NOTYET
+    const absentRate = markedCount > 0
+      ? Number(((data.counts[AttendanceStatus.ABSENT] / markedCount) * 100).toFixed(2))
       : 0;
 
     return {
@@ -557,33 +461,34 @@ export const getCourseAttendanceStats = async (
       student: studentMap[studentId] || null,
       counts: data.counts,
       totalSessions: data.total,
+      markedSessions: markedCount,
       attendanceRate,
       absentRate,
       longestAbsentStreak: data.longestAbsentStreak,
       alerts: {
         highAbsence: absentRate >= threshold,
-        lateTooOften: data.counts[AttendanceStatus.LATE] >= LATE_THRESHOLD_FOR_ALERT,
       },
     };
   });
 
-  const totalSessions = Object.values(statsByStudent).reduce((acc, curr) => acc + curr.total, 0);
+
+  // Calculate class attendance rate based on marked records only (excluding NOTYET)
+  const markedRecords = records.filter(
+    (record) => record.status === AttendanceStatus.PRESENT || record.status === AttendanceStatus.ABSENT
+  );
+  const presentRecords = records.filter(
+    (record) => record.status === AttendanceStatus.PRESENT
+  );
 
   const classAttendanceRate =
-    totalSessions === 0
+    markedRecords.length === 0
       ? 0
       : Number(
-          (
-            (records.filter((record) => record.status !== AttendanceStatus.ABSENT).length /
-              totalSessions) *
-            100
-          ).toFixed(2)
+
+          ((presentRecords.length / markedRecords.length) * 100).toFixed(2)
         );
 
   const studentsAtRisk = studentStats.filter((stat) => stat.alerts.highAbsence);
-  const oftenLateStudents = studentStats.filter(
-    (stat) => stat.counts[AttendanceStatus.LATE] >= LATE_THRESHOLD_FOR_ALERT
-  );
 
   return {
     courseId,
@@ -591,7 +496,6 @@ export const getCourseAttendanceStats = async (
     totalRecords: records.length,
     classAttendanceRate,
     studentsAtRisk,
-    oftenLateStudents,
     studentStats,
     threshold,
   };
@@ -610,7 +514,7 @@ export const getStudentAttendanceStats = async (
 ) => {
   const course = await ensureAttendanceManagePermission(courseId, actorId, role);
 
-  await verifyStudentsBelongToCourse(courseId, [new mongoose.Types.ObjectId(studentId)]);
+  await verifyStudentsBelongToCourse(courseId, [studentId]);
 
   const filter: Record<string, any> = {
     courseId: new mongoose.Types.ObjectId(courseId),
@@ -628,12 +532,17 @@ export const getStudentAttendanceStats = async (
 
   const counts = summarizeStatuses(records);
   const total = records.length;
-  const attended =
-    counts[AttendanceStatus.PRESENT] +
-    counts[AttendanceStatus.LATE] +
-    counts[AttendanceStatus.EXCUSED];
+  
+  // Only count records that have been marked (not NOTYET)
+  const markedCount = counts[AttendanceStatus.PRESENT] + counts[AttendanceStatus.ABSENT];
+  const attended = counts[AttendanceStatus.PRESENT];
 
   const studentInfo = await UserModel.findById(studentId).select('fullname username email').lean();
+
+  // Attendance rate: PRESENT / (PRESENT + ABSENT), excluding NOTYET
+  const attendanceRate = markedCount > 0
+    ? Number(((attended / markedCount) * 100).toFixed(2))
+    : 0;
 
   return {
     courseId,
@@ -641,9 +550,207 @@ export const getStudentAttendanceStats = async (
     student: studentInfo,
     counts,
     total,
-    attendanceRate: total ? Number(((attended / total) * 100).toFixed(2)) : 0,
+    markedSessions: markedCount,
+    attendanceRate,
     longestAbsentStreak: computeLongestAbsentStreak(
       records as { status: AttendanceStatus; date: Date }[]
     ),
   };
 };
+
+/**
+ * Nghiệp vụ 1: Teacher/Admin đánh dấu điểm danh cho học viên trong một khóa học.
+ * - Chỉ instructor của course hoặc admin mới được thao tác.
+ * - Không cho phép ghi nhận ngày tương lai, enforce 1 record/student-course-date.
+ * - Tự động upsert trạng thái cho danh sách student truyền vào.
+ */
+export const markAttendance = async (
+  payload: MarkAttendanceInput,
+  actorId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  const { courseId, date, entries } = payload;
+  const normalizedDate = normalizeDateOnly(date);
+
+  appAssert(!isDateInFuture(normalizedDate), BAD_REQUEST, "Cannot mark future date");
+
+  const course = await ensureAttendanceManagePermission(courseId, actorId, role);
+  assertDateWithinCourseSchedule(
+    course as { startDate: Date; endDate: Date },
+    normalizedDate
+  );
+
+  const courseObjectId = new mongoose.Types.ObjectId(courseId);
+  
+  // Remove duplicate student IDs and verify they belong to course
+  const uniqueStudentIds = [...new Set(entries.map((entry) => entry.studentId))];
+  await verifyStudentsBelongToCourse(courseId, uniqueStudentIds);
+
+  // Create map for quick ObjectId lookup during operations
+  const studentIdMap = new Map(
+    uniqueStudentIds.map((id) => [id, new mongoose.Types.ObjectId(id)])
+  );
+
+  const operations = entries.map((entry) => {
+    const studentObjectId = studentIdMap.get(entry.studentId)!;
+    return {
+      updateOne: {
+        filter: {
+          courseId: courseObjectId,
+          studentId: studentObjectId,
+          date: normalizedDate,
+        },
+        update: { 
+          $set: {
+            status: entry.status,
+            markedBy: actorId,
+          },
+          $setOnInsert: {
+            courseId: courseObjectId,
+            studentId: studentObjectId,
+            date: normalizedDate,
+          },
+        },
+        upsert: true,
+      },
+    };
+  });
+
+  await AttendanceModel.bulkWrite(operations, { ordered: false });
+
+  const studentObjectIds = Array.from(studentIdMap.values());
+  const records = await AttendanceModel.find({
+    courseId: courseObjectId,
+    studentId: { $in: studentObjectIds },
+    date: normalizedDate,
+  })
+    .populate("studentId", "fullname username email")
+    .populate("markedBy", "fullname email role")
+    .lean();
+
+  return {
+    message: "Attendance marked successfully",
+    records,
+    summary: summarizeStatuses(records),
+  };
+};
+
+/**
+ * Nghiệp vụ: Gửi email cảnh báo/false môn học cho học sinh vắng
+ * - Hỗ trợ gửi cho 1 học sinh hoặc nhiều học sinh (tối đa 100 học sinh/lần)
+ * - Admin/Teacher có thể gửi email cho học sinh trong course
+ * - Tự động kiểm tra số buổi vắng và gửi email phù hợp:
+ *   + Nếu = 4 buổi vắng → Gửi email cảnh báo
+ *   + Nếu > 4 buổi vắng → Gửi email false môn học
+ *   + Nếu < 4 buổi vắng → Không gửi email (trả về error trong result)
+ */
+export const sendAbsenceNotificationEmails = async (
+  courseId: string,
+  studentIds: string[], // Có thể là 1 hoặc nhiều học sinh (tối đa 100)
+  actorId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  appAssert(studentIds.length > 0, BAD_REQUEST, "At least one student ID is required");
+  appAssert(studentIds.length <= 100, BAD_REQUEST, "Cannot send emails to more than 100 students at once");
+
+  // Validate course và quyền:
+  // - ADMIN: có toàn quyền, có thể gửi email cho bất kỳ course nào
+  // - TEACHER: chỉ có thể gửi email cho course mà họ được assign (kiểm tra trong ensureAttendanceManagePermission)
+  const course = await ensureAttendanceManagePermission(courseId, actorId, role);
+  const courseObjectId = new mongoose.Types.ObjectId(courseId);
+
+  // Validate studentIds
+  const validStudentIds = studentIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+  appAssert(validStudentIds.length === studentIds.length, BAD_REQUEST, "Invalid student ID format");
+
+  // Verify students belong to course
+  await verifyStudentsBelongToCourse(courseId, validStudentIds);
+
+  // Lấy thông tin học sinh
+  const students = await UserModel.find({
+    _id: { $in: validStudentIds.map((id) => new mongoose.Types.ObjectId(id)) },
+  })
+    .select("fullname email")
+    .lean();
+
+  appAssert(students.length === validStudentIds.length, NOT_FOUND, "Some students not found");
+
+  // Gửi email cho từng học sinh
+  const results = await Promise.all(
+    students.map(async (student) => {
+      const studentId = student._id as mongoose.Types.ObjectId;
+      const absentCount = await countAbsentSessions(courseObjectId, studentId);
+      const emailResult = await sendAbsenceNotificationEmail(studentId, courseObjectId, absentCount);
+
+      return {
+        studentId: studentId.toString(),
+        studentName: student.fullname || student.email,
+        email: student.email,
+        absentCount,
+        ...emailResult,
+      };
+    })
+  );
+
+  const successCount = results.filter((r) => r.success).length;
+  const failedCount = results.filter((r) => !r.success).length;
+
+  return {
+    total: results.length,
+    success: successCount,
+    failed: failedCount,
+    results,
+  };
+};
+
+
+/**
+ * Nghiệp vụ 2 & 3: Teacher/Admin cập nhật lại attendance với giới hạn thời gian.
+ * - Có thể update 1 record (truyền string) hoặc nhiều records (truyền array).
+ * - Admin được sửa bất kỳ lúc nào; Teacher chỉ sửa trong 12 giờ kể từ lúc điểm danh.
+ * - Ghi nhận người sửa cuối (markedBy) và trả về bản ghi populate.
+ */
+export const updateAttendance = async (
+  attendanceId: string | string[],
+  data: UpdateAttendanceInput,
+  actorId: mongoose.Types.ObjectId,
+  role: Role
+): Promise<any> => {
+  const returnIdsOnly = data.returnIdsOnly ?? false;
+  return Array.isArray(attendanceId)
+    ? updateMultipleAttendanceRecords(attendanceId, data, actorId, role, returnIdsOnly)
+    : updateSingleAttendanceRecord(attendanceId, data, actorId, role);
+};
+
+/**
+ * Nghiệp vụ 3: Admin quản lý attendance (delete bất kỳ) và Teacher delete cùng ngày.
+ * - Kiểm tra quyền theo course, Teacher chỉ xóa record của chính khóa trong ngày hiện tại.
+ */
+export const deleteAttendance = async (
+  attendanceId: string,
+  actorId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  const attendance = await AttendanceModel.findById(attendanceId);
+  appAssert(attendance, NOT_FOUND, "Attendance not found");
+
+  const course = await ensureAttendanceManagePermission(
+    attendance.courseId.toString(),
+    actorId,
+    role
+  );
+  assertDateWithinCourseSchedule(
+    course as { startDate: Date; endDate: Date },
+    attendance.date
+  );
+
+  if (role === Role.TEACHER) {
+    const diff = daysDiffFromToday(attendance.date);
+    appAssert(diff === 0, FORBIDDEN, "Teachers can delete only same-day records");
+  }
+
+  await attendance.deleteOne();
+  return { deleted: true };
+};
+
+

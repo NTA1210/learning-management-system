@@ -3,9 +3,10 @@ import {
   CourseModel,
   UserModel,
   QuizQuestionModel,
+  EnrollmentModel,
 } from "../models";
 import appAssert from "../utils/appAssert";
-import { CONFLICT, NOT_FOUND, FORBIDDEN } from "../constants/http";
+import { CONFLICT, NOT_FOUND, FORBIDDEN, BAD_REQUEST } from "../constants/http";
 import { ISubject, Role } from "@/types";
 import { ListParams } from "@/types/dto";
 import mongoose from "mongoose";
