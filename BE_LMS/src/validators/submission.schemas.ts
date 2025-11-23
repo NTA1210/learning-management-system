@@ -28,3 +28,7 @@ export const gradeSubmissionSchema = z.object({
 export const assignmentIdParamSchema = z.object({
   assignmentId: z.string().length(24, "Assignment Id is invalid"),
 });
+
+export const submissionIdParamSchema = z.object({
+  submissionId: z.string().length(24, "Submission Id is invalid"),
+});

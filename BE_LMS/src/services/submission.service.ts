@@ -1,8 +1,9 @@
 import SubmissionModel from "../models/submission.model";
 import AssignmentModel from "../models/assignment.model";
 import EnrollmentModel from "../models/enrollment.model";
+import CourseModel from "../models/course.model";
 import appAssert from "../utils/appAssert";
-import { NOT_FOUND, BAD_REQUEST } from "../constants/http";
+import { NOT_FOUND, BAD_REQUEST, FORBIDDEN } from "../constants/http";
 import mongoose from "mongoose";
 import {
   SubmissionStatus,
@@ -13,7 +14,7 @@ import {
 import IAssignment from "../types/assignment.type";
 import { UserModel } from "@/models";
 import { Role } from "@/types";
-import { uploadFile } from "@/utils/uploadFile";
+import { uploadFile, getSignedUrl } from "@/utils/uploadFile";
 import { prefixSubmission } from "@/utils/filePrefix";
 import { EnrollmentStatus } from "@/types/enrollment.type";
 import { createNotification } from "./notification.service";
@@ -141,6 +142,63 @@ export const getSubmissionStatus = async (
     submittedAt: submission.submittedAt,
   };
 };
+
+//get sub by Id,và load file
+export const getSubmissionById = async (
+  submissionId: string,
+  requesterId: mongoose.Types.ObjectId,
+  requesterRole?: Role
+) => {
+  const submission = await SubmissionModel.findById(submissionId)
+    .populate("assignmentId", "title dueDate allowLate maxScore courseId")
+    .populate("gradedBy", "fullname email");
+
+  appAssert(submission, NOT_FOUND, "Submission not found");
+
+  const submissionStudentId = submission.studentId as mongoose.Types.ObjectId;
+
+  //nếu std
+  if (requesterRole === Role.STUDENT || !requesterRole) {
+    appAssert(
+      submissionStudentId.toString() === requesterId.toString(),
+      FORBIDDEN,
+      "You can only view your own submission"
+    );
+  }
+  //nếu teacher
+  else if (requesterRole === Role.TEACHER) {
+    const assignment = submission.assignmentId as any;
+    const courseId = assignment?.courseId;
+    appAssert(courseId, NOT_FOUND, "Course not found for this assignment");
+
+    const course = await CourseModel.findById(courseId);
+    appAssert(course, NOT_FOUND, "Course not found");
+
+    const teacherIds = course.teacherIds || [];
+    const isTeacherInCourse = teacherIds.some(
+      (teacherId: mongoose.Types.ObjectId) =>
+        teacherId.toString() === requesterId.toString()
+    );
+
+    appAssert(
+      isTeacherInCourse,
+      FORBIDDEN,
+      "You do not have permission to view submissions in this course"
+    );
+  }
+
+  //tajo presigned URL cho file
+  let publicURL: string | null = null;
+  if (submission.key) {
+    publicURL = await getSignedUrl(submission.key, submission.originalName);
+  }
+
+  return {
+    ...submission.toObject(),
+    publicURL,
+  };
+};
+
 //hàm bổ sung, ds bài nộp theo assignment cho GV
 export const listSubmissionsByAssignment = async (
   assignmentId: string,
@@ -325,9 +383,11 @@ export const listAllGradesByStudent = async (
   //     : null;
 
   //dữ liệu trả về
-  const grades = submissions.map((s) => {
+  const grades = submissions.map((s: any) => {
     const assignment = s.assignmentId as any;
+    const submissionId = s._id ? String(s._id) : null;
     return {
+      submissionId,
       courseName: assignment?.courseId?.title || "Unknown course",
       assignmentTitle: assignment?.title,
       maxScore: assignment?.maxScore ?? 10,
