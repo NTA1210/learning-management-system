@@ -1,21 +1,15 @@
-import { NOT_FOUND } from "@/constants/http";
-import { SpecialistModel } from "@/models";
-import EnrollmentModel from "@/models/enrollment.model";
-import UserModel from "@/models/user.model";
-import { ISpecialist, IUser, Role, UserStatus } from "@/types";
-import appAssert from "@/utils/appAssert";
-import { prefixUserAvatar } from "@/utils/filePrefix";
-import { removeFile, uploadFile } from "@/utils/uploadFile";
-import {
-  TGetAllUsersFilter,
-  TUpdateUserProfile,
-} from "@/validators/user.schemas";
+import { NOT_FOUND } from '@/constants/http';
+import { SpecialistModel } from '@/models';
+import EnrollmentModel from '@/models/enrollment.model';
+import UserModel from '@/models/user.model';
+import { ISpecialist, IUser, Role, UserStatus } from '@/types';
+import appAssert from '@/utils/appAssert';
+import { prefixUserAvatar } from '@/utils/filePrefix';
+import { removeFile, uploadFile } from '@/utils/uploadFile';
+import { TGetAllUsersFilter, TUpdateUserProfile } from '@/validators/user.schemas';
 
-export const getAllUsers = async (
-  request: TGetAllUsersFilter,
-  viewerRole: Role
-) => {
-  const { role, email, username, status, page = 1, limit = 10 } = request;
+export const getAllUsers = async (request: TGetAllUsersFilter, viewerRole: Role) => {
+  const { role, email, username, status, specialistIds, page = 1, limit = 10 } = request;
 
   // 3️⃣ Pagination
   const skip = (page - 1) * limit;
@@ -27,7 +21,9 @@ export const getAllUsers = async (
     if (status) query.status = status; // admin có thể lọc status cụ thể
   } else {
     if (viewerRole === Role.TEACHER) {
-      query.role = Role.STUDENT; // teacher chỉ được xem student
+      if (role !== Role.ADMIN) {
+        query.role = role;
+      }
     }
     if (viewerRole === Role.STUDENT) {
       query.role = Role.TEACHER;
@@ -35,15 +31,16 @@ export const getAllUsers = async (
     query.status = UserStatus.ACTIVE; // không phải admin chỉ xem user active
   }
 
-  if (email) query.email = { $regex: email, $options: "i" };
-  if (username) query.username = { $regex: username, $options: "i" };
+  if (email) query.email = { $regex: email, $options: 'i' };
+  if (username) query.username = { $regex: username, $options: 'i' };
+  if (specialistIds && specialistIds.length) query.specialistIds = { $in: specialistIds };
 
   const [users, total] = await Promise.all([
     UserModel.find(query)
-      .populate("specialistIds")
+      .populate('specialistIds')
       .skip(skip)
       .limit(limit)
-      .select("-password -__v")
+      .select('-password -__v')
       .sort({ createdAt: -1 })
       .lean<IUser[]>(),
     UserModel.countDocuments(query),
@@ -106,7 +103,7 @@ export const updateUserProfile = async (
   userRole: Role
 ) => {
   const user = await UserModel.findById(userId);
-  appAssert(user, NOT_FOUND, "User not found");
+  appAssert(user, NOT_FOUND, 'User not found');
 
   const {
     username,
@@ -122,13 +119,13 @@ export const updateUserProfile = async (
 
   if (username) {
     const usernameExists = await UserModel.exists({ username });
-    appAssert(!usernameExists, NOT_FOUND, "Username already in use");
+    appAssert(!usernameExists, NOT_FOUND, 'Username already in use');
     user.username = username;
   }
 
   if (email) {
     const emailExists = await UserModel.exists({ email });
-    appAssert(!emailExists, NOT_FOUND, "Email already in use");
+    appAssert(!emailExists, NOT_FOUND, 'Email already in use');
     user.email = email;
   }
 
@@ -148,19 +145,16 @@ export const updateUserProfile = async (
   if (userRole === Role.ADMIN) {
     if (status) user.status = status;
     if (isVerified) user.isVerified = isVerified;
-    if (specialistIds?.length) {
+    if (specialistIds && specialistIds.length) {
       const specialists = await SpecialistModel.find({
         _id: { $in: specialistIds },
       });
-      appAssert(
-        specialists.length === specialistIds.length,
-        NOT_FOUND,
-        "Specialist not found"
-      );
+      appAssert(specialists.length === specialistIds.length, NOT_FOUND, 'Specialist not found');
       user.specialistIds = specialists.map((spec: ISpecialist) => spec._id);
     }
   }
 
-  await user.save();
-  return formatUserResponse(user.toObject(), userRole);
+  const updatedUser = await user.save();
+
+  return formatUserResponse(updatedUser.toObject(), userRole);
 };

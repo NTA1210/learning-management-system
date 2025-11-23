@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { enrollmentService, courseService } from "../services";
+import http from "../utils/http";
 import { userService } from "../services/userService";
 
 type Status =
@@ -68,6 +69,8 @@ const [form, setForm] = useState<{ userId: string; courseId: string; status: "pe
 });
 const [users, setUsers] = useState<Array<{ _id: string; username: string; email: string; fullname?: string }>>([]);
 const [courses, setCourses] = useState<Array<{ _id: string; title: string; description?: string }>>([]);
+const [courseTeachers, setCourseTeachers] = useState<Record<string, string[]>>({});
+const [updating, setUpdating] = useState<Record<string, boolean>>({});
 
     const filtered = useMemo(() => {
         const term = search.trim().toLowerCase();
@@ -109,6 +112,26 @@ return () => {
         };
     }, [page, limit, status]);
 
+    useEffect(() => {
+        const ids = Array.from(new Set(items.map((it: any) => it?.courseId?._id).filter(Boolean)));
+        const missing = ids.filter((id) => !(courseTeachers[id]));
+        if (!missing.length) return;
+        (async () => {
+            const results = await Promise.all(missing.map((id) => courseService.getCourseById(id).catch(() => null)));
+            const mapUpdate: Record<string, string[]> = {};
+            results.forEach((course, idx) => {
+                const id = missing[idx];
+                const arr = Array.isArray((course as any)?.teacherIds)
+                    ? (course as any).teacherIds.map((t: any) => (typeof t === 'string' ? t : t?._id)).filter(Boolean)
+                    : Array.isArray((course as any)?.teachers)
+                    ? (course as any).teachers.map((t: any) => t?._id).filter(Boolean)
+                    : [];
+                mapUpdate[id] = arr;
+            });
+            setCourseTeachers((prev) => ({ ...prev, ...mapUpdate }));
+        })();
+    }, [items]);
+
 useEffect(() => {
   if (!showCreateModal) return;
   let mounted = true;
@@ -148,6 +171,29 @@ useEffect(() => {
             setCreating(false);
         }
     }
+    const isAdmin = user?.role === 'admin';
+    const isTeacher = user?.role === 'teacher';
+
+    const canUpdateEnrollment = (it: any) => {
+        if (isAdmin) return true;
+        if (isTeacher && user?._id) {
+            const courseId = it?.courseId?._id;
+            const ids = courseId ? (courseTeachers[courseId] || []) : [];
+            return ids.includes(user._id);
+        }
+        return false;
+    };
+
+    async function handleApprove(id: string) {
+        setUpdating(prev => ({ ...prev, [id]: true }));
+        try {
+            await http.put(`/enrollments/${id}`, { status: 'approved' });
+            setItems(prev => prev.map((it: any) => it._id === id ? { ...it, status: 'approved', updatedAt: new Date().toISOString() } : it));
+        } finally {
+            setUpdating(prev => ({ ...prev, [id]: false }));
+        }
+    }
+
     return (
         <div
             className="min-h-screen transition-colors duration-300"
@@ -158,7 +204,7 @@ useEffect(() => {
         >
             <Navbar />
             <Sidebar />
-            <div className="max-w-[1200px] mt-[100px] mx-auto px-4 sm:pl-[93px] py-6">
+            <div className="max-w-[1600px] mt-[100px] mx-auto px-4 sm:pl-[93px] py-6">
                 <div className="flex items-center justify-between mb-4">
                     <h1
                         className="text-2xl font-semibold"
@@ -333,13 +379,13 @@ useEffect(() => {
                     </div>
                 ) : (
                     <div
-                        className="rounded-lg overflow-hidden shadow"
+                        className="rounded-lg shadow w-full"
                         style={{
                             backgroundColor: darkMode ? "#0b132b" : "#ffffff",
                             border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
                         }}
                     >
-                        <div className="overflow-x-auto">
+                        <div className="">
                             <table className="min-w-full">
                                 <thead>
                                     <tr
@@ -354,12 +400,13 @@ useEffect(() => {
                                         <th className="px-4 py-3">Progress</th>
                                         <th className="px-4 py-3">Created</th>
                                         <th className="px-4 py-3">Updated</th>
+                                        <th className="px-4 py-3">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {filtered.length === 0 ? (
                                         <tr>
-                                            <td className="px-4 py-6 text-center" colSpan={8}
+                                            <td className="px-4 py-6 text-center" colSpan={9}
                                                 style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
                                             >
                                                 Không có dữ liệu
@@ -379,7 +426,7 @@ useEffect(() => {
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         <div className="font-medium">{it?.courseId?.title}</div>
-                                                        <div className="text-sm truncate max-w-[300px]" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>{it?.courseId?.description}</div>
+                                                        <div className="text-sm break-words" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>{it?.courseId?.description}</div>
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         <span className={`px-2 py-1 rounded-full text-xs ${statusColors(it?.status, darkMode)}`}>{it?.status}</span>
@@ -401,6 +448,17 @@ useEffect(() => {
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         <div className="text-sm">{it?.updatedAt ? new Date(it.updatedAt).toLocaleString() : "-"}</div>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {user?.role === 'student' ? null : (
+                                                          <button
+                                                            onClick={() => handleApprove(it._id)}
+                                                            disabled={it?.status !== 'pending' || !canUpdateEnrollment(it) || !!updating[it._id]}
+                                                            className="px-3 py-1 rounded-lg text-sm bg-[#525fe1] text-white disabled:opacity-50"
+                                                          >
+                                                            Approve
+                                                          </button>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             );
