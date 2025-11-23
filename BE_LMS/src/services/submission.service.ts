@@ -4,14 +4,19 @@ import EnrollmentModel from "../models/enrollment.model";
 import appAssert from "../utils/appAssert";
 import { NOT_FOUND, BAD_REQUEST } from "../constants/http";
 import mongoose from "mongoose";
-import { SubmissionStatus,SubmissionStats,GradeDistribution,SubmissionReportQuery } from "../types/submission.type";
+import {
+  SubmissionStatus,
+  SubmissionStats,
+  GradeDistribution,
+  SubmissionReportQuery,
+} from "../types/submission.type";
 import IAssignment from "../types/assignment.type";
 import { UserModel } from "@/models";
 import { Role } from "@/types";
 import { uploadFile } from "@/utils/uploadFile";
 import { prefixSubmission } from "@/utils/filePrefix";
 import { EnrollmentStatus } from "@/types/enrollment.type";
-
+import { createNotification } from "./notification.service";
 
 //submit assign
 export const submitAssignment = async ({
@@ -161,7 +166,8 @@ export const gradeSubmission = async (
   studentId: mongoose.Types.ObjectId,
   graderId: mongoose.Types.ObjectId,
   grade: number,
-  feedback?: string
+  feedback?: string,
+  graderRole?: Role
 ) => {
   const student = await UserModel.findOne({ _id: studentId, role: Role.STUDENT });
   appAssert(student, BAD_REQUEST, "Missing user ID");
@@ -201,6 +207,15 @@ export const gradeSubmission = async (
 
   await submission.save();
 
+  await notifyStudentOfGrading({
+    studentId,
+    graderId,
+    graderRole,
+    assignmentTitle: assignment.title || "Assignment",
+    grade,
+    maxScore,
+  });
+
   //Populate thông tin trả về
   return await submission.populate([
     { path: "studentId", select: "fullname email" },
@@ -213,9 +228,13 @@ export const gradeSubmissionById = async (
   submissionId: string,
   graderId: mongoose.Types.ObjectId,
   grade: number,
-  feedback?: string
+  feedback?: string,
+  graderRole?: Role
 ) => {
-  const submission = await SubmissionModel.findById(submissionId).populate({ path: 'assignmentId', select: 'maxScore' });
+  const submission = await SubmissionModel.findById(submissionId).populate({
+    path: "assignmentId",
+    select: "title maxScore",
+  });
   appAssert(submission, NOT_FOUND, 'Submission not found');
 
   const assignment: any = submission.assignmentId;
@@ -240,7 +259,18 @@ export const gradeSubmissionById = async (
     gradedAt: new Date(),
   });
 
+  const studentRef = submission.studentId as mongoose.Types.ObjectId | string;
+
   await submission.save();
+
+  await notifyStudentOfGrading({
+    studentId: studentRef,
+    graderId,
+    graderRole,
+    assignmentTitle: assignment?.title || "Assignment",
+    grade,
+    maxScore,
+  });
 
   return await submission.populate([
     { path: 'studentId', select: 'fullname email' },
@@ -402,3 +432,52 @@ export const getSubmissionReportByCourse = async (courseId: string) => {
     return reports;
 };
 
+const isTeacherOrAdmin = (role?: Role | null): role is Role =>
+  !!role && [Role.TEACHER, Role.ADMIN].includes(role);
+
+const notifyStudentOfGrading = async ({
+  studentId,
+  graderId,
+  graderRole,
+  assignmentTitle,
+  grade,
+  maxScore,
+}: {
+  studentId: mongoose.Types.ObjectId | string;
+  graderId: mongoose.Types.ObjectId;
+  graderRole?: Role | null;
+  assignmentTitle: string;
+  grade: number;
+  maxScore: number;
+}) => {
+  if (!isTeacherOrAdmin(graderRole)) {
+    return;
+  }
+
+  if (!studentId) {
+    return;
+  }
+
+  const recipientUser =
+    typeof studentId === "string"
+      ? studentId
+      : (studentId as mongoose.Types.ObjectId).toHexString();
+
+  const title = `Grade posted: ${assignmentTitle}`;
+  const message = `Your submission for "${assignmentTitle}" has been graded. Score: ${grade}/${maxScore}. Check the feedback for details.`;
+
+  try {
+    await createNotification(
+      {
+        title,
+        message,
+        recipientType: "user",
+        recipientUser,
+      },
+      graderId,
+      graderRole
+    );
+  } catch (error) {
+    console.error("Failed to send grading notification", error);
+  }
+};

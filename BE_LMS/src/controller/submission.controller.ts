@@ -93,7 +93,8 @@ export const gradeSubmissionHandler = catchErrors(async (req, res) => {
     studentId,
     graderId,
     grade,
-    feedback
+    feedback,
+    req.role
   );
 
   return res.success(OK, {
@@ -113,7 +114,13 @@ export const gradeSubmissionByIdHandler = catchErrors(async (req, res) => {
   const { grade, feedback } = req.body as { grade?: number; feedback?: string };
   appAssert(typeof grade === 'number', BAD_REQUEST, 'Missing grade');
 
-  const result = await gradeSubmissionById(submissionId, graderId, grade, feedback);
+  const result = await gradeSubmissionById(
+    submissionId,
+    graderId,
+    grade,
+    feedback,
+    req.role
+  );
 
   return res.success(OK, {
     data: result,
