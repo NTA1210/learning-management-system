@@ -242,7 +242,7 @@ export default function CourseQuizzesPage() {
                                 )}
                                 <button
                                   onClick={() => {
-                                    navigate(`/quiz/questions/${quiz._id}`);
+                                    navigate(`/questionbank/questions/${quiz._id}`);
                                   }}
                                   className="px-3 py-1 rounded text-xs font-medium flex items-center gap-1"
                                   style={{ backgroundColor: "#3b82f6", color: "#fff" }}

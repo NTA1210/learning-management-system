@@ -524,7 +524,7 @@ const QuizCreatePage: React.FC = () => {
                         backgroundColor: "var(--card-row-bg)",
                         borderColor: "var(--card-row-border)",
                       }}
-                      onClick={() => navigate(`/quiz/${course._id}`)}
+                      onClick={() => navigate(`/questionbank/${course._id}`)}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>

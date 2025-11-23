@@ -129,17 +129,17 @@ function AppRoutes() {
         } />
 
         {/* Quiz Management */}
-        <Route path="/quiz" element={
+        <Route path="/questionbank" element={
           <ProtectedRoute>
             <QuizManagementPage />
           </ProtectedRoute>
         } />
-        <Route path="/quiz/:courseId" element={
+        <Route path="/questionbank/:courseId" element={
           <ProtectedRoute>
             <CourseQuizzesPage />
           </ProtectedRoute>
         } />
-        <Route path="/quiz/questions/:quizId" element={
+        <Route path="/questionbank/questions/:quizId" element={
           <ProtectedRoute>
             <QuizQuestionsPage />
           </ProtectedRoute>

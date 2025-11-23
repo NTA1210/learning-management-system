@@ -1,11 +1,12 @@
-import { useEffect, useState, useRef } from "react";
+﻿import { useEffect, useState, useRef } from "react";
 import type { FormEvent } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { PlusCircle, X, ImagePlus, CheckCircle, AlertCircle, Info, Upload, Download } from "lucide-react";
-import { subjectService, quizQuestionService, type Subject, type QuizQuestion } from "../services";
+import { subjectService, quizQuestionService, type QuizQuestion } from "../services";
+import type { Subject } from "../types/subject";
 import { useNavigate } from "react-router-dom";
 
 type Question = {
@@ -103,7 +104,7 @@ export default function QuizManagementPage() {
   }, []);
 
   const handlePickSubject = (subjectId: string) => {
-    navigate(`/quiz/${subjectId}`);
+    navigate(`/questionbank/${subjectId}`);
   };
 
   const generateExamCode = (subject: Subject) => {
@@ -527,7 +528,7 @@ const handleImportQuiz = async () => {
     setImportFile(null);
 
     // Navigate to quiz page và pass cả câu hỏi cũ và mới để hiển thị
-    navigate(`/quiz/${importSubjectId}`, {
+    navigate(`/questionbank/${importSubjectId}`, {
       state: { mergedQuestions: allQuestions, subjectInfo: subjectDetail ?? undefined },
     });
   } catch (error) {
