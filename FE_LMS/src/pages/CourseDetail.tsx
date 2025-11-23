@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
 import { useTheme } from "../hooks/useTheme";
+import { useAuth } from "../hooks/useAuth";
+import Navbar from "../components/Navbar";
+import Sidebar from "../components/Sidebar";
 import { courseService } from "../services";
 import type { Course } from "../types/course";
 
@@ -40,6 +43,7 @@ export default function CourseDetail() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
   const { darkMode: isDarkMode } = useTheme();
+  const { user } = useAuth();
 
   const [course, setCourse] = useState<ApiCourse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,42 +112,10 @@ export default function CourseDetail() {
         color: isDarkMode ? "#ffffff" : "#0f172a",
       }}
     >
-      <div
-        className="sticky top-0 z-40"
-        style={{
-          backgroundColor: isDarkMode ? "#0f172a" : "#ffffff",
-          borderBottom: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
-        }}
-      >
-        <div className="max-w-[1200px] mx-auto px-4 py-4 flex items-center justify-between">
-          <button
-            onClick={() => navigate(-1)}
-            className="px-3 py-2 rounded-lg hover:scale-105 transition"
-            style={{
-              backgroundColor: isDarkMode ? "#111827" : "#f3f4f6",
-              color: isDarkMode ? "#ffffff" : "#111827",
-            }}
-          >
-            Quay lại
-          </button>
-          <div className="flex items-center gap-3">
-            <span className="font-semibold truncate max-w-[300px]">
-              {course?.title ?? "Course Detail"}
-            </span>
-            {subject?.name && (
-              <span className="text-sm opacity-70">{subject.name}</span>
-            )}
-          </div>
-          <button
-            onClick={() => navigate("/register")}
-            className="bg-[#525fe1] text-white px-4 py-2 rounded-lg hover:opacity-90"
-          >
-            Đăng ký
-          </button>
-        </div>
-      </div>
+      <Navbar />
+      <Sidebar role={(user?.role as "admin" | "teacher" | "student") || "student"} />
 
-      <div className="max-w-[1200px] mx-auto px-4 py-10">
+      <div className="max-w-[1200px] mx-auto px-4 py-10 mt-16 sm:pl-24 md:pl-28">
         {loading ? (
           <div className="animate-pulse">
             <div className="h-8 w-48 bg-gray-300 dark:bg-gray-700 rounded mb-6" />
