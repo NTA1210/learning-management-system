@@ -25,7 +25,7 @@ const subjectRoutes = Router();
 
 // prefix: /subjects
 
-// Protected routes (require authentication)
+
 // GET /subjects - List Subject (search/lọc/phân trang)
 subjectRoutes.get('/', listSubjectsHandler);
 // GET /subjects/id/:id - Chi tiết Subject theo ID
