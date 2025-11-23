@@ -127,9 +127,9 @@ export const updateQuiz = async (
       );
   }
 
-  const updated = snapshotQuestions.filter((q) => q.isDirty && !q.isNew && !q.isDeleted);
-  const added = snapshotQuestions.filter((q) => q.isNew && !q.isDeleted);
-  const deleted = snapshotQuestions.filter((q) => q.isDeleted && !q.isNew);
+  const updated = snapshotQuestions.filter((q) => q.isDirty && !q.isNewQuestion && !q.isDeleted);
+  const added = snapshotQuestions.filter((q) => q.isNewQuestion && !q.isDeleted);
+  const deleted = snapshotQuestions.filter((q) => q.isDeleted && !q.isNewQuestion);
 
   for (const q of updated) {
     const index = map.get(q.id) || -1;
@@ -326,4 +326,15 @@ export const getStatisticByQuizId = async (
     scoreDistribution,
     students,
   };
+};
+
+export const getQuizById = async (quizId: string, userId: mongoose.Types.ObjectId, role: Role) => {
+  const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId').lean();
+  appAssert(quiz, NOT_FOUND, 'Quiz not found');
+
+  if (role === Role.TEACHER) {
+    isTeacherOfCourse(quiz.courseId, userId);
+  }
+
+  return quiz;
 };

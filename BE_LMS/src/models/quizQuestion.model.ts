@@ -1,15 +1,15 @@
-import IQuizQuestion, { QuizQuestionType } from "../types/quizQuestion.type";
-import mongoose from "mongoose";
+import IQuizQuestion, { QuizQuestionType } from '../types/quizQuestion.type';
+import mongoose from 'mongoose';
 
 export const QuizQuestionSchema = new mongoose.Schema<IQuizQuestion>(
   {
     subjectId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Subject",
+      ref: 'Subject',
       required: true,
       index: true,
     },
-    text: { type: String, required: true },
+    text: { type: String, required: true, trim: true },
     images: {
       type: [String],
       default: [],
@@ -27,19 +27,19 @@ export const QuizQuestionSchema = new mongoose.Schema<IQuizQuestion>(
       default: [],
     },
     points: { type: Number, default: 1 },
-    explanation: { type: String },
+    explanation: { type: String, trim: true },
   },
   { timestamps: true }
 );
 
 //Indexes
 QuizQuestionSchema.index({ subjectId: 1, text: 1 });
-QuizQuestionSchema.index({ text: "text" });
+QuizQuestionSchema.index({ text: 'text' });
 
 const QuizQuestionModel = mongoose.model<IQuizQuestion>(
-  "QuizQuestion",
+  'QuizQuestion',
   QuizQuestionSchema,
-  "quiz_questions"
+  'quiz_questions'
 );
 
 export default QuizQuestionModel;
