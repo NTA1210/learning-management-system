@@ -1,28 +1,19 @@
-import { CREATED, OK } from "@/constants/http";
-import {
-  createQuiz,
-  deleteQuiz,
-  getQuizzes,
-  updateQuiz,
-} from "@/services/quiz.service";
-import { catchErrors } from "@/utils/asyncHandler";
-import {
-  updateQuizSchema,
-  createQuizSchema,
-  quizIdSchema,
-  getQuizzesSchema,
-} from "@/validators/quiz.schemas";
+import { CREATED, OK } from '@/constants/http';
+import { createQuiz, deleteQuiz, getStatisticByQuizId, updateQuiz } from '@/services/quiz.service';
+import { catchErrors } from '@/utils/asyncHandler';
+import { updateQuizSchema, createQuizSchema, quizIdSchema } from '@/validators/quiz.schemas';
 
 // POST /quizzes - Create a new quiz
 export const createQuizHandler = catchErrors(async (req, res) => {
   const input = createQuizSchema.parse(req.body);
   const userId = req.userId;
+  const role = req.role;
 
-  const data = await createQuiz(input, userId);
+  const data = await createQuiz(input, userId, role);
 
   return res.success(CREATED, {
     data,
-    message: "Quiz created successfully",
+    message: 'Quiz created successfully',
   });
 });
 
@@ -32,12 +23,14 @@ export const updateQuizHandler = catchErrors(async (req, res) => {
     ...req.body,
     quizId: req.params.quizId,
   });
+  const userId = req.userId;
+  const role = req.role;
 
-  const data = await updateQuiz(input);
+  const data = await updateQuiz(input, userId, role);
 
   return res.success(CREATED, {
     data,
-    message: "Quiz updated successfully",
+    message: 'Quiz updated successfully',
   });
 });
 
@@ -45,17 +38,25 @@ export const updateQuizHandler = catchErrors(async (req, res) => {
 export const deleteQuizHandler = catchErrors(async (req, res) => {
   const quizId = quizIdSchema.parse(req.params.quizId);
   const userId = req.userId;
-  await deleteQuiz({ quizId, userId });
+  const role = req.role;
+
+  await deleteQuiz({ quizId, userId, role });
 
   return res.success(OK, {
-    message: "Quiz deleted successfully",
+    message: 'Quiz deleted successfully',
   });
 });
 
-// GET /quizzes - Get all quizzes
-export const getQuizzesHandler = catchErrors(async (req, res) => {
-  const role = req.role;
+//GET /quizzes/:quizId/statistics
+export const getStatisticByQuizIdHandler = catchErrors(async (req, res) => {
+  const quizId = quizIdSchema.parse(req.params.quizId);
   const userId = req.userId;
-  const input = getQuizzesSchema.parse(req.query);
-  await getQuizzes(input, role, userId);
+  const role = req.role;
+
+  const data = await getStatisticByQuizId(quizId, userId, role);
+
+  return res.success(OK, {
+    data,
+    message: 'Statistic retrieved successfully',
+  });
 });

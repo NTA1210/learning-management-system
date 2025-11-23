@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
@@ -6,6 +6,7 @@ import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import { feedbackService } from "../services/feedbackService";
 import { userService } from "../services/userService";
+import { renderMarkdown } from "../utils/markdown";
 import type { FeedbackType } from "../types/feedback";
 import type { User } from "../types/auth";
 
@@ -42,9 +43,9 @@ export default function Feedback() {
 		description: "",
 		targetId: undefined
 	});
+	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
 	const emojiOptions = ["😀", "🙂", "😐", "😕", "😡", "❤️", "🚀"];
-
 	const categoryOptions = useMemo(
 		() => (isTeacher ? categories.filter((c) => c.value !== "teacher") : categories),
 		[isTeacher]
@@ -132,11 +133,94 @@ export default function Feedback() {
 		}
 	};
 
+	const markdownPreview = useMemo(() => renderMarkdown(form.description), [form.description]);
+
 	const handleEmojiInsert = (emoji: string) => {
 		setForm((prev) => ({
 			...prev,
 			description: prev.description ? `${prev.description} ${emoji}` : emoji
 		}));
+	};
+
+	type MarkdownAction =
+		| "bold"
+		| "italic"
+		| "code"
+		| "strike"
+		| "unordered-list"
+		| "ordered-list"
+		| "link";
+
+	const applyMarkdown = (action: MarkdownAction) => {
+		const textarea = textareaRef.current;
+		if (!textarea) return;
+
+		const { selectionStart = 0, selectionEnd = 0, value } = textarea;
+		const hasSelection = selectionEnd > selectionStart;
+		const selectedText = hasSelection ? value.slice(selectionStart, selectionEnd) : "";
+		let insertText = "";
+		let cursorStart = selectionStart;
+		let cursorEnd: number;
+
+		const wrap = (prefix: string, suffix = prefix, placeholder = "text") => {
+			const inner = selectedText || placeholder;
+			insertText = `${prefix}${inner}${suffix}`;
+			const offset = prefix.length;
+			cursorStart = selectionStart + offset;
+			cursorEnd = cursorStart + inner.length;
+		};
+
+		switch (action) {
+			case "bold":
+				wrap("**");
+				break;
+			case "italic":
+				wrap("_", "_");
+				break;
+			case "code":
+				wrap("`");
+				break;
+			case "strike":
+				wrap("~~");
+				break;
+			case "unordered-list": {
+				const text = selectedText || "List item";
+				const lines = text.split("\n").map((line) => (line.startsWith("- ") ? line : `- ${line}`));
+				insertText = lines.join("\n");
+				cursorStart = selectionStart;
+				cursorEnd = selectionStart + insertText.length;
+				break;
+			}
+			case "ordered-list": {
+				const text = selectedText || "Step one";
+				const lines = text
+					.split("\n")
+					.map((line, index) => (line.match(/^\d+\.\s/) ? line : `${index + 1}. ${line}`));
+				insertText = lines.join("\n");
+				cursorStart = selectionStart;
+				cursorEnd = selectionStart + insertText.length;
+				break;
+			}
+			case "link": {
+				const label = selectedText || "Link text";
+				insertText = `[${label}](https://example.com)`;
+				cursorStart = selectionStart + 1;
+				cursorEnd = cursorStart + label.length;
+				break;
+			}
+			default:
+				return;
+		}
+
+		const updatedValue = `${value.slice(0, selectionStart)}${insertText}${value.slice(selectionEnd)}`;
+		setForm((prev) => ({ ...prev, description: updatedValue }));
+
+		requestAnimationFrame(() => {
+			if (!textarea) return;
+			textarea.focus();
+			textarea.selectionStart = cursorStart;
+			textarea.selectionEnd = cursorEnd;
+		});
 	};
 
 	return (
@@ -370,8 +454,99 @@ export default function Feedback() {
 
 							{/* Message */}
 							<div className="fade-in-up" style={{ animationDelay: "200ms" }}>
-								<label className="block text-sm font-medium mb-1">Detailed description</label>
+								<label className="block text-sm font-medium mb-1 flex items-center gap-2">
+									Detailed description
+									<span
+										className="text-[11px] px-2 py-0.5 rounded-full"
+										style={{
+											backgroundColor: darkMode ? "rgba(59,130,246,0.12)" : "rgba(59,130,246,0.15)",
+											color: darkMode ? "#bfdbfe" : "#1d4ed8"
+										}}
+									>
+										Supports Markdown
+									</span>
+								</label>
+								<div className="flex flex-wrap gap-2 mb-2">
+									<button
+										type="button"
+										onClick={() => applyMarkdown("bold")}
+										className="px-2 py-1 text-xs rounded-lg border font-semibold click-animate"
+										style={{
+											borderColor: darkMode ? "rgba(148,163,184,0.4)" : "rgba(148,163,184,0.4)",
+											backgroundColor: darkMode ? "rgba(15,23,42,0.6)" : "rgba(248,250,252,0.8)"
+										}}
+									>
+										<strong>B</strong>
+									</button>
+									<button
+										type="button"
+										onClick={() => applyMarkdown("italic")}
+										className="px-2 py-1 text-xs rounded-lg border italic click-animate"
+										style={{
+											borderColor: darkMode ? "rgba(148,163,184,0.4)" : "rgba(148,163,184,0.4)",
+											backgroundColor: darkMode ? "rgba(15,23,42,0.6)" : "rgba(248,250,252,0.8)"
+										}}
+									>
+										I
+									</button>
+									<button
+										type="button"
+										onClick={() => applyMarkdown("code")}
+										className="px-2 py-1 text-xs rounded-lg border font-mono click-animate"
+										style={{
+											borderColor: darkMode ? "rgba(148,163,184,0.4)" : "rgba(148,163,184,0.4)",
+											backgroundColor: darkMode ? "rgba(15,23,42,0.6)" : "rgba(248,250,252,0.8)"
+										}}
+									>
+										`code`
+									</button>
+									<button
+										type="button"
+										onClick={() => applyMarkdown("strike")}
+										className="px-2 py-1 text-xs rounded-lg border click-animate"
+										style={{
+											borderColor: darkMode ? "rgba(148,163,184,0.4)" : "rgba(148,163,184,0.4)",
+											backgroundColor: darkMode ? "rgba(15,23,42,0.6)" : "rgba(248,250,252,0.8)"
+										}}
+									>
+										<del>S</del>
+									</button>
+									<button
+										type="button"
+										onClick={() => applyMarkdown("unordered-list")}
+										className="px-2 py-1 text-xs rounded-lg border click-animate"
+										style={{
+											borderColor: darkMode ? "rgba(148,163,184,0.4)" : "rgba(148,163,184,0.4)",
+											backgroundColor: darkMode ? "rgba(15,23,42,0.6)" : "rgba(248,250,252,0.8)"
+										}}
+									>
+										• List
+									</button>
+									<button
+										type="button"
+										onClick={() => applyMarkdown("ordered-list")}
+										className="px-2 py-1 text-xs rounded-lg border click-animate"
+										style={{
+											borderColor: darkMode ? "rgba(148,163,184,0.4)" : "rgba(148,163,184,0.4)",
+											backgroundColor: darkMode ? "rgba(15,23,42,0.6)" : "rgba(248,250,252,0.8)"
+										}}
+									>
+										1. List
+									</button>
+									<button
+										type="button"
+										onClick={() => applyMarkdown("link")}
+										className="px-2 py-1 text-xs rounded-lg border click-animate"
+										style={{
+											borderColor: darkMode ? "rgba(148,163,184,0.4)" : "rgba(148,163,184,0.4)",
+											backgroundColor: darkMode ? "rgba(15,23,42,0.6)" : "rgba(248,250,252,0.8)"
+										}}
+									>
+										Link
+									</button>
+								</div>
 								<textarea
+									ref={textareaRef}
 									value={form.description}
 									onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
 									placeholder="Describe the issue or proposal with steps, expected vs actual, etc."
@@ -400,8 +575,33 @@ export default function Feedback() {
 									))}
 								</div>
 								<p className="mt-2 text-xs" style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}>
-									Add context, reproduction steps (if any), and screenshots if possible.
+									Add context, reproduction steps (if any), and screenshots if possible. Mix in Markdown for clearer sections.
 								</p>
+								<div className="mt-4">
+									<div
+										className="rounded-2xl p-4 border"
+										style={{
+											borderColor: darkMode ? "rgba(148,163,184,0.35)" : "rgba(148,163,184,0.4)",
+											backgroundColor: darkMode ? "rgba(15,23,42,0.9)" : "#fff"
+										}}
+									>
+										<div className="flex items-center justify-between mb-2 text-xs font-semibold" style={{ color: darkMode ? "#94a3b8" : "#374151" }}>
+											<span>Live preview</span>
+											<span>Rendered Markdown</span>
+										</div>
+										<div
+											className="prose prose-sm max-w-none text-sm"
+											style={{
+												color: darkMode ? "#e5e7eb" : "#111827"
+											}}
+											dangerouslySetInnerHTML={{
+												__html:
+													markdownPreview ||
+													"<p class='text-xs' style='opacity:0.6'>Start typing Markdown (lists, code, links…) to preview here.</p>"
+											}}
+										/>
+									</div>
+								</div>
 							</div>
 
 							{/* Submit */}

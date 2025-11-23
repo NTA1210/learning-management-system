@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import ICourseInvite from "../types/courseInvite.type";
-import {EMAIL_REGEX} from "@/constants/regex";
+import { EMAIL_REGEX } from "@/constants/regex";
 
 const CourseInviteSchema = new mongoose.Schema<ICourseInvite>(
   {
@@ -21,10 +21,9 @@ const CourseInviteSchema = new mongoose.Schema<ICourseInvite>(
       ref: "User",
       required: true,
     },
-    invitedEmail: {
-      type: String,
+    invitedEmails: {
+      type: [String],
       required: true,
-      match: EMAIL_REGEX,
       index: true,
     },
     maxUses: {

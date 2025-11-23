@@ -85,6 +85,11 @@ const CourseManagement: React.FC = () => {
   // Role-based permissions
   const isAdmin = user?.role === 'admin';
   const isTeacher = user?.role === 'teacher';
+  useEffect(() => {
+    if (isTeacher && user?._id) {
+      setCurrentTeacherId(user._id);
+    }
+  }, [isTeacher, user]);
   const isStudent = user?.role === 'student';
   const canCreate = isAdmin || isTeacher;
   // Check if teacher can edit a specific course
@@ -220,18 +225,18 @@ const CourseManagement: React.FC = () => {
   const handleEdit = (course: Course) => {
     setEditingCourse(course);
     setFormData({
-      title: "",
+      title: course.title || "",
       subjectId: "",
-      description: "",
+      description: course.description || "",
       startDate: "",
       endDate: "",
       teacherIds: "",
-      isPublished: false,
+      isPublished: !!course.isPublished,
       enrollRequiresApproval: true,
-      capacity: 50,
+      capacity: typeof course.capacity === 'number' ? course.capacity : 0,
       status: "draft", 
     });
-    setSelectedTeachers(course.teachers.map(t => t._id));
+    setSelectedTeachers(Array.isArray(course.teachers) ? course.teachers.map(t => t._id) : []);
     setCategorySearchTerm(course.category?.name || "");
     setShowEditModal(true);
   };
@@ -402,10 +407,8 @@ const CourseManagement: React.FC = () => {
                 </p>
               </div>
               <button
-                className="px-4 py-2 rounded-lg text-white flex items-center transition-all duration-200"
+                className="px-4 py-2 rounded-lg text-white flex items-center transition-all duration-200 hover:opacity-90 hover:scale-105"
                 style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
-                onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#5b21b6' : '#4338ca'}
-                onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#4c1d95' : '#4f46e5'}
                 onClick={fetchCourses}
               >
                 <svg className="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -433,18 +436,12 @@ const CourseManagement: React.FC = () => {
                 />
               </div>
               <button
-  onClick={handleSearch}
-  className="p-2 rounded-lg text-white transition-all duration-200 flex items-center justify-center"
-  style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
-  onMouseEnter={(e) =>
-    ((e.target as HTMLElement).style.backgroundColor = darkMode ? '#5b21b6' : '#4338ca')
-  }
-  onMouseLeave={(e) =>
-    ((e.target as HTMLElement).style.backgroundColor = darkMode ? '#4c1d95' : '#4f46e5')
-  }
->
-  <Search size={20} />
-</button>
+                onClick={handleSearch}
+                className="p-2 rounded-lg text-white transition-all duration-200 flex items-center justify-center hover:opacity-90 hover:scale-105"
+                style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
+              >
+                <Search size={20} />
+              </button>
               {/* Sort options: a-z, z-a, old->new, new->old */}
               <div className="relative">
                 <select
@@ -549,22 +546,15 @@ const CourseManagement: React.FC = () => {
                 <button
                   onClick={() => {
                     setShowCreateModal(true);
-                    // If teacher, pre-select themselves using stored ID
                     if (isTeacher && currentTeacherId) {
                       setSelectedTeachers([currentTeacherId]);
                     } else {
                       setSelectedTeachers([]);
                     }
                   }}
-                  className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg"
+                  className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105"
                   style={{ 
                     backgroundColor: darkMode ? '#059669' : '#10b981'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = darkMode ? '#047857' : '#059669';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = darkMode ? '#059669' : '#10b981';
                   }}
                 >
                   + Create Course
@@ -610,17 +600,6 @@ const CourseManagement: React.FC = () => {
                       animation: 'fadeInUp 0.6s ease-out forwards',
                       opacity: 0,
                       transform: 'translateY(20px)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-6px) scale(1.03)';
-                      // amplify the dual-shadow slightly on hover
-                      e.currentTarget.style.boxShadow = darkMode
-                        ? '28px 28px 48px rgba(0,0,0,0.6), -28px -28px 48px rgba(255,255,255,0.06)'
-                        : '34px 34px 54px rgba(0,0,0,0.28), -34px -34px 54px rgba(255,255,255,0.72)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                      e.currentTarget.style.boxShadow = '';
                     }}
                   >
                     {/* Course Header */}
@@ -740,14 +719,7 @@ const CourseManagement: React.FC = () => {
                           backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff',
                           color: darkMode ? '#a5b4fc' : '#4f46e5'
                         }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = darkMode ? 'rgba(99, 102, 241, 0.3)' : '#e0e7ff';
-                          e.currentTarget.style.transform = 'scale(1.05)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff';
-                          e.currentTarget.style.transform = 'scale(1)';
-                        }}
+
                         onClick={() => navigate(`/courses/${course._id}`)}
                       >
                         {/* Điều hướng đến page chi tiết bằng _id */}
@@ -760,14 +732,7 @@ const CourseManagement: React.FC = () => {
                             backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff',
                             color: darkMode ? '#a5b4fc' : '#4f46e5'
                           }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = darkMode ? 'rgba(99, 102, 241, 0.3)' : '#e0e7ff';
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff';
-                            e.currentTarget.style.transform = 'scale(1)';
-                          }}
+
                           onClick={() => handleEdit(course)}
                         >
                           Edit
@@ -780,14 +745,7 @@ const CourseManagement: React.FC = () => {
                           backgroundColor: darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2',
                           color: darkMode ? '#fca5a5' : '#dc2626'
                         }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = darkMode ? 'rgba(239, 68, 68, 0.3)' : '#fecaca';
-                          e.currentTarget.style.transform = 'scale(1.05)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2';
-                          e.currentTarget.style.transform = 'scale(1)';
-                        }}
+
                         onClick={() => handleDelete(course._id)}
                       >
                         <Trash size={16} />
@@ -801,14 +759,7 @@ const CourseManagement: React.FC = () => {
                             backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5',
                             color: darkMode ? '#6ee7b7' : '#059669'
                           }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = darkMode ? 'rgba(16, 185, 129, 0.3)' : '#a7f3d0';
-                            e.currentTarget.style.transform = 'scale(1.05)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = darkMode ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5';
-                            e.currentTarget.style.transform = 'scale(1)';
-                          }}
+
                         >
                           Enroll
                         </button>
@@ -956,15 +907,6 @@ const CourseManagement: React.FC = () => {
                 <div>
                   <label className="block mb-2 font-semibold">Category *</label>
          
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formData.isPublished}
-                    onChange={(e) => setFormData({ ...formData, isPublished: e.target.checked })}
-                    className="mr-2"
-                  />
-                  <label>Published</label>
                 </div>
               </div>
               <div className="col-span-2">

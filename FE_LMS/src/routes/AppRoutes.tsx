@@ -20,6 +20,8 @@ import {DashboardPage ,
       QuizCreatePage,
       FeedbackPage,
       FeedbackListPage,
+      EnrollmentsListPage,
+      CurriculumPage,
     } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -157,6 +159,19 @@ function AppRoutes() {
         <Route path="/help/feedback-list" element={
           <ProtectedRoute>
             <FeedbackListPage />
+          </ProtectedRoute>
+        } />
+
+        {/* Enrollments */}
+        <Route path="/enrollments-list" element={
+          <ProtectedRoute>
+            <EnrollmentsListPage />
+          </ProtectedRoute>
+        } />
+        {/* Curriculum */}
+        <Route path="/curriculum" element={
+          <ProtectedRoute>
+            <CurriculumPage />
           </ProtectedRoute>
         } />
 

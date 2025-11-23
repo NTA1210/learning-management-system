@@ -21,3 +21,5 @@ export { default as AssignmentDetailPage } from "./AssignmentDetailPage";
 export { default as QuizManagementPage } from "./QuizManagementPage";
 export { default as QuizCoursePage } from "./QuizCoursePage";
 export { default as QuizCreatePage } from "./QuizCreatePage";
+export { default as EnrollmentsListPage } from "./EnrollmentsList";
+export { default as CurriculumPage } from "./Curriculum";

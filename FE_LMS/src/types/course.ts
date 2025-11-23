@@ -12,15 +12,25 @@ export interface Category {
   description?: string;
 }
 
+import type { Subject } from "./subject";
+
 export interface Course {
   _id: string;
   title: string;
   code: string;
   description: string;
+  logo?: string;
   category?: Category;
-  teachers: Teacher[];
+  subjectId?: Subject | string | null;
+  teachers?: Teacher[];
+  teacherIds?: Teacher[];
   isPublished: boolean;
   capacity: number;
+  status?: 'ongoing' | 'draft' | 'completed';
+  startDate?: string;
+  endDate?: string;
+  semesterId?: string;
+  enrollRequiresApproval?: boolean;
   createdAt: string;
   updatedAt: string;
   __v: number;

@@ -8,6 +8,7 @@ export const enum CourseStatus {
 }
 
 export default interface ICourse extends mongoose.Document {
+    semesterId: mongoose.Types.ObjectId;
     title: string;
     subjectId?: mongoose.Types.ObjectId;
     logo?: string;
@@ -18,8 +19,6 @@ export default interface ICourse extends mongoose.Document {
     status: CourseStatus;
     /** Can be multiple teachers. */
     teacherIds: mongoose.Types.ObjectId[];
-    /** Classes under this course. */
-    classIds: mongoose.Types.ObjectId[];
     isPublished: boolean;
     capacity?: number;
     meta?: Record<string, any>;

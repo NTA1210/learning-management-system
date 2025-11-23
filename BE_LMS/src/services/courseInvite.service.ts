@@ -12,20 +12,24 @@ import { APP_ORIGIN } from "@/constants/env";
 import { TCreateCourseInvite, TListCourseInvite, TUpdateCourseInvite } from "@/validators/courseInvite.schemas";
 import ICourseInvite from "@/types/courseInvite.type";
 import { FilterQuery, Types } from "mongoose";
-
+import { sendMail } from "@/utils/sendMail";
+import { getCourseInviteTemplate } from "@/utils/emailTemplates";
 /**
  * Yêu cầu nghiệp vụ:
  * - Teacher/Admin tạo link mời tham gia khóa học
  * - Cho phép invite cả email chưa đăng ký (student sẽ đăng ký/đăng nhập sau khi nhận link)
+ * - Giới hạn số lượng email mời trong 1 lần gửi (1-100 emails)
  * - Dùng crypto.randomBytes để tạo token ngẫu nhiên (64 ký tự hex)
  * - Hash token bằng SHA256 trước khi lưu vào DB (bảo mật)
  * - Link có thời hạn và giới hạn số lần dùng (optional)
  * - Chỉ gửi token gốc qua link, không lưu vào DB
+ * - Gửi email mời tham gia khóa học đến từng email trong danh sách
+ * - Xử lý gửi mail tuần tự (sequential) với delay để tránh rate limit của dịch vụ mail
  * - Teacher chỉ tạo được link cho course mình dạy
  * - Admin tạo được link cho bất kỳ course nào
  *
- * Input: courseId, expiresInDays, maxUses, createdBy (userId)
- * Output: inviteLink với token gốc, thông tin invite
+ * Input: courseId, expiresInDays, maxUses, invitedEmails, createdBy (userId)
+ * Output: Danh sách kết quả invite (thành công/bỏ qua), inviteLink, emailId
  */
 export const createCourseInvite = async (
   data: TCreateCourseInvite,
@@ -54,77 +58,95 @@ export const createCourseInvite = async (
   //Check duplicate email, chuẩn hóa lower-case
   const uniqueEmails = Array.from(new Set(invitedEmails.map(email => email.toLowerCase())));
 
+  // Kiểm tra giới hạn số lượng email (1-100)
+  appAssert(
+    uniqueEmails.length >= 1 && uniqueEmails.length <= 100,
+    BAD_REQUEST,
+    `Number of emails must be between 1 and 100. You provided ${uniqueEmails.length} email(s).`
+  );
+
   // Tính thời gian hết hạn
   const expiresAt = new Date(
     Date.now() + expiresInDays * 24 * 60 * 60 * 1000
   );
 
-  //Duyệt qua từng email và xử lý song song
-  const results = await Promise.all(
-    uniqueEmails.map(async (email) => {
 
-  // Kiểm tra xem mail đã có invite active chưa
-  const existing = await CourseInviteModel.findOne({
-    courseId,
-    invitedEmail: email,
-    isActive: true,
-    expiresAt: { $gt: new Date() },
-    deletedAt: null //chỉ check deletedAt
-  })
-
-  if (existing) {
-    return {
-      email,
-      skip: true,
-      reason: "Existing active invite found",
-    }
-  }
-
-  // Tạo token ngẫu nhiên 32 bytes = 64 ký tự hex
   const token = crypto.randomBytes(32).toString("hex");
-
-  // Hash token bằng SHA256 để lưu vào DB
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
 
-
-  // Tạo invite record
+  // Tạo bản ghi invite (Lưu mảng email)
   const invite = await CourseInviteModel.create({
     tokenHash,
     courseId,
     createdBy,
-    invitedEmail: email,
+    invitedEmails: uniqueEmails, // <--- Lưu mảng
     maxUses,
     expiresAt,
     isActive: true,
   });
 
-// kiểm tra tạo invite trong db thành công chưa
   appAssert(invite, INTERNAL_SERVER_ERROR, "Failed to create invite link");
 
-  // Tạo link với token gốc (KHÔNG lưu token gốc vào DB)
   const inviteLink = `${APP_ORIGIN}/courses/join?token=${token}`;
 
-  return {
-      email,
-      invite: {
-        _id: invite._id,
-        courseId: invite.courseId,
-        maxUses: invite.maxUses,
-        usedCount: invite.usedCount,
-        expiresAt: invite.expiresAt,
-        isActive: invite.isActive,
-        createdAt: invite.createdAt,
-      },
-      inviteLink,
-    };
-  }));
+  // Gửi email background theo lô (Batch)
+  void sendInvitesWithBatch(uniqueEmails, inviteLink, course.title);
 
   return {
-    courseId,
-    invitedCount: results.length,
-    invites: results
+    invite,
+    inviteLink,
+    invitedCount: uniqueEmails.length
+  };
+};
+// Helper function để gửi email invite 
+const sendCourseInviteEmail = async (
+  email: string,
+  inviteLink: string,
+  courseTitle: string
+) => {
+  try {
+    const { error } = await sendMail({
+      to: email,
+      ...getCourseInviteTemplate(inviteLink, courseTitle),
+    });
+
+    if (error) {
+      console.error(`Failed to send invite to ${email}`, error);
+    }
+  } catch (err) {
+    console.error(`Error when sending invite to ${email}`, err);
   }
 };
+
+// Helper: Sleep function
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Helper: Gửi email theo lô (Batch)
+const sendInvitesWithBatch = async (
+  emails: string[],
+  inviteLink: string,
+  courseTitle: string
+) => {
+  const BATCH_SIZE = 2;      // Mỗi lô gửi 2 email song song
+  const BATCH_DELAY = 700;   // Nghỉ 700ms giữa các lô
+
+  for (let i = 0; i < emails.length; i += BATCH_SIZE) {
+    const batch = emails.slice(i, i + BATCH_SIZE);
+
+    // Gửi 1 lô song song
+    await Promise.all(
+      batch.map((email) =>
+        sendCourseInviteEmail(email, inviteLink, courseTitle)
+      )
+    );
+
+    // Nếu chưa phải lô cuối thì nghỉ chút
+    if (i + BATCH_SIZE < emails.length) {
+      await sleep(BATCH_DELAY);
+    }
+  }
+};
+
 
 /**
  * Yêu cầu nghiệp vụ:
@@ -146,7 +168,7 @@ export const joinCourseByInvite = async (token: string, userId: Types.ObjectId) 
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex")
 
   // Tìm invite trong DB
-  const invite = await CourseInviteModel.findOne({tokenHash}).populate(
+  const invite = await CourseInviteModel.findOne({ tokenHash }).populate(
     "courseId",
     "title"
   )
@@ -169,7 +191,7 @@ export const joinCourseByInvite = async (token: string, userId: Types.ObjectId) 
   appAssert(invite.expiresAt > new Date(), BAD_REQUEST, "This invite link has expired");
 
   //ktra số lần dùng 
-  if (invite.maxUses !== null){
+  if (invite.maxUses !== null) {
     appAssert(
       invite.usedCount < invite.maxUses,
       BAD_REQUEST,
@@ -181,12 +203,13 @@ export const joinCourseByInvite = async (token: string, userId: Types.ObjectId) 
   const user = await UserModel.findById(userId);
   appAssert(user, NOT_FOUND, "User not found");
   appAssert(user.role === Role.STUDENT, BAD_REQUEST, "Only students can join courses via invite links");
- 
+
   //Ràng buộc email được gửi đến và email đăng nhập phải trùng nhau
-  appAssert(invite.invitedEmail === user.email,
+  appAssert(
+    invite.invitedEmails.includes(user.email), // Check xem email user có trong mảng không
     FORBIDDEN,
-    `Invite was sent to ${invite.invitedEmail}, please use that email to join the course`
-  )
+    `Invite was not sent to ${user.email}. Please use an invited email to join.`
+  );
   //ktra student đã enroll chưa
   const existingEnrollment = await EnrollmentModel.findOne({
     courseId: invite.courseId._id,
@@ -216,31 +239,31 @@ export const joinCourseByInvite = async (token: string, userId: Types.ObjectId) 
   invite.usedCount += 1;
   await invite.save();
 
-  return{
+  return {
     message: `Successfully joined the course "${(invite.courseId as any).title}".`,
     enrollment,
     alreadyEnrolled: false,
-    invitedEmail: invite.invitedEmail,
+    invitedEmail: invite.invitedEmails,
   }
 }
 
-  /**
-   * Yêu cầu nghiệp vụ:
-   * - Lấy danh sách các lời mời tham gia khóa học (course invites) dựa trên filter đầu vào.
-   * - Chỉ cho phép giáo viên (instructor), trợ giảng (teaching assistant) hoặc admin của khóa học xem danh sách này.
-   * - Hỗ trợ filter theo: courseId, invitedEmail, isActive, phân trang (page, limit).
-   * - Nếu là admin site/ hệ thống thì được phép query tất cả lời mời.
-   * - Nếu là giáo viên/trợ giảng thì chỉ query được lời mời của các khóa học do mình quản lý (ít nhất là instructor/course admin).
-   * 
-   * Input:
-   *   - query: object chứa các filter (courseId?, invitedEmail?, isActive?, page, limit)
-   *   - viewerId: id người dùng thực hiện (string)
-   *   - viewerRole: vai trò của người dùng thực hiện (Role)
-   * Output:
-   *   - Trả về danh sách course invites cùng pagination info
-   * Trường hợp đặc biệt:
-   *   - Nếu không có quyền truy cập → trả lỗi FORBIDDEN
-   */
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Lấy danh sách các lời mời tham gia khóa học (course invites) dựa trên filter đầu vào.
+ * - Chỉ cho phép giáo viên (instructor), trợ giảng (teaching assistant) hoặc admin của khóa học xem danh sách này.
+ * - Hỗ trợ filter theo: courseId, invitedEmail, isActive, phân trang (page, limit).
+ * - Nếu là admin site/ hệ thống thì được phép query tất cả lời mời.
+ * - Nếu là giáo viên/trợ giảng thì chỉ query được lời mời của các khóa học do mình quản lý (ít nhất là instructor/course admin).
+ * 
+ * Input:
+ *   - query: object chứa các filter (courseId?, invitedEmail?, isActive?, page, limit)
+ *   - viewerId: id người dùng thực hiện (string)
+ *   - viewerRole: vai trò của người dùng thực hiện (Role)
+ * Output:
+ *   - Trả về danh sách course invites cùng pagination info
+ * Trường hợp đặc biệt:
+ *   - Nếu không có quyền truy cập → trả lỗi FORBIDDEN
+ */
 
 export const listCourseInvites = async (
   query: TListCourseInvite,
@@ -248,20 +271,20 @@ export const listCourseInvites = async (
   viewerRole: Role,
 ) => {
   const { courseId, invitedEmail, isActive, page, limit, from, to } = query;
-// Build filter query
+  // Build filter query
   const filter: FilterQuery<ICourseInvite> = {
     deletedAt: null, //Mặc định ẩn invite đã xóa
   };
   // Filter by courseId
-  if(courseId) {
+  if (courseId) {
     filter.courseId = courseId;
   }
   // Filter by invitedEmail
-  if(invitedEmail) {
-    filter.invitedEmail = { $regex: invitedEmail, $options: "i" };
+  if (invitedEmail) {
+    filter.invitedEmails = { $regex: invitedEmail, $options: "i" } as any;
   }
   // Filter by isActive
-  if(isActive !== undefined) {
+  if (isActive !== undefined) {
     filter.isActive = isActive;
   }
   // Filter by date range
@@ -296,7 +319,7 @@ export const listCourseInvites = async (
   const results = invites.map((invite) => ({
     id: invite._id,
     course: invite.courseId,
-    invitedEmail: invite.invitedEmail,
+    invitedEmail: invite.invitedEmails,
     maxUses: invite.maxUses,
     usedCount: invite.usedCount,
     expiresAt: invite.expiresAt,
@@ -369,7 +392,7 @@ export const updateCourseInvite = async (
       "Only course teachers or admin can update invite links"
     );
   }
-  
+
   //Validate khi enable invite
   if (data.isActive === true) {
     // Nếu không update expiresInDays, check expiresAt hiện tại
@@ -427,7 +450,7 @@ export const updateCourseInvite = async (
   return {
     id: updatedInvite._id,
     courseId: updatedInvite.courseId,
-    invitedEmail: updatedInvite.invitedEmail,
+    invitedEmail: updatedInvite.invitedEmails,
     maxUses: updatedInvite.maxUses,
     usedCount: updatedInvite.usedCount,
     expiresAt: updatedInvite.expiresAt,
@@ -448,10 +471,10 @@ export const updateCourseInvite = async (
  *    - Enable lại (bất kỳ cách nào)
  *    - Sử dụng token để join course
  *    - Hiển thị trong danh sách mặc định
- * 
- * 3. Data retention (soft delete):
+   
+   3. Data retention (soft delete):
  *    - Vẫn tồn tại trong DB
- *    - Giữ nguyên history: usedCount, invitedEmails, createdAt, ...
+      - Giữ nguyên history: usedCount, invitedEmails, createdAt, ...
  *    - Có thể query với param includeDeleted=true (nếu cần audit)
  * 
  * 4. Side effects:
@@ -493,10 +516,10 @@ export const deleteCourseInvite = async (
       deletedAt: invite.deletedAt,
     };
   }
-         
+
   // 4. Soft delete - đánh dấu xóa
   invite.deletedAt = new Date();
-  invite.isActive = false; 
+  invite.isActive = false;
   await invite.save();
 
   return {

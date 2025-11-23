@@ -25,11 +25,6 @@ export default interface IUser
     isVerified: boolean;
     status?: UserStatus;
     specialistIds: mongoose.Types.ObjectId[];
-    /**
-     * Classes this student is in.
-     * A student can be in multiple classes.
-     * */
-    classIds: mongoose.Types.ObjectId[];
     createdAt: Date;
     updatedAt: Date;
 

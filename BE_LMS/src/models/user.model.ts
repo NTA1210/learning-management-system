@@ -31,7 +31,6 @@ const UserSchema = new mongoose.Schema<IUser>(
         specialistIds: [
             {type: mongoose.Schema.Types.ObjectId, ref: "Specialist"},
         ],
-        classIds: [{type: mongoose.Schema.Types.ObjectId, ref: "Class"}],
     },
     {
         timestamps: true,

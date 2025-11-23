@@ -1,18 +1,18 @@
 import {
   createQuizHandler,
   deleteQuizHandler,
-  getQuizzesHandler,
+  getStatisticByQuizIdHandler,
   updateQuizHandler,
-} from "@/controller/quiz.controller";
-import { authenticate } from "@/middleware";
-import { Router } from "express";
+} from '@/controller/quiz.controller';
+
+import { Router } from 'express';
 
 const quizRoutes = Router();
 
 // prefix: /quizzes
-quizRoutes.post("/", authenticate, createQuizHandler);
-quizRoutes.put("/:quizId", updateQuizHandler);
-quizRoutes.delete("/:quizId", deleteQuizHandler);
-quizRoutes.get("/", getQuizzesHandler);
+quizRoutes.post('/', createQuizHandler);
+quizRoutes.put('/:quizId', updateQuizHandler);
+quizRoutes.delete('/:quizId', deleteQuizHandler);
+quizRoutes.get('/:quizId/statistics', getStatisticByQuizIdHandler);
 
 export default quizRoutes;
