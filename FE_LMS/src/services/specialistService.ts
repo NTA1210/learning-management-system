@@ -42,7 +42,7 @@ export const specialistService = {
 
   // Get a single specialist by ID
   getSpecialistById: async (id: string): Promise<Specialist> => {
-    const response = await http.get<Specialist>(`/specialists/${id}`);
+    const response = await http.get<Specialist>(`/specialists/id/${id}`);
     return response.data;
   },
 

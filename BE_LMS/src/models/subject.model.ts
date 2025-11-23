@@ -1,18 +1,16 @@
-import { ISubject } from "../types";
-import mongoose from "mongoose";
+import { ISubject } from '../types';
+import mongoose from 'mongoose';
 
 const SubjectSchema = new mongoose.Schema<ISubject>(
   {
-    name: { type: String, required: true },
-    description: { type: String },
-    code: { type: String, required: true },
-    slug: { type: String, required: true },
-    specialistIds: [
-      { type: mongoose.Schema.Types.ObjectId, ref: "Specialist" },
-    ],
+    name: { type: String, required: true, trim: true },
+    description: { type: String, trim: true },
+    code: { type: String, required: true, trim: true },
+    slug: { type: String, required: true, trim: true },
+    specialistIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Specialist' }],
     credits: { type: Number, required: true },
     isActive: { type: Boolean, default: true },
-    prerequisites: [{ type: mongoose.Schema.Types.ObjectId, ref: "Subject" }],
+    prerequisites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Subject' }],
   },
   {
     timestamps: true,
@@ -27,15 +25,15 @@ SubjectSchema.index({ specialistIds: 1 });
 
 // ✅ Text index (nếu có tính năng search) + weights ưu tiên name > code > description
 SubjectSchema.index(
-  { name: "text", description: "text", code: "text" },
+  { name: 'text', description: 'text', code: 'text' },
   { weights: { name: 10, code: 6, description: 2 } }
 );
 
 // ✅ Hook: Tạo slug tự động
-SubjectSchema.pre("save", function (next) {
-  this.slug = this.name.toLowerCase().replace(/\s+/g, "-");
+SubjectSchema.pre('save', function (next) {
+  this.slug = this.name.toLowerCase().replace(/\s+/g, '-');
   next();
 });
 
-const SubjectModel = mongoose.model<ISubject>("Subject", SubjectSchema);
+const SubjectModel = mongoose.model<ISubject>('Subject', SubjectSchema);
 export default SubjectModel;

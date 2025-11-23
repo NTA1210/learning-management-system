@@ -1,17 +1,17 @@
-import mongoose from "mongoose";
-import ISubmission, { SubmissionStatus } from "../types/submission.type";
+import mongoose from 'mongoose';
+import ISubmission, { SubmissionStatus } from '../types/submission.type';
 
 const SubmissionSchema = new mongoose.Schema<ISubmission>(
   {
     assignmentId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Assignment",
+      ref: 'Assignment',
       required: true,
       index: true,
     },
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
       index: true,
     },
@@ -23,7 +23,7 @@ const SubmissionSchema = new mongoose.Schema<ISubmission>(
       default: 0,
       validate: {
         validator: (v: number) => v <= 20 * 1024 * 1024,
-        message: "File size must be <= 20MB",
+        message: 'File size must be <= 20MB',
       },
     },
     submittedAt: { type: Date, default: Date.now },
@@ -31,11 +31,11 @@ const SubmissionSchema = new mongoose.Schema<ISubmission>(
     // 🧩 Điểm hiện tại (latest grade)
     grade: {
       type: Number,
-      min: [0, "Grade must be >= 0"],
-      max: [10, "Grade must be <= 10"],
+      min: [0, 'Grade must be >= 0'],
+      max: [10, 'Grade must be <= 10'],
     },
-    feedback: { type: String },
-    gradedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    feedback: { type: String, trim: true },
+    gradedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     gradedAt: { type: Date },
 
     // 🆕 Lưu lịch sử chấm điểm
@@ -45,11 +45,11 @@ const SubmissionSchema = new mongoose.Schema<ISubmission>(
           grade: {
             type: Number,
             required: true,
-            min: [0, "Grade must be >= 0"],
-            max: [10, "Grade must be <= 10"],
+            min: [0, 'Grade must be >= 0'],
+            max: [10, 'Grade must be <= 10'],
           },
-          feedback: { type: String },
-          gradedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+          feedback: { type: String, trim: true },
+          gradedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
           gradedAt: { type: Date, default: Date.now },
         },
       ],
@@ -75,8 +75,8 @@ SubmissionSchema.index({ gradedBy: 1, gradedAt: -1 });
 SubmissionSchema.index({ assignmentId: 1, submittedAt: -1 });
 
 // 🧩 Middleware kiểm tra nộp trễ
-SubmissionSchema.pre("save", async function (next) {
-  const Assignment = mongoose.model("Assignment");
+SubmissionSchema.pre('save', async function (next) {
+  const Assignment = mongoose.model('Assignment');
   const assignment: any = await Assignment.findById(this.assignmentId);
 
   if (assignment?.dueDate && this.submittedAt > assignment.dueDate) {
@@ -90,9 +90,9 @@ SubmissionSchema.pre("save", async function (next) {
 });
 
 // 🧩 Middleware tự động cập nhật gradedAt & gradeHistory
-SubmissionSchema.pre<ISubmission>("save", function (next) {
+SubmissionSchema.pre<ISubmission>('save', function (next) {
   if (
-    (this.isModified("grade") || this.isModified("feedback")) &&
+    (this.isModified('grade') || this.isModified('feedback')) &&
     this.grade !== undefined &&
     this.gradedBy !== undefined
   ) {
@@ -102,7 +102,7 @@ SubmissionSchema.pre<ISubmission>("save", function (next) {
     if (!this.gradeHistory) this.gradeHistory = [];
     this.gradeHistory.push({
       grade: this.grade,
-      feedback: this.feedback || "",
+      feedback: this.feedback || '',
       gradedBy: this.gradedBy,
       gradedAt: new Date(),
     });
@@ -110,9 +110,6 @@ SubmissionSchema.pre<ISubmission>("save", function (next) {
   next();
 });
 
-const SubmissionModel = mongoose.model<ISubmission>(
-  "Submission",
-  SubmissionSchema
-);
+const SubmissionModel = mongoose.model<ISubmission>('Submission', SubmissionSchema);
 
 export default SubmissionModel;
