@@ -1,21 +1,21 @@
-import mongoose from "mongoose";
-import { IForumPost } from "../types";
+import mongoose from 'mongoose';
+import { IForumPost } from '../types';
 
 const ForumPostSchema = new mongoose.Schema<IForumPost>(
   {
     forumId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Forum",
+      ref: 'Forum',
       required: true,
       index: true,
     },
     authorId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
     },
-    title: { type: String },
-    content: { type: String, required: true },
+    title: { type: String, trim: true },
+    content: { type: String, required: true, trim: true },
     pinned: { type: Boolean, default: false },
     replyCount: { type: Number, default: 0 },
   },
@@ -26,10 +26,6 @@ const ForumPostSchema = new mongoose.Schema<IForumPost>(
 ForumPostSchema.index({ forumId: 1, pinned: -1, createdAt: -1 });
 ForumPostSchema.index({ authorId: 1, createdAt: -1 });
 
-const ForumPostModel = mongoose.model<IForumPost>(
-  "ForumPost",
-  ForumPostSchema,
-  "forumPosts"
-);
+const ForumPostModel = mongoose.model<IForumPost>('ForumPost', ForumPostSchema, 'forumPosts');
 
 export default ForumPostModel;

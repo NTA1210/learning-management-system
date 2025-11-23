@@ -1,5 +1,5 @@
-import mongoose from "mongoose";
-import { QuizQuestionType } from "./quizQuestion.type";
+import mongoose from 'mongoose';
+import { QuizQuestionType } from './quizQuestion.type';
 
 export interface SnapshotQuestion {
   id: string;
@@ -11,7 +11,7 @@ export interface SnapshotQuestion {
   points: number;
   explanation?: string;
   isExternal: boolean;
-  isNew: boolean;
+  isNewQuestion: boolean;
   isDeleted: boolean;
   isDirty: boolean;
 }
