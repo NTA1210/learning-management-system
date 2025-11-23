@@ -26,3 +26,5 @@ export { default as CourseQuizzesPage } from "./CourseQuizzesPage";
 export { default as QuizQuestionsPage } from "./QuizQuestionsPage";
 export { default as EnrollmentsListPage } from "./EnrollmentsList";
 export { default as CurriculumPage } from "./Curriculum";
+export { default as UserManagementPage } from "./UserManagement";
+export { default as UserBioPage } from "./UserBioPage";

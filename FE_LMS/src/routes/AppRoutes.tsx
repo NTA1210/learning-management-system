@@ -24,6 +24,8 @@ import {DashboardPage ,
       FeedbackListPage,
       EnrollmentsListPage,
       CurriculumPage,
+      UserManagementPage,
+      UserBioPage,
     } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -184,6 +186,20 @@ function AppRoutes() {
         <Route path="/curriculum" element={
           <ProtectedRoute>
             <CurriculumPage />
+          </ProtectedRoute>
+        } />
+
+        {/* User Bio - must come before /user to avoid route conflict */}
+        <Route path="/user/:userId" element={
+          <ProtectedRoute>
+            <UserBioPage />
+          </ProtectedRoute>
+        } />
+
+        {/* User Management */}
+        <Route path="/user" element={
+          <ProtectedRoute requiredRole="admin">
+            <UserManagementPage />
           </ProtectedRoute>
         } />
 

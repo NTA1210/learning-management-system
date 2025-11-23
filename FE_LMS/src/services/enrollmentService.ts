@@ -104,6 +104,22 @@ export const enrollmentService = {
     const created = response.data as unknown as ApiEnrollmentRecord;
     return created;
   },
+
+  getByStudent: async (
+    studentId: string,
+    params?: { page?: number; limit?: number; status?: string }
+  ): Promise<{ items: ApiEnrollmentRecord[]; pagination?: PaginationMeta }> => {
+    const usp = new URLSearchParams();
+    if (params?.page) usp.append("page", String(params.page));
+    if (params?.limit) usp.append("limit", String(params.limit));
+    if (params?.status) usp.append("status", params.status);
+    const qs = usp.toString();
+    const url = `/enrollments/student/${studentId}${qs ? `?${qs}` : ""}`;
+    const response = await http.get<{ data: ApiEnrollmentRecord[]; pagination?: PaginationMeta }>(url);
+    const items: ApiEnrollmentRecord[] = Array.isArray(response.data) ? (response.data as ApiEnrollmentRecord[]) : [];
+    const pagination: PaginationMeta | undefined = response.pagination || (response as any).meta?.pagination;
+    return { items, pagination };
+  },
 };
 
 

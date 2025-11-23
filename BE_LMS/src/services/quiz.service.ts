@@ -226,7 +226,7 @@ export const deleteQuiz = async ({
   }
   //isOnGoing
   const isOnGoing = quiz.startTime.getTime() <= Date.now() && quiz.endTime.getTime() >= Date.now();
-  appAssert(isOnGoing, BAD_REQUEST, 'Cannot delete a quiz that is on going');
+  appAssert(!isOnGoing, BAD_REQUEST, 'Cannot delete a quiz that is on going');
 
   quiz.deletedAt = new Date();
   quiz.deletedBy = userId;
