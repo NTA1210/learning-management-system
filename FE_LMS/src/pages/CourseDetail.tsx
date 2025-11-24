@@ -7,6 +7,7 @@ import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { courseService } from "../services";
 import type { Course } from "../types/course";
+import { httpClient } from "../utils/http";
 
 type ApiCourse = Partial<Course> & {
   subjectId?: {
@@ -48,7 +49,52 @@ export default function CourseDetail() {
   const [course, setCourse] = useState<ApiCourse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [enrolling, setEnrolling] = useState(false);
 
+  const showToastSuccess = async (message: string) => {
+    try {
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: message,
+        showConfirmButton: false,
+        timer: 2000,
+      });
+    } catch {}
+  };
+
+  const showToastInfo = async (message: string) => {
+    try {
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "info",
+        title: message,
+        showConfirmButton: false,
+        timer: 2000,
+      });
+    } catch { }
+  };
+  const handleEnroll = async () => {
+    try {
+      setEnrolling(true);
+      await httpClient.post("/enrollments/enroll", { courseId: id, role: "student" }, { withCredentials: true });
+      await showToastSuccess("Enroll thành công");
+    } catch (e: any) {
+      const status = e?.response?.status;
+      if (status === 409) {
+        const message = e?.response?.data?.message || "You are already enrolled in this course.";
+        await showToastInfo(message);
+      } else {
+        console.error(e);
+      }
+    } finally {
+      setEnrolling(false);
+    }
+  };
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -455,16 +501,17 @@ export default function CourseDetail() {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => navigate("/register")}
-                className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition"
+                onClick={handleEnroll}
+                disabled={enrolling}
+                className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
               >
-                Đăng ký học
+               {enrolling ? "Enrolling..." : "Enroll"}
               </button>
               <button
                 onClick={() => navigate(-1)}
                 className="bg-[#eaedff] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition"
               >
-                Quay lại
+                Back
               </button>
             </div>
           </div>
