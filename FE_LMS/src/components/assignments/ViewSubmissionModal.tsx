@@ -1,13 +1,15 @@
 import React from "react";
 import { useTheme } from "../../hooks/useTheme";
-import { X } from "lucide-react";
+import { X, Download } from "lucide-react";
 
 interface SubmissionDetails {
+  _id?: string;
   status: string;
   isLate?: boolean;
   grade?: number;
   feedback?: string;
   submittedAt?: string;
+  key?: string;
 }
 
 interface Assignment {
@@ -21,6 +23,7 @@ interface ViewSubmissionModalProps {
   assignment: Assignment | null;
   onClose: () => void;
   onResubmit: () => void;
+  onDownload?: (submissionId: string) => void;
   formatDate: (date: string) => string;
 }
 
@@ -30,6 +33,7 @@ const ViewSubmissionModal: React.FC<ViewSubmissionModalProps> = ({
   assignment,
   onClose,
   onResubmit,
+  onDownload,
   formatDate,
 }) => {
   const { darkMode } = useTheme();
@@ -142,6 +146,19 @@ const ViewSubmissionModal: React.FC<ViewSubmissionModalProps> = ({
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t" style={{ borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "rgba(229, 231, 235, 0.5)" }}>
+            {submissionDetails._id && submissionDetails.key && onDownload && (
+              <button
+                onClick={() => submissionDetails._id && onDownload(submissionDetails._id)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors hover:opacity-80"
+                style={{
+                  backgroundColor: darkMode ? "rgba(59, 130, 246, 0.2)" : "#3b82f6",
+                  color: darkMode ? "#93c5fd" : "#ffffff",
+                }}
+              >
+                <Download size={16} />
+                Download
+              </button>
+            )}
             {assignment?.allowLate && (
               <button
                 onClick={onResubmit}
