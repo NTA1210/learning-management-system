@@ -8,10 +8,9 @@ import { datePreprocess } from './helpers/date.schema';
 export const objectIdSchema = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid MongoDB ObjectId');
 
 export const attendanceStatusSchema = z.enum([
+  AttendanceStatus.NOTYET,
   AttendanceStatus.PRESENT,
   AttendanceStatus.ABSENT,
-  AttendanceStatus.LATE,
-  AttendanceStatus.EXCUSED,
 ] as const);
 
 /* ----------------------------------------------------
@@ -55,6 +54,14 @@ export const updateAttendanceSchema = z.object({
     .min(10, 'Reason must be at least 10 characters')
     .max(500, 'Reason too long')
     .optional(),
+  // Optional: Nếu muốn update nhiều records, truyền array of IDs trong body
+  attendanceIds: z
+    .array(objectIdSchema)
+    .min(1, "At least one attendance ID is required")
+    .max(100, "Cannot update more than 100 records at once")
+    .optional(),
+  // Optional: Chỉ trả về IDs thay vì full records để giảm payload
+  returnIdsOnly: z.boolean().optional().default(false),
 });
 
 /* ----------------------------------------------------
@@ -148,9 +155,22 @@ export const lessonTemplateSchema = z.object({
     .optional()
     .transform((v) => (typeof v === 'string' ? v === 'true' : Boolean(v))),
 });
+/* ----------------------------------------------------
+ *  Send Absence Notification Emails
+ * -------------------------------------------------- */
+export const sendAbsenceNotificationSchema = z.object({
+  studentIds: z
+    .array(objectIdSchema)
+    .min(1, "At least one student ID is required")
+    .max(100, "Cannot send emails to more than 100 students at once"),
+});
+
 export type MarkAttendanceInput = z.infer<typeof markAttendanceSchema>;
 export type UpdateAttendanceInput = z.infer<typeof updateAttendanceSchema>;
 export type ListAttendanceInput = z.infer<typeof listAttendanceQuerySchema>;
 export type StudentHistoryInput = z.infer<typeof studentHistoryQuerySchema>;
 export type CourseStatsInput = z.infer<typeof courseStatsQuerySchema>;
 export type ExportAttendanceInput = z.infer<typeof exportAttendanceQuerySchema>;
+export type SendAbsenceNotificationInput = z.infer<typeof sendAbsenceNotificationSchema>;
+
+

@@ -22,6 +22,7 @@ import {
   isTeacherOfCourse,
   standardDeviation,
 } from './helpers/quizHelpers';
+import { superRefine } from 'zod';
 
 /**
  * Create a new quiz.
@@ -83,13 +84,41 @@ export const createQuiz = async (
 
 /**
  * Update a quiz.
- * @param  { quizId, courseId, title, description, startTime, endTime, shuffleQuestions, snapshotQuestions }
- * @throws  If quiz not found
- * @throws  If quiz is already completed
- * @throws  If snapshot questions already added
- * @throws  If no questions provided
- * @returns  Updated quiz
+ *
+ * This function updates the properties of an existing quiz, including its title, description,
+ * start and end times, shuffle settings, and questions. It handles added, updated, and deleted
+ * questions, merges images safely, and validates question types and time constraints.
+ *
+ * Rules:
+ * - If the quiz is currently ongoing:
+ *   - Only title, description, and endTime can be updated.
+ *   - endTime cannot be set to a past time.
+ *   - startTime and shuffleQuestions cannot be changed.
+ * - startTime must always be before endTime.
+ * - For updated questions (`isDirty`), full question data is expected from the client.
+ * - For deleted questions, associated images that are not from DB will be removed from storage.
+ *
+ * @param params - Parameters to update the quiz.
+ * @param params.quizId - ID of the quiz to update.
+ * @param params.title - (Optional) New title of the quiz.
+ * @param params.description - (Optional) New description of the quiz.
+ * @param params.startTime - (Optional) New start time of the quiz.
+ * @param params.endTime - (Optional) New end time of the quiz.
+ * @param params.shuffleQuestions - (Optional) Whether to shuffle questions.
+ * @param params.snapshotQuestions - (Optional) Array of questions to add/update/delete.
+ * @param userId - ID of the user performing the update.
+ * @param role - Role of the user performing the update (e.g., TEACHER).
+ *
+ * @throws NOT_FOUND if the quiz does not exist.
+ * @throws BAD_REQUEST if:
+ *   - The quiz is ongoing and the user attempts to update disallowed fields.
+ *   - startTime is after endTime.
+ *   - endTime is set to a past time for ongoing quizzes.
+ *   - Updated question data is invalid or a question already exists when adding.
+ *
+ * @returns The updated quiz document.
  */
+
 export const updateQuiz = async (
   {
     quizId,
@@ -113,21 +142,31 @@ export const updateQuiz = async (
 
   //isOnGoing
   const isOnGoing = quiz.startTime.getTime() <= Date.now() && quiz.endTime.getTime() >= Date.now();
-  appAssert(!isOnGoing, BAD_REQUEST, 'Cannot update a quiz that is on going');
+
+  if (isOnGoing) {
+    appAssert(
+      (!snapshotQuestions || snapshotQuestions.length === 0) &&
+        shuffleQuestions === undefined &&
+        startTime === undefined,
+      BAD_REQUEST,
+      'You can just update title, description, endTime while quiz is on going'
+    );
+  }
 
   let deletedImages: string[] = [];
   const map = new Map<string, number>();
   quiz.snapshotQuestions.forEach((q: any, i: number) => map.set(q.id, i));
 
-  for (const question of snapshotQuestions) {
-    if (!question.isDeleted)
-      checkProperQuestionType(
-        question.type,
-        question.correctOptions,
-        `Question "${question.text}" is invalid`
-      );
+  if (snapshotQuestions?.length) {
+    for (const question of snapshotQuestions) {
+      if (!question.isDeleted)
+        checkProperQuestionType(
+          question.type,
+          question.correctOptions,
+          `Question "${question.text}" is invalid`
+        );
+    }
   }
-
   const updated = snapshotQuestions.filter((q) => q.isDirty && !q.isNewQuestion && !q.isDeleted);
   const added = snapshotQuestions.filter((q) => q.isNewQuestion && !q.isDeleted);
   const deleted = snapshotQuestions.filter((q) => q.isDeleted && !q.isNewQuestion);
@@ -146,9 +185,8 @@ export const updateQuiz = async (
       ...q,
     };
 
-    // Merge ảnh: giữ ảnh DB, add ảnh newcom
-    const mergedImages = [...newImages];
-    quiz.snapshotQuestions[index].images = mergedImages;
+    // Merge ảnh
+    quiz.snapshotQuestions[index].images = newImages;
 
     // Xóa ảnh
     deletedImages.push(
@@ -172,9 +210,6 @@ export const updateQuiz = async (
     for (const q of deleted) {
       const index = map.get(q.id);
       if (index === -1) continue;
-      quiz.snapshotQuestions = quiz.snapshotQuestions.filter(
-        (q) => !deleted.some((d) => d.id === q.id)
-      );
 
       const images: string[] = (q.images || [])
         .filter((img: TImage) => !img.fromDB)
@@ -183,6 +218,9 @@ export const updateQuiz = async (
       deletedImages.push(...images);
     }
   }
+
+  const deletedIds = deleted.map((q) => q.id);
+  quiz.snapshotQuestions = quiz.snapshotQuestions.filter((q) => !deletedIds.includes(q.id));
 
   if (deletedImages.length > 0) {
     await removeFiles(deletedImages.map((img) => getKeyFromPublicUrl(img)));
@@ -193,7 +231,16 @@ export const updateQuiz = async (
   quiz.title = title ?? quiz.title;
   quiz.description = description ?? quiz.description;
   quiz.startTime = startTime ?? quiz.startTime;
-  quiz.endTime = endTime ?? quiz.endTime;
+  if (endTime) {
+    if (isOnGoing) {
+      appAssert(
+        endTime.getTime() >= Date.now(),
+        BAD_REQUEST,
+        'You can not update endTime less than current time'
+      );
+    }
+    quiz.endTime = endTime;
+  }
   quiz.shuffleQuestions = shuffleQuestions ?? quiz.shuffleQuestions;
 
   await quiz.save();

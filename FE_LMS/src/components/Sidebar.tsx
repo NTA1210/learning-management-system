@@ -110,13 +110,13 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
         label: "Enrollments"
       },
       {
-        href: "/admin/room-control",
+        href: "/attendance",
         icon: (
           <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path>
           </svg>
         ),
-        label: "Room Controls"
+        label: "Attendance"
       }
     ];
   }

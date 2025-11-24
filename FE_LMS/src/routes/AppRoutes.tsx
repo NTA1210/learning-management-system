@@ -26,6 +26,7 @@ import {DashboardPage ,
       CurriculumPage,
       UserManagementPage,
       UserBioPage,
+      AttendancePage,
     } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -205,6 +206,23 @@ function AppRoutes() {
         <Route path="/user" element={
           <ProtectedRoute requiredRole="admin">
             <UserManagementPage />
+          </ProtectedRoute>
+        } />
+
+        {/* Attendance */}
+        <Route path="/attendance" element={
+          <ProtectedRoute>
+            <AttendancePage />
+          </ProtectedRoute>
+        } />
+        <Route path="/attendance/:semesterId" element={
+          <ProtectedRoute>
+            <AttendancePage />
+          </ProtectedRoute>
+        } />
+        <Route path="/attendance/:semesterId/:courseId" element={
+          <ProtectedRoute>
+            <AttendancePage />
           </ProtectedRoute>
         } />
 
