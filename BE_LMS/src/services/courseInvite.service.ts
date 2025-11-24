@@ -12,8 +12,7 @@ import { APP_ORIGIN } from "@/constants/env";
 import { TCreateCourseInvite, TListCourseInvite, TUpdateCourseInvite } from "@/validators/courseInvite.schemas";
 import ICourseInvite from "@/types/courseInvite.type";
 import { FilterQuery, Types } from "mongoose";
-import { sendMail } from "@/utils/sendMail";
-import { getCourseInviteTemplate } from "@/utils/emailTemplates";
+import { sendInvitesWithBatch } from './helpers/courseInviteHelpers'
 /**
  * Yêu cầu nghiệp vụ:
  * - Teacher/Admin tạo link mời tham gia khóa học
@@ -98,55 +97,6 @@ export const createCourseInvite = async (
     invitedCount: uniqueEmails.length
   };
 };
-// Helper function để gửi email invite 
-const sendCourseInviteEmail = async (
-  email: string,
-  inviteLink: string,
-  courseTitle: string
-) => {
-  try {
-    const { error } = await sendMail({
-      to: email,
-      ...getCourseInviteTemplate(inviteLink, courseTitle),
-    });
-
-    if (error) {
-      console.error(`Failed to send invite to ${email}`, error);
-    }
-  } catch (err) {
-    console.error(`Error when sending invite to ${email}`, err);
-  }
-};
-
-// Helper: Sleep function
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Helper: Gửi email theo lô (Batch)
-const sendInvitesWithBatch = async (
-  emails: string[],
-  inviteLink: string,
-  courseTitle: string
-) => {
-  const BATCH_SIZE = 2;      // Mỗi lô gửi 2 email song song
-  const BATCH_DELAY = 700;   // Nghỉ 700ms giữa các lô
-
-  for (let i = 0; i < emails.length; i += BATCH_SIZE) {
-    const batch = emails.slice(i, i + BATCH_SIZE);
-
-    // Gửi 1 lô song song
-    await Promise.all(
-      batch.map((email) =>
-        sendCourseInviteEmail(email, inviteLink, courseTitle)
-      )
-    );
-
-    // Nếu chưa phải lô cuối thì nghỉ chút
-    if (i + BATCH_SIZE < emails.length) {
-      await sleep(BATCH_DELAY);
-    }
-  }
-};
-
 
 /**
  * Yêu cầu nghiệp vụ:
