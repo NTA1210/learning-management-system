@@ -28,25 +28,6 @@ const AttendanceSchema = new mongoose.Schema<IAttendance>(
         },
         markedBy: {type: mongoose.Schema.Types.ObjectId, ref: "User"},
     },
-    studentId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-      index: true,
-    },
-    date: { type: Date, required: true, index: true },
-    status: {
-      type: String,
-      enum: [
-        AttendanceStatus.PRESENT,
-        AttendanceStatus.ABSENT,
-        AttendanceStatus.LATE,
-        AttendanceStatus.EXCUSED,
-      ],
-      default: AttendanceStatus.ABSENT,
-    },
-    markedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  },
   { timestamps: true }
 );
 
