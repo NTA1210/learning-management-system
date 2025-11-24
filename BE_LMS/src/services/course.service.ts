@@ -188,6 +188,23 @@ export const listCourses = async ({
     filter.semesterId = semesterId;
   }
 
+  // ✅ HIDE EXPIRED COURSES: Non-admins should not see courses from past semesters in public list
+  if (!isAdmin) {
+    const now = new Date();
+    const expiredSemesters = await SemesterModel.find({ endDate: { $lt: now } }).select('_id');
+    const expiredSemesterIds = expiredSemesters.map((s) => s._id);
+
+    if (expiredSemesterIds.length > 0) {
+      if (filter.semesterId) {
+        // If specific semester requested, ensure it's not expired
+        filter.semesterId = { $eq: filter.semesterId, $nin: expiredSemesterIds };
+      } else {
+        // Exclude all expired semesters
+        filter.semesterId = { $nin: expiredSemesterIds };
+      }
+    }
+  }
+
   // Filter by teacher ID
   if (teacherId) {
     filter.teacherIds = teacherId;
