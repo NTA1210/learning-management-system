@@ -21,6 +21,13 @@ import {DashboardPage ,
       FeedbackListPage,
       EnrollmentsListPage,
       CurriculumPage,
+<<<<<<< Updated upstream
+=======
+      UserManagementPage,
+      UserBioPage,
+      AttendancePage,
+      MyEnrollmentsPage,
+>>>>>>> Stashed changes
     } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -64,6 +71,19 @@ function AppRoutes() {
             <CourseManagementPage />
           </ProtectedRoute>
         } />
+<<<<<<< Updated upstream
+=======
+        <Route path="/my-courses" element={
+          <ProtectedRoute requiredRole="student">
+            <MyCoursesPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/my-enrollments" element={
+          <ProtectedRoute requiredRole="student">
+            <MyEnrollmentsPage />
+          </ProtectedRoute>
+        } />
+>>>>>>> Stashed changes
         <Route path="/admin/dashboard" element={
           <ProtectedRoute requiredRole="admin">
             <DashboardPage />

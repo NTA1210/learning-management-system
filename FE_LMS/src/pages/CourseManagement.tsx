@@ -10,6 +10,10 @@ import Sidebar from "../components/Sidebar.tsx";
 import CreateCourseForm from "../components/CreateCourseForm.tsx";
 import { Search, Trash } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+<<<<<<< Updated upstream
+=======
+import http, { httpClient } from "../utils/http";
+>>>>>>> Stashed changes
 
  
 
@@ -108,6 +112,34 @@ const CourseManagement: React.FC = () => {
       return course.teachers.some(teacher => teacher._id === currentTeacherId);
     }
     return false;
+  };
+
+  const [enrolling, setEnrolling] = useState<Record<string, boolean>>({});
+
+  const showToastSuccess = async (message: string) => {
+    try {
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: message,
+        showConfirmButton: false,
+        timer: 2000,
+      });
+    } catch {}
+  };
+
+  const handleEnroll = async (courseId: string) => {
+    try {
+      setEnrolling(prev => ({ ...prev, [courseId]: true }));
+      await httpClient.post("/enrollments/enroll", { courseId, role: "student" }, { withCredentials: true });
+      await showToastSuccess("Enroll thành công");
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setEnrolling(prev => ({ ...prev, [courseId]: false }));
+    }
   };
 
   useEffect(() => {
@@ -754,14 +786,15 @@ const CourseManagement: React.FC = () => {
                       )}
                       {isStudent && (
                         <button
-                          className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md"
+                          onClick={() => handleEnroll(course._id)}
+                          disabled={!!enrolling[course._id]}
+                          className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md disabled:opacity-50"
                           style={{
                             backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5',
                             color: darkMode ? '#6ee7b7' : '#059669'
                           }}
-
                         >
-                          Enroll
+                          {enrolling[course._id] ? 'Enrolling...' : 'Enroll'}
                         </button>
                       )}
                     </div>
