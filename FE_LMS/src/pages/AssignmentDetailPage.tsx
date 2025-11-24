@@ -78,11 +78,13 @@ const AssignmentDetailPage: React.FC = () => {
     submittedAt?: string;
   } | null>(null);
   const [submissionDetails, setSubmissionDetails] = useState<{
+    _id?: string;
     status: string;
     isLate?: boolean;
     grade?: number;
     feedback?: string;
     submittedAt?: string;
+    key?: string;
   } | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -197,11 +199,22 @@ const AssignmentDetailPage: React.FC = () => {
     if (!assignment?._id) return;
     setLoadingSubmission(true);
     try {
-      const response = await httpClient.get(`/submissions/${assignment._id}/status`, {
+      // Lấy status (backend đã được cập nhật để trả về _id và key)
+      const statusResponse = await httpClient.get(`/submissions/${assignment._id}/status`, {
         withCredentials: true,
       });
-      if (response.data?.success && response.data.data.status !== "not_submitted") {
-        setSubmissionDetails(response.data.data);
+      
+      if (statusResponse.data?.success && statusResponse.data.data.status !== "not_submitted") {
+        const statusData = statusResponse.data.data;
+        setSubmissionDetails({
+          _id: statusData._id,
+          status: statusData.status,
+          isLate: statusData.isLate,
+          grade: statusData.grade,
+          feedback: statusData.feedback,
+          submittedAt: statusData.submittedAt,
+          key: statusData.key,
+        });
         setShowViewSubmissionModal(true);
       } else {
         await showSwalError("You haven't submitted this assignment yet.");
@@ -258,12 +271,12 @@ const AssignmentDetailPage: React.FC = () => {
 
   const handleDownloadSubmission = async (submissionId: string) => {
     try {
-      const response = await httpClient.get(`/submissions/by-submission/${submissionId}/download`, {
+      const response = await httpClient.get(`/submissions/${submissionId}`, {
         withCredentials: true,
       });
-      if (response.data?.success && response.data.data?.signedUrl) {
+      if (response.data?.success && response.data.data?.publicURL) {
         // Mở signed URL trong tab mới để download
-        window.open(response.data.data.signedUrl, "_blank");
+        window.open(response.data.data.publicURL, "_blank");
       } else {
         await showSwalError("Failed to get download URL");
       }
@@ -714,6 +727,7 @@ const AssignmentDetailPage: React.FC = () => {
             setShowViewSubmissionModal(false);
             setShowSubmissionModal(true);
           }}
+          onDownload={submissionDetails._id ? handleDownloadSubmission : undefined}
           formatDate={formatDate}
         />
       )}
