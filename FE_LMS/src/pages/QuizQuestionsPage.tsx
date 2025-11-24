@@ -276,7 +276,7 @@ export default function QuizQuestionsPage() {
       const allImages = [...existingImages, ...newImages];
 
       // Update question in quiz
-      await quizService.updateQuestionById(quiz._id, editingQuestion.id || "", {
+      const updateResult = await quizService.updateQuestionById(quiz._id, editingQuestion.id || "", {
         text: trimmedText,
         type: nextType,
         options: cleanedOptions,
@@ -286,12 +286,21 @@ export default function QuizQuestionsPage() {
         images: allImages.length > 0 ? allImages : undefined,
       });
 
-      // Refresh quiz data
-      const updatedQuiz = await quizService.getQuizById(quiz._id);
-      setQuiz(updatedQuiz);
+      // Always refresh quiz data to ensure we have the latest snapshotQuestions
+      // The updateQuiz response might not include snapshotQuestions, so we fetch again
+      const refreshedQuiz = await quizService.getQuizById(quiz._id);
+      
+      if (!refreshedQuiz) {
+        throw new Error("Failed to refresh quiz data");
+      }
+      
+      // Force update state with new quiz data
+      setQuiz({ ...refreshedQuiz });
+      
+      // Close edit modal
+      handleCloseEdit();
       
       alert("Question updated successfully.");
-      handleCloseEdit();
     } catch (error) {
       console.error("Error updating question:", error);
       const message =

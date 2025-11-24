@@ -149,6 +149,11 @@ function AppRoutes() {
             <QuizCreatePage />
           </ProtectedRoute>
         } />
+        <Route path="/quizz/:courseId" element={
+          <ProtectedRoute>
+            <CourseQuizzesPage />
+          </ProtectedRoute>
+        } />
 
         {/* About Us */}
         <Route path="/help/about" element={

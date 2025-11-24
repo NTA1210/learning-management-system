@@ -7,6 +7,7 @@ import { courseService, quizService, subjectService, quizQuestionService } from 
 import type { Course } from "../types/course";
 import type { Subject } from "../types/subject";
 import type { QuizQuestion } from "../services/quizQuestionService";
+import { QuizPagination } from "../components/quiz/QuizPagination";
 
 interface CreateQuizForm {
   courseId: string;
@@ -15,6 +16,7 @@ interface CreateQuizForm {
   startTime: string;
   endTime: string;
   shuffleQuestions: boolean;
+  isPublished: boolean;
 }
 
 interface DraftQuestion {
@@ -34,7 +36,7 @@ interface SnapshotQuestion {
   explanation?: string | number;
   images?: Array<{ url: string; fromDB?: boolean }>;
   isExternal: boolean;
-  isNew: boolean;
+  isNewQuestion: boolean;
   isDeleted: boolean;
   isDirty: boolean;
 }
@@ -100,7 +102,7 @@ const normalizeSnapshotQuestion = (snapshot: SnapshotQuestion) => {
     images: Array.isArray(snapshot.images) ? snapshot.images : undefined,
     id: snapshot.id ? String(snapshot.id) : undefined,
     isExternal: Boolean(snapshot.isExternal),
-    isNew: Boolean(snapshot.isNew),
+      isNewQuestion: Boolean(snapshot.isNewQuestion ?? false),
     isDeleted: Boolean(snapshot.isDeleted ?? false),
     isDirty: Boolean(snapshot.isDirty ?? false),
   };
@@ -116,6 +118,16 @@ const QuizCreatePage: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
+  const [coursesPage, setCoursesPage] = useState(1);
+  const [coursesPageSize] = useState(10);
+  const [coursesPagination, setCoursesPagination] = useState<{
+    totalItems: number;
+    currentPage: number;
+    limit: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  } | null>(null);
 
   const [showWizard, setShowWizard] = useState(false);
   const [wizardStep, setWizardStep] = useState<"details" | "select">("details");
@@ -135,6 +147,7 @@ const QuizCreatePage: React.FC = () => {
     startTime: "",
     endTime: "",
     shuffleQuestions: false,
+    isPublished: true,
   });
 
   const [error, setError] = useState<string | null>(null);
@@ -166,8 +179,35 @@ const QuizCreatePage: React.FC = () => {
     const fetchCourses = async () => {
       try {
         setLoadingCourses(true);
-        const { courses } = await courseService.getAllCourses({ isPublished: true, limit: 100 });
+        const { courses, pagination } = await courseService.getAllCourses({ 
+          isPublished: true, 
+          page: coursesPage,
+          limit: coursesPageSize 
+        });
         setCourses(courses);
+        
+        // Handle pagination response
+        if (pagination && typeof pagination === 'object') {
+          const paginationData = pagination as Record<string, unknown>;
+          setCoursesPagination({
+            totalItems: (paginationData.totalItems as number) || (paginationData.total as number) || courses.length,
+            currentPage: (paginationData.currentPage as number) || (paginationData.page as number) || coursesPage,
+            limit: (paginationData.limit as number) || coursesPageSize,
+            totalPages: (paginationData.totalPages as number) || Math.ceil(((paginationData.totalItems as number) || courses.length) / coursesPageSize),
+            hasNext: (paginationData.hasNext as boolean) || (paginationData.hasNextPage as boolean) || false,
+            hasPrev: (paginationData.hasPrev as boolean) || (paginationData.hasPrevPage as boolean) || false,
+          });
+        } else {
+          // Fallback if no pagination info
+          setCoursesPagination({
+            totalItems: courses.length,
+            currentPage: coursesPage,
+            limit: coursesPageSize,
+            totalPages: 1,
+            hasNext: false,
+            hasPrev: false,
+          });
+        }
       } catch (err) {
         console.error("Failed to load courses", err);
         setError("Failed to load courses. Please refresh.");
@@ -176,7 +216,7 @@ const QuizCreatePage: React.FC = () => {
       }
     };
     fetchCourses();
-  }, []);
+  }, [coursesPage, coursesPageSize]);
 
   const openWizardWithoutCourse = () => {
     setQuizDetails({
@@ -186,6 +226,7 @@ const QuizCreatePage: React.FC = () => {
       startTime: "",
       endTime: "",
       shuffleQuestions: false,
+      isPublished: true,
     });
     setDraftQuestions([emptyDraftQuestion()]);
     setSelectedBankIds(new Set());
@@ -307,7 +348,7 @@ const QuizCreatePage: React.FC = () => {
           )
         : undefined,
       isExternal: !fromBank,
-      isNew: !fromBank,
+      isNewQuestion: !fromBank,
       isDeleted: false,
       isDirty: false,
     };
@@ -408,6 +449,7 @@ const QuizCreatePage: React.FC = () => {
         startTime: convertToISOUTC(quizDetails.startTime),
         endTime: convertToISOUTC(quizDetails.endTime),
         shuffleQuestions: quizDetails.shuffleQuestions,
+        isPublished: quizDetails.isPublished,
         snapshotQuestions: normalizedSnapshots,
       });
 
@@ -524,7 +566,7 @@ const QuizCreatePage: React.FC = () => {
                         backgroundColor: "var(--card-row-bg)",
                         borderColor: "var(--card-row-border)",
                       }}
-                      onClick={() => navigate(`/questionbank/${course._id}`)}
+                      onClick={() => navigate(`/quizz/${course._id}`)}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
@@ -551,6 +593,23 @@ const QuizCreatePage: React.FC = () => {
                   ))}
                 </div>
               )}
+              {coursesPagination && coursesPagination.totalPages > 1 && (
+                <QuizPagination
+                  currentPage={coursesPagination.currentPage}
+                  totalPages={coursesPagination.totalPages}
+                  textColor="var(--heading-text)"
+                  borderColor="var(--card-border)"
+                  hasPrev={coursesPagination.hasPrev}
+                  hasNext={coursesPagination.hasNext}
+                  pageOptions={Array.from({ length: Math.min(5, coursesPagination.totalPages) }, (_, i) => {
+                    const start = Math.max(1, coursesPagination.currentPage - 2);
+                    return Math.min(start + i, coursesPagination.totalPages);
+                  }).filter((v, i, arr) => arr.indexOf(v) === i)}
+                  onPrev={() => setCoursesPage((p) => Math.max(1, p - 1))}
+                  onNext={() => setCoursesPage((p) => Math.min(coursesPagination!.totalPages, p + 1))}
+                  onSelectPage={(page) => setCoursesPage(page)}
+                />
+              )}
             </section>
           </div>
         </main>
@@ -558,7 +617,7 @@ const QuizCreatePage: React.FC = () => {
 
       {showWizard && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowWizard(false)} />
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowWizard(false)} />
           <div
             className="relative w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
             style={{
@@ -702,6 +761,24 @@ const QuizCreatePage: React.FC = () => {
                         }}
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={quizDetails.isPublished}
+                        onChange={(e) => setQuizDetails((prev) => ({ ...prev, isPublished: e.target.checked }))}
+                        className="w-4 h-4 rounded border"
+                        style={{
+                          backgroundColor: quizDetails.isPublished ? "var(--primary-color)" : "var(--input-bg)",
+                          borderColor: "var(--input-border)",
+                        }}
+                      />
+                      <span className="text-sm font-medium" style={{ color: "var(--muted-text)" }}>
+                        Published
+                      </span>
+                    </label>
                   </div>
 
 
