@@ -16,6 +16,7 @@ import {
   autocompleteSubjectsHandler,
   relatedSubjectsHandler,
   deleteQuestionsBySubjectIdHandler,
+  getMySubjectsHandler,
 } from '../controller/subject.controller';
 import authenticate from '../middleware/authenticate';
 import authorize from '../middleware/authorize';
@@ -26,6 +27,10 @@ const subjectRoutes = Router();
 // prefix: /subjects
 
 // Protected routes (require authentication)
+// GET /subjects/my-subjects - Get my subjects (Student: from enrolled courses, Teacher: by specialist, Admin: all)
+// Must be before /:id route
+subjectRoutes.get('/my-subjects', authenticate, getMySubjectsHandler);
+
 // GET /subjects - List Subject (search/lọc/phân trang)
 subjectRoutes.get('/', listSubjectsHandler);
 // GET /subjects/id/:id - Chi tiết Subject theo ID

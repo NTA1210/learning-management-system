@@ -3,9 +3,10 @@ import {
   CourseModel,
   UserModel,
   QuizQuestionModel,
+  EnrollmentModel,
 } from "../models";
 import appAssert from "../utils/appAssert";
-import { CONFLICT, NOT_FOUND, FORBIDDEN } from "../constants/http";
+import { CONFLICT, NOT_FOUND, FORBIDDEN ,BAD_REQUEST} from "../constants/http";
 import { ISubject, Role } from "@/types";
 import { ListParams } from "@/types/dto";
 import mongoose from "mongoose";
@@ -610,3 +611,159 @@ export const deleteQuestionsBySubjectId = async (subjectId: string) => {
     deletedCount: count,
   };
 };
+
+
+/**
+ * Lấy danh sách môn học của tôi (My Subjects)
+ * - Student: Các môn học từ các khóa học đã enroll
+ * - Teacher: Các môn học có specialistIds trùng với specialistIds của teacher
+ * - Admin: Tất cả môn học
+ */
+export const getMySubjects = async ({
+  userId,
+  userRole,
+  params,
+}: {
+  userId: string;
+  userRole: Role;
+  params: ListSubjectParams;
+}) => {
+  const {
+    page,
+    limit,
+    search,
+    name,
+    slug,
+    code,
+    specialistId,
+    isActive,
+    sortBy = "createdAt",
+    sortOrder = "desc",
+  } = params;
+
+  // Validate pagination
+  appAssert(page > 0, BAD_REQUEST, "Page must be greater than 0");
+  appAssert(
+    limit > 0 && limit <= 100,
+    BAD_REQUEST,
+    "Limit must be between 1 and 100"
+  );
+
+  const filter: any = {};
+
+  // 1. Role-based filtering
+  if (userRole === Role.STUDENT) {
+    // Student: Find subjects from enrolled courses
+    const enrollments = await EnrollmentModel.find({
+      studentId: userId,
+    }).select("courseId");
+
+    const courseIds = enrollments.map((e) => e.courseId);
+    const courses = await CourseModel.find({
+      _id: { $in: courseIds },
+      isDeleted: false,
+    }).select("subjectId");
+
+    // Filter courses with subjectId and extract unique subjectIds
+    const subjectIds: string[] = [];
+    const seenIds = new Set<string>();
+    
+    for (const course of courses) {
+      if (course.subjectId) {
+        const subjectIdStr = course.subjectId.toString();
+        if (!seenIds.has(subjectIdStr)) {
+          seenIds.add(subjectIdStr);
+          subjectIds.push(subjectIdStr);
+        }
+      }
+    }
+    
+    if (subjectIds.length === 0) {
+      // Student has no enrolled courses, return empty result
+      filter._id = { $in: [] };
+    } else {
+      filter._id = { $in: subjectIds.map((id) => new mongoose.Types.ObjectId(id)) };
+    }
+  } else if (userRole === Role.TEACHER) {
+    // Teacher: Find subjects where their specialistIds match subject's specialistIds
+    const user = await UserModel.findById(userId).lean();
+    appAssert(user, NOT_FOUND, "User not found");
+
+    const userSpecialistIds = (user.specialistIds || []).map((id: any) =>
+      id.toString()
+    );
+
+    if (userSpecialistIds.length > 0) {
+      filter.specialistIds = {
+        $in: userSpecialistIds.map(
+          (id: string) => new mongoose.Types.ObjectId(id)
+        ),
+      };
+    } else {
+      // Teacher without specialistIds should see no subjects
+      filter._id = { $in: [] };
+    }
+  } else if (userRole === Role.ADMIN) {
+    // Admin: See all (no extra filter needed on _id/owner)
+  }
+
+  // 2. Common filters (Search, Name, Slug, Code, Specialist, IsActive)
+  if (search) {
+    filter.$and = filter.$and || [];
+    filter.$and.push({
+      $or: [
+        { name: { $regex: search, $options: "i" } },
+        { description: { $regex: search, $options: "i" } },
+        { code: { $regex: search, $options: "i" } },
+      ],
+    });
+  }
+
+  if (name) filter.name = name;
+  if (slug) filter.slug = slug;
+  if (code) filter.code = code;
+
+  if (specialistId) {
+    filter.specialistIds = new mongoose.Types.ObjectId(specialistId);
+  }
+
+  if (typeof isActive !== "undefined") {
+    const val = typeof isActive === "string" ? isActive === "true" : !!isActive;
+    filter.isActive = val;
+  }
+
+  // 3. Pagination & Sort
+  const skip = (page - 1) * limit;
+  const sort: any = {};
+  sort[sortBy] = sortOrder === "asc" ? 1 : -1;
+
+  // 4. Execute Query
+  const [subjects, total] = await Promise.all([
+    SubjectModel.find(filter)
+      .populate("specialistIds", "name code description")
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .lean(),
+    SubjectModel.countDocuments(filter),
+  ]);
+
+  // 5. Pagination Metadata
+  const totalPages = Math.ceil(total / limit);
+  const hasNextPage = page < totalPages;
+  const hasPrevPage = page > 1;
+
+  return {
+    subjects,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages,
+      hasNextPage,
+      hasPrevPage,
+    },
+  };
+};
+
+
