@@ -62,6 +62,7 @@ export const listFeedbacksHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     data: result.feedbacks,
     message: "Feedbacks retrieved successfully",
+    averageRating: result.averageRating,
     pagination: result.pagination,
   });
 });

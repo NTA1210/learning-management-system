@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import http from "../utils/http";
+import http, { httpClient } from "../utils/http";
 import { subjectService } from "../services";
 import { userService } from "../services/userService";
-import type { Subject } from "../services/subjectService";
+
 import type { User } from "../types/auth";
+import type { Subject } from "../types/subject";
+type Semester = { _id: string; name: string; type: string; year: number; startDate: string; endDate: string };
 
 type Props = {
   darkMode?: boolean;
@@ -17,6 +19,8 @@ const statuses = ["draft", "ongoing", "completed"] as const;
 const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, presetTeacherId }) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [teachers, setTeachers] = useState<User[]>([]);
+  const [semesters, setSemesters] = useState<Semester[]>([]);
+  const [currentSpecialistIds, setCurrentSpecialistIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -27,6 +31,7 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
     description: "",
     startDate: "",
     endDate: "",
+    semesterId: "",
     teacherIds: [] as string[],
     status: "draft",
     isPublished: false,
@@ -38,13 +43,23 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
     const load = async () => {
       setError("");
       try {
-        const [subjectRes, teacherRes] = await Promise.all([
+        const [subjectsResult, teachersResult, semestersResult] = await Promise.allSettled([
           subjectService.getAllSubjects(),
-          userService.getUsers({ role: "teacher", limit: 50 }),
+          userService.getUsers({ role: "teacher", specialistIds: currentSpecialistIds } as any),
+          httpClient.get("/semesters", { withCredentials: true }),
         ]);
-        setSubjects(subjectRes.data || []);
-        console.log('subjectRes', subjectRes);
-        setTeachers(teacherRes.users || []);
+        if (subjectsResult.status === "fulfilled") {
+          setSubjects(subjectsResult.value.data || []);
+          console.log("subjects", subjectsResult.value.data || []);
+        }
+        if (teachersResult.status === "fulfilled") {
+          setTeachers(teachersResult.value.users || []);
+        }
+        if (semestersResult.status === "fulfilled") {
+          const body: any = semestersResult.value.data;
+          const list = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
+          setSemesters(list);
+        }
       } catch (e: any) {
         setError(e?.message || "Không thể tải dữ liệu");
       }
@@ -58,7 +73,9 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
     }
   }, [presetTeacherId]);
 
-  const teacherOptions = useMemo(() => teachers.map(t => ({ id: t._id, name: t.fullname || t.username })), [teachers]);
+  const teacherOptions = useMemo(() => {
+    return teachers.map(t => ({ id: t._id, name: t.fullname || t.username }));
+  }, [teachers]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type, checked } = e.target as any;
@@ -66,6 +83,25 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
       ...prev,
       [name]: type === "checkbox" ? checked : name === "capacity" ? Number(value) : value,
     }));
+    if (name === "subjectId") {
+      const selected = subjects.find(s => s._id === value) as any;
+      const rawSpecIds = Array.isArray(selected?.specialistIds)
+        ? selected.specialistIds
+        : Array.isArray(selected?.specialists)
+        ? (selected.specialists || []).map((s: any) => s?._id).filter(Boolean)
+        : [selected?.specialistId || selected?.specialist?._id].filter(Boolean);
+      const specIds = rawSpecIds
+        .map((x: any) => (typeof x === "string" ? x : x?._id))
+        .filter((id: any) => typeof id === "string" && id);
+      setCurrentSpecialistIds(specIds);
+      void (async () => {
+        try {
+          const params: any = { role: "teacher",  specialistIds: specIds };
+          const res = await userService.getUsers(params);
+          setTeachers(res.users || []);
+        } catch (_e) {}
+      })();
+    }
   };
 
   const toggleTeacher = (id: string) => {
@@ -88,6 +124,7 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
         description: form.description,
         startDate: form.startDate,
         endDate: form.endDate,
+        semesterId: form.semesterId ? [form.semesterId] : undefined,
         teacherIds: form.teacherIds,
         status: form.status,
         isPublished: form.isPublished,
@@ -103,6 +140,7 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
         description: "",
         startDate: "",
         endDate: "",
+        semesterId: "",
         teacherIds: [],
         status: "draft",
         isPublished: false,
@@ -138,7 +176,7 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
               borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
               color: darkMode ? "#ffffff" : "#000000",
             }}
-            placeholder="Tên khóa học"
+            placeholder="Enter course title"
             required
           />
         </div>
@@ -158,7 +196,7 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
             }}
             required
           >
-            <option value="">Chọn môn học</option>
+            <option value="">Select subject</option>
             {subjects.map(s => (
               <option key={s._id} value={s._id}>{s.name || s.code}</option>
             ))}
@@ -178,7 +216,7 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
               borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
               color: darkMode ? "#ffffff" : "#000000",
             }}
-            placeholder="Mô tả ngắn"
+            placeholder="Enter course description"
           />
         </div>
       </div>
@@ -241,6 +279,29 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
 
       <div className="mb-6">
         <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+          Semester
+        </label>
+        <select
+          name="semesterId"
+          value={form.semesterId}
+          onChange={handleChange}
+          className="w-full px-4 py-2 rounded-lg border"
+          style={{
+            backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
+            borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+            color: darkMode ? "#ffffff" : "#000000",
+          }}
+          required
+        >
+          <option value="">Select semester</option>
+          {semesters.map(s => (
+            <option key={s._id} value={s._id}>{s.name} ({s.year})</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
           Teachers
         </label>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-auto p-2 rounded border"
@@ -269,11 +330,11 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
         <div className="flex items-center gap-6">
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="isPublished" checked={form.isPublished} onChange={handleChange} />
-            <span>Publish ngay</span>
+            <span>Is published</span>
           </label>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="enrollRequiresApproval" checked={form.enrollRequiresApproval} onChange={handleChange} />
-            <span>Enroll cần duyệt</span>
+            <span>Enroll requires approval</span>
           </label>
         </div>
       </div>
@@ -285,14 +346,14 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
           className="px-4 py-2 rounded-lg"
           style={{ backgroundColor: darkMode ? "#1f2937" : "#e5e7eb", color: darkMode ? "#e5e7eb" : "#111827" }}
         >
-          Hủy
+          Cancel
         </button>
         <button
           type="submit"
           className="px-5 py-2 rounded-lg text-white font-medium transition-all duration-200"
           style={{ backgroundColor: darkMode ? "#4c1d95" : "#4f46e5" }}
         >
-          Tạo
+          Create
         </button>
       </div>
     </form>

@@ -1,6 +1,7 @@
-import { NextFunction, Request, Response } from "express";
-import { IApiResponse } from "../types/dto/apiResponse.type";
-import { nowLocal, nowTZone } from "../utils/time";
+import { NextFunction, Request, Response } from 'express';
+import { IApiResponse } from '../types/dto/apiResponse.type';
+import { nowLocal, nowTZone } from '../utils/time';
+import AppErrorCode from '@/constants/appErrorCode';
 
 const customResponse = (req: Request, res: Response, next: NextFunction) => {
   res.success = function <T>(
@@ -17,7 +18,7 @@ const customResponse = (req: Request, res: Response, next: NextFunction) => {
   ) {
     const response: IApiResponse<T> = {
       success: true,
-      message: message || "Success",
+      message: message || 'Success',
       data: data ?? null,
       ...args,
       meta: {
@@ -38,14 +39,14 @@ const customResponse = (req: Request, res: Response, next: NextFunction) => {
       ...args
     }: {
       message?: string;
-      code?: string;
+      code?: AppErrorCode;
       details?: any;
       [key: string]: any;
     }
   ) {
     const response: IApiResponse<null> = {
       success: false,
-      message: message || "Error",
+      message: message || 'Error',
       data: null,
       error: {
         code,

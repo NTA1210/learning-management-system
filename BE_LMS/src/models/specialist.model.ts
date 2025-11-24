@@ -1,12 +1,12 @@
-import ISpecialist from "../types/specialist.type";
-import mongoose from "mongoose";
+import ISpecialist from '../types/specialist.type';
+import mongoose from 'mongoose';
 
 const SpecialistSchema = new mongoose.Schema<ISpecialist>(
   {
-    name: { type: String, required: true },
-    description: { type: String },
-    slug: { type: String },
-    majorId: { type: mongoose.Schema.Types.ObjectId, ref: "Major" },
+    name: { type: String, required: true, trim: true },
+    description: { type: String, trim: true },
+    slug: { type: String, trim: true },
+    majorId: { type: mongoose.Schema.Types.ObjectId, ref: 'Major' },
     isActive: { type: Boolean, default: true },
   },
   {
@@ -16,21 +16,17 @@ const SpecialistSchema = new mongoose.Schema<ISpecialist>(
 
 //indexes
 SpecialistSchema.index({ name: 1 }, { unique: true });
-SpecialistSchema.index({ name: "text" });
+SpecialistSchema.index({ name: 'text' });
 SpecialistSchema.index({ slug: 1 }, { unique: true });
-SpecialistSchema.index({ slug: "text" });
+SpecialistSchema.index({ slug: 'text' });
 SpecialistSchema.index({ majorId: 1, isActive: 1 });
 
 //hooks
-SpecialistSchema.pre("save", function (next) {
-  this.slug = this.name.toLowerCase().replace(/ /g, "-");
+SpecialistSchema.pre('save', function (next) {
+  this.slug = this.name.toLowerCase().replace(/ /g, '-');
   next();
 });
 
-const SpecialistModel = mongoose.model<ISpecialist>(
-  "Specialist",
-  SpecialistSchema,
-  "specialists"
-);
+const SpecialistModel = mongoose.model<ISpecialist>('Specialist', SpecialistSchema, 'specialists');
 
 export default SpecialistModel;

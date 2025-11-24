@@ -8,6 +8,12 @@ export * from './enrollmentService';
 export * from './feedbackService';
 export * from './quizQuestionService';
 export * from './subjectService';
+export * from './quizService';
+export * from './specialistService';
+export * from './majorService';
+export * from './userService';
+export * from './semesterService';
+export * from './attendanceService';
 
 // storage keys
 const USER_STORAGE_KEY = 'lms:user';

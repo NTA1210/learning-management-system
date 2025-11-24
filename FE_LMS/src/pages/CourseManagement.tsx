@@ -10,6 +10,8 @@ import Sidebar from "../components/Sidebar.tsx";
 import CreateCourseForm from "../components/CreateCourseForm.tsx";
 import { Search, Trash } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import http, { httpClient } from "../utils/http";
+
 
  
 
@@ -39,12 +41,14 @@ const CourseManagement: React.FC = () => {
     description: "",
     startDate: "",
     endDate: "",
-    teacherIds: "",
+    semesterId: "",
+    teacherIds: [] as string[],
     isPublished: false,
     enrollRequiresApproval: true,
     capacity: 50,
     status: "draft",
   });
+  const [semesters, setSemesters] = useState<Array<{ _id: string; name: string; type: string; year: number; startDate: string; endDate: string }>>([]);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailCourse, setDetailCourse] = useState<Course | null>(null);
   const [enrollments, setEnrollments] = useState<{
@@ -96,7 +100,12 @@ const CourseManagement: React.FC = () => {
   const canTeacherEditCourse = (course: Course) => {
     if (isAdmin) return true;
     if (isTeacher && currentTeacherId) {
-      return course.teachers.some(teacher => teacher._id === currentTeacherId);
+      const ids = Array.isArray(course.teachers)
+        ? course.teachers.map(t => t._id)
+        : Array.isArray((course as any).teacherIds)
+        ? (course as any).teacherIds.map((t: any) => (typeof t === 'string' ? t : t?._id)).filter(Boolean)
+        : [];
+      return ids.includes(currentTeacherId);
     }
     return false;
   };
@@ -104,17 +113,77 @@ const CourseManagement: React.FC = () => {
   const canTeacherDeleteCourse = (course: Course) => {
     if (isAdmin) return true;
     if (isTeacher && currentTeacherId) {
-      // Teacher can delete courses they are assigned to
-      return course.teachers.some(teacher => teacher._id === currentTeacherId);
+      const ids = Array.isArray(course.teachers)
+        ? course.teachers.map(t => t._id)
+        : Array.isArray((course as any).teacherIds)
+        ? (course as any).teacherIds.map((t: any) => (typeof t === 'string' ? t : t?._id)).filter(Boolean)
+        : [];
+      return ids.includes(currentTeacherId);
     }
     return false;
+  };
+
+  const [enrolling, setEnrolling] = useState<Record<string, boolean>>({});
+
+  const showToastSuccess = async (message: string) => {
+    try {
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: message,
+        showConfirmButton: false,
+        timer: 2000,
+      });
+    } catch {}
+  };
+
+  const showToastInfo = async (message: string) => {
+    try {
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "info",
+        title: message,
+        showConfirmButton: false,
+        timer: 2000,
+      });
+    } catch {}
+  };
+
+  const handleEnroll = async (courseId: string) => {
+    try {
+      setEnrolling(prev => ({ ...prev, [courseId]: true }));
+      await httpClient.post("/enrollments/enroll", { courseId, role: "student" }, { withCredentials: true });
+      await showToastSuccess("Enroll thành công");
+    } catch (e: any) {
+      const status = e?.response?.status;
+      if (status === 409) {
+        const message = e?.response?.data?.message || "You are already enrolled in this course.";
+        await showToastInfo(message);
+      } else {
+        console.error(e);
+      }
+    } finally {
+      setEnrolling(prev => ({ ...prev, [courseId]: false }));
+    }
   };
 
   useEffect(() => {
     fetchCourses();
   }, []);
 
-
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await http.get("/semesters");
+        const list = Array.isArray((res as any)?.data) ? (res as any).data : [];
+        setSemesters(list);
+      } catch {}
+    })();
+  }, []);
 
   // Fetch teachers list from users API (role = teacher)
   const fetchTeachers = async () => {
@@ -230,13 +299,24 @@ const CourseManagement: React.FC = () => {
       description: course.description || "",
       startDate: "",
       endDate: "",
-      teacherIds: "",
+      teacherIds: [] as string[],
       isPublished: !!course.isPublished,
       enrollRequiresApproval: true,
       capacity: typeof course.capacity === 'number' ? course.capacity : 0,
       status: "draft", 
+      semesterId: ((): string => {
+        const sem: any = (course as any).semesterId;
+        if (typeof sem === 'string') return sem;
+        if (typeof sem === 'object' && sem && sem._id) return sem._id;
+        return "";
+      })(),
     });
-    setSelectedTeachers(Array.isArray(course.teachers) ? course.teachers.map(t => t._id) : []);
+    const normalizedTeacherIds = Array.isArray((course as any).teacherIds)
+      ? (course as any).teacherIds.map((t: any) => (typeof t === 'string' ? t : t?._id)).filter(Boolean)
+      : Array.isArray(course.teachers)
+      ? course.teachers.map(t => t._id).filter(Boolean)
+      : [];
+    setSelectedTeachers(normalizedTeacherIds);
     setCategorySearchTerm(course.category?.name || "");
     setShowEditModal(true);
   };
@@ -255,7 +335,8 @@ const CourseManagement: React.FC = () => {
         description: formData.description,
         isPublished: formData.isPublished,
         capacity: formData.capacity,
-        teachers: selectedTeachers,
+        semesterId: formData.semesterId,
+        teacherIds: selectedTeachers,
 
       });
       setShowEditModal(false);
@@ -296,7 +377,7 @@ const CourseManagement: React.FC = () => {
   useEffect(() => {
     fetchCourses();
     // eslint-disable-next-line
-  }, [currentPage, pageLimit, sortOption]);
+  }, [currentPage, pageLimit, sortOption, searchTerm]);
 
   return (
     <>
@@ -672,7 +753,10 @@ const CourseManagement: React.FC = () => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                         </svg>
                         <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                          {course.category?.name || 'No Category'}
+                          {(() => {
+                            const sem: any = (course as any).semesterId;
+                            return typeof sem === 'object' && sem ? (sem.name || 'No Semester') : 'No Semester';
+                          })()}
                         </span>
                       </div>
                       <div className="flex items-center text-sm">
@@ -683,33 +767,44 @@ const CourseManagement: React.FC = () => {
                           Capacity: {course.capacity} students
                         </span>
                       </div>
-                      <div className="flex items-center text-sm">
+                      {/* <div className="flex items-center text-sm">
                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: darkMode ? '#6b7280' : '#9ca3af' }}>
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
-                     
-                      </div>
+                        <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                          
+                        </span>
+                      </div> */}
                     </div>
 
                     {/* Teachers List */}
-                    {course?.teachers?.length > 0 && (
-                      <div className="mb-4">
-                        <div className="flex flex-wrap gap-2">
-                          {course.teachers.map((teacher) => (
-                            <span
-                              key={teacher._id}
-                              className="px-2 py-1 rounded text-xs"
-                              style={{
-                                backgroundColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#f3f4f6',
-                                color: darkMode ? '#d1d5db' : '#4b5563'
-                              }}
-                            >
-                              {teacher.username}
-                            </span>
-                          ))}
+                    {(() => {
+                      const list = Array.isArray((course as any).teacherIds)
+                        ? (course as any).teacherIds
+                        : Array.isArray(course.teachers)
+                        ? course.teachers
+                        : [];
+                      return list.length > 0 ? (
+                        <div className="mb-4">
+                          <div className="flex flex-wrap gap-2">
+                            {list.map((teacher: any) => (
+                              <span
+                                key={typeof teacher === 'string' ? teacher : teacher?._id}
+                                className="px-2 py-1 rounded text-xs"
+                                style={{
+                                  backgroundColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#f3f4f6',
+                                  color: darkMode ? '#d1d5db' : '#4b5563'
+                                }}
+                              >
+                                {typeof teacher === 'object' && teacher !== null
+                                  ? (teacher.fullname || teacher.username || 'Teacher')
+                                  : 'Teacher'}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      ) : null;
+                    })()}
 
                     {/* Action Buttons */}
                     <div className="flex space-x-2 pt-4 border-t" style={{ borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb' }}>
@@ -754,14 +849,15 @@ const CourseManagement: React.FC = () => {
                       )}
                       {isStudent && (
                         <button
-                          className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md"
+                          onClick={() => handleEnroll(course._id)}
+                          disabled={!!enrolling[course._id]}
+                          className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md disabled:opacity-50"
                           style={{
                             backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5',
                             color: darkMode ? '#6ee7b7' : '#059669'
                           }}
-
                         >
-                          Enroll
+                          {enrolling[course._id] ? 'Enrolling...' : 'Enroll'}
                         </button>
                       )}
                     </div>
@@ -905,8 +1001,22 @@ const CourseManagement: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block mb-2 font-semibold">Category *</label>
-         
+                  <label className="block mb-2 font-semibold">Semester *</label>
+                  <select
+                    value={formData.semesterId || ""}
+                    onChange={(e) => setFormData({ ...formData, semesterId: e.target.value })}
+                    className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                  >
+                    <option value="">Select semester</option>
+                    {semesters.map((s) => (
+                      <option key={s._id} value={s._id}>{s.name} ({s.year})</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="col-span-2">
@@ -1134,32 +1244,46 @@ const CourseManagement: React.FC = () => {
                 <div style={{marginBottom:'0.8rem', marginTop:'1.1rem'}}>
                   <div style={{fontWeight:600, marginBottom:'.6rem'}}>Teachers</div>
                   <div style={{display:'flex', flexWrap:'wrap', gap: '1rem'}}>
-                    {detailCourse.teachers.length > 0 ? detailCourse.teachers.map(t => (
-                      <div
-                        key={t._id}
-                        style={{
-                          display:'flex', alignItems:'center',
-                          borderRadius: '1.2rem',
-                          backgroundColor: darkMode ? '#5b21b6':'#f3e8ff',
-                          color: darkMode ? '#f3e8ff':'#5b21b6',
-                          border: darkMode ? '1.5px solid #a78bfa':'1.5px solid #c4b5fd',
-                          minWidth: '100%', padding: '0.55rem 1.1rem', boxShadow:darkMode?'0 3px 7px #181F2A':'0 1px 5px #ede9fe', fontSize:'0.93em', gap:12
-                        }}
-                      >
-                        <img
-                          src={"https://admin.toandz.id.vn/placeholder/img/14.jpg"}
-                          alt="avatar"
-                          width={48}
-                          height={48}
-                          style={{ borderRadius: '50%', aspectRatio: '1 / 1', objectFit: 'cover', marginRight: 8, border: darkMode ? '2px solid #a78bfa' : '2px solid #c4b5fd', background: darkMode ? '#232946':'#fff' }}
-                        />
-                        <div style={{display:'flex', flexDirection:'column', minWidth:0, width:'100%'}}>
-                          <span style={{fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{t.username}</span>
-                          {t.fullname && <span style={{fontSize:'11px', color:darkMode?'#f3e8ff':'#5b21b6', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{t.fullname}</span>}
-                          <span style={{fontSize:'11px', color:darkMode?'#ddd6fe':'#7c3aed', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{t.email}</span>
-                        </div>
-                      </div>
-                    )) : <span style={{fontStyle:'italic', color:darkMode?'#a3a3a3':'#64748b'}}>No teachers assigned</span>}
+                    {(() => {
+                      const list = Array.isArray(detailCourse?.teachers)
+                        ? detailCourse!.teachers
+                        : Array.isArray((detailCourse as any)?.teacherIds)
+                        ? (detailCourse as any).teacherIds
+                        : [];
+                      if (!list.length) return <span style={{fontStyle:'italic', color:darkMode?'#a3a3a3':'#64748b'}}>No teachers assigned</span>;
+                      return list.map((t: any) => {
+                        const id = typeof t === 'string' ? t : t?._id;
+                        const username = typeof t === 'object' && t !== null ? (t.username || 'Teacher') : 'Teacher';
+                        const fullname = typeof t === 'object' && t !== null ? t.fullname : '';
+                        const email = typeof t === 'object' && t !== null ? t.email : '';
+                        return (
+                          <div
+                            key={id}
+                            style={{
+                              display:'flex', alignItems:'center',
+                              borderRadius: '1.2rem',
+                              backgroundColor: darkMode ? '#5b21b6':'#f3e8ff',
+                              color: darkMode ? '#f3e8ff':'#5b21b6',
+                              border: darkMode ? '1.5px solid #a78bfa':'1.5px solid #c4b5fd',
+                              minWidth: '100%', padding: '0.55rem 1.1rem', boxShadow:darkMode?'0 3px 7px #181F2A':'0 1px 5px #ede9fe', fontSize:'0.93em', gap:12
+                            }}
+                          >
+                            <img
+                              src={"https://admin.toandz.id.vn/placeholder/img/14.jpg"}
+                              alt="avatar"
+                              width={48}
+                              height={48}
+                              style={{ borderRadius: '50%', aspectRatio: '1 / 1', objectFit: 'cover', marginRight: 8, border: darkMode ? '2px solid #a78bfa' : '2px solid #c4b5fd', background: darkMode ? '#232946':'#fff' }}
+                            />
+                            <div style={{display:'flex', flexDirection:'column', minWidth:0, width:'100%'}}>
+                              <span style={{fontWeight:600, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{username}</span>
+                              {fullname && <span style={{fontSize:'11px', color:darkMode?'#f3e8ff':'#5b21b6', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{fullname}</span>}
+                              {email && <span style={{fontSize:'11px', color:darkMode?'#ddd6fe':'#7c3aed', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{email}</span>}
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
               </div>

@@ -11,8 +11,17 @@ export { default as Sidebar } from './Sidebar.tsx';
 export { default as ListToolbar } from './list/ListToolbar';
 export { default as AssignmentCard } from './assignments/AssignmentCard';
 export { default as AssignmentFormModal } from './assignments/AssignmentFormModal';
+export { default as SubmissionModal } from './assignments/SubmissionModal';
+export { default as ViewSubmissionModal } from './assignments/ViewSubmissionModal';
+export { default as AllSubmissionsModal } from './assignments/AllSubmissionsModal';
+export { default as SubmissionCard } from './assignments/SubmissionCard';
+export { default as GradeSubmissionModal } from './assignments/GradeSubmissionModal';
 export { default as LessonCard } from './lessons/LessonCard';
 export { default as LessonFormModal } from './lessons/LessonFormModal';
 export { default as LessonSummary } from './materials/LessonSummary';
 export { default as MaterialCard } from './materials/MaterialCard';
 export { default as MaterialFormModal } from './materials/MaterialFormModal';
+export { default as AverageRating } from './AverageRating';
+export { default as SearchableSelect } from './common/SearchableSelect';
+export { default as UserBio } from './UserBio';
+

@@ -1,4 +1,4 @@
-import { BAD_REQUEST, FORBIDDEN, NOT_FOUND } from '@/constants/http';
+import { BAD_REQUEST, NOT_FOUND } from '@/constants/http';
 import { CourseModel, EnrollmentModel, QuizAttemptModel, QuizModel } from '@/models';
 import {
   AttemptStatus,
@@ -19,8 +19,10 @@ import {
   calculateMedian,
   calculateRank,
   findMinMax,
+  isTeacherOfCourse,
   standardDeviation,
 } from './helpers/quizHelpers';
+import { QuizQuestionType } from '@/types/quizQuestion.type';
 
 /**
  * Create a new quiz.
@@ -38,7 +40,7 @@ export const createQuiz = async (
     startTime,
     endTime,
     shuffleQuestions,
-    // questionIds,
+    isPublished,
     snapshotQuestions,
   }: CreateQuiz,
   userId: mongoose.Types.ObjectId,
@@ -49,8 +51,7 @@ export const createQuiz = async (
 
   //check whether user is teacher of course
   if (role === Role.TEACHER) {
-    const isTeacherOfCourse = course.teacherIds.some((teacherId) => teacherId.equals(userId));
-    appAssert(isTeacherOfCourse, FORBIDDEN, 'You are not a teacher of this course');
+    isTeacherOfCourse(course, userId);
   }
 
   //check endTime > startTime
@@ -73,6 +74,7 @@ export const createQuiz = async (
     startTime,
     endTime,
     shuffleQuestions,
+    isPublished,
     createdBy: userId,
     snapshotQuestions: [...snapshotQuestions],
   });
@@ -82,42 +84,92 @@ export const createQuiz = async (
 
 /**
  * Update a quiz.
- * @param  { quizId, courseId, title, description, startTime, endTime, shuffleQuestions, snapshotQuestions }
- * @throws  If quiz not found
- * @throws  If quiz is already completed
- * @throws  If snapshot questions already added
- * @throws  If no questions provided
- * @returns  Updated quiz
+ *
+ * This function updates the properties of an existing quiz, including its title, description,
+ * start and end times, shuffle settings, and questions. It handles added, updated, and deleted
+ * questions, merges images safely, and validates question types and time constraints.
+ *
+ * Rules:
+ * - If the quiz is currently ongoing:
+ *   - Only title, description, and endTime can be updated.
+ *   - endTime cannot be set to a past time.
+ *   - startTime and shuffleQuestions cannot be changed.
+ * - startTime must always be before endTime.
+ * - For updated questions (`isDirty`), full question data is expected from the client.
+ * - For deleted questions, associated images that are not from DB will be removed from storage.
+ *
+ * @param params - Parameters to update the quiz.
+ * @param params.quizId - ID of the quiz to update.
+ * @param params.title - (Optional) New title of the quiz.
+ * @param params.description - (Optional) New description of the quiz.
+ * @param params.startTime - (Optional) New start time of the quiz.
+ * @param params.endTime - (Optional) New end time of the quiz.
+ * @param params.shuffleQuestions - (Optional) Whether to shuffle questions.
+ * @param params.snapshotQuestions - (Optional) Array of questions to add/update/delete.
+ * @param userId - ID of the user performing the update.
+ * @param role - Role of the user performing the update (e.g., TEACHER).
+ *
+ * @throws NOT_FOUND if the quiz does not exist.
+ * @throws BAD_REQUEST if:
+ *   - The quiz is ongoing and the user attempts to update disallowed fields.
+ *   - startTime is after endTime.
+ *   - endTime is set to a past time for ongoing quizzes.
+ *   - Updated question data is invalid or a question already exists when adding.
+ *
+ * @returns The updated quiz document.
  */
-export const updateQuiz = async ({
-  quizId,
-  courseId,
-  title,
-  description,
-  startTime,
-  endTime,
-  shuffleQuestions,
-  snapshotQuestions,
-}: UpdateQuiz) => {
-  const quiz = await QuizModel.findById(quizId);
+
+export const updateQuiz = async (
+  {
+    quizId,
+    title,
+    description,
+    startTime,
+    endTime,
+    shuffleQuestions,
+    snapshotQuestions,
+  }: UpdateQuiz,
+  userId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId');
   appAssert(quiz, NOT_FOUND, 'Quiz not found');
+
+  //isTeacher of course
+  if (role === Role.TEACHER) {
+    isTeacherOfCourse(quiz.courseId, userId);
+  }
+
+  //isOnGoing
+  const isOnGoing = quiz.startTime.getTime() <= Date.now() && quiz.endTime.getTime() >= Date.now();
+
+  if (isOnGoing) {
+    appAssert(
+      (!snapshotQuestions || snapshotQuestions.length === 0) &&
+        shuffleQuestions === undefined &&
+        startTime === undefined,
+      BAD_REQUEST,
+      'You can just update title, description, endTime while quiz is on going'
+    );
+  }
 
   let deletedImages: string[] = [];
   const map = new Map<string, number>();
   quiz.snapshotQuestions.forEach((q: any, i: number) => map.set(q.id, i));
 
-  for (const question of snapshotQuestions) {
-    if (!question.isDeleted)
-      checkProperQuestionType(
-        question.type,
-        question.correctOptions,
-        `Question "${question.text}" is invalid`
-      );
+  if (snapshotQuestions?.length) {
+    for (const question of snapshotQuestions) {
+      if (!question.isDeleted)
+        checkProperQuestionType(
+          question.type,
+          question.correctOptions,
+          `Question "${question.text}" is invalid`
+        );
+    }
   }
-
-  const updated = snapshotQuestions.filter((q) => q.isDirty && !q.isNew && !q.isDeleted);
-  const added = snapshotQuestions.filter((q) => q.isNew && !q.isDeleted);
-  const deleted = snapshotQuestions.filter((q) => q.isDeleted && !q.isNew);
+  const updated = snapshotQuestions.filter((q) => q.isDirty && !q.isNewQuestion && !q.isDeleted);
+  const added = snapshotQuestions.filter((q) => q.isNewQuestion && !q.isDeleted);
+  const deleted = snapshotQuestions.filter((q) => q.isDeleted && !q.isNewQuestion);
 
   for (const q of updated) {
     const index = map.get(q.id) || -1;
@@ -133,9 +185,8 @@ export const updateQuiz = async ({
       ...q,
     };
 
-    // Merge ảnh: giữ ảnh DB, add ảnh newcom
-    const mergedImages = [...newImages];
-    quiz.snapshotQuestions[index].images = mergedImages;
+    // Merge ảnh
+    quiz.snapshotQuestions[index].images = newImages;
 
     // Xóa ảnh
     deletedImages.push(
@@ -159,9 +210,6 @@ export const updateQuiz = async ({
     for (const q of deleted) {
       const index = map.get(q.id);
       if (index === -1) continue;
-      quiz.snapshotQuestions = quiz.snapshotQuestions.filter(
-        (q) => !deleted.some((d) => d.id === q.id)
-      );
 
       const images: string[] = (q.images || [])
         .filter((img: TImage) => !img.fromDB)
@@ -171,6 +219,9 @@ export const updateQuiz = async ({
     }
   }
 
+  const deletedIds = deleted.map((q) => q.id);
+  quiz.snapshotQuestions = quiz.snapshotQuestions.filter((q) => !deletedIds.includes(q.id));
+
   if (deletedImages.length > 0) {
     await removeFiles(deletedImages.map((img) => getKeyFromPublicUrl(img)));
   }
@@ -179,9 +230,17 @@ export const updateQuiz = async ({
 
   quiz.title = title ?? quiz.title;
   quiz.description = description ?? quiz.description;
-  quiz.courseId = new mongoose.Types.ObjectId(courseId ?? quiz.courseId);
   quiz.startTime = startTime ?? quiz.startTime;
-  quiz.endTime = endTime ?? quiz.endTime;
+  if (endTime) {
+    if (isOnGoing) {
+      appAssert(
+        endTime.getTime() >= Date.now(),
+        BAD_REQUEST,
+        'You can not update endTime less than current time'
+      );
+    }
+    quiz.endTime = endTime;
+  }
   quiz.shuffleQuestions = shuffleQuestions ?? quiz.shuffleQuestions;
 
   await quiz.save();
@@ -200,16 +259,22 @@ export const updateQuiz = async ({
 export const deleteQuiz = async ({
   quizId,
   userId,
+  role,
 }: {
   quizId: string;
   userId: mongoose.Types.ObjectId;
+  role: Role;
 }) => {
-  const quiz = await QuizModel.findById(quizId);
+  const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId');
   appAssert(quiz, NOT_FOUND, 'Quiz not found');
 
+  //isTeacher of course
+  if (role === Role.TEACHER) {
+    isTeacherOfCourse(quiz.courseId, userId);
+  }
+  //isOnGoing
   const isOnGoing = quiz.startTime.getTime() <= Date.now() && quiz.endTime.getTime() >= Date.now();
-
-  appAssert(isOnGoing, BAD_REQUEST, 'Cannot delete a quiz that is on going');
+  appAssert(!isOnGoing, BAD_REQUEST, 'Cannot delete a quiz that is on going');
 
   quiz.deletedAt = new Date();
   quiz.deletedBy = userId;
@@ -235,11 +300,10 @@ export const getStatisticByQuizId = async (
   appAssert(quiz, NOT_FOUND, 'Quiz not found');
 
   if (role === Role.TEACHER) {
-    const isTeacherOfCourse = quiz.courseId.teacherIds.some((teacherId) =>
-      teacherId.equals(userId)
-    );
-    appAssert(isTeacherOfCourse, FORBIDDEN, 'You are not a teacher of this course');
+    isTeacherOfCourse(quiz.courseId, userId);
   }
+
+  // count total student
   const totalStudents = await EnrollmentModel.find({
     courseId: quiz.courseId._id,
     status: EnrollmentStatus.APPROVED,
@@ -254,17 +318,24 @@ export const getStatisticByQuizId = async (
 
   const scoresArray = quizAttempt.map((attempt) => attempt.score);
 
+  // count submitted
   const submittedCount = quizAttempt.length;
 
+  // count average
   const averageScore = quizAttempt.length
     ? quizAttempt.reduce((total, attempt) => total + attempt.score, 0) / quizAttempt.length
     : 0;
 
+  // count median
   const medianScore = calculateMedian(scoresArray);
 
+  // count min max
   const minMax = findMinMax([...new Set(scoresArray)]);
+
+  // count standard deviation
   const standardDeviationScore = standardDeviation(scoresArray);
 
+  // count distribution
   const intervals = [
     { min: 0, max: 2, label: '0-2' },
     { min: 2, max: 4, label: '2-4' },
@@ -290,6 +361,7 @@ export const getStatisticByQuizId = async (
     };
   });
 
+  // count rank
   const students = calculateRank(quizAttempt);
 
   return {
@@ -302,4 +374,41 @@ export const getStatisticByQuizId = async (
     scoreDistribution,
     students,
   };
+};
+
+interface StudentSnapshotQuestion {
+  id: string;
+  text: string;
+  type: QuizQuestionType;
+  options: string[];
+  images?: { url: string; fromDB: boolean }[];
+}
+
+export const getQuizById = async (quizId: string, userId: mongoose.Types.ObjectId, role: Role) => {
+  const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId').lean();
+  appAssert(quiz, NOT_FOUND, 'Quiz not found');
+
+  if (role === Role.TEACHER) {
+    isTeacherOfCourse(quiz.courseId, userId);
+  }
+
+  if (role === Role.STUDENT) {
+    quiz.snapshotQuestions = quiz.snapshotQuestions.map((q): any => {
+      const {
+        correctOptions,
+        explanation,
+        points,
+        isDeleted,
+        isDirty,
+        isExternal,
+        isNewQuestion,
+        ...rest
+      } = q;
+      return rest;
+    });
+    const { courseId, ...rest } = quiz;
+    return rest;
+  }
+
+  return quiz;
 };

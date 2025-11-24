@@ -4,6 +4,7 @@ import {
   submitAssignment,
   resubmitAssignment,
   getSubmissionStatus,
+  getSubmissionById,
   listSubmissionsByAssignment,
   gradeSubmission,
   gradeSubmissionById,
@@ -12,7 +13,7 @@ import {
   getSubmissionReportByAssignment,
   getSubmissionReportByCourse,
 } from "../services/submission.service";
-import { submissionBodySchema, assignmentIdParamSchema, gradeSubmissionSchema } from "../validators/submission.schemas"; // Validate đầu vào
+import { submissionBodySchema, assignmentIdParamSchema, submissionIdParamSchema, gradeSubmissionSchema } from "../validators/submission.schemas"; // Validate đầu vào
 import appAssert from "../utils/appAssert";
 import { SubmissionReportQuery } from "../types/submission.type";
  
@@ -67,6 +68,19 @@ export const getSubmissionStatusHandler = catchErrors(async (req, res) => {
   });
 });
 
+//get sub by Id, load file
+export const getSubmissionByIdHandler = catchErrors(async (req, res) => {
+  const requesterId = req.userId;
+
+  const { submissionId } = submissionIdParamSchema.parse(req.params);
+  const submission = await getSubmissionById(submissionId, requesterId, req.role);
+
+  return res.success(OK, {
+    data: submission,
+    message: "Submission retrieved successfully",
+  });
+});
+
 // Danh sách bài nộp theo assignment (cho giảng viên)
 export const listSubmissionsByAssignmentHandler = catchErrors(
   async (req, res) => {
@@ -93,7 +107,8 @@ export const gradeSubmissionHandler = catchErrors(async (req, res) => {
     studentId,
     graderId,
     grade,
-    feedback
+    feedback,
+    req.role
   );
 
   return res.success(OK, {
@@ -113,7 +128,13 @@ export const gradeSubmissionByIdHandler = catchErrors(async (req, res) => {
   const { grade, feedback } = req.body as { grade?: number; feedback?: string };
   appAssert(typeof grade === 'number', BAD_REQUEST, 'Missing grade');
 
-  const result = await gradeSubmissionById(submissionId, graderId, grade, feedback);
+  const result = await gradeSubmissionById(
+    submissionId,
+    graderId,
+    grade,
+    feedback,
+    req.role
+  );
 
   return res.success(OK, {
     data: result,

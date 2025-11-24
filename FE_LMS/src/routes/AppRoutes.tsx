@@ -10,16 +10,26 @@ import {DashboardPage ,
       LoginPage,
       RegisterPage,
       CourseManagementPage,
+      MyCoursesPage,
       CourseDetailPage,
       ListAllLessonsPage,
       AboutUsPage,
       FAQPage,
       AssignmentPage,
       QuizManagementPage,
-      QuizCoursePage,
+      QuizCreatePage,
+      CourseQuizzesPage,
+      QuizQuestionsPage,
       FeedbackPage,
       FeedbackListPage,
       EnrollmentsListPage,
+      CurriculumPage,
+
+
+      UserManagementPage,
+      UserBioPage,
+      AttendancePage,
+      MyEnrollmentsPage,
     } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -61,6 +71,17 @@ function AppRoutes() {
         <Route path="/courses" element={
           <ProtectedRoute>
             <CourseManagementPage />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/my-courses" element={
+          <ProtectedRoute requiredRole="student">
+            <MyCoursesPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/my-enrollments" element={
+          <ProtectedRoute requiredRole="student">
+            <MyEnrollmentsPage />
           </ProtectedRoute>
         } />
         <Route path="/admin/dashboard" element={
@@ -125,7 +146,17 @@ function AppRoutes() {
         } />
         <Route path="/quiz/:courseId" element={
           <ProtectedRoute>
-            <QuizCoursePage />
+            <CourseQuizzesPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/quiz/questions/:quizId" element={
+          <ProtectedRoute>
+            <QuizQuestionsPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/quizz" element={
+          <ProtectedRoute>
+            <QuizCreatePage />
           </ProtectedRoute>
         } />
 
@@ -159,6 +190,43 @@ function AppRoutes() {
         <Route path="/enrollments-list" element={
           <ProtectedRoute>
             <EnrollmentsListPage />
+          </ProtectedRoute>
+        } />
+        {/* Curriculum */}
+        <Route path="/curriculum" element={
+          <ProtectedRoute>
+            <CurriculumPage />
+          </ProtectedRoute>
+        } />
+
+        {/* User Bio - must come before /user to avoid route conflict */}
+        <Route path="/user/:userId" element={
+          <ProtectedRoute>
+            <UserBioPage />
+          </ProtectedRoute>
+        } />
+
+        {/* User Management */}
+        <Route path="/user" element={
+          <ProtectedRoute requiredRole="admin">
+            <UserManagementPage />
+          </ProtectedRoute>
+        } />
+
+        {/* Attendance */}
+        <Route path="/attendance" element={
+          <ProtectedRoute>
+            <AttendancePage />
+          </ProtectedRoute>
+        } />
+        <Route path="/attendance/:semesterId" element={
+          <ProtectedRoute>
+            <AttendancePage />
+          </ProtectedRoute>
+        } />
+        <Route path="/attendance/:semesterId/:courseId" element={
+          <ProtectedRoute>
+            <AttendancePage />
           </ProtectedRoute>
         } />
 

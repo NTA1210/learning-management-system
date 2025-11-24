@@ -1,12 +1,12 @@
-import mongoose from "mongoose";
-import { IVerificationCode } from "../types";
+import mongoose from 'mongoose';
+import { IVerificationCode } from '../types';
 
 const verificationSchema = new mongoose.Schema<IVerificationCode>({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     index: true,
-    ref: "User",
+    ref: 'User',
   },
   type: { type: String, required: true },
   email: { type: String, required: true },
@@ -15,9 +15,9 @@ const verificationSchema = new mongoose.Schema<IVerificationCode>({
 });
 
 const VerificationCodeModel = mongoose.model<IVerificationCode>(
-  "VerificationCode",
+  'VerificationCode',
   verificationSchema,
-  "verification_codes"
+  'verification_codes'
 );
 
 export default VerificationCodeModel;

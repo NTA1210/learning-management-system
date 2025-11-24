@@ -731,8 +731,6 @@ export const deleteAttendance = async (
   actorId: mongoose.Types.ObjectId,
   role: Role
 ) => {
-  appAssert(role === Role.ADMIN || role === Role.TEACHER, FORBIDDEN, "Not authorized");
-
   const attendance = await AttendanceModel.findById(attendanceId);
   appAssert(attendance, NOT_FOUND, "Attendance not found");
 

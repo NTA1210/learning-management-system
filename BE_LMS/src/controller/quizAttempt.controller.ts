@@ -1,28 +1,28 @@
-import { CREATED, OK } from "@/constants/http";
-import { enrollQuiz, submitQuizAttempt } from "@/services/quizAttempt.service";
-import { catchErrors } from "@/utils/asyncHandler";
+import { CREATED, OK } from '@/constants/http';
+import { enrollQuiz, saveQuizAttempt, submitQuizAttempt } from '@/services/quizAttempt.service';
+import { catchErrors } from '@/utils/asyncHandler';
 import {
   enrollQuizSchema,
   quizAttemptIdSchema,
   submitQuizSchema,
-} from "@/validators/quizAttempt.schemas";
+} from '@/validators/quizAttempt.schemas';
 
 // POST /quiz-attempts/enroll - Enroll in a quiz
 export const enrollQuizHandler = catchErrors(async (req, res) => {
   const input = enrollQuizSchema.parse(req.body);
-  const { userId, role } = req;
-  const userAgent = req.headers["user-agent"];
-  const xff = req.headers["x-forwarded-for"] as string | undefined;
-  const ip = xff?.split(",")[0] || req.socket.remoteAddress;
+  const { userId } = req;
+  const userAgent = req.headers['user-agent'];
+  const xff = req.headers['x-forwarded-for'] as string | undefined;
+  const ip = xff?.split(',')[0] || req.socket.remoteAddress;
 
   const data = await enrollQuiz({
     ...input,
-    user: { userId, role, userAgent, ip },
+    user: { userId, userAgent, ip },
   });
 
   return res.success(CREATED, {
     data,
-    message: "Quiz enrolled successfully",
+    message: 'Quiz enrolled successfully',
   });
 });
 
@@ -32,9 +32,24 @@ export const submitQuizHandler = catchErrors(async (req, res) => {
     quizAttemptId: req.params.quizAttemptId,
     answers: req.body.answers,
   });
-  const data = await submitQuizAttempt(input);
+  const userId = req.userId;
+  const data = await submitQuizAttempt(input, userId);
   return res.success(OK, {
     data,
-    message: "Submit quiz attempt successfully",
+    message: 'Submit quiz attempt successfully',
+  });
+});
+
+// PUT /quiz-attempts/:quizAttemptId/save - Update a quiz attempt
+export const saveQuizHandler = catchErrors(async (req, res) => {
+  const input = submitQuizSchema.parse({
+    quizAttemptId: req.params.quizAttemptId,
+    answers: req.body.answers,
+  });
+  const userId = req.userId;
+  const data = await saveQuizAttempt(input, userId);
+  return res.success(OK, {
+    data,
+    message: 'Submit quiz attempt successfully',
   });
 });

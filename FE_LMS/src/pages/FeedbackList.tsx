@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
+import AverageRating from "../components/AverageRating";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../hooks/useTheme";
 import { feedbackService } from "../services/feedbackService";
 import type { Feedback, FeedbackMeta, FeedbackPagination } from "../types/feedback";
+import { renderMarkdown } from "../utils/markdown";
 
 function formatDate(value: string, timezone?: string) {
   try {
@@ -34,6 +36,9 @@ function getInitials(value?: string) {
     .join("");
 }
 
+const PAGE_SIZE = 5;
+const PREVIEW_CHAR_LIMIT = 500;
+
 export default function FeedbackList() {
   const { darkMode } = useTheme();
   const { user } = useAuth();
@@ -49,12 +54,24 @@ export default function FeedbackList() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<"system" | "teacher">("system");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [expandedFeedbackIds, setExpandedFeedbackIds] = useState<Record<string, boolean>>({});
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
 
-  const fetchFeedbacks = async () => {
+  const fetchFeedbacks = useCallback(async (page: number, type: "system" | "teacher", from?: string, to?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await feedbackService.getFeedbacks();
+      const params: { page: number; limit: number; type: "system" | "teacher"; from?: string; to?: string } = {
+        page,
+        limit: PAGE_SIZE,
+        type,
+      };
+      if (from) params.from = from;
+      if (to) params.to = to;
+      
+      const response = await feedbackService.getFeedbacks(params);
       setFeedbacks(response.feedbacks);
       setPagination(response.pagination);
       setMeta(response.meta);
@@ -64,13 +81,13 @@ export default function FeedbackList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const handleDelete = async (id: string) => {
     setDeletingId(id);
     try {
       await feedbackService.deleteFeedback(id);
-      setFeedbacks((prev) => prev.filter((fb) => fb._id !== id));
+      await fetchFeedbacks(currentPage, activeFilter, dateFrom || undefined, dateTo || undefined);
     } catch (err) {
       console.error(err);
       setError("Failed to delete feedback. Please try again.");
@@ -90,8 +107,20 @@ export default function FeedbackList() {
   };
 
   useEffect(() => {
-    void fetchFeedbacks();
-  }, []);
+    void fetchFeedbacks(currentPage, activeFilter, dateFrom || undefined, dateTo || undefined);
+  }, [currentPage, activeFilter, fetchFeedbacks]);
+
+  const handleDateSearch = () => {
+    setCurrentPage(1);
+    void fetchFeedbacks(1, activeFilter, dateFrom || undefined, dateTo || undefined);
+  };
+
+  const handleClearDateFilter = () => {
+    setDateFrom("");
+    setDateTo("");
+    setCurrentPage(1);
+    void fetchFeedbacks(1, activeFilter);
+  };
 
   const heroDescription = isStudent
     ? "Xem lại toàn bộ phản hồi mà bạn đã gửi cho hệ thống."
@@ -117,6 +146,27 @@ export default function FeedbackList() {
     }, {});
     return { count, average: Number(average.toFixed(1)), byType };
   }, [filteredFeedbacks]);
+
+  const pageNumbers = useMemo(() => {
+    if (!pagination) return [];
+    const maxButtons = 5;
+    let start = Math.max(1, currentPage - 2);
+    let end = Math.min(pagination.totalPages, start + maxButtons - 1);
+    if (end - start < maxButtons - 1) {
+      start = Math.max(1, end - maxButtons + 1);
+    }
+    const pages: number[] = [];
+    for (let number = start; number <= end; number += 1) {
+      pages.push(number);
+    }
+    return pages;
+  }, [pagination, currentPage]);
+
+  const handlePageChange = (page: number) => {
+    if (!pagination) return;
+    if (page < 1 || page > pagination.totalPages || page === currentPage) return;
+    setCurrentPage(page);
+  };
 
   const filterOptions = [
     { value: "system", label: "System", helper: "Platform related" },
@@ -359,7 +409,7 @@ export default function FeedbackList() {
               )}
               <button
                 type="button"
-                onClick={() => void fetchFeedbacks()}
+                onClick={() => void fetchFeedbacks(currentPage, activeFilter, dateFrom || undefined, dateTo || undefined)}
                 className="px-4 py-2 rounded-xl font-semibold border border-transparent transition-all hover:-translate-y-0.5 click-animate"
 
                 style={{
@@ -372,6 +422,102 @@ export default function FeedbackList() {
               </button>
             </div>
           </div>
+
+          {/* Date Range Search Section */}
+          <section
+            className="rounded-2xl shadow-lg p-6 mb-6 fade-up"
+            style={{
+              animationDelay: "75ms",
+              background: darkMode ? "rgba(17, 24, 39, 0.8)" : "#fff",
+              border: "1px solid rgba(148, 163, 184, 0.2)",
+            }}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold" style={{ color: darkMode ? "#cbd5f5" : "#0f172a" }}>
+                  Search by Date Range
+                </p>
+                <p className="text-xs" style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}>
+                  Filter feedbacks from a specific time period
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+              <div>
+                <label className="block text-xs font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+                  From Date
+                </label>
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="w-full px-4 py-2 rounded-xl border transition-all focus:outline-none"
+                  style={{
+                    backgroundColor: darkMode ? "rgba(15,23,42,0.7)" : "#ffffff",
+                    borderColor: darkMode ? "rgba(148,163,184,0.3)" : "rgba(148,163,184,0.5)",
+                    color: darkMode ? "#e5e7eb" : "#1f2937",
+                  }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+                  To Date
+                </label>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  min={dateFrom || undefined}
+                  className="w-full px-4 py-2 rounded-xl border transition-all focus:outline-none"
+                  style={{
+                    backgroundColor: darkMode ? "rgba(15,23,42,0.7)" : "#ffffff",
+                    borderColor: darkMode ? "rgba(148,163,184,0.3)" : "rgba(148,163,184,0.5)",
+                    color: darkMode ? "#e5e7eb" : "#1f2937",
+                  }}
+                />
+              </div>
+              <div className="flex items-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleDateSearch}
+                  disabled={loading || (!dateFrom && !dateTo)}
+                  className="flex-1 px-4 py-2 rounded-xl font-semibold border border-transparent transition-all hover:-translate-y-0.5 click-animate disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    background: "linear-gradient(135deg, #525fe1 0%, #7c3aed 100%)",
+                    color: "#fff",
+                  }}
+                >
+                  Search
+                </button>
+              </div>
+              <div className="flex items-end">
+                {(dateFrom || dateTo) && (
+                  <button
+                    type="button"
+                    onClick={handleClearDateFilter}
+                    className="w-full px-4 py-2 rounded-xl font-semibold border transition-all hover:-translate-y-0.5 click-animate"
+                    style={{
+                      background: darkMode ? "rgba(239,68,68,0.15)" : "rgba(239,68,68,0.1)",
+                      color: darkMode ? "#fca5a5" : "#dc2626",
+                      borderColor: darkMode ? "rgba(239,68,68,0.3)" : "rgba(239,68,68,0.4)",
+                    }}
+                  >
+                    Clear Filter
+                  </button>
+                )}
+              </div>
+            </div>
+            {(dateFrom || dateTo) && (
+              <div className="mt-3">
+                <span className="text-xs px-3 py-1 rounded-full" style={{ 
+                  background: darkMode ? "rgba(16,185,129,0.15)" : "rgba(16,185,129,0.12)", 
+                  color: darkMode ? "#6ee7b7" : "#059669" 
+                }}>
+                  Filtering: {dateFrom ? `From ${dateFrom}` : ""} {dateFrom && dateTo ? "to" : ""} {dateTo ? `To ${dateTo}` : ""}
+                </span>
+              </div>
+            )}
+          </section>
 
           <section
             className="rounded-2xl shadow-lg p-6 mb-6 fade-up"
@@ -401,7 +547,10 @@ export default function FeedbackList() {
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setActiveFilter(option.value)}
+                    onClick={() => {
+                      setActiveFilter(option.value);
+                      setCurrentPage(1);
+                    }}
                             className="text-left rounded-2xl border px-4 py-3 transition-all focus:outline-none click-animate"
                     style={{
                       borderColor: isActive
@@ -447,13 +596,17 @@ export default function FeedbackList() {
                 <p className="text-xs uppercase tracking-wide text-gray-400">Total feedback</p>
                 <p className="text-2xl font-bold mt-2">{summary.count}</p>
               </div>
-              <div
-                className="rounded-2xl p-4 shadow float-card"
-                style={{ background: darkMode ? "rgba(17,24,39,0.8)" : "#fff" }}
-              >
-                <p className="text-xs uppercase tracking-wide text-gray-400">Average rating</p>
-                <p className="text-2xl font-bold mt-2">{summary.average}/5</p>
-              </div>
+              {activeFilter === "system" ? (
+                <AverageRating />
+              ) : (
+                <div
+                  className="rounded-2xl p-4 shadow float-card"
+                  style={{ background: darkMode ? "rgba(17,24,39,0.8)" : "#fff" }}
+                >
+                  <p className="text-xs uppercase tracking-wide text-gray-400">Average rating</p>
+                  <p className="text-2xl font-bold mt-2">{summary.average}/5</p>
+                </div>
+              )}
               <div
                 className="rounded-2xl p-4 shadow float-card"
                 style={{ background: darkMode ? "rgba(17,24,39,0.8)" : "#fff" }}
@@ -612,9 +765,34 @@ export default function FeedbackList() {
                       </button>
                     )}
                   </div>
-                  <p className="text-sm mt-3 leading-relaxed" style={{ color: darkMode ? "#cbd5e1" : "#0f172a" }}>
-                    {fb.description}
-                  </p>
+                  <div className="mt-3">
+                    <div
+                      className="text-sm leading-relaxed prose prose-sm max-w-none"
+                      style={{ color: darkMode ? "#cbd5e1" : "#0f172a" }}
+                      dangerouslySetInnerHTML={{
+                        __html: renderMarkdown(
+                          expandedFeedbackIds[fb._id] || fb.description.length <= PREVIEW_CHAR_LIMIT
+                            ? fb.description
+                            : `${fb.description.slice(0, PREVIEW_CHAR_LIMIT).trimEnd()}…`,
+                        ),
+                      }}
+                    />
+                    {fb.description.length > PREVIEW_CHAR_LIMIT && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedFeedbackIds((prev) => ({
+                            ...prev,
+                            [fb._id]: !prev[fb._id],
+                          }))
+                        }
+                        className="mt-2 text-xs font-semibold underline-offset-2 hover:underline"
+                        style={{ color: darkMode ? "#93c5fd" : "#2563eb" }}
+                      >
+                        {expandedFeedbackIds[fb._id] ? "Show less" : "Show more"}
+                      </button>
+                    )}
+                  </div>
                   <div className="flex flex-wrap items-center gap-3 mt-4 text-xs info-line">
                     <span className="info-chip">Email: {fb.userId?.email}</span>
                   </div>
@@ -692,11 +870,63 @@ export default function FeedbackList() {
             )}
 
           {pagination && (
-            <div className="mt-6 text-sm flex flex-wrap items-center gap-4" style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}>
-              <span>
-                Page {pagination.page}/{pagination.totalPages} • Total {pagination.total} feedback
-              </span>
-              <span>Page size: {pagination.limit}</span>
+            <div className="mt-6 flex flex-col gap-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={!pagination.hasPrevPage}
+                  className="w-10 h-10 rounded-full border font-semibold click-animate flex items-center justify-center"
+                  style={{
+                    background: darkMode ? "rgba(15,23,42,0.6)" : "#fff",
+                    color: darkMode ? "#e5e7eb" : "#1f2937",
+                    borderColor: darkMode ? "rgba(148,163,184,0.4)" : "rgba(148,163,184,0.6)",
+                    opacity: pagination.hasPrevPage ? 1 : 0.4,
+                  }}
+                >
+                  {"<"}
+                </button>
+                {pageNumbers.map((pageNumber) => {
+                  const isActive = pageNumber === currentPage;
+                  return (
+                    <button
+                      key={pageNumber}
+                      type="button"
+                      onClick={() => handlePageChange(pageNumber)}
+                      className="min-w-[40px] h-10 rounded-full border px-3 text-sm font-semibold click-animate"
+                      style={{
+                        background: isActive
+                          ? "linear-gradient(135deg, #525fe1, #7c3aed)"
+                          : darkMode
+                            ? "rgba(15,23,42,0.6)"
+                            : "#fff",
+                        color: isActive ? "#fff" : darkMode ? "#e5e7eb" : "#1f2937",
+                        borderColor: isActive
+                          ? "transparent"
+                          : darkMode
+                            ? "rgba(148,163,184,0.4)"
+                            : "rgba(148,163,184,0.6)",
+                      }}
+                    >
+                      {pageNumber}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={!pagination.hasNextPage}
+                  className="w-10 h-10 rounded-full border font-semibold click-animate flex items-center justify-center"
+                  style={{
+                    background: darkMode ? "rgba(15,23,42,0.6)" : "#fff",
+                    color: darkMode ? "#e5e7eb" : "#1f2937",
+                    borderColor: darkMode ? "rgba(148,163,184,0.4)" : "rgba(148,163,184,0.6)",
+                    opacity: pagination.hasNextPage ? 1 : 0.4,
+                  }}
+                >
+                  {">"}
+                </button>
+              </div>
             </div>
           )}
 
