@@ -76,7 +76,11 @@
   export const updateAssignmentHandler = catchErrors(async (req, res) => {
     const assignmentId = assignmentIdSchema.parse(req.params.id);
     const data = updateAssignmentSchema.parse(req.body);
-    const assignment = await updateAssignment(assignmentId, data);
+  const userId = req.userId;
+  const userRole = req.role;
+  appAssert(userId, BAD_REQUEST, "Missing user ID");
+
+  const assignment = await updateAssignment(assignmentId, data, userId, userRole);
 
     return res.success(OK, {
       data: assignment,
@@ -86,7 +90,11 @@
 
   export const deleteAssignmentHandler = catchErrors(async (req, res) => {
     const assignmentId = assignmentIdSchema.parse(req.params.id);
-    await deleteAssignment(assignmentId);
+  const userId = req.userId;
+  const userRole = req.role;
+  appAssert(userId, BAD_REQUEST, "Missing user ID");
+
+  await deleteAssignment(assignmentId, userId, userRole);
 
     return res.success(OK, {
       data: null,
