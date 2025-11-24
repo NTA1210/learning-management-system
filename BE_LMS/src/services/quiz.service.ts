@@ -278,9 +278,9 @@ export const deleteQuiz = async ({
 
   quiz.deletedAt = new Date();
   quiz.deletedBy = userId;
-  await quiz.save();
+  const data = await quiz.save();
 
-  return quiz;
+  return data;
 };
 
 /**
