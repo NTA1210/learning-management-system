@@ -171,7 +171,7 @@ export const deleteAttendanceController = catchErrors(async (req, res) => {
     const result = await deleteAttendance(payload.attendanceIds, req.userId, req.role);
     return res.success(OK, {
       data: result,
-      message: `Reset ${result.reset} attendance record(s) to NOTYET`,
+      message: `Deleted ${result.deleted} attendance record(s)`,
     });
   }
 
@@ -180,7 +180,7 @@ export const deleteAttendanceController = catchErrors(async (req, res) => {
 
   return res.success(OK, {
     data: result,
-    message: "Attendance reset to NOTYET",
+    message: result.deleted ? "Attendance deleted" : "Attendance not found or already deleted",
   });
 });
 

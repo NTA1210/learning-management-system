@@ -785,41 +785,21 @@ export const deleteAttendance = async (
     errors.length ? `All records failed validation: ${errors.join(", ")}` : "No attendance records to reset"
   );
 
-  const resetOperations = recordsToReset.map((id) => ({
-    updateOne: {
-      filter: { _id: id },
-      update: {
-        $set: { status: AttendanceStatus.NOTYET },
-        $unset: { markedBy: "" },
-      },
-    },
-  }));
-
-  const resetResult = await AttendanceModel.bulkWrite(resetOperations, { ordered: false });
-  const modifiedCount = resetResult.modifiedCount || 0;
+  const deleteResult = await AttendanceModel.deleteMany({
+    _id: { $in: recordsToReset },
+  });
+  const deletedCount = deleteResult.deletedCount || 0;
 
   if (Array.isArray(attendanceId)) {
     return {
-      reset: modifiedCount,
+      deleted: deletedCount,
       total: attendanceIds.length,
-      skipped: attendanceIds.length - modifiedCount,
-      resetIds: recordsToReset.map((id) => id.toString()),
+      skipped: attendanceIds.length - deletedCount,
+      deletedIds: recordsToReset.map((id) => id.toString()),
       errors: errors.length > 0 ? errors : undefined,
     };
   }
-
-  const updatedRecord = await AttendanceModel.findById(attendanceIds[0])
-    .populate("studentId", "fullname username email")
-    .populate("markedBy", "fullname email role")
-    .lean();
-
-  appAssert(updatedRecord, NOT_FOUND, "Attendance record not found after reset");
-
-  return {
-    deleted: true,
-    status: AttendanceStatus.NOTYET,
-    record: updatedRecord,
-  };
+  return { deleted: deletedCount === 1 };
 };
 
 
