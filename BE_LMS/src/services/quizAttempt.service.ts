@@ -273,6 +273,16 @@ export const deleteQuizAttempt = async (
   return deleted;
 };
 
+/**
+ * Ban a quiz attempt.
+ * @param  quizAttemptId - ID of the quiz attempt to ban.
+ * @param  userId - ID of the user who is banning the quiz attempt.
+ * @param  role - Role of the user who is banning the quiz attempt.
+ * @throws  If the quiz attempt is not found.
+ * @throws  If the user is not the creator of the quiz and is a teacher.
+ * @throws  If the quiz attempt is already submitted.
+ * @returns  The banned quiz attempt.
+ */
 export const banQuizAttempt = async (
   quizAttemptId: string,
   userId: mongoose.Types.ObjectId,
