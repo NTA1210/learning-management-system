@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
-import { httpClient } from "../utils/http";
+import http from "../utils/http";
 import { myCourses } from "../services/mock";
 import { quizQuestionService, courseService, type QuizQuestion } from "../services";
 import { Clock, FileText, Calendar, CheckCircle, XCircle } from "lucide-react";
@@ -20,18 +20,6 @@ interface Enrollment {
   courseId: Course | string;
   status: string;
   role: string;
-}
-
-interface ApiResponse {
-  success: boolean;
-  message: string;
-  data: Enrollment[];
-  pagination?: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
 }
 
 interface Quiz {
@@ -140,87 +128,47 @@ const QuizPage: React.FC = () => {
     setLoading(true);
     setError("");
     try {
-      // Fetch all enrollments - httpClient.get returns axios response, so response.data contains backend response
-      // Backend returns: { success: true, data: [...], pagination: {...} }
-      const response = await httpClient.get<ApiResponse>("/enrollments/my-enrollments", {
+      const response = await http.get("/courses/my-courses", {
         params: {
           page: 1,
-          limit: 1000, // High limit to get all enrollments in one request
+          limit: 1000,
         },
-        withCredentials: true,
       });
 
-      const data = response.data; // Backend response: { success, data, pagination }
-      console.log("API Response:", data);
-      
-      if (data.success && data.data) {
-        const allEnrollments: Enrollment[] = Array.isArray(data.data) ? data.data : [];
-        console.log(`Found ${allEnrollments.length} enrollments on page 1`);
+      // Normalize response structure – backend returns { success, data, pagination }
+      const rawCourses =
+        Array.isArray(response?.data) ? response.data :
+        Array.isArray(response?.data?.data) ? response.data.data :
+        Array.isArray(response) ? response : [];
 
-        // If pagination exists and there are more pages, fetch them all
-        if (data.pagination && data.pagination.totalPages > 1) {
-          const totalPages = data.pagination.totalPages;
-          console.log(`Fetching ${totalPages} total pages`);
-          
-          // Fetch remaining pages in parallel for better performance
-          const pagePromises = [];
-          for (let page = 2; page <= totalPages; page++) {
-            pagePromises.push(
-              httpClient.get<ApiResponse>("/enrollments/my-enrollments", {
-                params: {
-                  page: page,
-                  limit: 1000,
-                },
-                withCredentials: true,
-              }).then(pageResponse => {
-                const pageData = pageResponse.data;
-                if (pageData.success && pageData.data && Array.isArray(pageData.data)) {
-                  return pageData.data;
-                }
-                return [];
-              }).catch(pageErr => {
-                console.error(`Error fetching page ${page}:`, pageErr);
-                return [];
-              })
-            );
-          }
-          
-          const allPagesResults = await Promise.all(pagePromises);
-          allPagesResults.forEach((pageEnrollments, index) => {
-            if (Array.isArray(pageEnrollments) && pageEnrollments.length > 0) {
-              allEnrollments.push(...pageEnrollments);
-              console.log(`Page ${index + 2}: Added ${pageEnrollments.length} enrollments`);
-            }
-          });
-        }
-        
-        console.log(`Total enrollments: ${allEnrollments.length}`);
-        
-        // Filter out duplicates based on enrollment._id
-        const uniqueEnrollments = allEnrollments.filter((enrollment, index, self) =>
-          index === self.findIndex(e => e._id === enrollment._id)
-        );
-        
-        console.log(`Unique enrollments: ${uniqueEnrollments.length}`);
-        if (uniqueEnrollments.length === 0) {
-          // Fallback to mock courses when the user has no enrollments yet
-          const mockedEnrollments: Enrollment[] = myCourses.map((c) => {
-            const courseId = `mock-${String(c.id)}`;
-            return {
-              _id: `enr-${courseId}`,
-              courseId: { _id: courseId, title: c.name, description: `${c.instructor ?? ""}` },
-              status: "approved",
-              role: "student",
-            };
-          });
-          setEnrollments(mockedEnrollments);
-          // Do not show an error banner when falling back to mock data
-          setError("");
-        } else {
-          setEnrollments(uniqueEnrollments);
-        }
+      const pagination = response?.pagination || response?.meta?.pagination;
+
+      console.log("My courses response:", {
+        count: rawCourses.length,
+        pagination,
+      });
+
+      const mappedEnrollments: Enrollment[] = rawCourses.map((course: Course) => ({
+        _id: `course-${course._id}`,
+        courseId: course,
+        status: "approved",
+        role: "student",
+      }));
+
+      if (mappedEnrollments.length === 0) {
+        const mockedEnrollments: Enrollment[] = myCourses.map((c) => {
+          const courseId = `mock-${String(c.id)}`;
+          return {
+            _id: `enr-${courseId}`,
+            courseId: { _id: courseId, title: c.name, description: `${c.instructor ?? ""}` },
+            status: "approved",
+            role: "student",
+          };
+        });
+        setEnrollments(mockedEnrollments);
+        setError("");
       } else {
-        setError(data.message || "Failed to load courses");
+        setEnrollments(mappedEnrollments);
       }
     } catch (err) {
       console.error("Error fetching enrollments:", err);

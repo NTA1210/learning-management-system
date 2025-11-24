@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { useAuth } from "../hooks/useAuth";
+import http from "../utils/http";
 import { courseService, quizService, subjectService, quizQuestionService } from "../services";
 import type { Course } from "../types/course";
 import type { Subject } from "../types/subject";
@@ -179,28 +180,55 @@ const QuizCreatePage: React.FC = () => {
     const fetchCourses = async () => {
       try {
         setLoadingCourses(true);
-        const { courses, pagination } = await courseService.getAllCourses({ 
-          isPublished: true, 
-          page: coursesPage,
-          limit: coursesPageSize 
+        const response = await http.get("/courses/my-courses", {
+          params: {
+            page: coursesPage,
+            limit: coursesPageSize,
+            isPublished: true,
+          },
         });
-        setCourses(courses);
+
+        const coursesList: Course[] = Array.isArray(response?.data)
+          ? response.data
+          : Array.isArray(response?.data?.data)
+          ? response.data.data
+          : Array.isArray(response)
+          ? (response as Course[])
+          : [];
+
+        setCourses(coursesList);
+
+        const pagination = response?.pagination || response?.meta?.pagination;
         
-        // Handle pagination response
         if (pagination && typeof pagination === 'object') {
           const paginationData = pagination as Record<string, unknown>;
+          const totalItems =
+            Number(paginationData.totalItems) ||
+            Number(paginationData.total) ||
+            coursesList.length;
           setCoursesPagination({
-            totalItems: (paginationData.totalItems as number) || (paginationData.total as number) || courses.length,
-            currentPage: (paginationData.currentPage as number) || (paginationData.page as number) || coursesPage,
-            limit: (paginationData.limit as number) || coursesPageSize,
-            totalPages: (paginationData.totalPages as number) || Math.ceil(((paginationData.totalItems as number) || courses.length) / coursesPageSize),
-            hasNext: (paginationData.hasNext as boolean) || (paginationData.hasNextPage as boolean) || false,
-            hasPrev: (paginationData.hasPrev as boolean) || (paginationData.hasPrevPage as boolean) || false,
+            totalItems,
+            currentPage:
+              Number(paginationData.currentPage) ||
+              Number(paginationData.page) ||
+              coursesPage,
+            limit: Number(paginationData.limit) || coursesPageSize,
+            totalPages:
+              Number(paginationData.totalPages) ||
+              Math.ceil(totalItems / coursesPageSize) ||
+              1,
+            hasNext:
+              Boolean(paginationData.hasNext) ||
+              Boolean(paginationData.hasNextPage) ||
+              false,
+            hasPrev:
+              Boolean(paginationData.hasPrev) ||
+              Boolean(paginationData.hasPrevPage) ||
+              false,
           });
         } else {
-          // Fallback if no pagination info
           setCoursesPagination({
-            totalItems: courses.length,
+            totalItems: coursesList.length,
             currentPage: coursesPage,
             limit: coursesPageSize,
             totalPages: 1,
