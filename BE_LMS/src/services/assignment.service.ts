@@ -8,9 +8,8 @@ import { NOT_FOUND, FORBIDDEN } from "../constants/http";
 import { EnrollmentStatus } from "../types/enrollment.type";
 import { Role } from "../types";
 
-type MaybeObjectId = mongoose.Types.ObjectId | string;
 
-const normalizeObjectId = (id?: MaybeObjectId | null) => {
+const normalizeObjectId = (id?: mongoose.Types.ObjectId | null) => {
   if (!id) return "";
   return typeof id === "string" ? id : id.toString();
 };
@@ -22,8 +21,8 @@ const ensureTeacherAccessToCourse = async ({
   userRole,
 }: {
   course?: any;
-  courseId?: MaybeObjectId;
-  userId?: MaybeObjectId;
+  courseId?: mongoose.Types.ObjectId;
+  userId?: mongoose.Types.ObjectId;
   userRole?: Role;
 }) => {
   if (!userId || userRole !== Role.TEACHER) {
@@ -55,13 +54,13 @@ const ensureTeacherAccessToCourse = async ({
 export type ListAssignmentsParams = {
   page: number;
   limit: number;
-  courseId?: string;
+  courseId?: mongoose.Types.ObjectId;
   search?: string;
   dueBefore?: Date;
   dueAfter?: Date;
   sortBy?: string;
   sortOrder?: string;
-  userId?: MaybeObjectId;
+  userId?: mongoose.Types.ObjectId;
   userRole?: Role;
 };
 
@@ -199,7 +198,7 @@ export const listAssignments = async ({
 
 export const getAssignmentById = async (
   assignmentId: string,
-  userId?: MaybeObjectId,
+  userId?: mongoose.Types.ObjectId,
   userRole?: Role
 ) => {
   const assignment = await AssignmentModel.findById(assignmentId)
@@ -237,7 +236,7 @@ export const getAssignmentById = async (
 
 export const createAssignment = async (
   data: any,
-  userId?: MaybeObjectId,
+  userId?: mongoose.Types.ObjectId,
   userRole?: Role
 ) => {
   // Verify course exists
@@ -283,7 +282,7 @@ export const createAssignment = async (
 export const updateAssignment = async (
   assignmentId: string,
   data: any,
-  userId?: MaybeObjectId,
+  userId?: mongoose.Types.ObjectId,
   userRole?: Role
 ) => {
   if (userRole === Role.TEACHER && userId) {
@@ -293,7 +292,7 @@ export const updateAssignment = async (
     appAssert(assignment, NOT_FOUND, "Assignment not found");
 
     await ensureTeacherAccessToCourse({
-      courseId: assignment.courseId as MaybeObjectId,
+      courseId: assignment.courseId as mongoose.Types.ObjectId,
       userId,
       userRole,
     });
@@ -314,7 +313,7 @@ export const updateAssignment = async (
 
 export const deleteAssignment = async (
   assignmentId: string,
-  userId?: MaybeObjectId,
+  userId?: mongoose.Types.ObjectId,
   userRole?: Role
 ) => {
   if (userRole === Role.TEACHER && userId) {
@@ -324,7 +323,7 @@ export const deleteAssignment = async (
     appAssert(assignment, NOT_FOUND, "Assignment not found");
 
     await ensureTeacherAccessToCourse({
-      courseId: assignment.courseId as MaybeObjectId,
+      courseId: assignment.courseId as mongoose.Types.ObjectId,
       userId,
       userRole,
     });
