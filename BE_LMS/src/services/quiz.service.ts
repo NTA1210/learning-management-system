@@ -1,4 +1,4 @@
-import { BAD_REQUEST, FORBIDDEN, NOT_FOUND } from '@/constants/http';
+import { BAD_REQUEST, NOT_FOUND } from '@/constants/http';
 import { CourseModel, EnrollmentModel, QuizAttemptModel, QuizModel } from '@/models';
 import {
   AttemptStatus,
@@ -22,7 +22,7 @@ import {
   isTeacherOfCourse,
   standardDeviation,
 } from './helpers/quizHelpers';
-import { superRefine } from 'zod';
+import { QuizQuestionType } from '@/types/quizQuestion.type';
 
 /**
  * Create a new quiz.
@@ -376,12 +376,38 @@ export const getStatisticByQuizId = async (
   };
 };
 
+interface StudentSnapshotQuestion {
+  id: string;
+  text: string;
+  type: QuizQuestionType;
+  options: string[];
+  images?: { url: string; fromDB: boolean }[];
+}
+
 export const getQuizById = async (quizId: string, userId: mongoose.Types.ObjectId, role: Role) => {
   const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId').lean();
   appAssert(quiz, NOT_FOUND, 'Quiz not found');
 
   if (role === Role.TEACHER) {
     isTeacherOfCourse(quiz.courseId, userId);
+  }
+
+  if (role === Role.STUDENT) {
+    quiz.snapshotQuestions = quiz.snapshotQuestions.map((q): any => {
+      const {
+        correctOptions,
+        explanation,
+        points,
+        isDeleted,
+        isDirty,
+        isExternal,
+        isNewQuestion,
+        ...rest
+      } = q;
+      return rest;
+    });
+    const { courseId, ...rest } = quiz;
+    return rest;
   }
 
   return quiz;
