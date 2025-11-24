@@ -59,7 +59,6 @@
 
     const userId = req.userId;
     const userRole = req.role;
-    appAssert(userId, BAD_REQUEST, "Missing user ID");
 
     const assignment = await createAssignment(
       { ...data, courseId },
@@ -78,7 +77,6 @@
     const data = updateAssignmentSchema.parse(req.body);
   const userId = req.userId;
   const userRole = req.role;
-  appAssert(userId, BAD_REQUEST, "Missing user ID");
 
   const assignment = await updateAssignment(assignmentId, data, userId, userRole);
 
@@ -92,7 +90,6 @@
     const assignmentId = assignmentIdSchema.parse(req.params.id);
   const userId = req.userId;
   const userRole = req.role;
-  appAssert(userId, BAD_REQUEST, "Missing user ID");
 
   await deleteAssignment(assignmentId, userId, userRole);
 
