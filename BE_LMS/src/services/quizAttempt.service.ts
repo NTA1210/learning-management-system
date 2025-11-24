@@ -164,3 +164,62 @@ export const submitQuizAttempt = async (
     answersSubmitted,
   };
 };
+
+/**
+ * Submit a quiz attempt.
+ * @param  params - Parameters to submit a quiz attempt.
+ * @param  params.quizAttemptId - ID of the quiz attempt to submit.
+ * @param  params.answers - Array of answers to submit.
+ * @returns  - The submitted quiz attempt with score and other information.
+ * @throws  - If the quiz attempt is not found.
+ * @throws  - If the user was banned from taking the quiz.
+ * @throws  - If the user has already submitted the quiz.
+ * @throws  - If the time limit has been exceeded.
+ */
+export const saveQuizAttempt = async (
+  { quizAttemptId, answers }: SubmitQuizInput,
+  userId: mongoose.Types.ObjectId
+) => {
+  const quizAttempt = await QuizAttemptModel.findById(quizAttemptId).populate<{
+    quizId: IQuiz;
+  }>('quizId');
+
+  appAssert(quizAttempt, NOT_FOUND, 'Quiz attempt not found');
+
+  // Chỉ học sinh của khóa học mới được đăng ký làm bài quiz
+  const isStudentOfCourse = await EnrollmentModel.findOne({
+    studentId: userId,
+    courseId: quizAttempt.quizId.courseId,
+    status: EnrollmentStatus.APPROVED,
+  });
+  appAssert(isStudentOfCourse, BAD_REQUEST, 'You are not a student of this course');
+
+  appAssert(
+    quizAttempt.status !== AttemptStatus.ABANDONED,
+    BAD_REQUEST,
+    'You were banned from taking this quiz'
+  );
+
+  appAssert(
+    quizAttempt.status !== AttemptStatus.SUBMITTED,
+    BAD_REQUEST,
+    'You have already submitted this quiz'
+  );
+
+  // Kiem tra xem nguoi dung co dung thoi gian lam bai khong
+  const isOnTime = quizAttempt.quizId.endTime.getTime() + 30 * 1000 >= Date.now();
+
+  appAssert(isOnTime, BAD_REQUEST, 'Time limit exceeded');
+
+  //validate số lượng câu trả lời
+  appAssert(
+    answers.length === quizAttempt.quizId.snapshotQuestions.length,
+    BAD_REQUEST,
+    'Invalid number of answers submitted'
+  );
+
+  quizAttempt.answers = answers;
+  const data = await quizAttempt.save();
+
+  return data;
+};

@@ -1,5 +1,5 @@
 import { CREATED, OK } from '@/constants/http';
-import { enrollQuiz, submitQuizAttempt } from '@/services/quizAttempt.service';
+import { enrollQuiz, saveQuizAttempt, submitQuizAttempt } from '@/services/quizAttempt.service';
 import { catchErrors } from '@/utils/asyncHandler';
 import {
   enrollQuizSchema,
@@ -34,6 +34,20 @@ export const submitQuizHandler = catchErrors(async (req, res) => {
   });
   const userId = req.userId;
   const data = await submitQuizAttempt(input, userId);
+  return res.success(OK, {
+    data,
+    message: 'Submit quiz attempt successfully',
+  });
+});
+
+// PUT /quiz-attempts/:quizAttemptId/save - Update a quiz attempt
+export const saveQuizHandler = catchErrors(async (req, res) => {
+  const input = submitQuizSchema.parse({
+    quizAttemptId: req.params.quizAttemptId,
+    answers: req.body.answers,
+  });
+  const userId = req.userId;
+  const data = await saveQuizAttempt(input, userId);
   return res.success(OK, {
     data,
     message: 'Submit quiz attempt successfully',

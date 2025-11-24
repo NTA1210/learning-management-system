@@ -101,7 +101,7 @@ export const createApp = () => {
   app.use('/specialists', authenticate, specialistProtectedRoutes);
   app.use('/forums', authenticate, forumProtectedRoutes);
   app.use('/subjects', authenticate, subjectRoutes);
-  app.use('/quizzes', authenticate, authorize(Role.TEACHER, Role.ADMIN), quizRoutes);
+  app.use('/quizzes', authenticate, quizRoutes);
   app.use('/notifications', authenticate, notificationRoutes);
   app.use('/quiz-attempts', authenticate, quizAttemptRoutes);
   app.use('/attendances', authenticate, attendanceRoutes);
