@@ -139,13 +139,33 @@ const CourseManagement: React.FC = () => {
     } catch {}
   };
 
+  const showToastInfo = async (message: string) => {
+    try {
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "info",
+        title: message,
+        showConfirmButton: false,
+        timer: 2000,
+      });
+    } catch {}
+  };
+
   const handleEnroll = async (courseId: string) => {
     try {
       setEnrolling(prev => ({ ...prev, [courseId]: true }));
       await httpClient.post("/enrollments/enroll", { courseId, role: "student" }, { withCredentials: true });
       await showToastSuccess("Enroll thành công");
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      const status = e?.response?.status;
+      if (status === 409) {
+        const message = e?.response?.data?.message || "You are already enrolled in this course.";
+        await showToastInfo(message);
+      } else {
+        console.error(e);
+      }
     } finally {
       setEnrolling(prev => ({ ...prev, [courseId]: false }));
     }
