@@ -27,17 +27,17 @@ import { isTeacherOfCourse } from './helpers/quizHelpers';
  * @throws  - If the quiz is not found.
  */
 export const enrollQuiz = async ({ quizId, hashPassword, user }: EnrollQuizInput) => {
-  // Chỉ học sinh của khóa học mới được đăng ký làm bài quiz
-  const isStudentOfCourse = await EnrollmentModel.findOne({
-    studentId: user.userId,
-    courseId: quizId,
-    status: EnrollmentStatus.APPROVED,
-  });
-  appAssert(isStudentOfCourse, BAD_REQUEST, 'You are not a student of this course');
-
   // Logic đăng ký làm bài quiz
   const quiz = await QuizModel.findById(quizId);
   appAssert(quiz, NOT_FOUND, 'Quiz not found');
+
+  // Chỉ học sinh của khóa học mới được đăng ký làm bài quiz
+  const isStudentOfCourse = await EnrollmentModel.findOne({
+    studentId: user.userId,
+    courseId: quiz.courseId,
+    status: EnrollmentStatus.APPROVED,
+  });
+  appAssert(isStudentOfCourse, BAD_REQUEST, 'You are not a student of this course');
 
   // Kiem tra mat khau
   appAssert(quiz.compareHashPassword(hashPassword), BAD_REQUEST, 'Invalid password');
