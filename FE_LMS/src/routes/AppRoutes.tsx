@@ -24,9 +24,12 @@ import {DashboardPage ,
       FeedbackListPage,
       EnrollmentsListPage,
       CurriculumPage,
+
+
       UserManagementPage,
       UserBioPage,
       AttendancePage,
+      MyEnrollmentsPage,
     } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -70,9 +73,15 @@ function AppRoutes() {
             <CourseManagementPage />
           </ProtectedRoute>
         } />
+
         <Route path="/my-courses" element={
           <ProtectedRoute requiredRole="student">
             <MyCoursesPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/my-enrollments" element={
+          <ProtectedRoute requiredRole="student">
+            <MyEnrollmentsPage />
           </ProtectedRoute>
         } />
         <Route path="/admin/dashboard" element={
