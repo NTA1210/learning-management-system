@@ -40,8 +40,8 @@ const buildAttendanceFilter = async (
 ) => {
   const filter: Record<string, any> = {};
   let courseDateRange: {
-    from: Date;
-    to: Date;
+        from: Date;
+        to: Date;
   } | null = null;
 
   if (params.courseId) {
@@ -569,6 +569,8 @@ export const markAttendance = async (
   actorId: mongoose.Types.ObjectId,
   role: Role
 ) => {
+  //chỉ update đánh absent / present
+  appAssert(payload.entries.every((entry) => entry.status === "present" || entry.status === "absent"), BAD_REQUEST, "Invalid status");
   const { courseId, date, entries } = payload;
   const normalizedDate = normalizeDateOnly(date);
 
@@ -727,30 +729,97 @@ export const updateAttendance = async (
  * - Kiểm tra quyền theo course, Teacher chỉ xóa record của chính khóa trong ngày hiện tại.
  */
 export const deleteAttendance = async (
-  attendanceId: string,
+  attendanceId: string | string[],
   actorId: mongoose.Types.ObjectId,
   role: Role
 ) => {
-  const attendance = await AttendanceModel.findById(attendanceId);
-  appAssert(attendance, NOT_FOUND, "Attendance not found");
+  const attendanceIds = Array.isArray(attendanceId) ? attendanceId : [attendanceId];
 
-  const course = await ensureAttendanceManagePermission(
-    attendance.courseId.toString(),
-    actorId,
-    role
-  );
-  assertDateWithinCourseSchedule(
-    course as { startDate: Date; endDate: Date },
-    attendance.date
+  appAssert(attendanceIds.length > 0, BAD_REQUEST, "At least one attendance ID is required");
+  appAssert(attendanceIds.length <= 100, BAD_REQUEST, "Cannot delete more than 100 records at once");
+
+  const validIdStrings = attendanceIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+  appAssert(validIdStrings.length === attendanceIds.length, BAD_REQUEST, "Invalid attendance ID format");
+
+  const attendanceObjectIds = validIdStrings.map((id) => new mongoose.Types.ObjectId(id));
+  const attendances = await AttendanceModel.find({
+    _id: { $in: attendanceObjectIds },
+  });
+
+  appAssert(attendances.length > 0, NOT_FOUND, "No attendance records found");
+  appAssert(
+    attendances.length === attendanceIds.length,
+    BAD_REQUEST,
+    "Some attendance records not found"
   );
 
-  if (role === Role.TEACHER) {
-    const diff = daysDiffFromToday(attendance.date);
-    appAssert(diff === 0, FORBIDDEN, "Teachers can delete only same-day records");
+  const courseCache = new Map<string, { startDate: Date; endDate: Date }>();
+  const recordsToReset: mongoose.Types.ObjectId[] = [];
+  const errors: string[] = [];
+
+  for (const attendance of attendances) {
+    try {
+      const courseIdStr = attendance.courseId.toString();
+      if (!courseCache.has(courseIdStr)) {
+        const course = await ensureAttendanceManagePermission(courseIdStr, actorId, role);
+        courseCache.set(courseIdStr, course as { startDate: Date; endDate: Date });
+      }
+      const course = courseCache.get(courseIdStr)!;
+
+      assertDateWithinCourseSchedule(course, attendance.date);
+
+      if (role === Role.TEACHER) {
+        const diff = daysDiffFromToday(attendance.date);
+        appAssert(diff === 0, FORBIDDEN, "Teachers can delete only same-day records");
+      }
+
+      recordsToReset.push(attendance._id as mongoose.Types.ObjectId);
+    } catch (error: any) {
+      errors.push(`Attendance ${attendance._id}: ${error.message}`);
+    }
   }
 
-  await attendance.deleteOne();
-  return { deleted: true };
+  appAssert(
+    recordsToReset.length > 0,
+    BAD_REQUEST,
+    errors.length ? `All records failed validation: ${errors.join(", ")}` : "No attendance records to reset"
+  );
+
+  const resetOperations = recordsToReset.map((id) => ({
+    updateOne: {
+      filter: { _id: id },
+      update: {
+        $set: { status: AttendanceStatus.NOTYET },
+        $unset: { markedBy: "" },
+      },
+    },
+  }));
+
+  const resetResult = await AttendanceModel.bulkWrite(resetOperations, { ordered: false });
+  const modifiedCount = resetResult.modifiedCount || 0;
+
+  if (Array.isArray(attendanceId)) {
+    return {
+      reset: modifiedCount,
+      total: attendanceIds.length,
+      skipped: attendanceIds.length - modifiedCount,
+      resetIds: recordsToReset.map((id) => id.toString()),
+      errors: errors.length > 0 ? errors : undefined,
+    };
+  }
+
+  const updatedRecord = await AttendanceModel.findById(attendanceIds[0])
+    .populate("studentId", "fullname username email")
+    .populate("markedBy", "fullname email role")
+    .lean();
+
+  appAssert(updatedRecord, NOT_FOUND, "Attendance record not found after reset");
+
+  return {
+    deleted: true,
+    status: AttendanceStatus.NOTYET,
+    record: updatedRecord,
+  };
 };
 
 
