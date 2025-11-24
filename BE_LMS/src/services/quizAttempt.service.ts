@@ -1,5 +1,5 @@
 import { BAD_REQUEST, NOT_FOUND } from '@/constants/http';
-import { EnrollmentModel, QuizAttemptModel, QuizModel } from '@/models';
+import { CourseModel, EnrollmentModel, QuizAttemptModel, QuizModel } from '@/models';
 import {
   AttemptStatus,
   EnrollmentRole,
@@ -11,6 +11,7 @@ import {
 import appAssert from '@/utils/appAssert';
 import { EnrollQuizInput, SubmitQuizInput } from '@/validators/quizAttempt.schemas';
 import mongoose from 'mongoose';
+import { isTeacherOfCourse } from './helpers/quizHelpers';
 
 /**
  * Enroll in a quiz.
@@ -186,7 +187,7 @@ export const saveQuizAttempt = async (
 
   appAssert(quizAttempt, NOT_FOUND, 'Quiz attempt not found');
 
-  // Chỉ học sinh của khóa học mới được đăng ký làm bài quiz
+  // Chỉ học sinh của khóa học mới được lưu bài quiz
   const isStudentOfCourse = await EnrollmentModel.findOne({
     studentId: userId,
     courseId: quizAttempt.quizId.courseId,
@@ -218,8 +219,106 @@ export const saveQuizAttempt = async (
     'Invalid number of answers submitted'
   );
 
-  quizAttempt.answers = answers;
-  const data = await quizAttempt.save();
+  const data = await quizAttempt.updateOne(
+    {
+      answers,
+    },
+    {
+      new: true,
+    }
+  );
 
   return data;
+};
+
+/**
+ * Delete a quiz attempt.
+ * @param  quizAttemptId - ID of the quiz attempt to delete.
+ * @param  userId - ID of the user who is deleting the quiz attempt.
+ * @param  role - Role of the user who is deleting the quiz attempt.
+ * @throws  If the quiz attempt is not found.
+ * @throws  If the user is not the creator of the quiz and is a teacher.
+ * @throws  If the quiz attempt is on going.
+ * @returns  The deleted quiz attempt.
+ */
+export const deleteQuizAttempt = async (
+  quizAttemptId: string,
+  userId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  const data = await QuizAttemptModel.findById(quizAttemptId).populate<{
+    quizId: IQuiz;
+  }>('quizId');
+
+  appAssert(data, NOT_FOUND, 'Quiz attempt not found');
+
+  if (role === Role.TEACHER) {
+    appAssert(
+      data.quizId.createdBy?.equals(userId),
+      BAD_REQUEST,
+      'You are not the creator of this quiz'
+    );
+  }
+
+  const now = new Date();
+  const isOnGoing =
+    data.quizId.startTime.getTime() <= now.getTime() &&
+    data.quizId.endTime.getTime() >= now.getTime();
+  appAssert(!isOnGoing, BAD_REQUEST, 'Cannot delete a quiz attempt that is on going');
+
+  // Xóa quiz attempt
+  const deleted = await QuizAttemptModel.findByIdAndDelete(quizAttemptId);
+  appAssert(deleted, NOT_FOUND, 'Quiz attempt already deleted');
+
+  return deleted;
+};
+
+/**
+ * Ban a quiz attempt.
+ * @param  quizAttemptId - ID of the quiz attempt to ban.
+ * @param  userId - ID of the user who is banning the quiz attempt.
+ * @param  role - Role of the user who is banning the quiz attempt.
+ * @throws  If the quiz attempt is not found.
+ * @throws  If the user is not the creator of the quiz and is a teacher.
+ * @throws  If the quiz attempt is already submitted.
+ * @returns  The banned quiz attempt.
+ */
+export const banQuizAttempt = async (
+  quizAttemptId: string,
+  userId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  // Lấy quiz attempt cùng quiz
+  const quizAttempt = await QuizAttemptModel.findById(quizAttemptId).populate<{
+    quizId: IQuiz;
+  }>('quizId');
+
+  appAssert(quizAttempt, NOT_FOUND, 'Quiz attempt not found');
+
+  // Teacher chỉ được ban quiz do mình tạo
+  if (role === Role.TEACHER) {
+    appAssert(
+      quizAttempt.quizId.createdBy?.equals(userId),
+      BAD_REQUEST,
+      'You are not the creator of this quiz'
+    );
+  }
+
+  // Không thể ban quiz đã submit
+  appAssert(
+    quizAttempt.status !== AttemptStatus.SUBMITTED,
+    BAD_REQUEST,
+    'Cannot ban a submitted quiz attempt'
+  );
+
+  // Cập nhật trạng thái atomic
+  const updated = await QuizAttemptModel.findByIdAndUpdate(
+    quizAttemptId,
+    { status: AttemptStatus.ABANDONED },
+    { new: true }
+  );
+
+  appAssert(updated, NOT_FOUND, 'Quiz attempt not found or already banned');
+
+  return updated;
 };

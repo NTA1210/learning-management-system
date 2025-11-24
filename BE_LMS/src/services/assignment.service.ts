@@ -7,11 +7,49 @@ import appAssert from "../utils/appAssert";
 import { NOT_FOUND, FORBIDDEN } from "../constants/http";
 import { EnrollmentStatus } from "../types/enrollment.type";
 import { Role } from "../types";
+import { normalizeObjectId } from "./helpers/assignmentHelpers";
+
+const ensureTeacherAccessToCourse = async ({
+  course,
+  courseId,
+  userId,
+  userRole,
+}: {
+  course?: any;
+  courseId?: mongoose.Types.ObjectId;
+  userId?: mongoose.Types.ObjectId;
+  userRole?: Role;
+}) => {
+  if (!userId || userRole !== Role.TEACHER) {
+    return course;
+  }
+
+  const courseDoc =
+    course ??
+    (await CourseModel.findById(courseId).select("teacherIds title").lean());
+
+  appAssert(courseDoc, NOT_FOUND, "Course not found");
+
+  const teacherIdStr = normalizeObjectId(userId);
+  const isTeacherInCourse =
+    (courseDoc.teacherIds || []).some(
+      (teacherId: mongoose.Types.ObjectId) =>
+        teacherId.toString() === teacherIdStr
+    ) || false;
+
+  appAssert(
+    isTeacherInCourse,
+    FORBIDDEN,
+    "You are not assigned to teach this course"
+  );
+
+  return courseDoc;
+};
 
 export type ListAssignmentsParams = {
   page: number;
   limit: number;
-  courseId?: string;
+  courseId?: mongoose.Types.ObjectId;
   search?: string;
   dueBefore?: Date;
   dueAfter?: Date;
@@ -40,6 +78,18 @@ export const listAssignments = async ({
     filter.courseId = courseId;
   }
 
+  const emptyResult = {
+    assignments: [],
+    pagination: {
+      total: 0,
+      page,
+      limit,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPrevPage: false,
+    },
+  };
+
   //neu là std,ktra enrollment status
   if (userRole === Role.STUDENT && userId) {
     if (courseId) {
@@ -62,12 +112,29 @@ export const listAssignments = async ({
       const approvedCourseIds = approved.map((e: any) => e.courseId);
       //nếu approved courses, return empty
       if (!approvedCourseIds.length) {
-        return {
-          assignments: [],
-          pagination: { total: 0, page, limit, totalPages: 0, hasNextPage: false, hasPrevPage: false },
-        };
+        return emptyResult;
       }
       filter.courseId = { $in: approvedCourseIds };
+    }
+  }
+
+  // nếu là teacher, chỉ xem được course của họ
+  if (userRole === Role.TEACHER && userId) {
+    if (courseId) {
+      await ensureTeacherAccessToCourse({ courseId, userId, userRole });
+    } else {
+      const teacherCourses = await CourseModel.find({
+        teacherIds: userId,
+      })
+        .select("_id")
+        .lean();
+
+      if (!teacherCourses.length) {
+        return emptyResult;
+      }
+
+      const courseIds = teacherCourses.map((course: any) => course._id);
+      filter.courseId = { $in: courseIds };
     }
   }
 
@@ -124,7 +191,11 @@ export const listAssignments = async ({
   };
 };
 
-export const getAssignmentById = async (assignmentId: string, userId?: mongoose.Types.ObjectId, userRole?: string) => {
+export const getAssignmentById = async (
+  assignmentId: string,
+  userId?: mongoose.Types.ObjectId,
+  userRole?: Role
+) => {
   const assignment = await AssignmentModel.findById(assignmentId)
     .populate("courseId", "title code")
     .populate("createdBy", "username email fullname")
@@ -132,24 +203,42 @@ export const getAssignmentById = async (assignmentId: string, userId?: mongoose.
 
   appAssert(assignment, NOT_FOUND, "Assignment not found");
 
+  const courseIdValue =
+    (assignment as any).courseId?._id || (assignment as any).courseId;
+
   //nếu là học sinh,ktra enrollment status
   if (userRole === Role.STUDENT && userId) {
-    const courseIdValue = (assignment as any).courseId?._id || (assignment as any).courseId;
     const enrollment = await EnrollmentModel.findOne({
       studentId: userId,
       courseId: courseIdValue,
       status: EnrollmentStatus.APPROVED,
     });
-    appAssert(enrollment, FORBIDDEN, "You are not approved to access this course");
+    appAssert(
+      enrollment,
+      FORBIDDEN,
+      "You are not approved to access this course"
+    );
   }
+
+  await ensureTeacherAccessToCourse({
+    courseId: courseIdValue,
+    userId,
+    userRole,
+  });
 
   return assignment;
 };
 
-export const createAssignment = async (data: any, userId?: mongoose.Types.ObjectId, userRole?: Role) => {
+export const createAssignment = async (
+  data: any,
+  userId?: mongoose.Types.ObjectId,
+  userRole?: Role
+) => {
   // Verify course exists
   const course = await CourseModel.findById(data.courseId);
   appAssert(course, NOT_FOUND, "Course not found");
+
+  await ensureTeacherAccessToCourse({ course, userId, userRole });
 
   const createdBy = userId && (userId as any)._bsontype === 'ObjectID' ? userId : new mongoose.Types.ObjectId(userId as any);
   const assignmentData = { ...data, createdBy };
@@ -185,7 +274,25 @@ export const createAssignment = async (data: any, userId?: mongoose.Types.Object
   return populatedAssignment;
 };
 
-export const updateAssignment = async (assignmentId: string, data: any) => {
+export const updateAssignment = async (
+  assignmentId: string,
+  data: any,
+  userId?: mongoose.Types.ObjectId,
+  userRole?: Role
+) => {
+  if (userRole === Role.TEACHER && userId) {
+    const assignment = await AssignmentModel.findById(assignmentId).select(
+      "courseId"
+    );
+    appAssert(assignment, NOT_FOUND, "Assignment not found");
+
+    await ensureTeacherAccessToCourse({
+      courseId: assignment.courseId as mongoose.Types.ObjectId,
+      userId,
+      userRole,
+    });
+  }
+
   const assignment = await AssignmentModel.findByIdAndUpdate(
     assignmentId,
     data,
@@ -199,7 +306,24 @@ export const updateAssignment = async (assignmentId: string, data: any) => {
   return assignment;
 };
 
-export const deleteAssignment = async (assignmentId: string) => {
+export const deleteAssignment = async (
+  assignmentId: string,
+  userId?: mongoose.Types.ObjectId,
+  userRole?: Role
+) => {
+  if (userRole === Role.TEACHER && userId) {
+    const assignment = await AssignmentModel.findById(assignmentId).select(
+      "courseId"
+    );
+    appAssert(assignment, NOT_FOUND, "Assignment not found");
+
+    await ensureTeacherAccessToCourse({
+      courseId: assignment.courseId as mongoose.Types.ObjectId,
+      userId,
+      userRole,
+    });
+  }
+
   const assignment = await AssignmentModel.findByIdAndDelete(assignmentId);
   appAssert(assignment, NOT_FOUND, "Assignment not found");
   return assignment;

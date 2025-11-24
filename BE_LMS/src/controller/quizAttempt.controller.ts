@@ -1,5 +1,11 @@
 import { CREATED, OK } from '@/constants/http';
-import { enrollQuiz, saveQuizAttempt, submitQuizAttempt } from '@/services/quizAttempt.service';
+import {
+  banQuizAttempt,
+  deleteQuizAttempt,
+  enrollQuiz,
+  saveQuizAttempt,
+  submitQuizAttempt,
+} from '@/services/quizAttempt.service';
 import { catchErrors } from '@/utils/asyncHandler';
 import {
   enrollQuizSchema,
@@ -51,5 +57,29 @@ export const saveQuizHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     data,
     message: 'Submit quiz attempt successfully',
+  });
+});
+
+// DELETE /quiz-attempts/:quizAttemptId - Delete a quiz attempt
+export const deleteQuizAttemptHandler = catchErrors(async (req, res) => {
+  const quizAttemptId = quizAttemptIdSchema.parse(req.params.quizAttemptId);
+  const userId = req.userId;
+  const role = req.role;
+  const data = await deleteQuizAttempt(quizAttemptId, userId, role);
+  return res.success(OK, {
+    data,
+    message: 'Delete quiz attempt successfully',
+  });
+});
+
+// PUT /quiz-attempts/:quizAttemptId/ban - Ban a quiz attempt
+export const banQuizAttemptHandler = catchErrors(async (req, res) => {
+  const quizAttemptId = quizAttemptIdSchema.parse(req.params.quizAttemptId);
+  const userId = req.userId;
+  const role = req.role;
+  const data = await banQuizAttempt(quizAttemptId, userId, role);
+  return res.success(OK, {
+    data,
+    message: 'Ban quiz attempt successfully',
   });
 });
