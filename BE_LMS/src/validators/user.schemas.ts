@@ -10,10 +10,12 @@ export const listAllUsersSchema = z.object({
   status: z.string().optional(),
   specialistIds: z.array(specialistIdsSchema).optional(),
   page: z
-    .string()
+    .union([z.string(), z.number()])
     .optional()
-    .transform((val) => (val ? parseInt(val, 10) : 1))
-    .refine((val) => val > 0, { message: 'Page must be greater than 0' }),
+    .transform((val) => {
+      const num = Number(val);
+      return Number.isFinite(num) && num > 0 ? num : 1;
+    }),
   limit: z
     .string()
     .optional()
