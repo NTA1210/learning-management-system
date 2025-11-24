@@ -7,12 +7,7 @@ import appAssert from "../utils/appAssert";
 import { NOT_FOUND, FORBIDDEN } from "../constants/http";
 import { EnrollmentStatus } from "../types/enrollment.type";
 import { Role } from "../types";
-
-
-const normalizeObjectId = (id?: mongoose.Types.ObjectId | null) => {
-  if (!id) return "";
-  return typeof id === "string" ? id : id.toString();
-};
+import { normalizeObjectId } from "./helpers/assignmentHelpers";
 
 const ensureTeacherAccessToCourse = async ({
   course,
