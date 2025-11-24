@@ -12,6 +12,8 @@ export * from './quizService';
 export * from './specialistService';
 export * from './majorService';
 export * from './userService';
+export * from './semesterService';
+export * from './attendanceService';
 
 // storage keys
 const USER_STORAGE_KEY = 'lms:user';

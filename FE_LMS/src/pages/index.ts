@@ -28,3 +28,6 @@ export { default as EnrollmentsListPage } from "./EnrollmentsList";
 export { default as CurriculumPage } from "./Curriculum";
 export { default as UserManagementPage } from "./UserManagement";
 export { default as UserBioPage } from "./UserBioPage";
+export { default as AttendancePage } from "./AttendancePage";
+export { default as MyEnrollmentsPage } from "./MyEnrollmentsPage";
+
