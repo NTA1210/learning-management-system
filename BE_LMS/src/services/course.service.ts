@@ -11,6 +11,7 @@ import { NOT_FOUND, BAD_REQUEST, FORBIDDEN } from '../constants/http';
 import { CreateCourseInput, GetQuizzes, UpdateCourseInput } from '../validators/course.schemas';
 import { CourseStatus } from '../types/course.type';
 import { Role, UserStatus } from '../types/user.type';
+import { EnrollmentStatus } from '../types/enrollment.type';
 import { uploadFile, removeFile } from '../utils/uploadFile';
 import { prefixCourseLogo } from '../utils/filePrefix';
 import { QuizModel } from '@/models';
@@ -996,7 +997,7 @@ export const getMyCourses = async ({
     const enrollments = await EnrollmentModel.find({
       studentId: userId,
       // Optional: Filter by enrollment status if needed (e.g., only APPROVED)
-      // status: EnrollmentStatus.APPROVED
+      status: EnrollmentStatus.APPROVED,
     }).select('courseId');
 
     const courseIds = enrollments.map((e) => e.courseId);
