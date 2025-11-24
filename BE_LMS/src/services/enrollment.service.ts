@@ -342,7 +342,7 @@ export const createEnrollment = async (data: {
         appAssert(
           false,
           BAD_REQUEST,
-          `You must complete the prerequisite subject: ${prerequisiteSubject?.name || "Unknown"} before enrolling in this course.`
+          `${student.username} must complete the prerequisite subject ${prerequisiteSubject?.name || "Unknown"} before enrolling in this course.`
         );
       }
     }
