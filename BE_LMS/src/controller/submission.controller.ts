@@ -56,7 +56,7 @@ export const resubmitAssignmentHandler = catchErrors(async (req, res) => {
 
 // Xem trạng thái bài nộp
 export const getSubmissionStatusHandler = catchErrors(async (req, res) => {
-  const studentId = req.userId;
+  const studentId = req.userId; 
 
   const { assignmentId } = assignmentIdParamSchema.parse(req.params);
   const status = await getSubmissionStatus(studentId, assignmentId);
@@ -154,6 +154,7 @@ export const listAllGradesByStudentHandler = catchErrors(async (req, res) => {
 //static and report
 export const getSubmissionStatsHandler = catchErrors(async (req, res) => {
   const { assignmentId } = req.params;
+  appAssert(assignmentId, BAD_REQUEST, "Missing assignment ID");
 
   const stats = await getSubmissionStats(assignmentId);
   return res.success(OK, {
@@ -165,6 +166,7 @@ export const getSubmissionStatsHandler = catchErrors(async (req, res) => {
 export const getSubmissionReportHandler = catchErrors(async (req, res) => {
   const { assignmentId } = req.params;
   const query: SubmissionReportQuery = req.query;
+  appAssert(assignmentId, BAD_REQUEST, "Missing assignment ID");
 
   const report = await getSubmissionReportByAssignment(assignmentId, query);
   return res.success(OK, {
@@ -176,6 +178,7 @@ export const getSubmissionReportHandler = catchErrors(async (req, res) => {
 //report toan bo course
 export const getCourseReportHandler = catchErrors(async (req, res) => {
   const { courseId } = req.params;
+  appAssert(courseId, BAD_REQUEST, "Missing course ID");
 
   const report = await getSubmissionReportByCourse(courseId);
   return res.success(OK, {
