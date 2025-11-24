@@ -39,7 +39,6 @@ const QuizAttemptSchema = new mongoose.Schema<IQuizAttempt>(
     },
     ipAddress: { type: String },
     userAgent: { type: String },
-    rank: { type: Number },
   },
   { timestamps: true }
 );
