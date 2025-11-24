@@ -5,6 +5,7 @@ import {ISpecialist} from "@/types";
 import {Role} from "@/types";
 import {ListParams} from "@/types/dto";
 import mongoose from "mongoose";
+import {MajorModel} from "@/models";
 
 export interface ListSpecialistParams extends ListParams {
     name?: string;
@@ -182,8 +183,8 @@ export const updateSpecialistBySlug = async (
     }
 
     // If updating major, check if the major exists
-    if (data.majorId && data.majorId.toString() !== specialist.majorId.toString()) {
-        const majorExists = await SpecialistModel.findById(data.majorId);
+    if (specialist.majorId && data.majorId && data.majorId.toString() !== specialist.majorId.toString()) {
+        const majorExists = await MajorModel.findById(data.majorId);
         appAssert(majorExists, NOT_FOUND, "Major not found");
     }
 
