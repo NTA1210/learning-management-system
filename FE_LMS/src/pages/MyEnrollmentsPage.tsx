@@ -49,6 +49,7 @@ const MyEnrollmentsPage: React.FC = () => {
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(10);
     const [total, setTotal] = useState(0);
+    const [updating, setUpdating] = useState<Record<string, boolean>>({});
 
     const fetchMyEnrollments = async () => {
         try {
@@ -76,6 +77,16 @@ const MyEnrollmentsPage: React.FC = () => {
     useEffect(() => {
         fetchMyEnrollments();
     }, [page, limit]);
+
+    const handleCancel = async (id: string) => {
+        setUpdating(prev => ({ ...prev, [id]: true }));
+        try {
+            await http.put(`/enrollments/my-enrollments/${id}`, { status: "cancelled" });
+            setItems(prev => prev.map(it => it._id === id ? { ...it, status: "cancelled", updatedAt: new Date().toISOString() } : it));
+        } finally {
+            setUpdating(prev => ({ ...prev, [id]: false }));
+        }
+    };
 
     const totalPages = useMemo(() => {
         if (!limit) return 1;
@@ -226,8 +237,22 @@ const MyEnrollmentsPage: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="text-sm" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                                        {new Date(en.createdAt).toLocaleString()}
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => handleCancel(en._id)}
+                                            disabled={updating[en._id] || en.status === 'cancelled' || en.status === 'dropped' || en.status === 'completed'}
+                                            className="px-3 py-2 rounded-lg text-sm disabled:opacity-50"
+                                            style={{
+                                                backgroundColor: darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2',
+                                                color: darkMode ? '#fca5a5' : '#dc2626',
+                                                border: darkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #fecaca'
+                                            }}
+                                        >
+                                            {updating[en._id] ? 'Cancelling...' : 'Cancel'}
+                                        </button>
+                                        <div className="text-sm" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                                            {new Date(en.createdAt).toLocaleString()}
+                                        </div>
                                     </div>
                                 </div>
                             );
