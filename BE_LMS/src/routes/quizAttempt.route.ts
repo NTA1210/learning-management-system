@@ -1,4 +1,5 @@
 import {
+  autoSaveQuizHandler,
   banQuizAttemptHandler,
   deleteQuizAttemptHandler,
   enrollQuizHandler,
@@ -25,5 +26,7 @@ quizAttemptRoutes.put(
   authorize(Role.ADMIN, Role.TEACHER),
   banQuizAttemptHandler
 );
+
+quizAttemptRoutes.put('/:quizAttemptId/auto-save', authorize(Role.STUDENT), autoSaveQuizHandler);
 
 export default quizAttemptRoutes;
