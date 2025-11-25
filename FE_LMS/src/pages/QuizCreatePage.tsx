@@ -210,12 +210,32 @@ const normalizeCorrectFlag = (value: unknown): number => {
 };
 
 const buildCorrectOptions = (snapshot: SnapshotQuestion, normalizedOptions: string[]): number[] => {
-  const raw = Array.isArray(snapshot.correctOptions) ? snapshot.correctOptions : [];
+  const raw = (Array.isArray(snapshot.correctOptions)
+    ? snapshot.correctOptions
+    : []) as Array<number | string>;
   if (raw.length === normalizedOptions.length) {
     return raw.map((value) => normalizeCorrectFlag(value));
   }
 
   if (raw.length > 0) {
+    const normalizedOptionTexts = normalizedOptions.map((opt) =>
+      stripHtmlTags(String(opt || "")).toLowerCase()
+    );
+
+    const bitStringSource = raw.find(
+      (value): value is string =>
+        typeof value === "string" &&
+        value.replace(/[\s,|;]/g, "").match(/^[01]+$/) !== null
+    );
+
+    if (bitStringSource) {
+      const cleanedBits = bitStringSource.replace(/[\s,|;]/g, "");
+      if (cleanedBits.length === normalizedOptions.length) {
+        const bits = cleanedBits.split("").map((char: string) => (char === "1" ? 1 : 0));
+        return bits;
+      }
+    }
+
     const indexFlags = raw
       .map((value) => {
         if (typeof value === "number" && Number.isFinite(value)) {
@@ -228,6 +248,28 @@ const buildCorrectOptions = (snapshot: SnapshotQuestion, normalizedOptions: stri
 
     if (indexFlags.length > 0) {
       return normalizedOptions.map((_, idx) => (indexFlags.includes(idx) ? 1 : 0));
+    }
+
+    const textFlags = raw
+      .map((value) => {
+        if (value === null || value === undefined) return null;
+        const text = stripHtmlTags(String(value)).trim();
+        if (!text) return null;
+
+        const letterMatch = text.match(/^[A-Da-d]/);
+        if (letterMatch) {
+          const idx = letterMatch[0].toUpperCase().charCodeAt(0) - 65;
+          if (idx >= 0 && idx < normalizedOptions.length) return idx;
+        }
+
+        const normalizedText = text.toLowerCase();
+        const idx = normalizedOptionTexts.findIndex((opt) => opt === normalizedText);
+        return idx >= 0 ? idx : null;
+      })
+      .filter((idx): idx is number => idx !== null && idx >= 0 && idx < normalizedOptions.length);
+
+    if (textFlags.length > 0) {
+      return normalizedOptions.map((_, idx) => (textFlags.includes(idx) ? 1 : 0));
     }
   }
 
@@ -621,6 +663,30 @@ const QuizCreatePage: React.FC = () => {
           return opt;
         });
         return normalized;
+      });
+
+      for (let i = 0; i < normalizedSnapshots.length; i++) {
+        const snapshot = normalizedSnapshots[i];
+        const optionTexts = (snapshot.options || []).map((opt) =>
+          stripHtmlTags(String(opt ?? "")).toLowerCase()
+        );
+        if (optionTexts.length !== new Set(optionTexts).size) {
+          const plainQuestion = stripHtmlTags(snapshot.text).slice(0, 120) || `Question ${i + 1}`;
+          await showSwalError(
+            `Question "${plainQuestion}" has duplicate answer options. Please ensure each option is unique.`,
+            darkMode
+          );
+          return;
+        }
+      }
+
+      normalizedSnapshots.forEach((snapshot) => {
+        const trueCount = snapshot.correctOptions.filter((flag: number) => flag === 1).length;
+        if (trueCount > 1) {
+          snapshot.type = "multichoice";
+        } else {
+          snapshot.type = "mcq";
+        }
       });
 
       const invalidSnapshot = normalizedSnapshots.find((snapshot) =>
