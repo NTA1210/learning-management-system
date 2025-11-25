@@ -1,10 +1,11 @@
 import mongoose from 'mongoose';
 import { AttemptStatus, IQuestionAnswer, IQuiz, IQuizAttempt } from '../types';
 import { Answer } from '@/validators/quizAttempt.schemas';
+import { string } from 'zod';
 
 const QuestionAnswerSchema = new mongoose.Schema<IQuestionAnswer>(
   {
-    questionId: { type: mongoose.Schema.Types.ObjectId },
+    questionId: { type: String, required: true },
     answer: { type: [Number], default: [] },
     correct: { type: Boolean },
     pointsEarned: { type: Number },
