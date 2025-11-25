@@ -21,6 +21,7 @@ export type CreateLessonParams = {
   order?: number;
   durationMinutes?: number;
   publishedAt?: Date;
+  isPublished?: boolean;
 };
 
 /**
