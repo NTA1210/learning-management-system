@@ -648,50 +648,50 @@ const LessonMaterialDetailPage: React.FC = () => {
 
   const handleMaterialSubmit = async (values: MaterialFormValues, file?: File | null) => {
     if (!lessonId) return;
-
+    
     try {
       if (materialModal?.mode === "create") {
         if (file) {
-          const formDataToSend = new FormData();
+        const formDataToSend = new FormData();
           formDataToSend.append("file", file);
           formDataToSend.append("lessonId", lessonId);
           formDataToSend.append("title", values.title);
           if (values.note) {
             formDataToSend.append("note", values.note);
-          }
+        }
           let materialType = "other";
           if (values.mimeType) {
             if (values.mimeType.includes("pdf")) materialType = "pdf";
             else if (values.mimeType.includes("video")) materialType = "video";
             else if (values.mimeType.includes("presentation") || values.mimeType.includes("powerpoint")) materialType = "ppt";
             else if (values.mimeType.includes("link")) materialType = "link";
-          }
+        }
           formDataToSend.append("type", materialType);
 
-          await httpClient.post("/lesson-materials/upload", formDataToSend, {
-            withCredentials: true,
-            headers: {
+        await httpClient.post("/lesson-materials/upload", formDataToSend, {
+          withCredentials: true,
+          headers: {
               "Content-Type": "multipart/form-data",
-            },
-          });
-        } else {
+          },
+        });
+      } else {
           await httpClient.post(
             "/lesson-material/createMaterial",
             {
-              lessonId,
+          lessonId,
               ...values,
             },
             {
-              withCredentials: true,
+          withCredentials: true,
             }
           );
-        }
-        await showSwalSuccess("Material created successfully");
+      }
+      await showSwalSuccess("Material created successfully");
       } else if (materialModal?.mode === "edit" && materialModal.material) {
         await httpClient.patch(`/lesson-materials/${materialModal.material._id}`, values, {
-          withCredentials: true,
-        });
-        await showSwalSuccess("Material updated successfully");
+        withCredentials: true,
+      });
+      await showSwalSuccess("Material updated successfully");
       }
 
       setMaterialModal(null);
