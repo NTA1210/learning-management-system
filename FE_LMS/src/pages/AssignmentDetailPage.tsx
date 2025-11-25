@@ -84,6 +84,8 @@ const AssignmentDetailPage: React.FC = () => {
     grade?: number;
     feedback?: string;
     submittedAt?: string;
+    originalName?: string;
+    size?: number;
     key?: string;
   } | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -94,6 +96,20 @@ const AssignmentDetailPage: React.FC = () => {
   const [gradingFeedback, setGradingFeedback] = useState<string>("");
   const [grading, setGrading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const getSubmissionCacheKey = (assignmentId: string) => `submission:${assignmentId}`;
+  const fetchSubmissionDetailsById = async (submissionId: string) => {
+    try {
+      const response = await httpClient.get(`/submissions/${submissionId}`, {
+        withCredentials: true,
+      });
+      if (response.data?.success) {
+        return response.data.data;
+      }
+    } catch (error) {
+      console.error("Error fetching submission details:", error);
+    }
+    return null;
+  };
 
   // Utility function to scrub URLs from messages
   const scrubMessage = (message: string): string => {
@@ -176,10 +192,47 @@ const AssignmentDetailPage: React.FC = () => {
         withCredentials: true,
       });
       if (response.data?.success) {
-        setSubmissionStatus(response.data.data);
+        const statusData = response.data.data;
+        setSubmissionStatus(statusData);
         // Nếu đã có submission, lưu thông tin chi tiết
-        if (response.data.data.status !== "not_submitted") {
-          setSubmissionDetails(response.data.data);
+        if (statusData.status !== "not_submitted") {
+          const cacheKey = getSubmissionCacheKey(assignment._id);
+          const cachedId = (() => {
+            try {
+              return localStorage.getItem(cacheKey);
+            } catch {
+              return null;
+            }
+          })();
+
+          const submissionId = statusData._id || statusData.submissionId || cachedId;
+          let details = statusData;
+
+          if (submissionId) {
+            if (!statusData._id) {
+              try {
+                localStorage.setItem(cacheKey, submissionId);
+              } catch {
+                // ignore storage errors
+              }
+            }
+            const submissionData = await fetchSubmissionDetailsById(submissionId);
+            if (submissionData) {
+              details = {
+                ...submissionData,
+                status: submissionData.status || statusData.status,
+                grade: submissionData.grade ?? statusData.grade,
+                feedback: submissionData.feedback ?? statusData.feedback,
+                submittedAt: submissionData.submittedAt || statusData.submittedAt,
+              };
+            } else {
+              details = { ...statusData, _id: submissionId };
+            }
+          }
+
+          setSubmissionDetails(details);
+        } else {
+          setSubmissionDetails(null);
         }
       }
     } catch (error) {
@@ -199,22 +252,43 @@ const AssignmentDetailPage: React.FC = () => {
     if (!assignment?._id) return;
     setLoadingSubmission(true);
     try {
-      // Lấy status (backend đã được cập nhật để trả về _id và key)
-      const statusResponse = await httpClient.get(`/submissions/${assignment._id}/status`, {
+      const response = await httpClient.get(`/submissions/${assignment._id}/status`, {
         withCredentials: true,
       });
-      
-      if (statusResponse.data?.success && statusResponse.data.data.status !== "not_submitted") {
-        const statusData = statusResponse.data.data;
-        setSubmissionDetails({
-          _id: statusData._id,
-          status: statusData.status,
-          isLate: statusData.isLate,
-          grade: statusData.grade,
-          feedback: statusData.feedback,
-          submittedAt: statusData.submittedAt,
-          key: statusData.key,
-        });
+      if (response.data?.success && response.data.data.status !== "not_submitted") {
+        const statusData = response.data.data;
+        const cacheKey = getSubmissionCacheKey(assignment._id);
+        const cachedId = (() => {
+          try {
+            return localStorage.getItem(cacheKey);
+          } catch {
+            return null;
+          }
+        })();
+        const submissionId = statusData._id || statusData.submissionId || cachedId;
+        let details = statusData;
+
+        if (submissionId) {
+          try {
+            localStorage.setItem(cacheKey, submissionId);
+          } catch {
+            // ignore
+          }
+          const submissionData = await fetchSubmissionDetailsById(submissionId);
+          if (submissionData) {
+            details = {
+              ...submissionData,
+              status: submissionData.status || statusData.status,
+              grade: submissionData.grade ?? statusData.grade,
+              feedback: submissionData.feedback ?? statusData.feedback,
+              submittedAt: submissionData.submittedAt || statusData.submittedAt,
+            };
+          } else {
+            details = { ...statusData, _id: submissionId };
+          }
+        }
+
+        setSubmissionDetails(details);
         setShowViewSubmissionModal(true);
       } else {
         await showSwalError("You haven't submitted this assignment yet.");
@@ -465,6 +539,14 @@ const AssignmentDetailPage: React.FC = () => {
       });
 
       if (response.data?.success) {
+        const submissionData = response.data.data;
+        if (submissionData?._id) {
+          try {
+            localStorage.setItem(getSubmissionCacheKey(assignment._id), submissionData._id);
+          } catch {
+            // ignore storage errors
+          }
+        }
         await showSwalSuccess(isResubmit ? "Assignment resubmitted successfully!" : "Assignment submitted successfully!");
         setShowSubmissionModal(false);
         setSelectedFile(null);
@@ -583,7 +665,7 @@ const AssignmentDetailPage: React.FC = () => {
                           {loadingSubmission ? "Loading..." : "View Submit"}
                         </button>
                       )}
-                      <button
+                       <button
                         onClick={async () => {
                           const userRole = user?.role?.toLowerCase();
                           console.log("Button clicked - User role:", userRole);
@@ -621,7 +703,7 @@ const AssignmentDetailPage: React.FC = () => {
                             {submissionStatus?.status && submissionStatus.status !== "not_submitted" ? "Resubmit" : "Submit"}
                           </>
                         )}
-                      </button>
+                    </button>
                     </div>
                   </div>
                   <h1
@@ -727,7 +809,7 @@ const AssignmentDetailPage: React.FC = () => {
             setShowViewSubmissionModal(false);
             setShowSubmissionModal(true);
           }}
-          onDownload={submissionDetails._id ? handleDownloadSubmission : undefined}
+          onDownload={handleDownloadSubmission}
           formatDate={formatDate}
         />
       )}
