@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import http from "../utils/http";
 import { myCourses } from "../services/mock";
-import { quizQuestionService, courseService, type QuizQuestion } from "../services";
+import { quizService, courseService } from "../services";
+import type { QuizResponse } from "../services/quizService";
 import { Clock, FileText, Calendar, CheckCircle, XCircle } from "lucide-react";
 
 interface Course {
@@ -22,26 +24,15 @@ interface Enrollment {
   role: string;
 }
 
-interface Quiz {
-  _id: string;
-  title: string;
-  description: string;
-  totalQuestions: number;
-  duration: number;
-  maxScore: number;
-  dueDate?: string;
-  startDate?: string;
-  status: string;
-  subjectId?: string;
-}
 
 const QuizPage: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
-  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [quizzes, setQuizzes] = useState<QuizResponse[]>([]);
   const [quizTitle, setQuizTitle] = useState("");
 
   useEffect(() => {
@@ -59,65 +50,11 @@ const QuizPage: React.FC = () => {
   const fetchQuizzesForCourse = async (courseId: string) => {
     try {
       console.log("QuizPage: Fetching quizzes for courseId:", courseId);
-      
-      // Get course info to get subjectId
-      const courseData = await courseService.getCourseById(courseId);
-      console.log("QuizPage: Course loaded:", courseData);
-      
-      // Cast to Course interface with subjectId
-      const course = courseData as Course & { subjectId?: string | { _id: string; code?: string; name?: string } };
-      
-      // Get subjectId from course
-      const subjectId = typeof course.subjectId === "object" && course.subjectId 
-        ? course.subjectId._id 
-        : typeof course.subjectId === "string" 
-        ? course.subjectId 
-        : null;
-      
-      if (!subjectId) {
-        console.warn("QuizPage: No subjectId found for course:", courseId);
-        setQuizzes([]);
-        return;
-      }
-      
-      console.log("QuizPage: Fetching quiz questions for subjectId:", subjectId);
-      
-      // Fetch all quiz questions for this subject
-      const result = await quizQuestionService.getAllQuizQuestions({
-        limit: 1000,
+      const result = await quizService.getQuizzesByCourseId(courseId, {
+        isPublished: true,
       });
-      
-      console.log("QuizPage: All quiz questions:", result);
-      
-      // Filter questions by subjectId
-      const subjectQuestions = (result.data || []).filter((q: QuizQuestion) => {
-        const qSubjectId = typeof q.subjectId === "object" ? q.subjectId._id : q.subjectId;
-        return qSubjectId === subjectId;
-      });
-      
-      console.log("QuizPage: Filtered questions for subject:", subjectQuestions.length);
-      
-      // Group questions and create Quiz objects
-      // For now, create one Quiz per subject with all questions
-      if (subjectQuestions.length > 0) {
-        const totalPoints = subjectQuestions.reduce((sum, q) => sum + (q.points || 0), 0);
-        const estimatedDuration = Math.ceil(subjectQuestions.length * 2); // 2 minutes per question
-        
-        const quiz: Quiz = {
-          _id: `quiz-${subjectId}`,
-          title: `${course.title} - Quiz`,
-          description: `Quiz containing ${subjectQuestions.length} questions`,
-          totalQuestions: subjectQuestions.length,
-          duration: estimatedDuration,
-          maxScore: totalPoints,
-          status: "published",
-          subjectId: subjectId,
-        };
-        
-        setQuizzes([quiz]);
-      } else {
-        setQuizzes([]);
-      }
+      console.log("QuizPage: Quizzes fetched:", result.data);
+      setQuizzes(result.data || []);
     } catch (error) {
       console.error("QuizPage: Error fetching quizzes:", error);
       setQuizzes([]);
@@ -156,18 +93,18 @@ const QuizPage: React.FC = () => {
       }));
 
       if (mappedEnrollments.length === 0) {
-        const mockedEnrollments: Enrollment[] = myCourses.map((c) => {
-          const courseId = `mock-${String(c.id)}`;
-          return {
-            _id: `enr-${courseId}`,
-            courseId: { _id: courseId, title: c.name, description: `${c.instructor ?? ""}` },
-            status: "approved",
-            role: "student",
-          };
-        });
-        setEnrollments(mockedEnrollments);
-        setError("");
-      } else {
+          const mockedEnrollments: Enrollment[] = myCourses.map((c) => {
+            const courseId = `mock-${String(c.id)}`;
+            return {
+              _id: `enr-${courseId}`,
+              courseId: { _id: courseId, title: c.name, description: `${c.instructor ?? ""}` },
+              status: "approved",
+              role: "student",
+            };
+          });
+          setEnrollments(mockedEnrollments);
+          setError("");
+        } else {
         setEnrollments(mappedEnrollments);
       }
     } catch (err) {
@@ -231,18 +168,25 @@ const QuizPage: React.FC = () => {
     return null;
   };
 
-  const getQuizStatus = (quiz: Quiz) => {
+  const getQuizStatus = (quiz: QuizResponse) => {
     const now = new Date();
-    if (quiz.startDate && new Date(quiz.startDate) > now) {
+    const startTime = new Date(quiz.startTime);
+    const endTime = new Date(quiz.endTime);
+    
+    if (startTime > now) {
       return { text: "Not Started", color: "var(--status-neutral-text)", bg: "var(--status-neutral-bg)" };
     }
-    if (quiz.dueDate && new Date(quiz.dueDate) < now) {
+    if (endTime < now) {
       return { text: "Closed", color: "var(--status-closed-text)", bg: "var(--status-closed-bg)" };
     }
-    if (quiz.status === "published") {
+    if (quiz.isPublished) {
       return { text: "Available", color: "var(--status-available-text)", bg: "var(--status-available-bg)" };
     }
-    return { text: quiz.status, color: "var(--status-neutral-text)", bg: "var(--status-neutral-bg)" };
+    return { text: "Unavailable", color: "var(--status-neutral-text)", bg: "var(--status-neutral-bg)" };
+  };
+
+  const handleQuizClick = (quizId: string) => {
+    navigate(`/quiz/take/${quizId}`);
   };
 
   const handleCourseClick = (courseId: string) => {
@@ -415,10 +359,12 @@ const QuizPage: React.FC = () => {
                     <div className="space-y-4">
                       {quizzes.map((quiz) => {
                         const status = getQuizStatus(quiz);
+                        const questionCount = quiz.snapshotQuestions?.filter((q) => !q.isDeleted).length || 0;
                         return (
                           <div
                             key={quiz._id}
-                            className="rounded-lg shadow-md overflow-hidden transition-all duration-200 hover:shadow-lg"
+                            onClick={() => handleQuizClick(quiz._id)}
+                            className="rounded-lg shadow-md overflow-hidden transition-all duration-200 hover:shadow-lg cursor-pointer"
                             style={{
                               backgroundColor: "var(--card-surface)",
                               border: `1px solid var(--card-border)`,
@@ -445,22 +391,16 @@ const QuizPage: React.FC = () => {
                               <div className="space-y-2 mb-4">
                                 <div className="flex items-center text-sm" style={{ color: "var(--muted-text)" }}>
                                   <FileText className="w-4 h-4 mr-2" />
-                                  {quiz.totalQuestions} questions
+                                  {questionCount} questions
+                                </div>
+                                <div className="flex items-center text-sm" style={{ color: "var(--muted-text)" }}>
+                                  <Calendar className="w-4 h-4 mr-2" />
+                                  Start: {formatDate(quiz.startTime)}
                                 </div>
                                 <div className="flex items-center text-sm" style={{ color: "var(--muted-text)" }}>
                                   <Clock className="w-4 h-4 mr-2" />
-                                  Duration: {quiz.duration} minutes
-                                </div>
-                                <div className="flex items-center text-sm" style={{ color: "var(--muted-text)" }}>
-                                  <CheckCircle className="w-4 h-4 mr-2" />
-                                  Max Score: {quiz.maxScore} points
-                                </div>
-                                {quiz.dueDate && (
-                                  <div className="flex items-center text-sm" style={{ color: "var(--muted-text)" }}>
-                                    <Calendar className="w-4 h-4 mr-2" />
-                                    Due: {formatDate(quiz.dueDate)}
+                                  End: {formatDate(quiz.endTime)}
                                   </div>
-                                )}
                               </div>
 
                               {/* Status Badge */}
@@ -492,4 +432,6 @@ const QuizPage: React.FC = () => {
 };
 
 export default QuizPage;
+
+
 

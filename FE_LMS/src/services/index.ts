@@ -9,6 +9,7 @@ export * from './feedbackService';
 export * from './quizQuestionService';
 export * from './subjectService';
 export * from './quizService';
+export * from './quizAttemptService';
 export * from './specialistService';
 export * from './majorService';
 export * from './userService';

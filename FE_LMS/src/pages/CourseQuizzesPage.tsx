@@ -8,6 +8,7 @@ import type { Course } from "../types/course";
 import { Clock, Calendar, CheckCircle, ArrowLeft, Trash2, Edit2, X } from "lucide-react";
 import QuizCoursePage from "./QuizCoursePage";
 import { useTheme } from "../hooks/useTheme";
+import { useAuth } from "../hooks/useAuth";
 
 interface EditQuizForm {
   title: string;
@@ -21,6 +22,9 @@ export default function CourseQuizzesPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
   const { darkMode } = useTheme();
+  const { user } = useAuth();
+  const role = (user?.role as "admin" | "teacher" | "student") || "teacher";
+  const isStudent = role === "student";
 
   const [course, setCourse] = useState<Course | null>(null);
   const [quizzes, setQuizzes] = useState<QuizResponse[]>([]);
@@ -105,7 +109,9 @@ export default function CourseQuizzesPage() {
           setCourse(courseData);
 
           // Fetch quizzes for this course (don't send isDeleted: false, let backend use default)
-          const result = await quizService.getQuizzesByCourseId(courseId);
+          const result = await quizService.getQuizzesByCourseId(courseId, {
+            isPublished: isStudent ? true : undefined,
+          });
           console.log("Quizzes fetched:", result.data);
           setQuizzes(result.data || []);
           setIsSubjectId(false);
@@ -157,6 +163,13 @@ export default function CourseQuizzesPage() {
     } else {
       return { label: "Ended", color: "#6b7280" };
     }
+  };
+
+  const canTakeQuiz = (quiz: QuizResponse) => {
+    const now = new Date();
+    const startTime = new Date(quiz.startTime);
+    const endTime = new Date(quiz.endTime);
+    return Boolean(quiz.isPublished) && now >= startTime && now <= endTime;
   };
 
   const formatDate = (dateString: string) => {
@@ -355,7 +368,13 @@ export default function CourseQuizzesPage() {
                             backgroundColor: "var(--card-surface)",
                             border: `1px solid var(--card-border)`,
                           }}
-                          onClick={() => navigate(`/questionbank/questions/${quiz._id}`)}
+                          onClick={() => {
+                            if (isStudent) {
+                              navigate(`/quizz/${courseId}/quiz/${quiz._id}`);
+                            } else {
+                              navigate(`/questionbank/questions/${quiz._id}`);
+                            }
+                          }}
                         >
                           <div className="p-6">
                             {/* Quiz Title */}
@@ -387,45 +406,63 @@ export default function CourseQuizzesPage() {
                             </div>
 
                             {/* Status Badge and Actions */}
-                            <div className="flex items-center justify-between">
-                              <span
-                                className="text-xs font-semibold px-3 py-1 rounded-full"
-                                style={{ backgroundColor: `${status.color}20`, color: status.color }}
-                              >
-                                {status.label}
-                              </span>
-                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                {quiz.isPublished && (
-                                  <span className="text-xs flex items-center gap-1" style={{ color: "#10b981" }}>
-                                    <CheckCircle className="w-4 h-4" />
-                                    Published
-                                  </span>
-                                )}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleOpenEditQuiz(quiz);
-                                  }}
-                                  className="p-2 rounded hover:bg-blue-50 transition-colors"
-                                  style={{ color: "#3b82f6" }}
-                                  title="Edit quiz"
+                              <div className="flex items-center justify-between">
+                                <span
+                                  className="text-xs font-semibold px-3 py-1 rounded-full"
+                                  style={{ backgroundColor: `${status.color}20`, color: status.color }}
                                 >
-                                  <Edit2 className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteQuiz(quiz._id);
-                                  }}
-                                  disabled={deletingQuizId === quiz._id}
-                                  className="p-2 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                                  style={{ color: "#ef4444" }}
-                                  title="Delete quiz"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
+                                  {status.label}
+                                </span>
+                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                  {quiz.isPublished && (
+                                    <span className="text-xs flex items-center gap-1" style={{ color: "#10b981" }}>
+                                      <CheckCircle className="w-4 h-4" />
+                                      Published
+                                    </span>
+                                  )}
+                                  {isStudent ? (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (canTakeQuiz(quiz)) {
+                                          navigate(`/quizz/${courseId}/quiz/${quiz._id}`);
+                                        }
+                                      }}
+                                      disabled={!canTakeQuiz(quiz)}
+                                      className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+                                      style={{ backgroundColor: "#6d28d9" }}
+                                    >
+                                      {canTakeQuiz(quiz) ? "Take Quiz" : "Unavailable"}
+                                    </button>
+                                  ) : (
+                                    <>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenEditQuiz(quiz);
+                                        }}
+                                        className="p-2 rounded hover:bg-blue-50 transition-colors"
+                                        style={{ color: "#3b82f6" }}
+                                        title="Edit quiz"
+                                      >
+                                        <Edit2 className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteQuiz(quiz._id);
+                                        }}
+                                        disabled={deletingQuizId === quiz._id}
+                                        className="p-2 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                                        style={{ color: "#ef4444" }}
+                                        title="Delete quiz"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
                               </div>
-                            </div>
                           </div>
                         </div>
                       );
@@ -439,7 +476,7 @@ export default function CourseQuizzesPage() {
       </div>
 
       {/* Edit Quiz Modal */}
-      {editingQuiz && editForm && (
+      {!isStudent && editingQuiz && editForm && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleCloseEdit} />
           <div
