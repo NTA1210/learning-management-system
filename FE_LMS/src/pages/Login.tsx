@@ -3,10 +3,13 @@ import { Link, useSearchParams } from "react-router-dom";
 import { authService, saveCurrentUserFromApi } from "../services";
 import { type LoginRequest } from "../types/auth";
 import { useTheme } from "../hooks/useTheme";
+import { useAuth } from "../hooks/useAuth";
+import { KeyRound } from "lucide-react";
 
 type ErrorType = string | { path?: string[]; code?: string; message?: string };
 const LoginPage: React.FC = () => {
   const { darkMode } = useTheme();
+  const { saveAccountForQuickSwitch } = useAuth();
   const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState<LoginRequest>({
     email: "",
@@ -15,6 +18,7 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ErrorType | ErrorType[]>("");
+  const [rememberPassword, setRememberPassword] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -31,7 +35,8 @@ const LoginPage: React.FC = () => {
 
     try {
       const response = await authService.login(formData);
-      console.log("Login successful:", response);
+      const resolvedUser = ((response as { data?: unknown }).data ?? response) as Record<string, any>;
+      console.log("Login successful:", resolvedUser);
       // After login, fetch current user profile and save to storage
       try {
         const me = await saveCurrentUserFromApi();
@@ -42,7 +47,20 @@ const LoginPage: React.FC = () => {
       
       // Store authentication state
       localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userData', JSON.stringify(response));
+      localStorage.setItem('userData', JSON.stringify(resolvedUser));
+
+      saveAccountForQuickSwitch({
+        userId: resolvedUser?._id ?? resolvedUser?.id ?? formData.email,
+        email: formData.email,
+        password: rememberPassword ? formData.password : undefined,
+        displayName:
+          resolvedUser?.fullname ||
+          resolvedUser?.fullName ||
+          resolvedUser?.username ||
+          formData.email,
+        avatarUrl: resolvedUser?.avatar_url || resolvedUser?.profileImageUrl,
+        role: resolvedUser?.role,
+      });
       
       // Check if there's a redirect parameter
       const redirectPath = searchParams.get('redirect');
@@ -55,7 +73,7 @@ const LoginPage: React.FC = () => {
         window.location.href = redirectPath;
       } else {
         // Default redirect based on user role
-        const userRole = response.role;
+        const userRole = resolvedUser?.role;
         switch (userRole) {
           case 'admin':
             window.location.href = "/dashboard";
@@ -243,6 +261,26 @@ const LoginPage: React.FC = () => {
                       )}
                     </button>
                   </div>
+                </div>
+
+                {/* Save Password Option */}
+                <div className="flex items-center justify-between text-sm">
+                  <label className="inline-flex items-center gap-2 cursor-pointer select-none" htmlFor="remember-password">
+                    <input
+                      id="remember-password"
+                      type="checkbox"
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      checked={rememberPassword}
+                      onChange={(event) => setRememberPassword(event.target.checked)}
+                    />
+                    <span className="flex items-center gap-1 text-gray-600 dark:text-gray-300">
+                      <KeyRound className="h-4 w-4" />
+                      Save password
+                    </span>
+                  </label>
+                  <span className="text-xs text-gray-400">
+                    {rememberPassword ? "Stored securely" : "Prompt every login"}
+                  </span>
                 </div>
 
                 {/* Error Message */}
