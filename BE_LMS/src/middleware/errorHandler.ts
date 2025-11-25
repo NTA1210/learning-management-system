@@ -4,6 +4,7 @@ import z, { ZodError } from 'zod';
 import AppError from '../utils/AppError';
 import { clearAuthCookies, REFRESH_PATH } from '../utils/cookies';
 import mongoose from 'mongoose';
+import multer from 'multer';
 import AppErrorCode from '../constants/appErrorCode';
 import { MulterError } from 'multer';
 

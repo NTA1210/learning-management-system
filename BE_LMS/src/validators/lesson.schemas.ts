@@ -10,6 +10,7 @@ export const CreateLessonSchema = z.object({
   order: z.number().optional(),
   durationMinutes: z.number().optional(),
   publishedAt: z.coerce.date().optional(),
+  isPublished: z.boolean().optional(),
 });
 
 type LessonQueryFilters = ListParams & {
