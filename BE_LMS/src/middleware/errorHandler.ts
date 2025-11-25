@@ -4,6 +4,7 @@ import z, { ZodError } from 'zod';
 import AppError from '../utils/AppError';
 import { clearAuthCookies, REFRESH_PATH } from '../utils/cookies';
 import mongoose from 'mongoose';
+import multer from 'multer';
 import AppErrorCode from '../constants/appErrorCode';
 
 function handleZodError(res: Response, error: ZodError) {
@@ -55,6 +56,14 @@ function handleMongoError(res: Response, error: mongoose.Error) {
   });
 }
 
+function handleMulterError(res: Response, error: multer.MulterError) {
+  const isFileTooLarge = error.code === 'LIMIT_FILE_SIZE';
+  return res.error(BAD_REQUEST, {
+    message: isFileTooLarge ? 'File size exceeds the 5MB limit' : error.message,
+    code: AppErrorCode.UploadFileError,
+  });
+}
+
 const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
   console.log(`PATH: ${req.path} - ERROR: `, error);
 
@@ -80,6 +89,10 @@ const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
 
   if (error instanceof mongoose.Error) {
     return handleMongoError(res, error);
+  }
+
+  if (error instanceof multer.MulterError) {
+    return handleMulterError(res, error);
   }
 
   if (error.type === 'entity.parse.failed') {
