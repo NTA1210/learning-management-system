@@ -84,7 +84,11 @@ export const enrollQuiz = async ({ quizId, hashPassword, user }: EnrollQuizInput
 
     return {
       questionId: id,
-      answer: [],
+      answer: q.options.map((o) => 0),
+      text: q.text,
+      type: q.type,
+      options: q.options,
+      images: q.images,
       correct: false,
       pointsEarned: 0,
     };
@@ -128,7 +132,7 @@ export const submitQuizAttempt = async (
   }>('quizId');
   appAssert(quizAttempt, NOT_FOUND, 'Quiz attempt not found');
 
-  const answers: Answer[] = quizAttempt.answers;
+  const answers: IQuestionAnswer[] = quizAttempt.answers;
 
   // Chỉ học sinh của khóa học mới được đăng ký làm bài quiz
   const isStudentOfCourse = await EnrollmentModel.findOne({

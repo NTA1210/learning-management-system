@@ -1,14 +1,20 @@
 import mongoose from 'mongoose';
 import { AttemptStatus, IQuestionAnswer, IQuiz, IQuizAttempt } from '../types';
 import { Answer } from '@/validators/quizAttempt.schemas';
-import { string } from 'zod';
+import { QuizQuestionType } from '@/types/quizQuestion.type';
+import { ImageSchema } from './quiz.model';
 
 const QuestionAnswerSchema = new mongoose.Schema<IQuestionAnswer>(
   {
     questionId: { type: String, required: true },
     answer: { type: [Number], default: [] },
-    correct: { type: Boolean },
-    pointsEarned: { type: Number },
+    text: { type: String },
+    options: { type: [String], default: [] },
+    type: { type: String, enum: QuizQuestionType, required: true },
+    images: { type: [ImageSchema], default: [] },
+    explanation: { type: String, trim: true, default: '' },
+    correct: { type: Boolean, default: false },
+    pointsEarned: { type: Number, default: 0 },
   },
   { _id: false }
 );
@@ -30,6 +36,7 @@ const QuizAttemptSchema = new mongoose.Schema<IQuizAttempt>(
     durationSeconds: { type: Number, default: 0 },
     answers: {
       type: [QuestionAnswerSchema],
+      required: true,
       default: [],
     },
     score: { type: Number, default: 0 },
@@ -51,7 +58,7 @@ QuizAttemptSchema.index({ studentId: 1, status: 1 });
 QuizAttemptSchema.index({ quizId: 1, submittedAt: -1 });
 
 /** 🔥 Method chấm điểm */
-QuizAttemptSchema.methods.grade = async function (answers: Answer[], quiz: IQuiz) {
+QuizAttemptSchema.methods.grade = async function (answers: IQuestionAnswer[], quiz: IQuiz) {
   const attempt = this as IQuizAttempt;
   let totalScore = 0;
 
@@ -68,6 +75,7 @@ QuizAttemptSchema.methods.grade = async function (answers: Answer[], quiz: IQuiz
 
     ans.correct = isCorrect;
     ans.pointsEarned = isCorrect ? question.points : 0;
+    ans.explanation = question.explanation;
 
     if (isCorrect) totalScore += question.points;
   });
