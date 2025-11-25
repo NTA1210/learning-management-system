@@ -29,9 +29,5 @@ quizAttemptRoutes.put(
 );
 
 quizAttemptRoutes.put('/:quizAttemptId/auto-save', autoSaveQuizHandler);
-quizAttemptRoutes.get(
-  '/:quizAttemptId',
-  authorize(Role.TEACHER, Role.ADMIN),
-  getQuizAttemptByIdHandler
-);
+quizAttemptRoutes.get('/:quizAttemptId', getQuizAttemptByIdHandler);
 export default quizAttemptRoutes;

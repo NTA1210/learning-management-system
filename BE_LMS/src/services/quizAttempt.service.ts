@@ -263,13 +263,10 @@ export const saveQuizAttempt = async (
     'Invalid number of answers submitted'
   );
 
-  const data = await quizAttempt.updateOne(
-    {
-      answers,
-    },
-    {
-      new: true,
-    }
+  const data = await QuizAttemptModel.findOneAndUpdate(
+    { _id: quizAttemptId },
+    { answers },
+    { new: true }
   );
 
   return data;
@@ -430,7 +427,7 @@ export const getQuizAttemptById = async (
   appAssert(quizAttempt, NOT_FOUND, 'Quiz attempt not found');
 
   // Kiem tra quiz da duoc tao chua
-  const quiz = await QuizModel.findById(quizAttempt.quizId).populate<{ courseId: ICourse }>(
+  const quiz = await QuizModel.findById(quizAttempt.quizId._id).populate<{ courseId: ICourse }>(
     'courseId'
   );
   appAssert(quiz, NOT_FOUND, 'Quiz not found');
@@ -441,6 +438,8 @@ export const getQuizAttemptById = async (
       BAD_REQUEST,
       'You are not the creator of this quiz'
     );
+
+    quizAttempt.quizId = quizAttempt.quizId.id;
   }
 
   if (role === Role.TEACHER) {
@@ -450,5 +449,6 @@ export const getQuizAttemptById = async (
       'You are not a teacher of this course'
     );
   }
+
   return quizAttempt;
 };

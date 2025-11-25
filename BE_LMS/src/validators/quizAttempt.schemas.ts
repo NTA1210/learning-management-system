@@ -1,3 +1,4 @@
+import { QuizQuestionType } from '@/types/quizQuestion.type';
 import mongoose from 'mongoose';
 import z from 'zod';
 
@@ -28,9 +29,12 @@ const answerSchema = z.object({
         message: 'Answer must be 0 or 1',
       })
     )
-    .refine((arr) => arr.includes(1), {
-      message: 'At least one correct option is required',
-    }),
+    .optional(),
+  text: z.string().optional(),
+  options: z.array(z.string()).optional(),
+  type: z.enum(QuizQuestionType).optional(),
+  images: z.array(z.any()).optional(),
+  explanation: z.string().optional(),
   correct: z.boolean().optional(),
   pointsEarned: z.number().optional(),
 });

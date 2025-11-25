@@ -59,7 +59,7 @@ export const saveQuizHandler = catchErrors(async (req, res) => {
   const data = await saveQuizAttempt(input, userId);
   return res.success(OK, {
     data,
-    message: 'Submit quiz attempt successfully',
+    message: 'Save quiz attempt successfully',
   });
 });
 
