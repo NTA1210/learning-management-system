@@ -332,6 +332,7 @@ const QuizCreatePage: React.FC = () => {
 
   const [draftQuestions, setDraftQuestions] = useState<DraftQuestion[]>([emptyDraftQuestion()]);
   const [currentDraftPage, setCurrentDraftPage] = useState(1);
+  const createMarkup = (content?: string) => ({ __html: content || "" });
   const [quizDetails, setQuizDetails] = useState<CreateQuizForm>({
     courseId: "",
     title: "",
@@ -1129,9 +1130,11 @@ const QuizCreatePage: React.FC = () => {
                               onChange={() => toggleBankQuestion(question._id)}
                             />
                             <div>
-                              <p className="font-medium" style={{ color: "var(--heading-text)" }}>
-                                {question.text}
-                              </p>
+                              <div
+                                className="font-medium prose prose-sm max-w-none"
+                                style={{ color: "var(--heading-text)" }}
+                                dangerouslySetInnerHTML={createMarkup(question.text)}
+                              />
                               {Array.isArray(question.options) && (
                                 <ul className="text-sm list-disc pl-5 mt-1 space-y-0.5" style={{ color: "var(--muted-text)" }}>
                                   {question.options.map((opt, idx) => (
@@ -1141,9 +1144,8 @@ const QuizCreatePage: React.FC = () => {
                                         className={
                                           question.correctOptions?.[idx] === 1 ? "text-emerald-600 font-semibold" : ""
                                         }
-                                      >
-                                        {opt}
-                                      </span>
+                                        dangerouslySetInnerHTML={createMarkup(opt)}
+                                      />
                                     </li>
                                   ))}
                                 </ul>

@@ -38,6 +38,8 @@ export function QuizQuestionCard({
   const hasNext = currentImageIndex < images.length - 1;
   const hasPrev = currentImageIndex > 0;
 
+  const renderHTML = (value?: string | number) => ({ __html: value ? String(value) : "" });
+
   return (
     <div
       className="rounded-2xl w-full p-4 sm:p-6"
@@ -168,7 +170,7 @@ export function QuizQuestionCard({
                 }}
               >
                 <span className="font-semibold">{String.fromCharCode(65 + optIndex)}. </span>
-                {option}
+                <span dangerouslySetInnerHTML={renderHTML(option)} />
                 {isCorrect && <span className="ml-2 text-green-500">✓ (True)</span>}
               </div>
             );

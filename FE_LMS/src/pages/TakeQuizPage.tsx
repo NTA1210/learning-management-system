@@ -114,6 +114,8 @@ export default function TakeQuizPage() {
     return `${minutes}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const createMarkup = (content?: string) => ({ __html: content || "" });
+
   const handleEnroll = async () => {
     if (!quizId || !password.trim()) {
       setPasswordError("Please enter the quiz password");
@@ -236,13 +238,13 @@ export default function TakeQuizPage() {
     const type = (question?.type || "").toLowerCase();
     switch (type) {
       case "multichoice":
-        return "Multiple Choice • Select all that apply";
+        return "Multiple Choice";
       case "true_false":
         return "True / False";
       case "fill_blank":
         return "Fill in the Blank";
       default:
-        return "Single Choice • Select one answer";
+        return "Single Choice";
     }
   };
 
@@ -401,9 +403,11 @@ export default function TakeQuizPage() {
                     <span className="font-semibold text-lg" style={{ color: "var(--heading-text)" }}>
                       {currentQuestionIndex + 1}.
                     </span>
-                    <p className="flex-1" style={{ color: "var(--heading-text)" }}>
-                      {currentQuestion.text}
-                    </p>
+                    <div
+                      className="flex-1 prose prose-sm max-w-none"
+                      style={{ color: "var(--heading-text)" }}
+                      dangerouslySetInnerHTML={createMarkup(currentQuestion.text)}
+                    />
                   </div>
                   <div className="text-xs font-semibold uppercase px-3 py-1 rounded-full inline-flex" style={{ backgroundColor: "var(--card-row-bg)", color: "var(--muted-text)" }}>
                     {getQuestionTypeLabel(currentQuestion)}
@@ -423,7 +427,10 @@ export default function TakeQuizPage() {
                             className="w-4 h-4"
                           />
                           <span style={{ color: "var(--input-text)" }}>
-                            {String.fromCharCode(65 + optIdx)}. {option}
+                            <span className="font-semibold mr-1">
+                              {String.fromCharCode(65 + optIdx)}.
+                            </span>
+                            <span dangerouslySetInnerHTML={createMarkup(option)} />
                           </span>
                         </label>
                       ))}
@@ -513,7 +520,8 @@ export default function TakeQuizPage() {
                           )}
                           <div className="flex-1">
                             <p className="font-medium" style={{ color: "var(--heading-text)" }}>
-                              Question {index + 1}: {question.text}
+                              Question {index + 1}:{" "}
+                              <span dangerouslySetInnerHTML={createMarkup(question.text)} />
                             </p>
                             <p className="text-sm mt-1" style={{ color: "var(--muted-text)" }}>
                               Points: {answerData?.pointsEarned || 0} / {question.points || 1}

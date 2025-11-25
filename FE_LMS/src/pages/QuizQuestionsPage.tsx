@@ -43,6 +43,7 @@ export default function QuizQuestionsPage() {
   }, [quizId]);
 
   const questions = quiz?.snapshotQuestions?.filter((q) => !q.isDeleted) || [];
+  const renderMarkup = (content?: string | number) => ({ __html: content ? String(content) : "" });
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -111,9 +112,11 @@ export default function QuizQuestionsPage() {
                             {index + 1}.
                           </span>
                           <div className="flex-1">
-                            <p className="mb-3" style={{ color: "var(--heading-text)" }}>
-                              {question.text}
-                            </p>
+                            <div
+                              className="mb-3 prose prose-sm max-w-none"
+                              style={{ color: "var(--heading-text)" }}
+                              dangerouslySetInnerHTML={renderMarkup(question.text)}
+                            />
                             {Array.isArray(question.options) && question.options.length > 0 && (
                               <ul className="space-y-2">
                                 {question.options.map((opt, idx) => (
@@ -131,7 +134,10 @@ export default function QuizQuestionsPage() {
                                           : "var(--muted-text)",
                                     }}
                                   >
-                                    {String.fromCharCode(65 + idx)}. {opt}
+                                    <span className="font-semibold mr-1">
+                                      {String.fromCharCode(65 + idx)}.
+                                    </span>
+                                    <span dangerouslySetInnerHTML={renderMarkup(opt)} />
                                     {question.correctOptions?.[idx] === 1 && (
                                       <span className="ml-2 text-xs">✓ Correct</span>
                                     )}
@@ -144,9 +150,11 @@ export default function QuizQuestionsPage() {
                                 <p className="text-xs font-medium mb-1" style={{ color: "var(--muted-text)" }}>
                                   Explanation:
                                 </p>
-                                <p className="text-sm" style={{ color: "var(--heading-text)" }}>
-                                  {question.explanation}
-                                </p>
+                                <div
+                                  className="text-sm prose prose-sm max-w-none"
+                                  style={{ color: "var(--heading-text)" }}
+                                  dangerouslySetInnerHTML={renderMarkup(question.explanation)}
+                                />
                               </div>
                             )}
                           </div>
