@@ -8,7 +8,7 @@ export enum AttemptStatus {
 }
 
 export interface IQuestionAnswer {
-  questionId: mongoose.Types.ObjectId | string; // question _id inside quiz
+  questionId: string; // question _id inside quiz
   answer: any; // depends on question type
   correct?: boolean;
   pointsEarned?: number;
@@ -20,7 +20,7 @@ export default interface IQuizAttempt extends mongoose.Document {
   startedAt: Date;
   submittedAt?: Date;
   durationSeconds: number;
-  answers?: IQuestionAnswer[] | [];
+  answers: IQuestionAnswer[] | [];
   score: number;
   status: AttemptStatus;
   ipAddress?: string;

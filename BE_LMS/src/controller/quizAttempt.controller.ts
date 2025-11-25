@@ -1,5 +1,6 @@
 import { CREATED, OK } from '@/constants/http';
 import {
+  autoSaveQuizAttempt,
   banQuizAttempt,
   deleteQuizAttempt,
   enrollQuiz,
@@ -10,6 +11,8 @@ import { catchErrors } from '@/utils/asyncHandler';
 import {
   enrollQuizSchema,
   quizAttemptIdSchema,
+  saveQuizSchema,
+  submitAnswerSchema,
   submitQuizSchema,
 } from '@/validators/quizAttempt.schemas';
 
@@ -36,7 +39,6 @@ export const enrollQuizHandler = catchErrors(async (req, res) => {
 export const submitQuizHandler = catchErrors(async (req, res) => {
   const input = submitQuizSchema.parse({
     quizAttemptId: req.params.quizAttemptId,
-    answers: req.body.answers,
   });
   const userId = req.userId;
   const data = await submitQuizAttempt(input, userId);
@@ -48,7 +50,7 @@ export const submitQuizHandler = catchErrors(async (req, res) => {
 
 // PUT /quiz-attempts/:quizAttemptId/save - Update a quiz attempt
 export const saveQuizHandler = catchErrors(async (req, res) => {
-  const input = submitQuizSchema.parse({
+  const input = saveQuizSchema.parse({
     quizAttemptId: req.params.quizAttemptId,
     answers: req.body.answers,
   });
@@ -81,5 +83,19 @@ export const banQuizAttemptHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     data,
     message: 'Ban quiz attempt successfully',
+  });
+});
+
+// PUT /quiz-attempts/:quizAttemptId/auto-save - Auto save a quiz attempt
+export const autoSaveQuizHandler = catchErrors(async (req, res) => {
+  const input = submitAnswerSchema.parse({
+    quizAttemptId: req.params.quizAttemptId,
+    answer: req.body.answer,
+  });
+  const userId = req.userId;
+  const data = await autoSaveQuizAttempt(input, userId);
+  return res.success(OK, {
+    data,
+    message: 'Auto save quiz attempt successfully',
   });
 });

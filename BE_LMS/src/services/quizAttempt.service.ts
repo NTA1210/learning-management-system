@@ -1,17 +1,15 @@
 import { BAD_REQUEST, NOT_FOUND } from '@/constants/http';
-import { CourseModel, EnrollmentModel, QuizAttemptModel, QuizModel } from '@/models';
-import {
-  AttemptStatus,
-  EnrollmentRole,
-  EnrollmentStatus,
-  IQuiz,
-  IQuizAttempt,
-  Role,
-} from '@/types';
+import { EnrollmentModel, QuizAttemptModel, QuizModel } from '@/models';
+import { AttemptStatus, EnrollmentStatus, IQuestionAnswer, IQuiz, Role } from '@/types';
 import appAssert from '@/utils/appAssert';
-import { EnrollQuizInput, SubmitQuizInput } from '@/validators/quizAttempt.schemas';
+import {
+  Answer,
+  EnrollQuizInput,
+  SaveQuizInput,
+  SubmitAnswerInput,
+  SubmitQuizInput,
+} from '@/validators/quizAttempt.schemas';
 import mongoose from 'mongoose';
-import { isTeacherOfCourse } from './helpers/quizHelpers';
 
 /**
  * Enroll in a quiz.
@@ -81,15 +79,33 @@ export const enrollQuiz = async ({ quizId, hashPassword, user }: EnrollQuizInput
     'You can only enroll within 15 minutes after the quiz starts'
   );
 
-  // Tạo mới quiz attempt
-  const quizAttemptModel = new QuizAttemptModel({
-    quizId: quiz._id,
-    studentId: user.userId,
-    ipAddress: user.ip,
-    userAgent: user.userAgent,
+  const questionAnswers: IQuestionAnswer[] = quiz.snapshotQuestions.map((q) => {
+    const { id } = q;
+
+    return {
+      questionId: id,
+      answer: [],
+      correct: false,
+      pointsEarned: 0,
+    };
   });
-  await quizAttemptModel.save();
-  return quizAttemptModel;
+
+  // Tạo mới quiz attempt
+  const data = await QuizAttemptModel.findOneAndUpdate(
+    { quizId: quiz._id, studentId: user.userId },
+    {
+      $setOnInsert: {
+        quizId: quiz._id,
+        studentId: user.userId,
+        ipAddress: user.ip,
+        userAgent: user.userAgent,
+        answers: questionAnswers,
+      },
+    },
+    { upsert: true, new: true }
+  );
+
+  return data;
 };
 
 /**
@@ -104,15 +120,15 @@ export const enrollQuiz = async ({ quizId, hashPassword, user }: EnrollQuizInput
  * @throws  - If the time limit has been exceeded.
  */
 export const submitQuizAttempt = async (
-  { quizAttemptId, answers }: SubmitQuizInput,
+  { quizAttemptId }: SubmitQuizInput,
   userId: mongoose.Types.ObjectId
 ) => {
-  const quizAttempt = await QuizAttemptModel.findById(quizAttemptId)
-    .populate<{
-      quizId: IQuiz;
-    }>('quizId')
-    .lean<IQuizAttempt & { quizId: IQuiz }>();
+  const quizAttempt = await QuizAttemptModel.findById(quizAttemptId).populate<{
+    quizId: IQuiz;
+  }>('quizId');
   appAssert(quizAttempt, NOT_FOUND, 'Quiz attempt not found');
+
+  const answers: Answer[] = quizAttempt.answers;
 
   // Chỉ học sinh của khóa học mới được đăng ký làm bài quiz
   const isStudentOfCourse = await EnrollmentModel.findOne({
@@ -178,7 +194,7 @@ export const submitQuizAttempt = async (
  * @throws  - If the time limit has been exceeded.
  */
 export const saveQuizAttempt = async (
-  { quizAttemptId, answers }: SubmitQuizInput,
+  { quizAttemptId, answers }: SaveQuizInput,
   userId: mongoose.Types.ObjectId
 ) => {
   const quizAttempt = await QuizAttemptModel.findById(quizAttemptId).populate<{
@@ -321,4 +337,58 @@ export const banQuizAttempt = async (
   appAssert(updated, NOT_FOUND, 'Quiz attempt not found or already banned');
 
   return updated;
+};
+
+/**
+ * Auto save a quiz attempt.
+ * @param  data - Parameters to auto save a quiz attempt.
+ * @param  userId - ID of the user who is auto saving the quiz attempt.
+ * @throws  If the quiz attempt is not found.
+ * @throws  If the user is not a student of the course or if the user was banned from taking the quiz or if the user has already submitted the quiz or if the time limit has been exceeded.
+ * @returns  The saved quiz attempt.
+ */
+export const autoSaveQuizAttempt = async (
+  { quizAttemptId, answer }: SubmitAnswerInput,
+  userId: mongoose.Types.ObjectId
+) => {
+  const quizAttempt = await QuizAttemptModel.findById(quizAttemptId).populate<{
+    quizId: IQuiz;
+  }>('quizId');
+  appAssert(quizAttempt, NOT_FOUND, 'Quiz attempt not found');
+
+  // Chỉ học sinh của khóa học mới được đăng ký làm bài quiz
+  const isStudentOfCourse = await EnrollmentModel.findOne({
+    studentId: userId,
+    courseId: quizAttempt.quizId.courseId,
+    status: EnrollmentStatus.APPROVED,
+  });
+  appAssert(isStudentOfCourse, BAD_REQUEST, 'You are not a student of this course');
+
+  appAssert(
+    quizAttempt.status !== AttemptStatus.ABANDONED,
+    BAD_REQUEST,
+    'You were banned from taking this quiz'
+  );
+
+  appAssert(
+    quizAttempt.status !== AttemptStatus.SUBMITTED,
+    BAD_REQUEST,
+    'You have already submitted this quiz'
+  );
+
+  // Kiem tra xem nguoi dung co dung thoi gian lam bai khong
+  const isOnTime = quizAttempt.quizId.endTime.getTime() + 30 * 1000 >= Date.now();
+
+  appAssert(isOnTime, BAD_REQUEST, 'Time limit exceeded');
+
+  const { questionId, answer: options } = answer;
+
+  for (const ans of quizAttempt.answers) {
+    if (ans.questionId.toString() === questionId) {
+      ans.answer = options;
+    }
+  }
+  const data = await quizAttempt.save();
+  const { quizId, ...rest } = data.toObject();
+  return rest;
 };
