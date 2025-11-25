@@ -339,6 +339,14 @@ export const banQuizAttempt = async (
   return updated;
 };
 
+/**
+ * Auto save a quiz attempt.
+ * @param  data - Parameters to auto save a quiz attempt.
+ * @param  userId - ID of the user who is auto saving the quiz attempt.
+ * @throws  If the quiz attempt is not found.
+ * @throws  If the user is not a student of the course or if the user was banned from taking the quiz or if the user has already submitted the quiz or if the time limit has been exceeded.
+ * @returns  The saved quiz attempt.
+ */
 export const autoSaveQuizAttempt = async (
   { quizAttemptId, answer }: SubmitAnswerInput,
   userId: mongoose.Types.ObjectId
