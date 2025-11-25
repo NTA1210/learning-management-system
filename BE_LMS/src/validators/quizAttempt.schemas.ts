@@ -11,6 +11,7 @@ export const enrollQuizSchema = z.object({
 
 export type EnrollUserInfo = {
   userId: mongoose.Types.ObjectId;
+  role: string;
   userAgent?: string | string[];
   ip?: string | null;
 };

@@ -3,6 +3,7 @@ import {
   banQuizAttemptHandler,
   deleteQuizAttemptHandler,
   enrollQuizHandler,
+  getQuizAttemptByIdHandler,
   saveQuizHandler,
   submitQuizHandler,
 } from '@/controller/quizAttempt.controller';
@@ -13,9 +14,9 @@ import express from 'express';
 // prefix: /quiz-attempts
 const quizAttemptRoutes = express.Router();
 
-quizAttemptRoutes.post('/enroll', authorize(Role.STUDENT), enrollQuizHandler);
-quizAttemptRoutes.put('/:quizAttemptId/submit', authorize(Role.STUDENT), submitQuizHandler);
-quizAttemptRoutes.put('/:quizAttemptId/save', authorize(Role.STUDENT), saveQuizHandler);
+quizAttemptRoutes.post('/enroll', enrollQuizHandler);
+quizAttemptRoutes.put('/:quizAttemptId/submit', submitQuizHandler);
+quizAttemptRoutes.put('/:quizAttemptId/save', saveQuizHandler);
 quizAttemptRoutes.delete(
   '/:quizAttemptId',
   authorize(Role.TEACHER, Role.ADMIN),
@@ -27,6 +28,10 @@ quizAttemptRoutes.put(
   banQuizAttemptHandler
 );
 
-quizAttemptRoutes.put('/:quizAttemptId/auto-save', authorize(Role.STUDENT), autoSaveQuizHandler);
-
+quizAttemptRoutes.put('/:quizAttemptId/auto-save', autoSaveQuizHandler);
+quizAttemptRoutes.get(
+  '/:quizAttemptId',
+  authorize(Role.TEACHER, Role.ADMIN),
+  getQuizAttemptByIdHandler
+);
 export default quizAttemptRoutes;

@@ -1,6 +1,6 @@
 import { BAD_REQUEST, NOT_FOUND } from '@/constants/http';
 import { EnrollmentModel, QuizAttemptModel, QuizModel } from '@/models';
-import { AttemptStatus, EnrollmentStatus, IQuestionAnswer, IQuiz, Role } from '@/types';
+import { AttemptStatus, EnrollmentStatus, ICourse, IQuestionAnswer, IQuiz, Role } from '@/types';
 import appAssert from '@/utils/appAssert';
 import {
   Answer,
@@ -10,6 +10,7 @@ import {
   SubmitQuizInput,
 } from '@/validators/quizAttempt.schemas';
 import mongoose from 'mongoose';
+import { isTeacherOfCourse } from './helpers/quizHelpers';
 
 /**
  * Enroll in a quiz.
@@ -24,18 +25,32 @@ import mongoose from 'mongoose';
  * @throws  - If the user is not a student or if the user has already completed the quiz or if the user is banned from taking the quiz.
  * @throws  - If the quiz is not found.
  */
-export const enrollQuiz = async ({ quizId, hashPassword, user }: EnrollQuizInput) => {
+export const enrollQuiz = async ({
+  quizId,
+  hashPassword,
+  user: { role, userId, userAgent, ip },
+}: EnrollQuizInput) => {
   // Logic đăng ký làm bài quiz
-  const quiz = await QuizModel.findById(quizId);
+  const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId');
   appAssert(quiz, NOT_FOUND, 'Quiz not found');
 
-  // Chỉ học sinh của khóa học mới được đăng ký làm bài quiz
-  const isStudentOfCourse = await EnrollmentModel.findOne({
-    studentId: user.userId,
-    courseId: quiz.courseId,
-    status: EnrollmentStatus.APPROVED,
-  });
-  appAssert(isStudentOfCourse, BAD_REQUEST, 'You are not a student of this course');
+  if (role === Role.STUDENT) {
+    // Chỉ học sinh của khóa học mới được đăng ký làm bài quiz
+    const isStudentOfCourse = await EnrollmentModel.findOne({
+      studentId: userId,
+      courseId: quiz.courseId,
+      status: EnrollmentStatus.APPROVED,
+    });
+    appAssert(isStudentOfCourse, BAD_REQUEST, 'You are not a student of this course');
+  }
+
+  if (role === Role.TEACHER) {
+    appAssert(
+      isTeacherOfCourse(quiz.courseId, userId),
+      BAD_REQUEST,
+      'You are not a teacher of this course'
+    );
+  }
 
   // Kiem tra mat khau
   appAssert(quiz.compareHashPassword(hashPassword), BAD_REQUEST, 'Invalid password');
@@ -43,7 +58,7 @@ export const enrollQuiz = async ({ quizId, hashPassword, user }: EnrollQuizInput
   // Kiem tra nguoi dung da lam bai chua
   const quizAttempt = await QuizAttemptModel.findOne({
     quizId: quiz._id,
-    studentId: user.userId,
+    studentId: userId,
   });
   if (quizAttempt) {
     appAssert(
@@ -96,13 +111,13 @@ export const enrollQuiz = async ({ quizId, hashPassword, user }: EnrollQuizInput
 
   // Tạo mới quiz attempt
   const data = await QuizAttemptModel.findOneAndUpdate(
-    { quizId: quiz._id, studentId: user.userId },
+    { quizId: quiz._id, studentId: userId },
     {
       $setOnInsert: {
         quizId: quiz._id,
-        studentId: user.userId,
-        ipAddress: user.ip,
-        userAgent: user.userAgent,
+        studentId: userId,
+        ipAddress: ip,
+        userAgent: userAgent,
         answers: questionAnswers,
       },
     },
@@ -132,15 +147,19 @@ export const submitQuizAttempt = async (
   }>('quizId');
   appAssert(quizAttempt, NOT_FOUND, 'Quiz attempt not found');
 
-  const answers: IQuestionAnswer[] = quizAttempt.answers;
+  // Kiem tra quiz da duoc tao chua
+  const quiz = await QuizModel.findById(quizAttempt.quizId).populate<{ courseId: ICourse }>(
+    'courseId'
+  );
+  appAssert(quiz, NOT_FOUND, 'Quiz not found');
 
-  // Chỉ học sinh của khóa học mới được đăng ký làm bài quiz
-  const isStudentOfCourse = await EnrollmentModel.findOne({
-    studentId: userId,
-    courseId: quizAttempt.quizId.courseId,
-    status: EnrollmentStatus.APPROVED,
-  });
-  appAssert(isStudentOfCourse, BAD_REQUEST, 'You are not a student of this course');
+  appAssert(
+    quizAttempt.studentId.toString() === userId.toString(),
+    BAD_REQUEST,
+    'You are not the creator of this quiz'
+  );
+
+  const answers: IQuestionAnswer[] = quizAttempt.answers;
 
   appAssert(
     quizAttempt.status !== AttemptStatus.ABANDONED,
@@ -207,13 +226,18 @@ export const saveQuizAttempt = async (
 
   appAssert(quizAttempt, NOT_FOUND, 'Quiz attempt not found');
 
-  // Chỉ học sinh của khóa học mới được lưu bài quiz
-  const isStudentOfCourse = await EnrollmentModel.findOne({
-    studentId: userId,
-    courseId: quizAttempt.quizId.courseId,
-    status: EnrollmentStatus.APPROVED,
-  });
-  appAssert(isStudentOfCourse, BAD_REQUEST, 'You are not a student of this course');
+  // Kiem tra quiz da duoc tao chua
+  const quiz = await QuizModel.findById(quizAttempt.quizId).populate<{ courseId: ICourse }>(
+    'courseId'
+  );
+  appAssert(quiz, NOT_FOUND, 'Quiz not found');
+
+  // Kiem tra nguoi dung co phai nguoi tao khong
+  appAssert(
+    quizAttempt.studentId.toString() === userId.toString(),
+    BAD_REQUEST,
+    'You are not the creator of this quiz'
+  );
 
   appAssert(
     quizAttempt.status !== AttemptStatus.ABANDONED,
@@ -276,7 +300,7 @@ export const deleteQuizAttempt = async (
     appAssert(
       data.quizId.createdBy?.equals(userId),
       BAD_REQUEST,
-      'You are not the creator of this quiz'
+      'You are not the teacher who created this quiz'
     );
   }
 
@@ -360,13 +384,11 @@ export const autoSaveQuizAttempt = async (
   }>('quizId');
   appAssert(quizAttempt, NOT_FOUND, 'Quiz attempt not found');
 
-  // Chỉ học sinh của khóa học mới được đăng ký làm bài quiz
-  const isStudentOfCourse = await EnrollmentModel.findOne({
-    studentId: userId,
-    courseId: quizAttempt.quizId.courseId,
-    status: EnrollmentStatus.APPROVED,
-  });
-  appAssert(isStudentOfCourse, BAD_REQUEST, 'You are not a student of this course');
+  appAssert(
+    quizAttempt.studentId.toString() === userId.toString(),
+    BAD_REQUEST,
+    'You are not a creator of this quiz'
+  );
 
   appAssert(
     quizAttempt.status !== AttemptStatus.ABANDONED,
@@ -395,4 +417,38 @@ export const autoSaveQuizAttempt = async (
   const data = await quizAttempt.save();
   const { quizId, ...rest } = data.toObject();
   return rest;
+};
+
+export const getQuizAttemptById = async (
+  quizAttemptId: string,
+  userId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  const quizAttempt = await QuizAttemptModel.findById(quizAttemptId).populate<{
+    quizId: IQuiz;
+  }>('quizId');
+  appAssert(quizAttempt, NOT_FOUND, 'Quiz attempt not found');
+
+  // Kiem tra quiz da duoc tao chua
+  const quiz = await QuizModel.findById(quizAttempt.quizId).populate<{ courseId: ICourse }>(
+    'courseId'
+  );
+  appAssert(quiz, NOT_FOUND, 'Quiz not found');
+
+  if (role === Role.STUDENT) {
+    appAssert(
+      quizAttempt.studentId.toString() === userId.toString(),
+      BAD_REQUEST,
+      'You are not the creator of this quiz'
+    );
+  }
+
+  if (role === Role.TEACHER) {
+    appAssert(
+      isTeacherOfCourse(quiz.courseId, userId),
+      BAD_REQUEST,
+      'You are not a teacher of this course'
+    );
+  }
+  return quizAttempt;
 };
