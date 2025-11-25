@@ -7,7 +7,7 @@ import { useTheme } from "../hooks/useTheme";
 import { quizService, quizAttemptService } from "../services";
 import type { QuizResponse, SnapshotQuestion } from "../services/quizService";
 import type { QuizAnswer } from "../services/quizAttemptService";
-import { Clock, Lock, CheckCircle, XCircle } from "lucide-react";
+import { Clock, Lock, CheckCircle, XCircle, ChevronLeft, ChevronRight, Book } from "lucide-react";
 
 export default function TakeQuizPage() {
   const { courseId, quizId } = useParams<{ courseId?: string; quizId: string }>();
@@ -23,6 +23,9 @@ export default function TakeQuizPage() {
   const [enrolling, setEnrolling] = useState(false);
   const [quizAttemptId, setQuizAttemptId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, number[]>>({});
+  const [answersChanged, setAnswersChanged] = useState(false);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [savingProgress, setSavingProgress] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -146,12 +149,55 @@ export default function TakeQuizPage() {
       updated[optionIndex] = checked ? 1 : 0;
       return { ...prev, [questionId]: updated };
     });
+    setAnswersChanged(true);
+  };
+
+  const saveProgressIfNeeded = async () => {
+    if (!quizAttemptId || !answersChanged || savingProgress) return;
+    try {
+      setSavingProgress(true);
+      const answersArray: QuizAnswer[] =
+        quiz?.snapshotQuestions
+          ?.filter((q) => !q.isDeleted)
+          .map((q) => ({
+            questionId: q.id || "",
+            answer: answers[q.id || ""] || new Array(q.options?.length || 0).fill(0),
+          })) || [];
+      await quizAttemptService.saveQuiz({
+        quizAttemptId,
+        answers: answersArray,
+      });
+      setAnswersChanged(false);
+    } catch (err) {
+      console.warn("Failed to auto-save quiz attempt:", err);
+    } finally {
+      setSavingProgress(false);
+    }
+  };
+
+  const goToQuestion = async (index: number) => {
+    if (index === currentQuestionIndex || !quiz?.snapshotQuestions) return;
+    await saveProgressIfNeeded();
+    setCurrentQuestionIndex(index);
+  };
+
+  const handleNextQuestion = async () => {
+    if (!quiz?.snapshotQuestions) return;
+    await saveProgressIfNeeded();
+    setCurrentQuestionIndex((prev) => Math.min(prev + 1, quiz.snapshotQuestions!.length - 1));
+  };
+
+  const handlePrevQuestion = async () => {
+    if (!quiz?.snapshotQuestions) return;
+    await saveProgressIfNeeded();
+    setCurrentQuestionIndex((prev) => Math.max(prev - 1, 0));
   };
 
   const handleSubmit = async () => {
     if (!quizAttemptId || !quiz || submitted) return;
 
     try {
+      await saveProgressIfNeeded();
       setSubmitting(true);
 
       // Convert answers to the format expected by backend
@@ -183,7 +229,22 @@ export default function TakeQuizPage() {
     }
   };
 
-  const questions = quiz?.snapshotQuestions?.filter((q) => !q.isDeleted) || [];
+  const questions: SnapshotQuestion[] = (quiz?.snapshotQuestions?.filter((q) => !q.isDeleted) as SnapshotQuestion[]) || [];
+  const currentQuestion = questions[currentQuestionIndex];
+
+  const getQuestionTypeLabel = (question?: SnapshotQuestion) => {
+    const type = (question?.type || "").toLowerCase();
+    switch (type) {
+      case "multichoice":
+        return "Multiple Choice • Select all that apply";
+      case "true_false":
+        return "True / False";
+      case "fill_blank":
+        return "Fill in the Blank";
+      default:
+        return "Single Choice • Select one answer";
+    }
+  };
 
   if (loading) {
     return (
@@ -284,7 +345,7 @@ export default function TakeQuizPage() {
                   )}
                   <div className="flex gap-3 justify-end">
                     <button
-                      onClick={() => navigate("/quizzes")}
+                      onClick={() => navigate(courseId ? `/quizz/${courseId}` : "/quizz")}
                       className="px-4 py-2 rounded-lg text-sm font-medium"
                       style={{ backgroundColor: "var(--divider-color)", color: "var(--heading-text)" }}
                     >
@@ -304,46 +365,92 @@ export default function TakeQuizPage() {
             )}
 
             {/* Quiz Form */}
-            {quizAttemptId && !submitted && (
+            {quizAttemptId && !submitted && currentQuestion && (
               <>
-                <div className="space-y-6 mb-6">
-                  {questions.map((question, index) => (
-                    <div
-                      key={question.id || index}
-                      className="rounded-lg p-6 border"
-                      style={{ backgroundColor: "var(--card-surface)", borderColor: "var(--card-border)" }}
-                    >
-                      <div className="flex items-start gap-3 mb-4">
-                        <span className="font-semibold text-lg" style={{ color: "var(--heading-text)" }}>
-                          {index + 1}.
-                        </span>
-                        <p className="flex-1" style={{ color: "var(--heading-text)" }}>
-                          {question.text}
-                        </p>
-                      </div>
-                      {question.options && question.options.length > 0 && (
-                        <div className="space-y-2 ml-8">
-                          {question.options.map((option, optIdx) => (
-                            <label
-                              key={optIdx}
-                              className="flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-opacity-50"
-                              style={{ backgroundColor: "var(--input-bg)" }}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={(answers[question.id || ""]?.[optIdx] || 0) === 1}
-                                onChange={(e) => handleAnswerChange(question.id || "", optIdx, e.target.checked)}
-                                className="w-4 h-4"
-                              />
-                              <span style={{ color: "var(--input-text)" }}>
-                                {String.fromCharCode(65 + optIdx)}. {option}
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
+                <div className="mb-4 flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-full text-sm" style={{ backgroundColor: "var(--card-surface)", border: "1px solid var(--card-border)" }}>
+                    <Book className="w-4 h-4" />
+                    <span>
+                      Question {currentQuestionIndex + 1} / {questions.length}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {questions.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => goToQuestion(idx)}
+                        className={`w-8 h-8 rounded-full text-sm font-semibold ${
+                          idx === currentQuestionIndex ? "text-white" : ""
+                        }`}
+                        style={{
+                          backgroundColor: idx === currentQuestionIndex ? "#6d28d9" : "var(--card-surface)",
+                          border: "1px solid var(--card-border)",
+                        }}
+                      >
+                        {idx + 1}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div
+                  className="rounded-lg p-6 border mb-6 space-y-4"
+                  style={{ backgroundColor: "var(--card-surface)", borderColor: "var(--card-border)" }}
+                >
+                  <div className="flex items-start gap-3 mb-4">
+                    <span className="font-semibold text-lg" style={{ color: "var(--heading-text)" }}>
+                      {currentQuestionIndex + 1}.
+                    </span>
+                    <p className="flex-1" style={{ color: "var(--heading-text)" }}>
+                      {currentQuestion.text}
+                    </p>
+                  </div>
+                  <div className="text-xs font-semibold uppercase px-3 py-1 rounded-full inline-flex" style={{ backgroundColor: "var(--card-row-bg)", color: "var(--muted-text)" }}>
+                    {getQuestionTypeLabel(currentQuestion)}
+                  </div>
+                  {currentQuestion.options && currentQuestion.options.length > 0 && (
+                    <div className="space-y-2 ml-8">
+                      {currentQuestion.options.map((option, optIdx) => (
+                        <label
+                          key={optIdx}
+                          className="flex items-center gap-3 p-2 rounded cursor-pointer hover:bg-opacity-50"
+                          style={{ backgroundColor: "var(--input-bg)" }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={(answers[currentQuestion.id || ""]?.[optIdx] || 0) === 1}
+                            onChange={(e) => handleAnswerChange(currentQuestion.id || "", optIdx, e.target.checked)}
+                            className="w-4 h-4"
+                          />
+                          <span style={{ color: "var(--input-text)" }}>
+                            {String.fromCharCode(65 + optIdx)}. {option}
+                          </span>
+                        </label>
+                      ))}
                     </div>
-                  ))}
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+                  <button
+                    onClick={handlePrevQuestion}
+                    disabled={currentQuestionIndex === 0 || savingProgress}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+                    style={{ backgroundColor: "var(--card-surface)", border: "1px solid var(--card-border)" }}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Previous
+                  </button>
+                  {savingProgress && <span className="text-xs" style={{ color: "var(--muted-text)" }}>Saving...</span>}
+                  <button
+                    onClick={handleNextQuestion}
+                    disabled={currentQuestionIndex === questions.length - 1 || savingProgress}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+                    style={{ backgroundColor: "var(--card-surface)", border: "1px solid var(--card-border)" }}
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
 
                 <div className="flex justify-end gap-3">
@@ -392,7 +499,7 @@ export default function TakeQuizPage() {
                     return (
                       <div
                         key={question.id || index}
-                        className="rounded-lg p-4 border"
+                        className="rounded-lg p-4 border space-y-2"
                         style={{
                           backgroundColor: isCorrect ? "rgba(16, 185, 129, 0.1)" : "rgba(239, 68, 68, 0.1)",
                           borderColor: isCorrect ? "#10b981" : "#ef4444",
@@ -411,6 +518,9 @@ export default function TakeQuizPage() {
                             <p className="text-sm mt-1" style={{ color: "var(--muted-text)" }}>
                               Points: {answerData?.pointsEarned || 0} / {question.points || 1}
                             </p>
+                            <div className="text-xs font-semibold uppercase mt-1" style={{ color: "var(--muted-text)" }}>
+                              {getQuestionTypeLabel(question as SnapshotQuestion)}
+                            </div>
                           </div>
                         </div>
                       </div>
