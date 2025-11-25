@@ -68,7 +68,7 @@ const MyCoursesPage: React.FC = () => {
             }}
         >
             <Navbar />
-            <Sidebar />
+                  <Sidebar role={'student'} />
             <div className="max-w-[1200px] mt-[100px] mx-auto px-4 sm:pl-[93px] py-6">
                 <h1
                     className="text-2xl font-semibold mb-6"

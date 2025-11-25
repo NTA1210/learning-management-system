@@ -31,7 +31,40 @@ import {
   searchSubjectsAutocomplete,
   getRelatedSubjects,
   deleteQuestionsBySubjectId,
+  getMySubjects,
 } from "../services/subject.service";
+
+/**
+ * GET /subjects/my-subjects - Get my subjects
+ */
+export const getMySubjectsHandler = catchErrors(async (req, res) => {
+  const query = listSubjectsSchema.parse(req.query);
+  const userId = (req as any).userId;
+  const userRole = (req as any).role;
+
+  const result = await getMySubjects({
+    userId,
+    userRole,
+    params: {
+      page: query.page,
+      limit: query.limit,
+      search: query.search,
+      name: query.name,
+      slug: query.slug,
+      code: query.code,
+      specialistId: query.specialistId,
+      isActive: query.isActive,
+      sortBy: query.sortBy,
+      sortOrder: query.sortOrder,
+    },
+  });
+
+  return res.success(OK, {
+    data: result.subjects,
+    message: "My subjects retrieved successfully",
+    pagination: result.pagination,
+  });
+});
 
 // GET /subjects - Liệt kê Subject (search, lọc, phân trang, sắp xếp)
 export const listSubjectsHandler = catchErrors(async (req, res) => {

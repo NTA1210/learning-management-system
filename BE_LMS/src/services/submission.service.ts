@@ -18,6 +18,7 @@ import { uploadFile, getSignedUrl } from "@/utils/uploadFile";
 import { prefixSubmission } from "@/utils/filePrefix";
 import { EnrollmentStatus } from "@/types/enrollment.type";
 import { createNotification } from "./notification.service";
+import { ensureTeacherAccessToCourse } from "./helpers/courseAccessHelpers";
 
 //submit assign
 export const submitAssignment = async ({
@@ -168,23 +169,15 @@ export const getSubmissionById = async (
   //nếu teacher
   else if (requesterRole === Role.TEACHER) {
     const assignment = submission.assignmentId as any;
-    const courseId = assignment?.courseId;
-    appAssert(courseId, NOT_FOUND, "Course not found for this assignment");
+    const courseRef = assignment?.courseId;
+    appAssert(courseRef, NOT_FOUND, "Course not found for this assignment");
 
-    const course = await CourseModel.findById(courseId);
-    appAssert(course, NOT_FOUND, "Course not found");
-
-    const teacherIds = course.teacherIds || [];
-    const isTeacherInCourse = teacherIds.some(
-      (teacherId: mongoose.Types.ObjectId) =>
-        teacherId.toString() === requesterId.toString()
-    );
-
-    appAssert(
-      isTeacherInCourse,
-      FORBIDDEN,
-      "You do not have permission to view submissions in this course"
-    );
+    await ensureTeacherAccessToCourse({
+      course: courseRef,
+      courseId: (courseRef as any)?._id || courseRef,
+      userId: requesterId,
+      userRole: requesterRole,
+    });
   }
 
   //tajo presigned URL cho file
@@ -200,13 +193,32 @@ export const getSubmissionById = async (
 };
 
 //hàm bổ sung, ds bài nộp theo assignment cho GV
-export const listSubmissionsByAssignment = async (
-  assignmentId: string,
-  from?: Date,
-  to?: Date
-  ) => {
+type ListSubmissionsByAssignmentParams = {
+  assignmentId: string;
+  from?: Date;
+  to?: Date;
+  requesterId?: mongoose.Types.ObjectId;
+  requesterRole?: Role;
+};
+
+export const listSubmissionsByAssignment = async ({
+  assignmentId,
+  from,
+  to,
+  requesterId,
+  requesterRole,
+}: ListSubmissionsByAssignmentParams) => {
+  const assignment = await AssignmentModel.findById(assignmentId).select("courseId");
+  appAssert(assignment, NOT_FOUND, "Assignment not found");
+
+  await ensureTeacherAccessToCourse({
+    courseId: assignment.courseId as mongoose.Types.ObjectId,
+    userId: requesterId,
+    userRole: requesterRole,
+  });
+
   const filter: any = { assignmentId };
-  
+
   if (from || to) {
     filter.submittedAt = {};
     if (from) filter.submittedAt.$gte = from;
@@ -232,6 +244,12 @@ export const gradeSubmission = async (
   //Kiểm tra Assignment
   const assignment = await AssignmentModel.findById(assignmentId);
   appAssert(assignment, NOT_FOUND, "Assignment not found");
+
+  await ensureTeacherAccessToCourse({
+    courseId: assignment.courseId as mongoose.Types.ObjectId,
+    userId: graderId,
+    userRole: graderRole,
+  });
 
   //Kiểm tra Submission
   const submission = await SubmissionModel.findOne({ assignmentId, studentId });
@@ -291,11 +309,16 @@ export const gradeSubmissionById = async (
 ) => {
   const submission = await SubmissionModel.findById(submissionId).populate({
     path: "assignmentId",
-    select: "title maxScore",
+    select: "title maxScore courseId",
   });
   appAssert(submission, NOT_FOUND, 'Submission not found');
 
   const assignment: any = submission.assignmentId;
+  await ensureTeacherAccessToCourse({
+    courseId: assignment?.courseId,
+    userId: graderId,
+    userRole: graderRole,
+  });
   const maxScore = assignment?.maxScore ?? 10;
   appAssert(
     grade >= 0 && grade <= maxScore,
@@ -411,9 +434,26 @@ export const listAllGradesByStudent = async (
 //static and report
 
 // 1. Get Submission Statistics
-export const getSubmissionStats = async (assignmentId: string) => {
-    const assignment = await AssignmentModel.findById(assignmentId).populate({ path: "courseId", select: "studentId" });
+type SubmissionStatsParams = {
+  assignmentId: string;
+  requesterId?: mongoose.Types.ObjectId;
+  requesterRole?: Role;
+};
+
+export const getSubmissionStats = async ({
+  assignmentId,
+  requesterId,
+  requesterRole,
+}: SubmissionStatsParams) => {
+    const assignment = await AssignmentModel.findById(assignmentId).populate({ path: "courseId", select: "teacherIds title" });
     if (!assignment) throw new Error("Assignment not found");
+
+    await ensureTeacherAccessToCourse({
+      course: assignment.courseId,
+      courseId: (assignment.courseId as any)?._id || assignment.courseId,
+      userId: requesterId,
+      userRole: requesterRole,
+    });
 
     const totalStudents = await EnrollmentModel.countDocuments({ 
       courseId: assignment.courseId._id,
@@ -459,9 +499,11 @@ export const getGradeDistribution = async (assignmentId: string) => {
 
 export const getSubmissionReportByAssignment = async (
     assignmentId: string,
-    query?: SubmissionReportQuery
+    query?: SubmissionReportQuery,
+    requesterId?: mongoose.Types.ObjectId,
+    requesterRole?: Role
     ) => {
-    const stats = await getSubmissionStats(assignmentId);
+    const stats = await getSubmissionStats({ assignmentId, requesterId, requesterRole });
     const distribution = await getGradeDistribution(assignmentId);
 
     const filter: any = { assignmentId };
@@ -479,13 +521,27 @@ export const getSubmissionReportByAssignment = async (
 };
 
 // 4. Report by Course
-export const getSubmissionReportByCourse = async (courseId: string) => {
+export const getSubmissionReportByCourse = async (
+  courseId: string,
+  requesterId?: mongoose.Types.ObjectId,
+  requesterRole?: Role
+) => {
+    await ensureTeacherAccessToCourse({
+      courseId,
+      userId: requesterId,
+      userRole: requesterRole,
+    });
+
     const assignments = await AssignmentModel.find({ courseId }) as IAssignment[];
     const reports = [];
 
     for (const a of assignments) {
         const assignmentId = (a as any)._id && (a as any)._id.toHexString ? (a as any)._id.toHexString() : String((a as any)._id);
-        const stats = await getSubmissionStats(assignmentId);
+        const stats = await getSubmissionStats({
+          assignmentId,
+          requesterId,
+          requesterRole,
+        });
         const distribution = await getGradeDistribution(assignmentId);
         reports.push({ assignment: a.title, stats, distribution });
         }

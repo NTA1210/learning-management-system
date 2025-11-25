@@ -1,4 +1,4 @@
-import { BAD_REQUEST, FORBIDDEN, NOT_FOUND } from '@/constants/http';
+import { BAD_REQUEST, NOT_FOUND } from '@/constants/http';
 import { CourseModel, EnrollmentModel, QuizAttemptModel, QuizModel } from '@/models';
 import {
   AttemptStatus,
@@ -22,7 +22,7 @@ import {
   isTeacherOfCourse,
   standardDeviation,
 } from './helpers/quizHelpers';
-import { superRefine } from 'zod';
+import { QuizQuestionType } from '@/types/quizQuestion.type';
 
 /**
  * Create a new quiz.
@@ -278,9 +278,9 @@ export const deleteQuiz = async ({
 
   quiz.deletedAt = new Date();
   quiz.deletedBy = userId;
-  await quiz.save();
+  const data = await quiz.save();
 
-  return quiz;
+  return data;
 };
 
 /**
@@ -375,6 +375,14 @@ export const getStatisticByQuizId = async (
     students,
   };
 };
+
+interface StudentSnapshotQuestion {
+  id: string;
+  text: string;
+  type: QuizQuestionType;
+  options: string[];
+  images?: { url: string; fromDB: boolean }[];
+}
 
 export const getQuizById = async (quizId: string, userId: mongoose.Types.ObjectId, role: Role) => {
   const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId').lean();

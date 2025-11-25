@@ -5,6 +5,7 @@ import {ListParams} from "@/types/dto";
 import {ForumType} from "@/types/forum.type";
 import {IForum, IForumPost, IForumReply, ISpecialist} from "@/types";
 import mongoose, {Types} from "mongoose";
+import {CourseModel} from "@/models";
 
 // ============= FORUM INTERFACES =============
 export interface ListForumParams extends ListParams {
@@ -44,7 +45,7 @@ export const listForumsOfACourse = async ({
     title,
     description,
     forumType,
-    isActive,
+    isActive = true,
     isArchived,
     createdBy,
     createdAt,
@@ -106,6 +107,8 @@ export const listForumsOfACourse = async ({
     const sort: any = {};
     sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
+    console.log("Forum filter:", filter);
+
     // Execute query with pagination
     const [forums, total] = await Promise.all([
         ForumModel.find(filter)
@@ -148,6 +151,8 @@ export const getForumById = async (forumId: string) => {
 export const createForum = async (data: Omit<IForum, keyof mongoose.Document<mongoose.Types.ObjectId>>) => {
     // Validate courseId exists
     appAssert(data.courseId, NOT_FOUND, "Course ID is required");
+    const courseId = await CourseModel.findById(data.courseId);
+    appAssert(courseId, NOT_FOUND, "Course ID not found");
     appAssert(data.title, NOT_FOUND, "Forum title is required");
 
     return await ForumModel.create({
