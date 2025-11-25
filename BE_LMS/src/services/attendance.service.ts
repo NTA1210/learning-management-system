@@ -733,7 +733,8 @@ export const deleteAttendance = async (
   actorId: mongoose.Types.ObjectId,
   role: Role
 ) => {
-  const attendanceIds = Array.isArray(attendanceId) ? attendanceId : [attendanceId];
+  const isBulk = Array.isArray(attendanceId);
+  const attendanceIds = isBulk ? attendanceId : [attendanceId];
 
   appAssert(attendanceIds.length > 0, BAD_REQUEST, "At least one attendance ID is required");
   appAssert(attendanceIds.length <= 100, BAD_REQUEST, "Cannot delete more than 100 records at once");
@@ -755,6 +756,13 @@ export const deleteAttendance = async (
 
   const courseCache = new Map<string, { startDate: Date; endDate: Date }>();
   const recordsToReset: mongoose.Types.ObjectId[] = [];
+  const deletedRecordsMeta: {
+    id: string;
+    courseId: string;
+    studentId: string;
+    date: Date;
+    status: AttendanceStatus;
+  }[] = [];
   const errors: string[] = [];
 
   for (const attendance of attendances) {
@@ -773,7 +781,15 @@ export const deleteAttendance = async (
         appAssert(diff === 0, FORBIDDEN, "Teachers can delete only same-day records");
       }
 
-      recordsToReset.push(attendance._id as mongoose.Types.ObjectId);
+      const attendanceObjectId = attendance._id as mongoose.Types.ObjectId;
+      recordsToReset.push(attendanceObjectId);
+      deletedRecordsMeta.push({
+        id: attendanceObjectId.toString(),
+        courseId: attendance.courseId.toString(),
+        studentId: attendance.studentId.toString(),
+        date: attendance.date,
+        status: attendance.status as AttendanceStatus,
+      });
     } catch (error: any) {
       errors.push(`Attendance ${attendance._id}: ${error.message}`);
     }
@@ -785,21 +801,28 @@ export const deleteAttendance = async (
     errors.length ? `All records failed validation: ${errors.join(", ")}` : "No attendance records to reset"
   );
 
-  const deleteResult = await AttendanceModel.deleteMany({
-    _id: { $in: recordsToReset },
-  });
-  const deletedCount = deleteResult.deletedCount || 0;
+  if (isBulk) {
+    const deleteResult = await AttendanceModel.deleteMany({
+      _id: { $in: recordsToReset },
+    });
+    const deletedCount = deleteResult.deletedCount || 0;
 
-  if (Array.isArray(attendanceId)) {
     return {
       deleted: deletedCount,
       total: attendanceIds.length,
       skipped: attendanceIds.length - deletedCount,
       deletedIds: recordsToReset.map((id) => id.toString()),
-      errors: errors.length > 0 ? errors : undefined,
+      deletedRecords: deletedRecordsMeta,
+      errors: errors.length > 0 ? errors : undefined, 
     };
   }
-  return { deleted: deletedCount === 1 };
+
+  const singleId = recordsToReset[0];
+  const deleteResult = await AttendanceModel.deleteOne({ _id: singleId });
+  return {
+    deleted: deleteResult.deletedCount === 1,
+    record: deletedRecordsMeta[0] || null,
+  };
 };
 
 
