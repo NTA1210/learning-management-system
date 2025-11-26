@@ -23,22 +23,32 @@ export const createAnnouncement = async (
     userId: Types.ObjectId,
     userRole: Role
 ) => {
-    // Validate course existence
-    const course = await CourseModel.findById(data.courseId);
-    appAssert(course, NOT_FOUND, `Course ${data.courseId} not found`);
+    // If courseId is provided, validate course and permission
+    if (data.courseId) {
+        const course = await CourseModel.findById(data.courseId);
+        appAssert(course, NOT_FOUND, `Course ${data.courseId} not found`);
 
-    // Check permission: Only Admin or Teacher OF THE COURSE can create announcement
-    const isAdmin = userRole === Role.ADMIN;
-    // Check if user is in teacherIds list
-    const isTeacherOfCourse = course.teacherIds.some(
-        (id) => id.equals(userId)
-    );
+        // Check permission: Only Admin or Teacher OF THE COURSE can create announcement
+        const isAdmin = userRole === Role.ADMIN;
+        // Check if user is in teacherIds list
+        const isTeacherOfCourse = course.teacherIds.some((id) =>
+            id.equals(userId)
+        );
 
-    appAssert(
-        isAdmin || isTeacherOfCourse,
-        FORBIDDEN,
-        "Only Admin or Teacher of this course can create announcements"
-    );
+        appAssert(
+            isAdmin || isTeacherOfCourse,
+            FORBIDDEN,
+            "Only Admin or Teacher of this course can create announcements"
+        );
+    } else {
+        // System announcement: Only Admin can create
+        const isAdmin = userRole === Role.ADMIN;
+        appAssert(
+            isAdmin,
+            FORBIDDEN,
+            "Only Admin can create system announcements"
+        );
+    }
 
     const announcement = await AnnouncementModel.create({
         ...data,
@@ -200,6 +210,46 @@ export const getAllAnnouncements = async (
             .populate("courseId", "title")
             .lean(),
         AnnouncementModel.countDocuments({}),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+        announcements,
+        pagination: {
+            total,
+            page,
+            limit,
+            totalPages,
+        },
+    };
+};
+
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Lấy danh sách thông báo hệ thống (không thuộc khóa học nào).
+ * - Sắp xếp theo thời gian đăng giảm dần.
+ * - Phân trang.
+ *
+ * Input: page, limit
+ * Output: List system announcements
+ */
+export const getSystemAnnouncements = async (
+    page: number = 1,
+    limit: number = 10
+) => {
+    const skip = (page - 1) * limit;
+
+    const query = { courseId: { $exists: false } };
+
+    const [announcements, total] = await Promise.all([
+        AnnouncementModel.find(query)
+            .sort({ publishedAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate("authorId", "username fullname avatar_url")
+            .lean(),
+        AnnouncementModel.countDocuments(query),
     ]);
 
     const totalPages = Math.ceil(total / limit);
