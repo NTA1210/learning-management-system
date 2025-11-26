@@ -69,6 +69,7 @@ export type ListCoursesParams = {
   page: number;
   limit: number;
   search?: string;
+  slug?: string; // Filter by slug (partial match)
   from?: Date; // Date range start for createdAt filtering
   to?: Date; // Date range end for createdAt filtering
   subjectId?: string; // ✅ NEW: Filter by subject instead of specialist
@@ -97,6 +98,7 @@ export const listCourses = async ({
   page,
   limit,
   search,
+  slug,
   from,
   to,
   subjectId,
@@ -221,6 +223,12 @@ export const listCourses = async ({
     filter.createdAt = {};
     if (from) filter.createdAt.$gte = from;
     if (to) filter.createdAt.$lte = to;
+  }
+
+  // Filter by slug (partial match)
+  if (slug) {
+    const escapedSlug = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.slug = { $regex: escapedSlug, $options: 'i' };
   }
 
   // Search by title or description (text search)
@@ -1127,6 +1135,7 @@ export const getMyCourses = async ({
     page,
     limit,
     search,
+    slug,
     subjectId,
     semesterId,
     isPublished,
@@ -1168,6 +1177,12 @@ export const getMyCourses = async ({
         { description: { $regex: search, $options: 'i' } },
       ],
     });
+  }
+
+  // Filter by slug (partial match)
+  if (slug) {
+    const escapedSlug = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.slug = { $regex: escapedSlug, $options: 'i' };
   }
 
   if (subjectId) filter.subjectId = subjectId;
