@@ -105,8 +105,14 @@ export const updateEnrollmentSchema = z.object({
 });
 
 // PUT - Student update own enrollment (chỉ có thể cancel)
-// ⚠️ Student chỉ được phép CANCEL enrollment (tự hủy)
+// Student chỉ được phép CANCEL enrollment (tự hủy)
 // DROPPED là do Admin/Teacher thực hiện (đánh rớt student)
 export const updateSelfEnrollmentSchema = z.object({
   status: z.literal(EnrollmentStatus.CANCELLED).optional(),
 });
+
+// POST - Kick student from course (Admin/Teacher)
+export const kickStudentSchema = z.object({
+  reason: z.string().min(5, "Reason must be at least 5 characters"),
+});
+

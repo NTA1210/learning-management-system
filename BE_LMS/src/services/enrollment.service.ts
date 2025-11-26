@@ -9,6 +9,7 @@ import { compareValue } from "../utils/bcrypt";
 import { CourseStatus } from "../types/course.type";
 import { EnrollmentStatus, EnrollmentRole, EnrollmentMethod } from "@/types/enrollment.type";
 import { Role } from "../types/user.type";
+import { createNotification } from "./notification.service";
 
 type ObjectIdLike = Types.ObjectId | string;
 
@@ -430,17 +431,6 @@ export const createEnrollment = async (data: {
         appAssert(isValidPassword, UNAUTHORIZED, "Invalid course password");
       }
 
-      existingEnrollment.status = status as any;
-      existingEnrollment.role = role as any;
-      existingEnrollment.method = method as any;
-      existingEnrollment.note = note;
-      existingEnrollment.finalGrade = undefined; // Reset grade
-      existingEnrollment.progress = { totalLessons: 0, completedLessons: 0 }; // Reset progress
-      existingEnrollment.respondedBy = undefined;
-      existingEnrollment.respondedAt = undefined;
-      existingEnrollment.completedAt = undefined;
-      existingEnrollment.droppedAt = undefined;
-      await existingEnrollment.save();
 
       await existingEnrollment.populate([
         { path: "studentId", select: "username email fullname avatar_url" },
@@ -673,3 +663,90 @@ export const updateSelfEnrollment = async (
 
   return updatedEnrollment;
 };
+
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Admin hoặc Teacher kick học sinh ra khỏi khóa học.
+ * - Chỉ kick được khi status = APPROVED.
+ * - Cập nhật status = DROPPED.
+ * - Ghi log lý do vào note.
+ * - Gửi thông báo cho học sinh.
+ *
+ * Input: enrollmentId, reason, userId, userRole
+ * Output: Success message
+ */
+export const kickStudentFromCourse = async (
+  enrollmentId: string,
+  reason: string,
+  userId: Types.ObjectId,
+  userRole: Role
+) => {
+  // 1. Get enrollment & course
+  const enrollment = await EnrollmentModel.findById(enrollmentId).populate(
+    "courseId"
+  );
+  appAssert(enrollment, NOT_FOUND, "Enrollment not found");
+
+  const course = enrollment.courseId as any;
+  appAssert(course, NOT_FOUND, "Course not found");
+
+  // 2. Check permission
+  if (userRole !== Role.ADMIN) {
+    // If not admin, must be teacher of the course
+    const isTeacher = course.teacherIds.some((id: Types.ObjectId) =>
+      id.equals(userId)
+    );
+    appAssert(
+      isTeacher,
+      FORBIDDEN,
+      "You do not have permission to kick students from this course"
+    );
+  }
+
+  // 3. Check status
+  appAssert(
+    enrollment.status === EnrollmentStatus.APPROVED,
+    BAD_REQUEST,
+    "Can only kick students who are currently enrolled (APPROVED)"
+  );
+
+  // 4. Update enrollment
+  const now = new Date();
+  const kicker = await UserModel.findById(userId).select("username");
+  const kickerName = kicker?.username || (userRole === Role.ADMIN ? "Admin" : "Teacher")
+  const updatedNote = enrollment.note
+    ? `${enrollment.note}\n[Kicked by ${kickerName} at ${now.toISOString()}]: ${reason}`
+    : `[Kicked by ${kickerName} at ${now.toISOString()}]: ${reason}`;
+
+  enrollment.status = EnrollmentStatus.DROPPED;
+  enrollment.droppedAt = now;
+  enrollment.note = updatedNote;
+  await enrollment.save();
+
+  // 5. Send notification
+  await createNotification(
+    {
+      title: `You have been removed from course ${course.title}`,
+      message: `Reason: ${reason}`,
+      recipientType: "user",
+      recipientUser: enrollment.studentId.toString(),
+    },
+    userId,
+    userRole
+  );
+
+  return {
+    message: "Student kicked successfully",
+    data: {
+      enrollmentId: enrollment._id,
+      courseId: course._id,
+      studentId: enrollment.studentId,
+      kickerId: userId,
+      kickerName,
+      reason,
+      droppedAt: now,
+      note: updatedNote,
+    }
+  };
+};
+

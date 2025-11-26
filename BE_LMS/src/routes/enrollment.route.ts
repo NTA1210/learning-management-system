@@ -9,6 +9,7 @@ import {
   enrollSelfHandler,
   updateEnrollmentHandler,
   updateSelfEnrollmentHandler,
+  kickStudentHandler,
 } from "../controller/enrollment.controller";
 import authorize from "../middleware/authorize";
 import { Role } from "../types";
@@ -70,6 +71,13 @@ enrollmentRoutes.put(
   "/:id",
   authorize(Role.ADMIN, Role.TEACHER),
   updateEnrollmentHandler
+);
+
+// POST /enrollments/:id/kick - Kick student from course (Admin/Teacher)
+enrollmentRoutes.post(
+  "/:id/kick",
+  authorize(Role.ADMIN, Role.TEACHER),
+  kickStudentHandler
 );
 
 export default enrollmentRoutes;
