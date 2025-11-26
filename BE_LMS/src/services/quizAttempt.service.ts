@@ -411,9 +411,13 @@ export const autoSaveQuizAttempt = async (
       ans.answer = options;
     }
   }
-  const data = await quizAttempt.save();
-  const { quizId, ...rest } = data.toObject();
-  return rest;
+
+  const total = quizAttempt.answers.length;
+  const answeredTotal = quizAttempt.answers.filter((answer) => answer.answer.includes(1)).length;
+
+  const data = (await quizAttempt.save()).toObject();
+  data.quizId = data.quizId.id;
+  return { data, total, answeredTotal };
 };
 
 export const getQuizAttemptById = async (
