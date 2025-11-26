@@ -251,7 +251,8 @@ export const updateSingleAttendanceRecord = async (
     course as { startDate: Date; endDate: Date },
     attendance.date
   );
-
+  //chỉ update được status absent / present
+  appAssert(data.status === "present" || data.status === "absent", BAD_REQUEST, "Invalid status");
   const oldStatus = attendance.status as AttendanceStatus;
   const newStatus = data.status || oldStatus;
 
@@ -347,7 +348,8 @@ export const updateMultipleAttendanceRecords = async (
         course as { startDate: Date; endDate: Date },
         attendance.date
       );
-
+      //chỉ update được status absent / present
+      appAssert(data.status === "present" || data.status === "absent", BAD_REQUEST, "Invalid status");
       const oldStatus = attendance.status as AttendanceStatus;
       const newStatus = data.status || oldStatus;
       

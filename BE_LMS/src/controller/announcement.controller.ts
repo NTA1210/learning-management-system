@@ -14,6 +14,7 @@ import {
     updateAnnouncement,
     deleteAnnouncement,
     getAllAnnouncements,
+    getSystemAnnouncements,
 } from "../services/announcement.service";
 
 /**
@@ -48,6 +49,23 @@ export const getAllAnnouncementsHandler = catchErrors(async (req, res) => {
         message: "All announcements retrieved successfully",
     });
 });
+
+/**
+ * GET /announcements/system
+ * Get system announcements (No courseId)
+ */
+export const getSystemAnnouncementsHandler = catchErrors(async (req, res) => {
+    const { page, limit } = getAnnouncementsQuerySchema.parse(req.query);
+
+    const result = await getSystemAnnouncements(page, limit);
+
+    return res.success(OK, {
+        data: result.announcements,
+        pagination: result.pagination,
+        message: "System announcements retrieved successfully",
+    });
+});
+
 
 /**
  * GET /announcements/course/:courseId

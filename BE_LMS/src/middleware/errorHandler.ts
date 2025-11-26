@@ -4,7 +4,9 @@ import z, { ZodError } from 'zod';
 import AppError from '../utils/AppError';
 import { clearAuthCookies, REFRESH_PATH } from '../utils/cookies';
 import mongoose from 'mongoose';
+import multer from 'multer';
 import AppErrorCode from '../constants/appErrorCode';
+import { MulterError } from 'multer';
 
 function handleZodError(res: Response, error: ZodError) {
   const errors = error.issues.map((err) => ({
@@ -55,6 +57,18 @@ function handleMongoError(res: Response, error: mongoose.Error) {
   });
 }
 
+function handleUploadError(res: Response, error: MulterError) {
+  return res.error(BAD_REQUEST, {
+    message: error.message,
+  });
+}
+
+function handleUploadFileSizeError(res: Response, error: MulterError) {
+  return res.error(BAD_REQUEST, {
+    message: 'File size is too large, maximum size is 20MB',
+  });
+}
+
 const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
   console.log(`PATH: ${req.path} - ERROR: `, error);
 
@@ -80,6 +94,13 @@ const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
 
   if (error instanceof mongoose.Error) {
     return handleMongoError(res, error);
+  }
+
+  if (error instanceof MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return handleUploadFileSizeError(res, error);
+    }
+    return handleUploadError(res, error);
   }
 
   if (error.type === 'entity.parse.failed') {

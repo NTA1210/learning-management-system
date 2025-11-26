@@ -9,6 +9,7 @@ import {
   enrollSelfSchema,
   updateEnrollmentSchema,
   updateSelfEnrollmentSchema,
+  kickStudentSchema,
 } from "../validators/enrollment.schemas";
 import {
   getEnrollmentById,
@@ -18,6 +19,7 @@ import {
   createEnrollment,
   updateEnrollment,
   updateSelfEnrollment,
+  kickStudentFromCourse,
 } from "../services/enrollment.service";
 import { EnrollmentStatus, EnrollmentMethod } from "@/types/enrollment.type";
 
@@ -133,3 +135,18 @@ export const updateSelfEnrollmentHandler = catchErrors(async (req, res) => {
   const enrollment = await updateSelfEnrollment(id, studentId, data);
   return res.success(OK, { data: enrollment, message: "Enrollment updated successfully" });
 });
+
+// POST /enrollments/:id/kick - Kick student from course
+export const kickStudentHandler = catchErrors(async (req, res) => {
+  const { id } = enrollmentIdSchema.parse(req.params);
+  const { reason } = kickStudentSchema.parse(req.body);
+  const userId = req.userId!;
+  const userRole = req.role!;
+
+  const result = await kickStudentFromCourse(id, reason, userId, userRole);
+
+  return res.success(OK, {
+    message: result.message,
+  });
+});
+

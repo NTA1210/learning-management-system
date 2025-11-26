@@ -9,7 +9,7 @@ export type TImage = {
   fromDB: boolean;
 };
 
-const ImageSchema = {
+export const ImageSchema = {
   url: { type: String, required: true },
   fromDB: { type: Boolean, default: false },
 };

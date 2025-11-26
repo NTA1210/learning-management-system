@@ -31,6 +31,7 @@ import {
 } from "@/controller/submission.controller";
 import * as submissionService from "@/services/submission.service";
 import * as submissionSchemas from "@/validators/submission.schemas";
+import { Role } from "@/types";
 
 describe("Submission Controller Unit Tests", () => {
   let mockReq: Partial<Request>;
@@ -158,11 +159,18 @@ describe("Submission Controller Unit Tests", () => {
     it("should list submissions successfully", async () => {
       const submissions = [{ id: "sub1" }];
       mockReq.params = { assignmentId: "ass1" };
+      mockReq.userId = "teacher1" as any;
+      mockReq.role = Role.TEACHER;
       (submissionSchemas.assignmentIdParamSchema.parse as jest.Mock).mockReturnValue({ assignmentId: "ass1" });
       (submissionService.listSubmissionsByAssignment as jest.Mock).mockResolvedValue(submissions);
 
       await listSubmissionsByAssignmentHandler(mockReq as Request, mockRes as Response, mockNext);
 
+      expect(submissionService.listSubmissionsByAssignment).toHaveBeenCalledWith({
+        assignmentId: "ass1",
+        requesterId: "teacher1",
+        requesterRole: Role.TEACHER,
+      });
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: submissions,
         message: "Submissions retrieved successfully",
@@ -238,11 +246,17 @@ describe("Submission Controller Unit Tests", () => {
     it("should return submission stats successfully", async () => {
       const stats = { total: 10, submitted: 8 };
       mockReq.params = { assignmentId: "ass1" } as any;
+      mockReq.userId = "teacher1" as any;
+      mockReq.role = Role.TEACHER;
       (submissionService.getSubmissionStats as jest.Mock).mockResolvedValue(stats);
 
       await getSubmissionStatsHandler(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(submissionService.getSubmissionStats).toHaveBeenCalledWith("ass1");
+      expect(submissionService.getSubmissionStats).toHaveBeenCalledWith({
+        assignmentId: "ass1",
+        requesterId: "teacher1",
+        requesterRole: Role.TEACHER,
+      });
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: stats,
         message: "Submission statistics retrieved successfully",
@@ -276,11 +290,18 @@ describe("Submission Controller Unit Tests", () => {
       const report = { assignmentId: "ass1", rows: [] };
       mockReq.params = { assignmentId: "ass1" } as any;
       mockReq.query = { page: 1 } as any;
+      mockReq.userId = "teacher1" as any;
+      mockReq.role = Role.TEACHER;
       (submissionService.getSubmissionReportByAssignment as jest.Mock).mockResolvedValue(report);
 
       await getSubmissionReportHandler(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(submissionService.getSubmissionReportByAssignment).toHaveBeenCalledWith("ass1", { page: 1 });
+      expect(submissionService.getSubmissionReportByAssignment).toHaveBeenCalledWith(
+        "ass1",
+        { page: 1 },
+        "teacher1",
+        Role.TEACHER
+      );
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: report,
         message: "Submission report retrieved successfully",
@@ -315,11 +336,17 @@ describe("Submission Controller Unit Tests", () => {
     it("should return course report successfully", async () => {
       const report = { courseId: "c1", summary: {} };
       mockReq.params = { courseId: "c1" } as any;
+      mockReq.userId = "teacher1" as any;
+      mockReq.role = Role.TEACHER;
       (submissionService.getSubmissionReportByCourse as jest.Mock).mockResolvedValue(report);
 
       await getCourseReportHandler(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(submissionService.getSubmissionReportByCourse).toHaveBeenCalledWith("c1");
+      expect(submissionService.getSubmissionReportByCourse).toHaveBeenCalledWith(
+        "c1",
+        "teacher1",
+        Role.TEACHER
+      );
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: report,
         message: "Course report retrieved successfully",

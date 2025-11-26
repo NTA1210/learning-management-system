@@ -20,6 +20,8 @@ import {
   notifyTeacherCourseApproved,
   notifyTeacherAssigned,
 } from './helpers/notification.helper';
+import { snapShotQuestion } from '@/validators/quiz.schemas';
+
 
 // ====================================
 // HELPER FUNCTIONS FOR LOGO MANAGEMENT
@@ -1208,7 +1210,7 @@ export const getQuizzes = async (
     filter.description = { $regex: search, $options: 'i' };
   }
 
-  const [quizzes, total] = await Promise.all([
+  let [quizzes, total] = await Promise.all([
     QuizModel.find(filter)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
@@ -1216,6 +1218,12 @@ export const getQuizzes = async (
       .lean(),
     QuizModel.countDocuments(filter),
   ]);
+
+  if (role === Role.STUDENT) {
+    quizzes = quizzes.map((quiz) => {
+      return { ...quiz, snapshotQuestions: [] };
+    });
+  }
 
   // Calculate pagination metadata
   const totalPages = Math.ceil(total / limit);

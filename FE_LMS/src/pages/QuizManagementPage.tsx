@@ -1,12 +1,14 @@
-import { useEffect, useState, useRef } from "react";
+﻿import { useEffect, useState, useRef } from "react";
 import type { FormEvent } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { PlusCircle, X, ImagePlus, CheckCircle, AlertCircle, Info, Upload, Download } from "lucide-react";
-import { subjectService, quizQuestionService, type Subject, type QuizQuestion } from "../services";
+import { subjectService, quizQuestionService, type QuizQuestion } from "../services";
+import type { Subject } from "../types/subject";
 import { useNavigate } from "react-router-dom";
+import { QuizPagination } from "../components/quiz/QuizPagination";
 
 type Question = {
   text: string;
@@ -22,6 +24,16 @@ export default function QuizManagementPage() {
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [subjectsPage, setSubjectsPage] = useState(1);
+  const [subjectsPageSize] = useState(10);
+  const [subjectsPagination, setSubjectsPagination] = useState<{
+    totalItems: number;
+    currentPage: number;
+    limit: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  } | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -92,18 +104,43 @@ export default function QuizManagementPage() {
     (async () => {
       try {
         console.log("Fetching subjects from API...");
-        const result = await subjectService.getAllSubjects({ limit: 100 });
+        const result = await subjectService.getAllSubjects({ 
+          page: subjectsPage,
+          limit: subjectsPageSize 
+        });
         console.log("Subjects response:", result);
         setSubjects(result.data || []);
+        
+        // Handle pagination response
+        if (result.pagination) {
+          setSubjectsPagination({
+            totalItems: result.pagination.totalItems || result.data.length,
+            currentPage: result.pagination.currentPage || subjectsPage,
+            limit: result.pagination.limit || subjectsPageSize,
+            totalPages: result.pagination.totalPages || Math.ceil((result.pagination.totalItems || result.data.length) / subjectsPageSize),
+            hasNext: result.pagination.hasNext || false,
+            hasPrev: result.pagination.hasPrev || false,
+          });
+        } else {
+          // Fallback if no pagination info
+          setSubjectsPagination({
+            totalItems: result.data.length,
+            currentPage: subjectsPage,
+            limit: subjectsPageSize,
+            totalPages: 1,
+            hasNext: false,
+            hasPrev: false,
+          });
+        }
       } catch (error) {
         console.error("Error fetching subjects:", error);
         setSubjects([]);
       }
     })();
-  }, []);
+  }, [subjectsPage, subjectsPageSize]);
 
   const handlePickSubject = (subjectId: string) => {
-    navigate(`/quiz/${subjectId}`);
+    navigate(`/questionbank/${subjectId}`);
   };
 
   const generateExamCode = (subject: Subject) => {
@@ -527,7 +564,7 @@ const handleImportQuiz = async () => {
     setImportFile(null);
 
     // Navigate to quiz page và pass cả câu hỏi cũ và mới để hiển thị
-    navigate(`/quiz/${importSubjectId}`, {
+    navigate(`/questionbank/${importSubjectId}`, {
       state: { mergedQuestions: allQuestions, subjectInfo: subjectDetail ?? undefined },
     });
   } catch (error) {
@@ -670,6 +707,23 @@ const handleImportQuiz = async () => {
                       );
                     })}
                   </div>
+                )}
+                {subjectsPagination && subjectsPagination.totalPages > 1 && (
+                  <QuizPagination
+                    currentPage={subjectsPagination.currentPage}
+                    totalPages={subjectsPagination.totalPages}
+                    textColor={textColor}
+                    borderColor={darkMode ? "rgba(148,163,184,0.2)" : "rgba(148,163,184,0.2)"}
+                    hasPrev={subjectsPagination.hasPrev}
+                    hasNext={subjectsPagination.hasNext}
+                    pageOptions={Array.from({ length: Math.min(5, subjectsPagination.totalPages) }, (_, i) => {
+                      const start = Math.max(1, subjectsPagination.currentPage - 2);
+                      return Math.min(start + i, subjectsPagination.totalPages);
+                    }).filter((v, i, arr) => arr.indexOf(v) === i)}
+                    onPrev={() => setSubjectsPage((p) => Math.max(1, p - 1))}
+                    onNext={() => setSubjectsPage((p) => Math.min(subjectsPagination!.totalPages, p + 1))}
+                    onSelectPage={(page) => setSubjectsPage(page)}
+                  />
                 )}
               </div>
 
