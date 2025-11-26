@@ -20,6 +20,7 @@ import {DashboardPage ,
       QuizCreatePage,
       CourseQuizzesPage,
       QuizQuestionsPage,
+      TakeQuizPage,
       FeedbackPage,
       FeedbackListPage,
       EnrollmentsListPage,
@@ -143,17 +144,17 @@ function AppRoutes() {
         } />
 
         {/* Quiz Management */}
-        <Route path="/quiz" element={
+        <Route path="/questionbank" element={
           <ProtectedRoute>
             <QuizManagementPage />
           </ProtectedRoute>
         } />
-        <Route path="/quiz/:courseId" element={
+        <Route path="/questionbank/:courseId" element={
           <ProtectedRoute>
             <CourseQuizzesPage />
           </ProtectedRoute>
         } />
-        <Route path="/quiz/questions/:quizId" element={
+        <Route path="/questionbank/questions/:quizId" element={
           <ProtectedRoute>
             <QuizQuestionsPage />
           </ProtectedRoute>
@@ -161,6 +162,16 @@ function AppRoutes() {
         <Route path="/quizz" element={
           <ProtectedRoute>
             <QuizCreatePage />
+          </ProtectedRoute>
+        } />
+        <Route path="/quizz/:courseId" element={
+          <ProtectedRoute>
+            <CourseQuizzesPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/quizz/:courseId/quiz/:quizId" element={
+          <ProtectedRoute requiredRole="student">
+            <TakeQuizPage />
           </ProtectedRoute>
         } />
 
