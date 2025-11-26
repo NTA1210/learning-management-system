@@ -14,7 +14,7 @@ import {
 import IAssignment from "../types/assignment.type";
 import { UserModel } from "@/models";
 import { Role } from "@/types";
-import { uploadFile, getSignedUrl } from "@/utils/uploadFile";
+import { uploadFile, getSignedUrl, deleteFilesByPrefix, removeFile } from "@/utils/uploadFile";
 import { prefixSubmission } from "@/utils/filePrefix";
 import { EnrollmentStatus } from "@/types/enrollment.type";
 import { createNotification } from "./notification.service";
@@ -96,9 +96,22 @@ export const resubmitAssignment = async (
   const submission = await SubmissionModel.findOne({ assignmentId, studentId });
   appAssert(submission, NOT_FOUND, "Submission not found");
 
-  // const resubmittedAt = new Date();
-  // const isLate = assignment.dueDate && resubmittedAt > assignment.dueDate;
   const prefix = prefixSubmission(assignment.courseId, assignmentId, studentId);
+
+  if (submission.key) {
+    try {
+      await removeFile(submission.key as string);
+    } catch (error) {
+      console.error("Failed to remove old submission file", error);
+    }
+  } else {
+    try {
+      await deleteFilesByPrefix(prefix);
+    } catch (error) {
+      console.error("Failed to remove old submission files by prefix", error);
+    }
+  }
+
   const {key,originalName,mimeType,size} = await uploadFile(file,prefix);
 
   submission.originalName = originalName;
