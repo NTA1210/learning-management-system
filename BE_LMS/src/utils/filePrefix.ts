@@ -7,6 +7,13 @@ export const prefixLessonMaterial = (
   return `courses/${courseId}/lessons/${lessonId}`;
 };
 
+export const prefixAssignmentFile = (
+  courseId: mongoose.Types.ObjectId,
+  assignmentId: mongoose.Types.ObjectId
+) => {
+  return `courses/${courseId.toHexString()}/assignments/${assignmentId.toHexString()}/files`;
+};
+
 export const prefixSubmission = (
   courseId: string | import("mongoose").Types.ObjectId,
   assignmentId: string | import("mongoose").Types.ObjectId,

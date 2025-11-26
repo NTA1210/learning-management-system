@@ -8,6 +8,8 @@ import { NOT_FOUND, FORBIDDEN } from "../constants/http";
 import { EnrollmentStatus } from "../types/enrollment.type";
 import { Role } from "../types";
 import { ensureTeacherAccessToCourse } from "./helpers/courseAccessHelpers";
+import { uploadFile } from "../utils/uploadFile";
+import { prefixAssignmentFile } from "../utils/filePrefix";
 
 export type ListAssignmentsParams = {
   page: number;
@@ -195,7 +197,8 @@ export const getAssignmentById = async (
 export const createAssignment = async (
   data: any,
   userId?: mongoose.Types.ObjectId,
-  userRole?: Role
+  userRole?: Role,
+  file?: Express.Multer.File
 ) => {
   // Verify course exists
   const course = await CourseModel.findById(data.courseId);
@@ -203,9 +206,36 @@ export const createAssignment = async (
 
   await ensureTeacherAccessToCourse({ course, userId, userRole });
 
-  const createdBy = userId && (userId as any)._bsontype === 'ObjectID' ? userId : new mongoose.Types.ObjectId(userId as any);
-  const assignmentData = { ...data, createdBy };
+  const createdBy = userId;
+  const assignmentData: any = { ...data, createdBy };
+
+  // Create assignment first to have assignmentId for prefix
   const assignment = await AssignmentModel.create(assignmentData);
+
+  if (file) {
+    const courseObjectId =
+      (course as any)._id instanceof mongoose.Types.ObjectId
+        ? ((course as any)._id as mongoose.Types.ObjectId)
+        : mongoose.Types.ObjectId.createFromHexString(
+            String((course as any)._id)
+          );
+    const assignmentObjectId =
+      (assignment as any)._id instanceof mongoose.Types.ObjectId
+        ? ((assignment as any)._id as mongoose.Types.ObjectId)
+        : mongoose.Types.ObjectId.createFromHexString(
+            String((assignment as any)._id)
+          );
+
+    const prefix = prefixAssignmentFile(courseObjectId, assignmentObjectId);
+    const { key, originalName, mimeType, size } = await uploadFile(file, prefix);
+
+    assignment.fileKey = key;
+    assignment.fileOriginalName = originalName;
+    assignment.fileMimeType = (mimeType as string) || undefined;
+    assignment.fileSize = size;
+    await assignment.save();
+  }
+
   const populatedAssignment = await AssignmentModel.findById(assignment._id)
     .populate("courseId", "title code")
     .populate("createdBy", "username email fullname")
