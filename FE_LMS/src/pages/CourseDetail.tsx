@@ -95,6 +95,16 @@ export default function CourseDetail() {
       setEnrolling(false);
     }
   };
+
+  const handleCreateForumPost = () => {
+    if (!course?._id) return;
+    navigate("/forum", {
+      state: {
+        preselectedCourseId: course._id,
+        preselectedCourseTitle: course.title ?? course.code ?? "Course",
+      },
+    });
+  };
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -500,6 +510,13 @@ export default function CourseDetail() {
               <span className="text-sm opacity-70">{course?.title}</span>
             </div>
             <div className="flex gap-2">
+              <button
+                onClick={handleCreateForumPost}
+                disabled={!course?._id}
+                className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
+              >
+                Create Forum Post
+              </button>
               <button
                 onClick={handleEnroll}
                 disabled={enrolling}
