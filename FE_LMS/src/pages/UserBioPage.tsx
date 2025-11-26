@@ -13,6 +13,7 @@ import { attendanceService, type AttendanceRecord } from "../services/attendance
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import UserBio from "../components/UserBio.tsx";
+import MarkdownImage from "../components/MarkdownImage.tsx";
 import ReactMarkdown from "react-markdown";
 import { 
   BookOpen, 
@@ -282,7 +283,23 @@ const UserBioPage: React.FC = () => {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <button
-                  onClick={() => navigate(-1)}
+                  onClick={() => {
+                    if (window.history.length > 1) {
+                      navigate(-1);
+                    } else {
+                      // Fallback to dashboard if no history
+                      const userRole = user?.role;
+                      if (userRole === 'admin') {
+                        navigate('/dashboard');
+                      } else if (userRole === 'teacher') {
+                        navigate('/teacher-dashboard');
+                      } else if (userRole === 'student') {
+                        navigate('/student-dashboard');
+                      } else {
+                        navigate('/');
+                      }
+                    }
+                  }}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg border transition-all duration-200 hover:opacity-90 mb-4"
                   style={{
                     backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
@@ -333,6 +350,13 @@ const UserBioPage: React.FC = () => {
             {!loading && userData && (
               <>
                 <UserBio user={userData} showFullDetails={true} averageRating={averageRating} />
+
+                <h1
+                  className="text-3xl font-bold pt-6"
+                  style={{ color: darkMode ? '#ffffff' : '#1f2937' }}
+                >
+                  Activities
+                </h1>
 
                 {/* Activities Section */}
                 <div className="mt-6 space-y-6">
@@ -657,6 +681,16 @@ const UserBioPage: React.FC = () => {
                                       strong: ({ children }) => <strong style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>{children}</strong>,
                                       em: ({ children }) => <em>{children}</em>,
                                       code: ({ children }) => <code className="px-1 py-0.5 rounded text-xs" style={{ backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.5)' : '#f3f4f6' }}>{children}</code>,
+                                      img: ({ src, alt, title }) => (
+                                        <MarkdownImage
+                                          src={src}
+                                          alt={alt}
+                                          title={title}
+                                          darkMode={darkMode}
+                                          maxWidth="100%"
+                                          maxHeight="400px"
+                                        />
+                                      ),
                                     }}
                                   >
                                     {feedback.description}
@@ -793,6 +827,16 @@ const UserBioPage: React.FC = () => {
                                       strong: ({ children }) => <strong style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>{children}</strong>,
                                       em: ({ children }) => <em>{children}</em>,
                                       code: ({ children }) => <code className="px-1 py-0.5 rounded text-xs" style={{ backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.5)' : '#f3f4f6' }}>{children}</code>,
+                                      img: ({ src, alt, title }) => (
+                                        <MarkdownImage
+                                          src={src}
+                                          alt={alt}
+                                          title={title}
+                                          darkMode={darkMode}
+                                          maxWidth="100%"
+                                          maxHeight="400px"
+                                        />
+                                      ),
                                     }}
                                   >
                                     {feedback.description}
