@@ -9,7 +9,7 @@ import {
 } from "../validators/lessonMaterial.shemas";
 import appAssert from "../utils/appAssert";
 import { CONFLICT, NOT_FOUND, FORBIDDEN, BAD_REQUEST } from "../constants/http";
-import { Role } from "../types";
+import { EnrollmentStatus, Role } from "../types";
 import {
   uploadFile,
   uploadFiles,
@@ -112,7 +112,7 @@ export const getLessonMaterials = async (
     // Students can only see materials from enrolled courses
     const enrolledCourses = await EnrollmentModel.find({
       studentId: userId,
-      status: "active",
+      status: EnrollmentStatus.APPROVED,
     }).select("courseId");
 
     const enrolledCourseIds = enrolledCourses.map(
@@ -232,7 +232,7 @@ export const getLessonMaterials = async (
         const enrollment = await EnrollmentModel.findOne({
           studentId: userId,
           courseId: (lesson as any).courseId._id,
-          status: "active",
+          status: EnrollmentStatus.APPROVED,
         });
 
         if (enrollment) {
@@ -307,7 +307,7 @@ export const getLessonMaterialsByLesson = async (
     const enrollment = await EnrollmentModel.findOne({
       studentId: userId,
       courseId: (lesson.courseId as any)._id,
-      status: "active",
+      status: EnrollmentStatus.APPROVED,
     });
     appAssert(enrollment, FORBIDDEN, "Not enrolled in this course");
 
@@ -493,7 +493,7 @@ export const getLessonMaterialById = async (
     const enrollment = await EnrollmentModel.findOne({
       studentId: userId,
       courseId: (lesson as any).courseId._id,
-      status: "active",
+      status: EnrollmentStatus.APPROVED,
     });
 
     if (enrollment) {

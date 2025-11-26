@@ -4,6 +4,7 @@ import {
   banQuizAttempt,
   deleteQuizAttempt,
   enrollQuiz,
+  getQuizAttemptById,
   saveQuizAttempt,
   submitQuizAttempt,
 } from '@/services/quizAttempt.service';
@@ -19,14 +20,14 @@ import {
 // POST /quiz-attempts/enroll - Enroll in a quiz
 export const enrollQuizHandler = catchErrors(async (req, res) => {
   const input = enrollQuizSchema.parse(req.body);
-  const { userId } = req;
+  const { userId, role } = req;
   const userAgent = req.headers['user-agent'];
   const xff = req.headers['x-forwarded-for'] as string | undefined;
   const ip = xff?.split(',')[0] || req.socket.remoteAddress;
 
   const data = await enrollQuiz({
     ...input,
-    user: { userId, userAgent, ip },
+    user: { userId, role, userAgent, ip },
   });
 
   return res.success(CREATED, {
@@ -54,11 +55,11 @@ export const saveQuizHandler = catchErrors(async (req, res) => {
     quizAttemptId: req.params.quizAttemptId,
     answers: req.body.answers,
   });
-  const userId = req.userId;
+  const { userId } = req;
   const data = await saveQuizAttempt(input, userId);
   return res.success(OK, {
     data,
-    message: 'Submit quiz attempt successfully',
+    message: 'Save quiz attempt successfully',
   });
 });
 
@@ -93,9 +94,23 @@ export const autoSaveQuizHandler = catchErrors(async (req, res) => {
     answer: req.body.answer,
   });
   const userId = req.userId;
-  const data = await autoSaveQuizAttempt(input, userId);
+  const { data, total, answeredTotal } = await autoSaveQuizAttempt(input, userId);
   return res.success(OK, {
     data,
+    total,
+    answeredTotal,
     message: 'Auto save quiz attempt successfully',
+  });
+});
+
+// GET /quiz-attempts/:quizAttemptId - Get a quiz attempt by id
+export const getQuizAttemptByIdHandler = catchErrors(async (req, res) => {
+  const quizAttemptId = quizAttemptIdSchema.parse(req.params.quizAttemptId);
+  const userId = req.userId;
+  const role = req.role;
+  const data = await getQuizAttemptById(quizAttemptId, userId, role);
+  return res.success(OK, {
+    data,
+    message: 'Get quiz attempt by id successfully',
   });
 });

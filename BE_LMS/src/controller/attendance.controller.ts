@@ -14,6 +14,7 @@ import {
   studentHistoryQuerySchema,
   updateAttendanceSchema,
   sendAbsenceNotificationSchema,
+  deleteAttendanceSchema,
 } from "@/validators/attendance.schemas";
 import {
   exportAttendanceReport,
@@ -164,12 +165,22 @@ export const updateAttendanceController = catchErrors(async (req, res) => {
  * API: Admin delete attendance (Teacher chỉ delete same-day) theo nghiệp vụ 3.
  */
 export const deleteAttendanceController = catchErrors(async (req, res) => {
+  // Hỗ trợ delete/reset nhiều attendance cùng lúc thông qua body
+  if (req.body && Array.isArray(req.body.attendanceIds)) {
+    const payload = deleteAttendanceSchema.parse(req.body);
+    const result = await deleteAttendance(payload.attendanceIds, req.userId, req.role);
+    return res.success(OK, {
+      data: result,
+      message: `Deleted ${result.deleted} attendance record(s)`,
+    });
+  }
+
   const { attendanceId } = AttendanceIdParamSchema.parse(req.params);
   const result = await deleteAttendance(attendanceId, req.userId, req.role);
 
   return res.success(OK, {
     data: result,
-    message: "Attendance deleted",
+    message: result.deleted ? "Attendance deleted" : "Attendance not found or already deleted",
   });
 });
 

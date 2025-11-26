@@ -31,6 +31,10 @@ import {DashboardPage ,
       UserBioPage,
       AttendancePage,
       MyEnrollmentsPage,
+      ForumPage,
+      ForumListPage,
+      ForumDetailPage,
+      ForumPostDetailPage,
     } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -238,6 +242,28 @@ function AppRoutes() {
         <Route path="/attendance/:semesterId/:courseId" element={
           <ProtectedRoute>
             <AttendancePage />
+          </ProtectedRoute>
+        } />
+
+        {/* Forum */}
+        <Route path="/forum" element={
+          <ProtectedRoute>
+            <ForumPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/forum-list" element={
+          <ProtectedRoute>
+            <ForumListPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/forums/:forumId" element={
+          <ProtectedRoute>
+            <ForumDetailPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/forums/:forumId/posts/:postId" element={
+          <ProtectedRoute>
+            <ForumPostDetailPage />
           </ProtectedRoute>
         } />
 

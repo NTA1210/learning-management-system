@@ -7,44 +7,7 @@ import appAssert from "../utils/appAssert";
 import { NOT_FOUND, FORBIDDEN } from "../constants/http";
 import { EnrollmentStatus } from "../types/enrollment.type";
 import { Role } from "../types";
-import { normalizeObjectId } from "./helpers/assignmentHelpers";
-
-const ensureTeacherAccessToCourse = async ({
-  course,
-  courseId,
-  userId,
-  userRole,
-}: {
-  course?: any;
-  courseId?: mongoose.Types.ObjectId;
-  userId?: mongoose.Types.ObjectId;
-  userRole?: Role;
-}) => {
-  if (!userId || userRole !== Role.TEACHER) {
-    return course;
-  }
-
-  const courseDoc =
-    course ??
-    (await CourseModel.findById(courseId).select("teacherIds title").lean());
-
-  appAssert(courseDoc, NOT_FOUND, "Course not found");
-
-  const teacherIdStr = normalizeObjectId(userId);
-  const isTeacherInCourse =
-    (courseDoc.teacherIds || []).some(
-      (teacherId: mongoose.Types.ObjectId) =>
-        teacherId.toString() === teacherIdStr
-    ) || false;
-
-  appAssert(
-    isTeacherInCourse,
-    FORBIDDEN,
-    "You are not assigned to teach this course"
-  );
-
-  return courseDoc;
-};
+import { ensureTeacherAccessToCourse } from "./helpers/courseAccessHelpers";
 
 export type ListAssignmentsParams = {
   page: number;
