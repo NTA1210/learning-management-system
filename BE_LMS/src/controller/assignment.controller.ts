@@ -21,7 +21,7 @@
     const result = await listAssignments({
       page: query.page,
       limit: query.limit,
-      courseId: query.courseId,
+      courseId: query.courseId as any,
       search: query.search,
       dueBefore: query.dueBefore,
       dueAfter: query.dueAfter,
@@ -54,16 +54,16 @@
 
   export const createAssignmentHandler = catchErrors(async (req, res) => {
     const data = createAssignmentSchema.parse(req.body);
-    const { courseId } = req.params as { courseId?: string };
-    appAssert(courseId && courseId.length === 24, BAD_REQUEST, "Missing or invalid course ID");
 
     const userId = req.userId;
     const userRole = req.role;
+    const file = req.file as Express.Multer.File | undefined;
 
     const assignment = await createAssignment(
-      { ...data, courseId },
+      data,
       userId,
-      userRole
+      userRole,
+      file
     );
 
     return res.success(CREATED, {

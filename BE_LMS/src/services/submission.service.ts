@@ -14,7 +14,7 @@ import {
 import IAssignment from "../types/assignment.type";
 import { UserModel } from "@/models";
 import { Role } from "@/types";
-import { uploadFile, getSignedUrl } from "@/utils/uploadFile";
+import { uploadFile, getSignedUrl, deleteFilesByPrefix, removeFile } from "@/utils/uploadFile";
 import { prefixSubmission } from "@/utils/filePrefix";
 import { EnrollmentStatus } from "@/types/enrollment.type";
 import { createNotification } from "./notification.service";
@@ -96,9 +96,14 @@ export const resubmitAssignment = async (
   const submission = await SubmissionModel.findOne({ assignmentId, studentId });
   appAssert(submission, NOT_FOUND, "Submission not found");
 
-  // const resubmittedAt = new Date();
-  // const isLate = assignment.dueDate && resubmittedAt > assignment.dueDate;
   const prefix = prefixSubmission(assignment.courseId, assignmentId, studentId);
+
+  if (submission.key) {
+    await removeFile(submission.key as string);
+  } else {
+    await deleteFilesByPrefix(prefix);
+  }
+
   const {key,originalName,mimeType,size} = await uploadFile(file,prefix);
 
   submission.originalName = originalName;
@@ -445,8 +450,11 @@ export const getSubmissionStats = async ({
   requesterId,
   requesterRole,
 }: SubmissionStatsParams) => {
-    const assignment = await AssignmentModel.findById(assignmentId).populate({ path: "courseId", select: "teacherIds title" });
-    if (!assignment) throw new Error("Assignment not found");
+    const assignment = await AssignmentModel.findById(assignmentId).populate({
+      path: "courseId",
+      select: "teacherIds title",
+    });
+    appAssert(assignment, NOT_FOUND, "Assignment not found");
 
     await ensureTeacherAccessToCourse({
       course: assignment.courseId,
@@ -477,7 +485,13 @@ export const getSubmissionStats = async ({
 
 //grade Distribution
 export const getGradeDistribution = async (assignmentId: string) => {
-    const submissions = await SubmissionModel.find({ assignmentId, grade: { $ne: undefined } });
+    const assignment = await AssignmentModel.exists({ _id: assignmentId });
+    appAssert(assignment, NOT_FOUND, "Assignment not found");
+
+    const submissions = await SubmissionModel.find({
+      assignmentId,
+      grade: { $ne: undefined },
+    });
     const ranges = [
       { key: "0-2", min: 0, max: 2 },
       { key: "2-4", min: 2, max: 4 },
