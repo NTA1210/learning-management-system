@@ -497,6 +497,7 @@ export const createCourse = async (
   appAssert(populatedCourse, BAD_REQUEST, 'Failed to retrieve created course');
 
   // 🔔 NOTIFICATIONS
+  const warnings: string[] = [];
   try {
     const courseIdStr = String(course._id);
 
@@ -516,10 +517,15 @@ export const createCourse = async (
     }
   } catch (error) {
     console.error('Failed to send notifications for createCourse:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    warnings.push(`Failed to send notifications: ${errorMessage}`);
     // Don't fail the request if notification fails
   }
 
-  return populatedCourse;
+  return {
+    course: populatedCourse,
+    warnings,
+  };
 };
 
 /**
@@ -803,6 +809,7 @@ export const updateCourse = async (
   }
 
   // 🔔 NOTIFICATIONS
+  const warnings: string[] = [];
   try {
     const courseIdStr = courseId.toString();
 
@@ -839,9 +846,14 @@ export const updateCourse = async (
     }
   } catch (error) {
     console.error('Failed to send notifications for updateCourse:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    warnings.push(`Failed to send notifications: ${errorMessage}`);
   }
 
-  return updatedCourse;
+  return {
+    course: updatedCourse,
+    warnings,
+  };
 };
 
 /**

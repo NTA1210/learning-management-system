@@ -124,11 +124,12 @@ export const createCourseHandler = catchErrors(async (req, res) => {
   const userId = (req as any).userId;
 
   // Call service with logo file
-  const course = await createCourse(data, userId, logoFile);
+  const result = await createCourse(data, userId, logoFile);
 
   return res.success(CREATED, {
-    data: course,
+    data: result.course,
     message: 'Course created successfully',
+    ...(result.warnings.length > 0 && { warnings: result.warnings }),
   });
 });
 
@@ -152,11 +153,12 @@ export const updateCourseHandler = catchErrors(async (req, res) => {
   const userId = (req as any).userId;
 
   // Call service with logo file
-  const course = await updateCourse(courseId, data, userId, logoFile);
+  const result = await updateCourse(courseId, data, userId, logoFile);
 
   return res.success(OK, {
-    data: course,
+    data: result.course,
     message: 'Course updated successfully',
+    ...(result.warnings.length > 0 && { warnings: result.warnings }),
   });
 });
 
