@@ -445,8 +445,11 @@ export const getSubmissionStats = async ({
   requesterId,
   requesterRole,
 }: SubmissionStatsParams) => {
-    const assignment = await AssignmentModel.findById(assignmentId).populate({ path: "courseId", select: "teacherIds title" });
-    if (!assignment) throw new Error("Assignment not found");
+    const assignment = await AssignmentModel.findById(assignmentId).populate({
+      path: "courseId",
+      select: "teacherIds title",
+    });
+    appAssert(assignment, NOT_FOUND, "Assignment not found");
 
     await ensureTeacherAccessToCourse({
       course: assignment.courseId,
@@ -477,7 +480,13 @@ export const getSubmissionStats = async ({
 
 //grade Distribution
 export const getGradeDistribution = async (assignmentId: string) => {
-    const submissions = await SubmissionModel.find({ assignmentId, grade: { $ne: undefined } });
+    const assignment = await AssignmentModel.exists({ _id: assignmentId });
+    appAssert(assignment, NOT_FOUND, "Assignment not found");
+
+    const submissions = await SubmissionModel.find({
+      assignmentId,
+      grade: { $ne: undefined },
+    });
     const ranges = [
       { key: "0-2", min: 0, max: 2 },
       { key: "2-4", min: 2, max: 4 },
