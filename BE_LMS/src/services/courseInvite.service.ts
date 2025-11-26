@@ -13,6 +13,8 @@ import { TCreateCourseInvite, TListCourseInvite, TUpdateCourseInvite } from "@/v
 import ICourseInvite from "@/types/courseInvite.type";
 import { FilterQuery, Types } from "mongoose";
 import { sendInvitesWithBatch } from './helpers/courseInviteHelpers'
+import { createNotification } from './notification.service';
+
 /**
  * Yêu cầu nghiệp vụ:
  * - Teacher/Admin tạo link mời tham gia khóa học
@@ -188,6 +190,32 @@ export const joinCourseByInvite = async (token: string, userId: Types.ObjectId) 
   //Tăng counter: usedCount += 1 để track số lần dùng
   invite.usedCount += 1;
   await invite.save();
+
+  const courseTitle = (invite.courseId as any).title;
+
+// 1. Notify student
+await createNotification(
+  {
+    title: `Successfully joined ${courseTitle}`,
+    message: `You have successfully joined the course "${courseTitle}" via invite link.`,
+    recipientType: "user",
+    recipientUser: userId.toString(),
+  },
+  invite.createdBy as any,
+  Role.ADMIN
+);
+
+// 2. Notify teacher/admin who created the invite
+await createNotification(
+  {
+    title: `New student joined ${courseTitle}`,
+    message: `${user.username} has joined your course "${courseTitle}" via invite link.`,
+    recipientType: "user",
+    recipientUser: invite.createdBy.toString(),
+  },
+  userId,
+  Role.STUDENT
+);
 
   return {
     message: `Successfully joined the course "${(invite.courseId as any).title}".`,

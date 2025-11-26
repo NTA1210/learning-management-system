@@ -20,6 +20,7 @@ import {DashboardPage ,
       QuizCreatePage,
       CourseQuizzesPage,
       QuizQuestionsPage,
+      TakeQuizPage,
       FeedbackPage,
       FeedbackListPage,
       EnrollmentsListPage,
@@ -30,6 +31,10 @@ import {DashboardPage ,
       UserBioPage,
       AttendancePage,
       MyEnrollmentsPage,
+      ForumPage,
+      ForumListPage,
+      ForumDetailPage,
+      ForumPostDetailPage,
     } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -139,17 +144,17 @@ function AppRoutes() {
         } />
 
         {/* Quiz Management */}
-        <Route path="/quiz" element={
+        <Route path="/questionbank" element={
           <ProtectedRoute>
             <QuizManagementPage />
           </ProtectedRoute>
         } />
-        <Route path="/quiz/:courseId" element={
+        <Route path="/questionbank/:courseId" element={
           <ProtectedRoute>
             <CourseQuizzesPage />
           </ProtectedRoute>
         } />
-        <Route path="/quiz/questions/:quizId" element={
+        <Route path="/questionbank/questions/:quizId" element={
           <ProtectedRoute>
             <QuizQuestionsPage />
           </ProtectedRoute>
@@ -157,6 +162,16 @@ function AppRoutes() {
         <Route path="/quizz" element={
           <ProtectedRoute>
             <QuizCreatePage />
+          </ProtectedRoute>
+        } />
+        <Route path="/quizz/:courseId" element={
+          <ProtectedRoute>
+            <CourseQuizzesPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/quizz/:courseId/quiz/:quizId" element={
+          <ProtectedRoute requiredRole="student">
+            <TakeQuizPage />
           </ProtectedRoute>
         } />
 
@@ -227,6 +242,28 @@ function AppRoutes() {
         <Route path="/attendance/:semesterId/:courseId" element={
           <ProtectedRoute>
             <AttendancePage />
+          </ProtectedRoute>
+        } />
+
+        {/* Forum */}
+        <Route path="/forum" element={
+          <ProtectedRoute>
+            <ForumPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/forum-list" element={
+          <ProtectedRoute>
+            <ForumListPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/forums/:forumId" element={
+          <ProtectedRoute>
+            <ForumDetailPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/forums/:forumId/posts/:postId" element={
+          <ProtectedRoute>
+            <ForumPostDetailPage />
           </ProtectedRoute>
         } />
 

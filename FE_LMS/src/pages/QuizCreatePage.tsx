@@ -3,10 +3,13 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { useAuth } from "../hooks/useAuth";
-import { courseService, quizService, subjectService, quizQuestionService } from "../services";
+import { useTheme } from "../hooks/useTheme";
+import http from "../utils/http";
+import { quizService, subjectService, quizQuestionService } from "../services";
 import type { Course } from "../types/course";
 import type { Subject } from "../types/subject";
 import type { QuizQuestion } from "../services/quizQuestionService";
+import { QuizPagination } from "../components/quiz/QuizPagination";
 
 interface CreateQuizForm {
   courseId: string;
@@ -15,6 +18,7 @@ interface CreateQuizForm {
   startTime: string;
   endTime: string;
   shuffleQuestions: boolean;
+  isPublished: boolean;
 }
 
 interface DraftQuestion {
@@ -34,7 +38,7 @@ interface SnapshotQuestion {
   explanation?: string | number;
   images?: Array<{ url: string; fromDB?: boolean }>;
   isExternal: boolean;
-  isNew: boolean;
+  isNewQuestion: boolean;
   isDeleted: boolean;
   isDirty: boolean;
 }
@@ -83,24 +87,213 @@ const fixNestedPTags = (html: string | number | undefined | null): string => {
   return fixed;
 };
 
+const stripHtmlTags = (value: string): string => {
+  if (!value) return "";
+  return value.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+};
+
+const loadSwal = async () => (await import("sweetalert2")).default;
+
+const getSwalTheme = (darkMode: boolean) => ({
+  background: darkMode ? "#1f2937" : "#ffffff",
+  color: darkMode ? "#e2e8f0" : "#1f2937",
+  confirmButtonColor: darkMode ? "#6d28d9" : "#6d28d9",
+  confirmButtonText: darkMode ? "#ffffff" : "#ffffff",
+  cancelButtonColor: darkMode ? "#4b5563" : "#9ca3af",
+  popup: darkMode ? "#1f2937" : "#ffffff",
+  backdrop: darkMode ? "rgba(0, 0, 0, 0.8)" : "rgba(0, 0, 0, 0.4)",
+});
+
+const showSwalSuccess = async (message: string, darkMode: boolean = false) => {
+  const Swal = await loadSwal();
+  const theme = getSwalTheme(darkMode);
+  await Swal.fire({
+    icon: "success",
+    title: "Success",
+    text: message,
+    confirmButtonText: "OK",
+    background: theme.background,
+    color: theme.color,
+    confirmButtonColor: theme.confirmButtonColor,
+    backdrop: theme.backdrop,
+  });
+};
+
+const showSwalError = async (message: string, darkMode: boolean = false) => {
+  const Swal = await loadSwal();
+  const theme = getSwalTheme(darkMode);
+  await Swal.fire({
+    icon: "error",
+    title: "Error",
+    text: message,
+    confirmButtonText: "OK",
+    background: theme.background,
+    color: theme.color,
+    confirmButtonColor: theme.confirmButtonColor,
+    backdrop: theme.backdrop,
+  });
+};
+
+const showRandomResultSwal = async (count: number, darkMode: boolean = false) => {
+  const Swal = await loadSwal();
+  const theme = getSwalTheme(darkMode);
+  await Swal.fire({
+    icon: "success",
+    title: "Random Questions",
+    text: `Randomly selected ${count} question${count !== 1 ? "s" : ""}.`,
+    timer: 2000,
+    showConfirmButton: false,
+    background: theme.background,
+    color: theme.color,
+    backdrop: theme.backdrop,
+  });
+};
+
+const normalizeQuestionTypeValue = (type: string | number | undefined | null): string => {
+  if (type === null || type === undefined) return "mcq";
+  const raw =
+    typeof type === "string"
+      ? type
+      : typeof type === "number"
+      ? String(type)
+      : "";
+  const cleaned = raw.trim().toLowerCase().replace(/[\s-]/g, "_");
+
+  if (cleaned === "mcq" || cleaned === "multiple_choice" || cleaned === "multiplechoice") {
+    return "mcq";
+  }
+  if (
+    cleaned === "multichoice" ||
+    cleaned === "multi_choice" ||
+    cleaned === "multi" ||
+    cleaned === "multiple_correct"
+  ) {
+    return "multichoice";
+  }
+  if (
+    cleaned === "true_false" ||
+    cleaned === "truefalse" ||
+    cleaned === "true_or_false"
+  ) {
+    return "true_false";
+  }
+  if (
+    cleaned === "fill_blank" ||
+    cleaned === "fillintheblank" ||
+    cleaned === "fill_in_the_blank" ||
+    cleaned === "fill_in_blank"
+  ) {
+    return "fill_blank";
+  }
+
+  return "mcq";
+};
+
+const normalizeCorrectFlag = (value: unknown): number => {
+  if (typeof value === "number") {
+    return value > 0 ? 1 : 0;
+  }
+  if (typeof value === "boolean") {
+    return value ? 1 : 0;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim().toLowerCase();
+    if (trimmed === "true" || trimmed === "1" || trimmed === "yes" || trimmed === "correct") {
+      return 1;
+    }
+    const parsed = Number(trimmed);
+    if (!Number.isNaN(parsed)) {
+      return parsed > 0 ? 1 : 0;
+    }
+  }
+  return 0;
+};
+
+const buildCorrectOptions = (snapshot: SnapshotQuestion, normalizedOptions: string[]): number[] => {
+  const raw = (Array.isArray(snapshot.correctOptions)
+    ? snapshot.correctOptions
+    : []) as Array<number | string>;
+  if (raw.length === normalizedOptions.length) {
+    return raw.map((value) => normalizeCorrectFlag(value));
+  }
+
+  if (raw.length > 0) {
+    const normalizedOptionTexts = normalizedOptions.map((opt) =>
+      stripHtmlTags(String(opt || "")).toLowerCase()
+    );
+
+    const bitStringSource = raw.find(
+      (value): value is string =>
+        typeof value === "string" &&
+        value.replace(/[\s,|;]/g, "").match(/^[01]+$/) !== null
+    );
+
+    if (bitStringSource) {
+      const cleanedBits = bitStringSource.replace(/[\s,|;]/g, "");
+      if (cleanedBits.length === normalizedOptions.length) {
+        const bits = cleanedBits.split("").map((char: string) => (char === "1" ? 1 : 0));
+        return bits;
+      }
+    }
+
+    const indexFlags = raw
+      .map((value) => {
+        if (typeof value === "number" && Number.isFinite(value)) {
+          return value;
+        }
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+      })
+      .filter((idx): idx is number => idx !== null && idx >= 0 && idx < normalizedOptions.length);
+
+    if (indexFlags.length > 0) {
+      return normalizedOptions.map((_, idx) => (indexFlags.includes(idx) ? 1 : 0));
+    }
+
+    const textFlags = raw
+      .map((value) => {
+        if (value === null || value === undefined) return null;
+        const text = stripHtmlTags(String(value)).trim();
+        if (!text) return null;
+
+        const letterMatch = text.match(/^[A-Da-d]/);
+        if (letterMatch) {
+          const idx = letterMatch[0].toUpperCase().charCodeAt(0) - 65;
+          if (idx >= 0 && idx < normalizedOptions.length) return idx;
+        }
+
+        const normalizedText = text.toLowerCase();
+        const idx = normalizedOptionTexts.findIndex((opt) => opt === normalizedText);
+        return idx >= 0 ? idx : null;
+      })
+      .filter((idx): idx is number => idx !== null && idx >= 0 && idx < normalizedOptions.length);
+
+    if (textFlags.length > 0) {
+      return normalizedOptions.map((_, idx) => (textFlags.includes(idx) ? 1 : 0));
+    }
+  }
+
+  return normalizedOptions.map(() => 0);
+};
+
 // Force convert snapshot question to ensure all text fields are strings
 const normalizeSnapshotQuestion = (snapshot: SnapshotQuestion) => {
+  const normalizedOptions = Array.isArray(snapshot.options)
+    ? snapshot.options.map((opt: string | number) => String(opt ?? ""))
+    : [];
+
   return {
     ...snapshot,
     text: String(snapshot.text ?? ""),
-    type: String(snapshot.type ?? "mcq"),
-    options: Array.isArray(snapshot.options)
-      ? snapshot.options.map((opt: string | number) => String(opt ?? ""))
-      : [],
-    correctOptions: Array.isArray(snapshot.correctOptions)
-      ? snapshot.correctOptions.map((co: number) => Number(co) || 0)
-      : [],
+    type: normalizeQuestionTypeValue(snapshot.type),
+    options: normalizedOptions,
+    correctOptions: buildCorrectOptions(snapshot, normalizedOptions),
     points: Number(snapshot.points) || 1,
     explanation: snapshot.explanation ? String(snapshot.explanation) : undefined,
     images: Array.isArray(snapshot.images) ? snapshot.images : undefined,
     id: snapshot.id ? String(snapshot.id) : undefined,
     isExternal: Boolean(snapshot.isExternal),
-    isNew: Boolean(snapshot.isNew),
+      isNewQuestion: Boolean(snapshot.isNewQuestion ?? false),
     isDeleted: Boolean(snapshot.isDeleted ?? false),
     isDirty: Boolean(snapshot.isDirty ?? false),
   };
@@ -108,6 +301,7 @@ const normalizeSnapshotQuestion = (snapshot: SnapshotQuestion) => {
 
 const QuizCreatePage: React.FC = () => {
   const { user } = useAuth();
+  const { darkMode } = useTheme();
   const navigate = useNavigate();
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -116,6 +310,16 @@ const QuizCreatePage: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
+  const [coursesPage, setCoursesPage] = useState(1);
+  const [coursesPageSize] = useState(10);
+  const [coursesPagination, setCoursesPagination] = useState<{
+    totalItems: number;
+    currentPage: number;
+    limit: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  } | null>(null);
 
   const [showWizard, setShowWizard] = useState(false);
   const [wizardStep, setWizardStep] = useState<"details" | "select">("details");
@@ -128,6 +332,7 @@ const QuizCreatePage: React.FC = () => {
 
   const [draftQuestions, setDraftQuestions] = useState<DraftQuestion[]>([emptyDraftQuestion()]);
   const [currentDraftPage, setCurrentDraftPage] = useState(1);
+  const createMarkup = (content?: string) => ({ __html: content || "" });
   const [quizDetails, setQuizDetails] = useState<CreateQuizForm>({
     courseId: "",
     title: "",
@@ -135,10 +340,9 @@ const QuizCreatePage: React.FC = () => {
     startTime: "",
     endTime: "",
     shuffleQuestions: false,
+    isPublished: true,
   });
 
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [submittingQuiz, setSubmittingQuiz] = useState(false);
 
   const quizUploadEndpoint = useMemo(
@@ -154,29 +358,84 @@ const QuizCreatePage: React.FC = () => {
         setSubjects(data);
       } catch (err) {
         console.error("Failed to load subjects", err);
-        setError("Failed to load subjects. Please refresh.");
+        showSwalError("Failed to load subjects. Please refresh.", darkMode);
       } finally {
         setLoadingSubjects(false);
       }
     };
     fetchSubjects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const fetchCourses = async () => {
       try {
         setLoadingCourses(true);
-        const { courses } = await courseService.getAllCourses({ isPublished: true, limit: 100 });
-        setCourses(courses);
+        const response = await http.get("/courses/my-courses", {
+          params: {
+          page: coursesPage,
+            limit: coursesPageSize,
+          },
+        });
+
+        const coursesList: Course[] = Array.isArray(response?.data)
+          ? response.data
+          : Array.isArray(response?.data?.data)
+          ? response.data.data
+          : Array.isArray(response)
+          ? (response as Course[])
+          : [];
+
+        setCourses(coursesList);
+        
+        const pagination = response?.pagination || response?.meta?.pagination;
+        
+        if (pagination && typeof pagination === 'object') {
+          const paginationData = pagination as Record<string, unknown>;
+          const totalItems =
+            Number(paginationData.totalItems) ||
+            Number(paginationData.total) ||
+            coursesList.length;
+          setCoursesPagination({
+            totalItems,
+            currentPage:
+              Number(paginationData.currentPage) ||
+              Number(paginationData.page) ||
+              coursesPage,
+            limit: Number(paginationData.limit) || coursesPageSize,
+            totalPages:
+              Number(paginationData.totalPages) ||
+              Math.ceil(totalItems / coursesPageSize) ||
+              1,
+            hasNext:
+              Boolean(paginationData.hasNext) ||
+              Boolean(paginationData.hasNextPage) ||
+              false,
+            hasPrev:
+              Boolean(paginationData.hasPrev) ||
+              Boolean(paginationData.hasPrevPage) ||
+              false,
+          });
+        } else {
+          setCoursesPagination({
+            totalItems: coursesList.length,
+            currentPage: coursesPage,
+            limit: coursesPageSize,
+            totalPages: 1,
+            hasNext: false,
+            hasPrev: false,
+          });
+        }
       } catch (err) {
         console.error("Failed to load courses", err);
-        setError("Failed to load courses. Please refresh.");
+        showSwalError("Failed to load courses. Please refresh.", darkMode);
       } finally {
         setLoadingCourses(false);
       }
     };
     fetchCourses();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coursesPage, coursesPageSize]);
 
   const openWizardWithoutCourse = () => {
     setQuizDetails({
@@ -186,6 +445,7 @@ const QuizCreatePage: React.FC = () => {
       startTime: "",
       endTime: "",
       shuffleQuestions: false,
+      isPublished: true,
     });
     setDraftQuestions([emptyDraftQuestion()]);
     setSelectedBankIds(new Set());
@@ -210,7 +470,7 @@ const QuizCreatePage: React.FC = () => {
       setBankQuestions(normalizedQuestions);
     } catch (err) {
       console.error("Failed to fetch question bank", err);
-      setError("Không thể tải câu hỏi từ question bank.");
+      showSwalError("Failed to load questions from question bank.", darkMode);
     } finally {
       setBankLoading(false);
     }
@@ -231,25 +491,25 @@ const QuizCreatePage: React.FC = () => {
     });
   };
 
-  const randomPickBankQuestions = () => {
+  const randomPickBankQuestions = async () => {
     // Validate: randomCount must be positive and less than available questions
     const availableCount = filteredBankQuestions.length;
     if (!randomCount || randomCount <= 0) {
-      setError("Số câu random phải lớn hơn 0.");
+      await showSwalError("Random count must be greater than 0.", darkMode);
       return;
     }
     if (randomCount > availableCount) {
-      setError(`Số câu random (${randomCount}) không được lớn hơn số câu hỏi có sẵn (${availableCount}).`);
+      await showSwalError(`Random count (${randomCount}) cannot be greater than available questions (${availableCount}).`, darkMode);
       return;
     }
     if (availableCount === 0) {
-      setError("Không có câu hỏi nào để chọn.");
+      await showSwalError("No questions available to select.", darkMode);
       return;
     }
     const shuffled = [...filteredBankQuestions].sort(() => Math.random() - 0.5);
     const picked = shuffled.slice(0, randomCount);
     setSelectedBankIds(new Set(picked.map((q) => q._id)));
-    setError(null);
+    await showRandomResultSwal(picked.length, darkMode);
   };
 
   const addDraftQuestion = () => {
@@ -296,7 +556,7 @@ const QuizCreatePage: React.FC = () => {
     return {
       id: question._id ?? crypto.randomUUID(),
       text: String(fixNestedPTags(question.text || "")),
-      type: typeof question.type === "string" ? question.type : "mcq",
+      type: normalizeQuestionTypeValue(question.type),
       options: options.map(opt => String(fixNestedPTags(opt))),
       correctOptions: correct,
       points: Number(question.points) || 1,
@@ -307,7 +567,7 @@ const QuizCreatePage: React.FC = () => {
           )
         : undefined,
       isExternal: !fromBank,
-      isNew: !fromBank,
+      isNewQuestion: !fromBank,
       isDeleted: false,
       isDirty: false,
     };
@@ -347,21 +607,26 @@ const QuizCreatePage: React.FC = () => {
   };
 
   const submitQuiz = async () => {
-    setError(null);
     if (!selectedSubjectId) {
-      setError("Vui lòng chọn subject.");
+      await showSwalError("Please select a subject before creating the quiz.", darkMode);
       return;
     }
     if (!quizDetails.courseId) {
-      setError("Vui lòng chọn course.");
+      await showSwalError("Please select a course before creating the quiz.", darkMode);
       return;
     }
     if (!quizDetails.title.trim()) {
-      setError("Vui lòng nhập tiêu đề quiz.");
+      await showSwalError("Please enter a quiz title.", darkMode);
       return;
     }
     if (!quizDetails.startTime || !quizDetails.endTime) {
-      setError("Vui lòng chọn thời gian bắt đầu và kết thúc.");
+      await showSwalError("Please choose both start time and end time.", darkMode);
+      return;
+    }
+    const start = new Date(quizDetails.startTime);
+    const end = new Date(quizDetails.endTime);
+    if (start >= end) {
+      await showSwalError("End time must be later than start time.", darkMode);
       return;
     }
     try {
@@ -377,7 +642,7 @@ const QuizCreatePage: React.FC = () => {
       }
 
       if (snapshotQuestions.length === 0) {
-        setError("Không có câu hỏi nào được chọn.");
+        await showSwalError("No questions have been selected. Please add questions to the quiz.", darkMode);
         return;
       }
 
@@ -401,6 +666,40 @@ const QuizCreatePage: React.FC = () => {
         return normalized;
       });
 
+      for (let i = 0; i < normalizedSnapshots.length; i++) {
+        const snapshot = normalizedSnapshots[i];
+        const optionTexts = (snapshot.options || []).map((opt) =>
+          stripHtmlTags(String(opt ?? "")).toLowerCase()
+        );
+        if (optionTexts.length !== new Set(optionTexts).size) {
+          const plainQuestion = stripHtmlTags(snapshot.text).slice(0, 120) || `Question ${i + 1}`;
+          await showSwalError(
+            `Question "${plainQuestion}" has duplicate answer options. Please ensure each option is unique.`,
+            darkMode
+          );
+          return;
+        }
+      }
+
+      normalizedSnapshots.forEach((snapshot) => {
+        const trueCount = snapshot.correctOptions.filter((flag: number) => flag === 1).length;
+        if (trueCount > 1) {
+          snapshot.type = "multichoice";
+        } else {
+          snapshot.type = "mcq";
+        }
+      });
+
+      const invalidSnapshot = normalizedSnapshots.find((snapshot) =>
+        !snapshot.correctOptions.some((flag: number) => flag === 1)
+      );
+      if (invalidSnapshot) {
+        const plainQuestion = stripHtmlTags(invalidSnapshot.text).slice(0, 120) || "Unnamed question";
+        throw new Error(
+          `Question "${plainQuestion}" does not have a correct answer. Please update it before creating the quiz.`
+        );
+      }
+
       await quizService.createQuiz({
         courseId: quizDetails.courseId,
         title: quizDetails.title.trim(),
@@ -408,10 +707,11 @@ const QuizCreatePage: React.FC = () => {
         startTime: convertToISOUTC(quizDetails.startTime),
         endTime: convertToISOUTC(quizDetails.endTime),
         shuffleQuestions: quizDetails.shuffleQuestions,
+        isPublished: quizDetails.isPublished,
         snapshotQuestions: normalizedSnapshots,
       });
 
-      setSuccess("Quiz created successfully.");
+      await showSwalSuccess("Quiz created successfully.", darkMode);
       setShowWizard(false);
     } catch (err) {
       console.error("Failed to create quiz", err);
@@ -419,36 +719,34 @@ const QuizCreatePage: React.FC = () => {
         typeof err === "object" && err !== null && "message" in err
           ? String((err as { message?: string }).message)
           : "Failed to create quiz.";
-      setError(message);
+      await showSwalError(message || "Failed to create quiz. Please try again.", darkMode);
     } finally {
       setSubmittingQuiz(false);
     }
   };
 
-  const handleDetailsNext = (e: React.FormEvent) => {
+  const handleDetailsNext = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSuccess(null);
     if (!selectedSubjectId) {
-      setError("Vui lòng chọn subject cho quiz.");
+      await showSwalError("Please select a subject before continuing.", darkMode);
       return;
     }
     if (!quizDetails.courseId) {
-      setError("Vui lòng chọn course.");
+      await showSwalError("Please select a course before continuing.", darkMode);
       return;
     }
     if (!quizDetails.title.trim()) {
-      setError("Vui lòng nhập tiêu đề quiz.");
+      await showSwalError("Please enter a quiz title.", darkMode);
       return;
     }
     if (!quizDetails.startTime || !quizDetails.endTime) {
-      setError("Vui lòng chọn thời gian bắt đầu và kết thúc.");
+      await showSwalError("Please choose both start time and end time.", darkMode);
       return;
     }
     const start = new Date(quizDetails.startTime);
     const end = new Date(quizDetails.endTime);
     if (start >= end) {
-      setError("End time phải lớn hơn start time.");
+      await showSwalError("End time must be later than start time.", darkMode);
       return;
     }
     setWizardStep("select");
@@ -472,7 +770,7 @@ const QuizCreatePage: React.FC = () => {
                   Questions & Quiz Builder
                 </h1>
                 <p className="text-sm" style={{ color: "var(--muted-text)" }}>
-                  Chọn subject, thêm câu hỏi trước rồi mới tạo quiz.
+                 
                 </p>
               </div>
               <button
@@ -485,23 +783,6 @@ const QuizCreatePage: React.FC = () => {
               </button>
             </header>
 
-            {(error || success) && (
-              <div className="space-y-2">
-                {error && (
-                  <div className="p-3 rounded-md text-sm" style={{ backgroundColor: "var(--error-bg)", color: "var(--error-text)" }}>
-                    {error}
-                  </div>
-                )}
-                {success && (
-                  <div
-                    className="p-3 rounded-md text-sm"
-                    style={{ backgroundColor: "var(--status-available-bg)", color: "var(--status-available-text)" }}
-                  >
-                    {success}
-                  </div>
-                )}
-              </div>
-            )}
 
             <section
               className="rounded-3xl shadow-lg p-6 space-y-6 border"
@@ -524,7 +805,7 @@ const QuizCreatePage: React.FC = () => {
                         backgroundColor: "var(--card-row-bg)",
                         borderColor: "var(--card-row-border)",
                       }}
-                      onClick={() => navigate(`/quiz/${course._id}`)}
+                      onClick={() => navigate(`/quizz/${course._id}`)}
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
@@ -551,6 +832,23 @@ const QuizCreatePage: React.FC = () => {
                   ))}
                 </div>
               )}
+              {coursesPagination && coursesPagination.totalPages > 1 && (
+                <QuizPagination
+                  currentPage={coursesPagination.currentPage}
+                  totalPages={coursesPagination.totalPages}
+                  textColor="var(--heading-text)"
+                  borderColor="var(--card-border)"
+                  hasPrev={coursesPagination.hasPrev}
+                  hasNext={coursesPagination.hasNext}
+                  pageOptions={Array.from({ length: Math.min(5, coursesPagination.totalPages) }, (_, i) => {
+                    const start = Math.max(1, coursesPagination.currentPage - 2);
+                    return Math.min(start + i, coursesPagination.totalPages);
+                  }).filter((v, i, arr) => arr.indexOf(v) === i)}
+                  onPrev={() => setCoursesPage((p) => Math.max(1, p - 1))}
+                  onNext={() => setCoursesPage((p) => Math.min(coursesPagination!.totalPages, p + 1))}
+                  onSelectPage={(page) => setCoursesPage(page)}
+                />
+              )}
             </section>
           </div>
         </main>
@@ -558,7 +856,7 @@ const QuizCreatePage: React.FC = () => {
 
       {showWizard && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowWizard(false)} />
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowWizard(false)} />
           <div
             className="relative w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
             style={{
@@ -704,6 +1002,24 @@ const QuizCreatePage: React.FC = () => {
                     </div>
                   </div>
 
+                  <div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={quizDetails.isPublished}
+                        onChange={(e) => setQuizDetails((prev) => ({ ...prev, isPublished: e.target.checked }))}
+                        className="w-4 h-4 rounded border"
+                        style={{
+                          backgroundColor: quizDetails.isPublished ? "var(--primary-color)" : "var(--input-bg)",
+                          borderColor: "var(--input-border)",
+                        }}
+                      />
+                      <span className="text-sm font-medium" style={{ color: "var(--muted-text)" }}>
+                        Published
+                      </span>
+                    </label>
+                  </div>
+
 
                   <div className="flex items-center justify-between pt-4 border-t">
                     <button
@@ -814,9 +1130,11 @@ const QuizCreatePage: React.FC = () => {
                               onChange={() => toggleBankQuestion(question._id)}
                             />
                             <div>
-                              <p className="font-medium" style={{ color: "var(--heading-text)" }}>
-                                {question.text}
-                              </p>
+                              <div
+                                className="font-medium prose prose-sm max-w-none"
+                                style={{ color: "var(--heading-text)" }}
+                                dangerouslySetInnerHTML={createMarkup(question.text)}
+                              />
                               {Array.isArray(question.options) && (
                                 <ul className="text-sm list-disc pl-5 mt-1 space-y-0.5" style={{ color: "var(--muted-text)" }}>
                                   {question.options.map((opt, idx) => (
@@ -826,9 +1144,8 @@ const QuizCreatePage: React.FC = () => {
                                         className={
                                           question.correctOptions?.[idx] === 1 ? "text-emerald-600 font-semibold" : ""
                                         }
-                                      >
-                                        {opt}
-                                      </span>
+                                        dangerouslySetInnerHTML={createMarkup(opt)}
+                                      />
                                     </li>
                                   ))}
                                 </ul>

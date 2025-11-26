@@ -392,23 +392,5 @@ export const getQuizById = async (quizId: string, userId: mongoose.Types.ObjectI
     isTeacherOfCourse(quiz.courseId, userId);
   }
 
-  if (role === Role.STUDENT) {
-    quiz.snapshotQuestions = quiz.snapshotQuestions.map((q): any => {
-      const {
-        correctOptions,
-        explanation,
-        points,
-        isDeleted,
-        isDirty,
-        isExternal,
-        isNewQuestion,
-        ...rest
-      } = q;
-      return rest;
-    });
-    const { courseId, ...rest } = quiz;
-    return rest;
-  }
-
   return quiz;
 };

@@ -10,7 +10,7 @@ export interface SnapshotQuestionPayload {
   explanation?: string;
   images?: { url: string; fromDB?: boolean }[];
   isExternal?: boolean;
-  isNew?: boolean;
+  isNewQuestion?: boolean;
   isDeleted?: boolean;
   isDirty?: boolean;
 }
@@ -22,6 +22,7 @@ export interface CreateQuizPayload {
   startTime: string; // ISO string
   endTime: string; // ISO string
   shuffleQuestions?: boolean;
+  isPublished?: boolean;
   snapshotQuestions?: SnapshotQuestionPayload[];
 }
 
@@ -35,7 +36,7 @@ export interface SnapshotQuestion {
   explanation?: string;
   images?: { url: string; fromDB?: boolean }[];
   isExternal?: boolean;
-  isNew?: boolean;
+  isNewQuestion?: boolean;
   isDeleted?: boolean;
   isDirty?: boolean;
 }
@@ -98,8 +99,8 @@ const normalizeSnapshotForAPI = (snapshot: SnapshotQuestionPayload): SnapshotQue
     explanation: snapshot.explanation ? String(snapshot.explanation) : undefined,
     images: snapshot.images,
     id: snapshot.id ? String(snapshot.id) : undefined,
-    isExternal: Boolean(snapshot.isExternal),
-    isNew: Boolean(snapshot.isNew),
+    isExternal: Boolean(snapshot.isExternal ?? true),
+    isNewQuestion: Boolean(snapshot.isNewQuestion ?? false),
     isDeleted: Boolean(snapshot.isDeleted ?? false),
     isDirty: Boolean(snapshot.isDirty ?? false),
   };
@@ -117,6 +118,7 @@ export const quizService = {
       startTime: payload.startTime,
       endTime: payload.endTime,
       shuffleQuestions: payload.shuffleQuestions ?? false,
+      isPublished: payload.isPublished ?? false,
       snapshotQuestions: normalizedSnapshots,
     });
     return response.data as QuizResponse;
@@ -147,7 +149,7 @@ export const quizService = {
     // Filter out undefined/null values and boolean false values
     // Backend expects boolean, but query params are strings in HTTP GET
     // So we only send boolean params if they are true, or skip them entirely
-    const queryParams: Record<string, any> = {};
+    const queryParams: Record<string, string | number | boolean> = {};
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
@@ -235,14 +237,17 @@ export const quizService = {
     const quiz = await quizService.getQuizById(quizId);
     
     // Update the question - mark as dirty and not new
+    // Keep original isExternal value - this is a snapshot, not updating the original question in DB
     const updatedQuestions = (quiz.snapshotQuestions || []).map((q) =>
       q.id === questionId 
         ? { 
             ...q, 
             ...questionData,
             isDirty: true, 
-            isNewQuestion: false,
-            isDeleted: false
+            isNewQuestion: false, // Ensure it's not treated as a new question
+            isDeleted: false,
+            // Keep original isExternal - don't change it, this is just updating the snapshot
+            isExternal: q.isExternal ?? true
           } 
         : q
     );

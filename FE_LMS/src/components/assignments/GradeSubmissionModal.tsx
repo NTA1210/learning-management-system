@@ -2,11 +2,6 @@ import React from "react";
 import { useTheme } from "../../hooks/useTheme";
 import { X } from "lucide-react";
 
-interface Submission {
-  _id: string;
-  grade?: number;
-  feedback?: string;
-}
 
 interface GradeSubmissionModalProps {
   isOpen: boolean;
@@ -129,7 +124,7 @@ const GradeSubmissionModal: React.FC<GradeSubmissionModalProps> = ({
                 color: darkMode ? "#fde047" : "#ffffff",
               }}
             >
-              {grading ? "Grading..." : "Submit Grade"}
+              {grading ? "Grading..." : "Re-Grade"}
             </button>
           </div>
         </div>

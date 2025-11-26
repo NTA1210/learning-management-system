@@ -9,6 +9,7 @@ import { compareValue } from "../utils/bcrypt";
 import { CourseStatus } from "../types/course.type";
 import { EnrollmentStatus, EnrollmentRole, EnrollmentMethod } from "@/types/enrollment.type";
 import { Role } from "../types/user.type";
+import { createNotification } from "./notification.service";
 
 type ObjectIdLike = Types.ObjectId | string;
 
@@ -270,7 +271,7 @@ export const getAllEnrollments = async (
  * - Xác định status mặc định dựa vào enrollRequiresApproval của course:
  *   + Nếu enrollRequiresApproval = true → status = "pending"
  *   + Nếu enrollRequiresApproval = false → status = "approved"
- * - Kiểm tra enrollment đã tồn tại (theo FPT LMS logic):
+ * - Kiểm tra enrollment đã tồn tại:
  *   + Nếu status cũ = REJECTED hoặc CANCELLED → CHO PHÉP re-enroll (cập nhật lại)
  *   + Nếu status cũ = DROPPED hoặc COMPLETED → KHÔNG CHO PHÉP (phải học khóa KHÁC)
  *   + Nếu status cũ = PENDING hoặc APPROVED → KHÔNG CHO PHÉP (trả lỗi CONFLICT)
@@ -430,17 +431,6 @@ export const createEnrollment = async (data: {
         appAssert(isValidPassword, UNAUTHORIZED, "Invalid course password");
       }
 
-      existingEnrollment.status = status as any;
-      existingEnrollment.role = role as any;
-      existingEnrollment.method = method as any;
-      existingEnrollment.note = note;
-      existingEnrollment.finalGrade = undefined; // Reset grade
-      existingEnrollment.progress = { totalLessons: 0, completedLessons: 0 }; // Reset progress
-      existingEnrollment.respondedBy = undefined;
-      existingEnrollment.respondedAt = undefined;
-      existingEnrollment.completedAt = undefined;
-      existingEnrollment.droppedAt = undefined;
-      await existingEnrollment.save();
 
       await existingEnrollment.populate([
         { path: "studentId", select: "username email fullname avatar_url" },
@@ -494,6 +484,40 @@ export const createEnrollment = async (data: {
     { path: "courseId", select: "title code description" },
   ]);
 
+  // 6. Send notification if enrollment was created by admin/teacher (not self-enrollment)
+  if (method !== EnrollmentMethod.SELF) {
+    const courseData = enrollment.courseId as any;
+    const studentData = enrollment.studentId as any;
+
+    await createNotification(
+      {
+        title: `Enrolled in ${courseData.title}`,
+        message: `You have been enrolled in the course "${courseData.title}". ${status === EnrollmentStatus.APPROVED ? "You can now access the course materials." : "Your enrollment is pending approval."}`,
+        recipientType: "user",
+        recipientUser: studentData._id.toString(),
+      },
+      new Types.ObjectId(), // System notification
+      Role.ADMIN
+    );
+  }
+
+  // 7. Send notification to teachers if student self-enrolls with PENDING status
+  if (method === EnrollmentMethod.SELF && status === EnrollmentStatus.PENDING) {
+    const courseData = enrollment.courseId as any;
+    const studentData = enrollment.studentId as any;
+
+    await createNotification(
+      {
+        title: `New enrollment request for ${courseData.title}`,
+        message: `${studentData.username} has requested to enroll in your course "${courseData.title}". Please review and approve.`,
+        recipientType: "course",
+        recipientCourse: courseData._id.toString(),
+      },
+      studentData._id,
+      Role.STUDENT
+    );
+  }
+
   return enrollment;
 };
 
@@ -534,6 +558,9 @@ export const updateEnrollment = async (
   // 1. Check enrollment exists
   const enrollment = await EnrollmentModel.findById(enrollmentId).populate("courseId");
   appAssert(enrollment, NOT_FOUND, "Enrollment not found");
+
+  // Store old status for comparison
+  const oldStatus = enrollment.status;
 
   // 2. Check course exists and not expired
   const course = enrollment.courseId as any;
@@ -584,6 +611,40 @@ export const updateEnrollment = async (
   )
     .populate("studentId", "username email fullname avatar_url")
     .populate("courseId", "title code description");
+
+  // 5. Send notification ONLY if status actually changed
+  if (data.status !== undefined && updatedEnrollment && oldStatus !== data.status) {
+    const course = updatedEnrollment.courseId as any;
+    const studentId = updatedEnrollment.studentId as any;
+
+    let notificationTitle = "";
+    let notificationMessage = "";
+
+    if (data.status === EnrollmentStatus.APPROVED) {
+      notificationTitle = `Enrollment approved for ${course.title}`;
+      notificationMessage = `Your enrollment in course "${course.title}" has been approved. You can now access the course materials.`;
+    } else if (data.status === EnrollmentStatus.REJECTED) {
+      notificationTitle = `Enrollment rejected for ${course.title}`;
+      notificationMessage = `Your enrollment in course "${course.title}" has been rejected.${data.note ? ` Reason: ${data.note}` : ""}`;
+    } else if (data.status === EnrollmentStatus.COMPLETED) {
+      notificationTitle = `Congratulations! Course completed`;
+      notificationMessage = `Congratulations! You have successfully completed the course "${course.title}".`;
+    }
+
+    // Send notification if we have a message
+    if (notificationTitle && notificationMessage) {
+      await createNotification(
+        {
+          title: notificationTitle,
+          message: notificationMessage,
+          recipientType: "user",
+          recipientUser: studentId._id.toString(),
+        },
+        updatedEnrollment.respondedBy as any || new Types.ObjectId(), // Use respondedBy or system
+        Role.ADMIN // System notification
+      );
+    }
+  }
 
   return updatedEnrollment;
 };
@@ -673,3 +734,90 @@ export const updateSelfEnrollment = async (
 
   return updatedEnrollment;
 };
+
+/**
+ * Yêu cầu nghiệp vụ:
+ * - Admin hoặc Teacher kick học sinh ra khỏi khóa học.
+ * - Chỉ kick được khi status = APPROVED.
+ * - Cập nhật status = DROPPED.
+ * - Ghi log lý do vào note.
+ * - Gửi thông báo cho học sinh.
+ *
+ * Input: enrollmentId, reason, userId, userRole
+ * Output: Success message
+ */
+export const kickStudentFromCourse = async (
+  enrollmentId: string,
+  reason: string,
+  userId: Types.ObjectId,
+  userRole: Role
+) => {
+  // 1. Get enrollment & course
+  const enrollment = await EnrollmentModel.findById(enrollmentId).populate(
+    "courseId"
+  );
+  appAssert(enrollment, NOT_FOUND, "Enrollment not found");
+
+  const course = enrollment.courseId as any;
+  appAssert(course, NOT_FOUND, "Course not found");
+
+  // 2. Check permission
+  if (userRole !== Role.ADMIN) {
+    // If not admin, must be teacher of the course
+    const isTeacher = course.teacherIds.some((id: Types.ObjectId) =>
+      id.equals(userId)
+    );
+    appAssert(
+      isTeacher,
+      FORBIDDEN,
+      "You do not have permission to kick students from this course"
+    );
+  }
+
+  // 3. Check status
+  appAssert(
+    enrollment.status === EnrollmentStatus.APPROVED,
+    BAD_REQUEST,
+    "Can only kick students who are currently enrolled (APPROVED)"
+  );
+
+  // 4. Update enrollment
+  const now = new Date();
+  const kicker = await UserModel.findById(userId).select("username");
+  const kickerName = kicker?.username || (userRole === Role.ADMIN ? "Admin" : "Teacher")
+  const updatedNote = enrollment.note
+    ? `${enrollment.note}\n[Kicked by ${kickerName} at ${now.toISOString()}]: ${reason}`
+    : `[Kicked by ${kickerName} at ${now.toISOString()}]: ${reason}`;
+
+  enrollment.status = EnrollmentStatus.DROPPED;
+  enrollment.droppedAt = now;
+  enrollment.note = updatedNote;
+  await enrollment.save();
+
+  // 5. Send notification
+  await createNotification(
+    {
+      title: `You have been removed from course ${course.title}`,
+      message: `Reason: ${reason}`,
+      recipientType: "user",
+      recipientUser: enrollment.studentId.toString(),
+    },
+    userId,
+    userRole
+  );
+
+  return {
+    message: "Student kicked successfully",
+    data: {
+      enrollmentId: enrollment._id,
+      courseId: course._id,
+      studentId: enrollment.studentId,
+      kickerId: userId,
+      kickerName,
+      reason,
+      droppedAt: now,
+      note: updatedNote,
+    }
+  };
+};
+

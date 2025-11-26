@@ -20,6 +20,7 @@ import { NOT_FOUND, BAD_REQUEST } from "@/constants/http";
 import { SubmissionStatus } from "@/types/submission.type";
 import { Role } from "@/types";
 import mongoose from "mongoose";
+import { ensureTeacherAccessToCourse } from "@/services/helpers/courseAccessHelpers";
 
 jest.mock("@/models/assignment.model");
 jest.mock("@/models/submission.model");
@@ -28,6 +29,9 @@ jest.mock("@/models");
 jest.mock("@/utils/appAssert");
 jest.mock("@/utils/uploadFile");
 jest.mock("@/utils/filePrefix");
+jest.mock("@/services/helpers/courseAccess", () => ({
+  ensureTeacherAccessToCourse: jest.fn(),
+}));
 
 const mockedAssignmentModel = AssignmentModel as jest.Mocked<typeof AssignmentModel>;
 const mockedSubmissionModel = SubmissionModel as jest.Mocked<typeof SubmissionModel>;
@@ -46,10 +50,14 @@ const mockedUploadFile = uploadFile as unknown as jest.MockedFunction<
 const mockedPrefixSubmission = prefixSubmission as jest.MockedFunction<
   (courseId: string, assignmentId: string, studentId: string) => string
 >;
+const mockedEnsureTeacherAccess = ensureTeacherAccessToCourse as jest.MockedFunction<
+  typeof ensureTeacherAccessToCourse
+>;
 
 describe("Submission Service Unit Tests", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedEnsureTeacherAccess.mockResolvedValue(undefined as any);
   });
 
   describe("submitAssignment", () => {
@@ -269,17 +277,35 @@ describe("Submission Service Unit Tests", () => {
 
   describe("listSubmissionsByAssignment", () => {
     it("return sorted list", async () => {
+      const selectMock = jest
+        .fn()
+        .mockReturnValueOnce(
+          Promise.resolve({
+            courseId: new mongoose.Types.ObjectId(),
+          })
+        );
+      mockedAssignmentModel.findById.mockReturnValueOnce({ select: selectMock } as any);
       const mockFind = {
         populate: jest.fn().mockReturnThis(),
         sort: jest.fn().mockResolvedValueOnce([{ id: "s1" }]),
       };
       mockedSubmissionModel.find.mockReturnValueOnce(mockFind as any);
-
-      const result = await listSubmissionsByAssignment("a1");
+      const requesterId = new mongoose.Types.ObjectId();
+      const result = await listSubmissionsByAssignment({
+        assignmentId: "a1",
+        requesterId,
+        requesterRole: Role.TEACHER,
+      });
 
       expect(mockedSubmissionModel.find).toHaveBeenCalledWith({ assignmentId: "a1" });
       expect(mockFind.populate).toHaveBeenCalledWith("studentId", "fullname email");
       expect(mockFind.sort).toHaveBeenCalledWith({ submittedAt: -1 });
+      expect(mockedEnsureTeacherAccess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: requesterId,
+          userRole: Role.TEACHER,
+        })
+      );
       expect(result).toEqual([{ id: "s1" }]);
     });
   });
@@ -301,7 +327,7 @@ describe("Submission Service Unit Tests", () => {
     });
 
     it("update submission with valid grade", async () => {
-      const fakeAssignment = { maxScore: 10 };
+      const fakeAssignment = { maxScore: 10, courseId: new mongoose.Types.ObjectId() };
       const fakeSubmission = {
         save: jest.fn().mockResolvedValue(undefined),
         populate: jest.fn().mockResolvedValue({ id: "graded1" }),
@@ -328,7 +354,7 @@ describe("Submission Service Unit Tests", () => {
     });
 
     it("throws BAD_REQUEST when grade out of range", async () => {
-      const fakeSub = { assignmentId: { maxScore: 5 } };
+      const fakeSub = { assignmentId: { maxScore: 5, courseId: new mongoose.Types.ObjectId() } };
       mockedSubmissionModel.findById.mockReturnValueOnce({ populate: jest.fn().mockResolvedValueOnce(fakeSub) } as any);
 
       await expect(gradeSubmissionById("sub1", "g1" as any, 10)).rejects.toThrow();
@@ -336,7 +362,7 @@ describe("Submission Service Unit Tests", () => {
 
     it("grades submission successfully", async () => {
       const fakeSubmission: any = {
-        assignmentId: { maxScore: 10 },
+        assignmentId: { maxScore: 10, courseId: new mongoose.Types.ObjectId() },
         gradeHistory: [],
         save: jest.fn().mockResolvedValue(undefined),
         populate: jest.fn().mockResolvedValue({ id: "gradedById" }),
@@ -353,11 +379,11 @@ describe("Submission Service Unit Tests", () => {
     it("throws error when assignment not found", async () => {
       // findById().populate(...) should resolve to null to simulate missing assignment
       mockedAssignmentModel.findById.mockReturnValueOnce({ populate: jest.fn().mockResolvedValueOnce(null) } as any);
-      await expect(getSubmissionStats("a1")).rejects.toThrow("Assignment not found");
+      await expect(getSubmissionStats({ assignmentId: "a1" })).rejects.toThrow("Assignment not found");
     });
 
     it("returns stats successfully", async () => {
-      const fakeAssignment: any = { courseId: { _id: "c1" } };
+      const fakeAssignment: any = { courseId: { _id: "c1", teacherIds: [] } };
       mockedAssignmentModel.findById.mockReturnValueOnce({ populate: jest.fn().mockResolvedValueOnce(fakeAssignment) } as any);
       mockedEnrollmentModel.countDocuments.mockResolvedValueOnce(5 as any);
       mockedSubmissionModel.find.mockResolvedValueOnce([
@@ -365,7 +391,7 @@ describe("Submission Service Unit Tests", () => {
         { status: "overdue" },
       ] as any);
 
-      const stats = await getSubmissionStats("a1");
+      const stats = await getSubmissionStats({ assignmentId: "a1" });
       expect(stats).toHaveProperty("totalStudents", 5);
       expect(stats).toHaveProperty("submissionRate");
       expect(stats).toHaveProperty("onTimeRate");
@@ -396,7 +422,8 @@ describe("Submission Service Unit Tests", () => {
         .mockResolvedValueOnce([{ grade: 5 }] as any) // for distribution
         .mockReturnValueOnce({ populate: jest.fn().mockReturnThis(), sort: jest.fn().mockResolvedValueOnce([{ id: "d1" }]) } as any); // for details
 
-      const report = await getSubmissionReportByAssignment("a1", { page: 1 } as any);
+      const teacherId = new mongoose.Types.ObjectId();
+      const report = await getSubmissionReportByAssignment("a1", { page: 1 } as any, teacherId, Role.TEACHER);
       expect(report).toHaveProperty("stats");
       expect(report).toHaveProperty("distribution");
       expect(report).toHaveProperty("details");
@@ -418,7 +445,8 @@ describe("Submission Service Unit Tests", () => {
         .mockResolvedValueOnce([{ status: "submitted" }] as any)
         .mockResolvedValueOnce([{ grade: 7 }] as any);
 
-      const reports = await getSubmissionReportByCourse("c1");
+      const teacherId = new mongoose.Types.ObjectId();
+      const reports = await getSubmissionReportByCourse("c1", teacherId, Role.TEACHER);
       expect(Array.isArray(reports)).toBe(true);
       expect(reports[0]).toHaveProperty("assignment");
       expect(reports[0]).toHaveProperty("stats");
