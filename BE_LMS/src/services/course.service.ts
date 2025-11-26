@@ -15,7 +15,15 @@ import { EnrollmentStatus } from '../types/enrollment.type';
 import { uploadFile, removeFile } from '../utils/uploadFile';
 import { prefixCourseLogo } from '../utils/filePrefix';
 import { QuizModel } from '@/models';
+
+import {
+  notifyAdminNewCourse,
+  notifyTeacherCourseApproved,
+  notifyTeacherAssigned,
+} from './helpers/notification.helper';
+import slugify from 'slugify';
 import { snapShotQuestion } from '@/validators/quiz.schemas';
+
 
 // ====================================
 // HELPER FUNCTIONS FOR LOGO MANAGEMENT
@@ -64,6 +72,7 @@ export type ListCoursesParams = {
   page: number;
   limit: number;
   search?: string;
+  slug?: string; // Filter by slug (partial match)
   from?: Date; // Date range start for createdAt filtering
   to?: Date; // Date range end for createdAt filtering
   subjectId?: string; // ✅ NEW: Filter by subject instead of specialist
@@ -92,6 +101,7 @@ export const listCourses = async ({
   page,
   limit,
   search,
+  slug,
   from,
   to,
   subjectId,
@@ -218,6 +228,12 @@ export const listCourses = async ({
     if (to) filter.createdAt.$lte = to;
   }
 
+  // Filter by slug (partial match)
+  if (slug) {
+    const escapedSlug = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.slug = { $regex: escapedSlug, $options: 'i' };
+  }
+
   // Search by title or description (text search)
   if (search) {
     filter.$or = [
@@ -286,6 +302,33 @@ export const getCourseById = async (courseId: string) => {
   // ✅ SOFT DELETE: Only get non-deleted course
   const course = await CourseModel.findOne({
     _id: courseId,
+    isDeleted: false,
+  })
+    .populate('teacherIds', 'username email fullname avatar_url bio')
+    .populate('subjectId', 'name code slug description credits')
+    .populate('semesterId', 'name year type startDate endDate')
+    .populate('createdBy', 'username email fullname')
+    .lean();
+
+  appAssert(course, NOT_FOUND, 'Course not found');
+
+  return course;
+};
+
+/**
+ * Lấy thông tin chi tiết một khóa học theo Slug
+ * Hỗ trợ partial match: tìm "444" sẽ match với "444-rede44velopment-test-flug"
+ */
+export const getCourseBySlug = async (slug: string) => {
+  appAssert(slug, BAD_REQUEST, 'Slug is required');
+
+  // Escape special regex characters để tránh lỗi
+  const escapedSlug = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // ✅ SOFT DELETE: Only get non-deleted course
+  // Sử dụng regex để tìm kiếm partial match (case-insensitive)
+  const course = await CourseModel.findOne({
+    slug: { $regex: escapedSlug, $options: 'i' },
     isDeleted: false,
   })
     .populate('teacherIds', 'username email fullname avatar_url bio')
@@ -440,9 +483,25 @@ export const createCourse = async (
   const semester = await SemesterModel.findById(data.semesterId);
   appAssert(semester, BAD_REQUEST, 'Invalid semester ID');
 
+  // Generate slug from title
+  let slug = slugify(data.title, {
+    lower: true,
+    strict: true,
+    locale: 'vi',
+    trim: true
+  });
+
+  // Check for duplicate slug and make it unique if needed
+  const existingSlug = await CourseModel.findOne({ slug, isDeleted: false });
+  if (existingSlug) {
+    // Append timestamp to make it unique
+    slug = `${slug}-${Date.now().toString().slice(-6)}`;
+  }
+
   // Create course with createdBy
   const courseData = {
     ...data,
+    slug,
     startDate,
     endDate,
     status: finalStatus,
@@ -491,6 +550,29 @@ export const createCourse = async (
 
   // ❌ FIX: Ensure populated course exists
   appAssert(populatedCourse, BAD_REQUEST, 'Failed to retrieve created course');
+
+  // 🔔 NOTIFICATIONS
+  try {
+    const courseIdStr = String(course._id);
+
+    // 1. Notify Admin if Teacher created the course
+    if (!isAdmin) {
+      const teacherName = creator.fullname || creator.username || 'Unknown Teacher';
+      await notifyAdminNewCourse(courseIdStr, data.title, teacherName);
+    }
+
+    // 2. Notify assigned teachers (excluding the creator if they assigned themselves)
+    const assignedTeacherIds = data.teacherIds
+      .map((id) => id.toString())
+      .filter((id) => id !== userId.toString());
+
+    if (assignedTeacherIds.length > 0) {
+      await notifyTeacherAssigned(courseIdStr, data.title, assignedTeacherIds);
+    }
+  } catch (error) {
+    console.error('Failed to send notifications for createCourse:', error);
+    // Don't fail the request if notification fails
+  }
 
   return populatedCourse;
 };
@@ -547,6 +629,28 @@ export const updateCourse = async (
       _id: { $ne: courseId }, // Exclude current course
     });
     appAssert(!existingCourse, BAD_REQUEST, 'A course with this title already exists');
+
+    // Regenerate slug when title changes
+    let newSlug = slugify(data.title, {
+      lower: true,
+      strict: true,
+      locale: 'vi',
+      trim: true
+    });
+
+    // Check for duplicate slug
+    const existingSlug = await CourseModel.findOne({
+      slug: newSlug,
+      isDeleted: false,
+      _id: { $ne: courseId }
+    });
+
+    if (existingSlug) {
+      newSlug = `${newSlug}-${Date.now().toString().slice(-6)}`;
+    }
+
+    // Add slug to update data
+    (data as any).slug = newSlug;
   }
 
   // Validate dates if provided
@@ -775,6 +879,45 @@ export const updateCourse = async (
     throw err; // Re-throw to let error handler handle it
   }
 
+  // 🔔 NOTIFICATIONS
+  try {
+    const courseIdStr = courseId.toString();
+
+    // 1. Notify Teacher if Admin approved the course
+    // Check if status changed from DRAFT to ONGOING (or isPublished changed from false to true)
+    // Note: We use the *original* course state vs the *updateData* intent
+    if (
+      isAdmin &&
+      !course.isPublished &&
+      updateData.isPublished === true
+    ) {
+      // Notify all teachers of this course
+      const teacherIds = updatedCourse.teacherIds.map((t: any) => t._id.toString());
+      // Or just the creator? Usually the teachers assigned should know.
+      // Let's notify the creator if they are a teacher, OR all assigned teachers.
+      // Requirement says "Notify Teacher (owner)".
+      // Let's notify all assigned teachers as they are "owners" of the class content.
+      for (const tid of teacherIds) {
+        await notifyTeacherCourseApproved(courseIdStr, updatedCourse.title, tid);
+      }
+    }
+
+    // 2. Notify newly assigned teachers
+    if (data.teacherIds) {
+      const oldTeacherIds = course.teacherIds.map((id) => id.toString());
+      const newTeacherIds = data.teacherIds.map((id) => id.toString());
+
+      // Find IDs that are in new list but NOT in old list
+      const addedTeacherIds = newTeacherIds.filter((id) => !oldTeacherIds.includes(id));
+
+      if (addedTeacherIds.length > 0) {
+        await notifyTeacherAssigned(courseIdStr, updatedCourse.title, addedTeacherIds);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to send notifications for updateCourse:', error);
+  }
+
   return updatedCourse;
 };
 
@@ -995,6 +1138,7 @@ export const getMyCourses = async ({
     page,
     limit,
     search,
+    slug,
     subjectId,
     semesterId,
     isPublished,
@@ -1036,6 +1180,12 @@ export const getMyCourses = async ({
         { description: { $regex: search, $options: 'i' } },
       ],
     });
+  }
+
+  // Filter by slug (partial match)
+  if (slug) {
+    const escapedSlug = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.slug = { $regex: escapedSlug, $options: 'i' };
   }
 
   if (subjectId) filter.subjectId = subjectId;
