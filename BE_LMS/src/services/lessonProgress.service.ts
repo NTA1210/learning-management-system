@@ -4,7 +4,7 @@ import CourseModel from "../models/course.model";
 import LessonProgressModel from "../models/lessonProgress.model";
 import EnrollmentModel from "../models/enrollment.model";
 import appAssert from "../utils/appAssert";
-import { FORBIDDEN, NOT_FOUND, BAD_REQUEST } from "../constants/http";
+import { FORBIDDEN, NOT_FOUND, BAD_REQUEST, TOO_MANY_REQUESTS } from "../constants/http";
 import { Role } from "../types";
 import { EnrollmentStatus } from "../types/enrollment.type";
 
@@ -84,7 +84,7 @@ export const addTimeForLesson = async (
   }
 
   // Ensure enrollment for student
-  if (requesterRole === Role.STUDENT) {
+  if (requesterRole === Role.STUDENT) { 
     const enrolled = await EnrollmentModel.exists({
       studentId: requesterId,
       courseId: (lesson.courseId as any)._id,
@@ -94,6 +94,27 @@ export const addTimeForLesson = async (
   }
 
   const now = new Date();
+  
+  // Check existing progress to validate rate limiting (60 seconds)
+  // Sử dụng lastAccessedAt để kiểm tra, nhưng chỉ áp dụng nếu đã có timeSpentSeconds > 0
+  // (để tránh chặn request đầu tiên hoặc sau khi completeLesson)
+  const existingProgress = await LessonProgressModel.findOne({
+    lessonId: new mongoose.Types.ObjectId(lessonId),
+    courseId: (lesson.courseId as any)._id,
+    studentId: new mongoose.Types.ObjectId(requesterId)
+  }).lean();
+
+  // Chỉ kiểm tra rate limiting nếu đã có thời gian học (tức là đã từng gọi addTimeForLesson)
+  if (existingProgress?.lastAccessedAt && existingProgress?.timeSpentSeconds && existingProgress.timeSpentSeconds > 0) {
+    const timeSinceLastUpdate = (now.getTime() - existingProgress.lastAccessedAt.getTime()) / 1000; // seconds
+    const minIntervalSeconds = 60;
+    appAssert(
+      timeSinceLastUpdate >= minIntervalSeconds,
+      TOO_MANY_REQUESTS,
+      `Please wait ${Math.ceil(minIntervalSeconds - timeSinceLastUpdate)} seconds before sending another request`
+    );
+  }
+
   const progress = await LessonProgressModel.findOneAndUpdate(
     { lessonId: new mongoose.Types.ObjectId(lessonId), courseId: (lesson.courseId as any)._id, studentId: new mongoose.Types.ObjectId(requesterId) },
     { $setOnInsert: { isCompleted: false }, $inc: { timeSpentSeconds: incSeconds }, $set: { lastAccessedAt: now } },
