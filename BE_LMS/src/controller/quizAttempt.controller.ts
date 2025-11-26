@@ -94,9 +94,11 @@ export const autoSaveQuizHandler = catchErrors(async (req, res) => {
     answer: req.body.answer,
   });
   const userId = req.userId;
-  const data = await autoSaveQuizAttempt(input, userId);
+  const { data, total, answeredTotal } = await autoSaveQuizAttempt(input, userId);
   return res.success(OK, {
     data,
+    total,
+    answeredTotal,
     message: 'Auto save quiz attempt successfully',
   });
 });
