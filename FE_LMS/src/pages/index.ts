@@ -35,3 +35,4 @@ export { default as ForumPage } from "./ForumPage";
 export { default as ForumListPage } from "./ForumListPage";
 export { default as ForumDetailPage } from "./ForumDetailPage";
 export { default as ForumPostDetailPage } from "./ForumPostDetailPage";
+export { default as OnboardingPage } from "./Onboarding";

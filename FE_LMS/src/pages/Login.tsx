@@ -38,9 +38,11 @@ const LoginPage: React.FC = () => {
       const resolvedUser = ((response as { data?: unknown }).data ?? response) as Record<string, any>;
       console.log("Login successful:", resolvedUser);
       // After login, fetch current user profile and save to storage
+      let currentUser: Record<string, any> | null = null;
       try {
         const me = await saveCurrentUserFromApi();
         console.log("[auth] current user loaded:", me);
+        currentUser = me as unknown as Record<string, any>;
       } catch (e) {
         console.warn("[auth] failed to load current user after login", e);
       }
@@ -65,24 +67,29 @@ const LoginPage: React.FC = () => {
       // Check if there's a redirect parameter
       const redirectPath = searchParams.get('redirect');
       
-      // Delay to see log
-      // await new Promise(resolve => setTimeout(resolve, 3000));
+      // Determine if student needs onboarding (no specialistIds yet)
+      const effectiveUser = (currentUser || resolvedUser) as any;
+      const role = effectiveUser?.role;
+      const hasSpecialists =
+        Array.isArray(effectiveUser?.specialistIds) &&
+        effectiveUser.specialistIds.length > 0;
 
       if (redirectPath) {
         // Redirect to the original path the user was trying to access
         window.location.href = redirectPath;
+      } else if (role === 'student' && !hasSpecialists) {
+        window.location.href = "/onboarding";
       } else {
         // Default redirect based on user role
-        const userRole = resolvedUser?.role;
-        switch (userRole) {
+        switch (role) {
           case 'admin':
             window.location.href = "/dashboard";
             break;
           case 'teacher':
-            window.location.href = "/teacher-dashboard"; // You can create this later
+            window.location.href = "/teacher-dashboard";
             break;
           case 'student':
-            window.location.href = "/student-dashboard"; // You can create this later
+            window.location.href = "/student-dashboard";
             break;
           default:
             window.location.href = "/";
@@ -93,6 +100,12 @@ const LoginPage: React.FC = () => {
   console.error("Login error:", err);
 
   let finalError: string | any[] = "Đăng nhập thất bại";
+  const maybeMessage =
+    err?.message ||
+    (Array.isArray(err?.errors)
+      ? err.errors.map((e: any) => e.message || String(e)).join(", ")
+      : undefined) ||
+    "Đăng nhập thất bại";
 
   // Nếu backend trả JSON dạng chuỗi → parse thành mảng
   if (err.message && typeof err.message === "string") {

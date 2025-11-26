@@ -84,6 +84,15 @@ export const userService = {
     const response = await http.get(`/users/${userId}`);
     return response.data as UserDetail;
   },
+
+  updateUserSpecialists: async (
+    userId: string,
+    specialistIds: string[],
+  ): Promise<UserDetail> => {
+    const payload = { specialistIds };
+    const response = await http.put(`/users/${userId}`, payload);
+    return response.data as UserDetail;
+  },
 };
 
 
