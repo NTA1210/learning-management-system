@@ -20,6 +20,7 @@ import {
   notifyTeacherCourseApproved,
   notifyTeacherAssigned,
 } from './helpers/notification.helper';
+import slugify from 'slugify';
 
 // ====================================
 // HELPER FUNCTIONS FOR LOGO MANAGEMENT
@@ -304,6 +305,33 @@ export const getCourseById = async (courseId: string) => {
 };
 
 /**
+ * Lấy thông tin chi tiết một khóa học theo Slug
+ * Hỗ trợ partial match: tìm "444" sẽ match với "444-rede44velopment-test-flug"
+ */
+export const getCourseBySlug = async (slug: string) => {
+  appAssert(slug, BAD_REQUEST, 'Slug is required');
+
+  // Escape special regex characters để tránh lỗi
+  const escapedSlug = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // ✅ SOFT DELETE: Only get non-deleted course
+  // Sử dụng regex để tìm kiếm partial match (case-insensitive)
+  const course = await CourseModel.findOne({
+    slug: { $regex: escapedSlug, $options: 'i' },
+    isDeleted: false,
+  })
+    .populate('teacherIds', 'username email fullname avatar_url bio')
+    .populate('subjectId', 'name code slug description credits')
+    .populate('semesterId', 'name year type startDate endDate')
+    .populate('createdBy', 'username email fullname')
+    .lean();
+
+  appAssert(course, NOT_FOUND, 'Course not found');
+
+  return course;
+};
+
+/**
  * Tạo khóa học mới
  */
 export const createCourse = async (
@@ -444,9 +472,25 @@ export const createCourse = async (
   const semester = await SemesterModel.findById(data.semesterId);
   appAssert(semester, BAD_REQUEST, 'Invalid semester ID');
 
+  // Generate slug from title
+  let slug = slugify(data.title, {
+    lower: true,
+    strict: true,
+    locale: 'vi',
+    trim: true
+  });
+
+  // Check for duplicate slug and make it unique if needed
+  const existingSlug = await CourseModel.findOne({ slug, isDeleted: false });
+  if (existingSlug) {
+    // Append timestamp to make it unique
+    slug = `${slug}-${Date.now().toString().slice(-6)}`;
+  }
+
   // Create course with createdBy
   const courseData = {
     ...data,
+    slug,
     startDate,
     endDate,
     status: finalStatus,
@@ -574,6 +618,28 @@ export const updateCourse = async (
       _id: { $ne: courseId }, // Exclude current course
     });
     appAssert(!existingCourse, BAD_REQUEST, 'A course with this title already exists');
+
+    // Regenerate slug when title changes
+    let newSlug = slugify(data.title, {
+      lower: true,
+      strict: true,
+      locale: 'vi',
+      trim: true
+    });
+
+    // Check for duplicate slug
+    const existingSlug = await CourseModel.findOne({
+      slug: newSlug,
+      isDeleted: false,
+      _id: { $ne: courseId }
+    });
+
+    if (existingSlug) {
+      newSlug = `${newSlug}-${Date.now().toString().slice(-6)}`;
+    }
+
+    // Add slug to update data
+    (data as any).slug = newSlug;
   }
 
   // Validate dates if provided

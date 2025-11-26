@@ -17,12 +17,13 @@ import {
   permanentDeleteCourse,
   getMyCourses,
   getQuizzes,
+  getCourseBySlug,
 } from '../services/course.service';
 import { parseFormData } from '../utils/parseFormData';
 
 /**
- * GET /courses/my-courses - Get my courses
- */
+ * GET / courses / my - courses - Get my courses
+  */
 export const getMyCoursesHandler = catchErrors(async (req, res) => {
   const query = listCoursesSchema.parse(req.query);
   const userId = (req as any).userId;
@@ -100,6 +101,21 @@ export const getCourseByIdHandler = catchErrors(async (req, res) => {
 
   // Call service
   const course = await getCourseById(courseId);
+
+  return res.success(OK, {
+    data: course,
+    message: 'Course retrieved successfully',
+  });
+});
+
+/**
+ * GET /courses/slug/:slug - Get course by Slug
+ */
+export const getCourseBySlugHandler = catchErrors(async (req, res) => {
+  const slug = req.params.slug;
+
+  // Call service
+  const course = await getCourseBySlug(slug);
 
   return res.success(OK, {
     data: course,
