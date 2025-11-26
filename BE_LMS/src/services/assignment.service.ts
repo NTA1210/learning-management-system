@@ -209,24 +209,13 @@ export const createAssignment = async (
   const createdBy = userId;
   const assignmentData: any = { ...data, createdBy };
 
-  // Create assignment first to have assignmentId for prefix
   const assignment = await AssignmentModel.create(assignmentData);
 
   if (file) {
-    const courseObjectId =
-      (course as any)._id instanceof mongoose.Types.ObjectId
-        ? ((course as any)._id as mongoose.Types.ObjectId)
-        : mongoose.Types.ObjectId.createFromHexString(
-            String((course as any)._id)
-          );
-    const assignmentObjectId =
-      (assignment as any)._id instanceof mongoose.Types.ObjectId
-        ? ((assignment as any)._id as mongoose.Types.ObjectId)
-        : mongoose.Types.ObjectId.createFromHexString(
-            String((assignment as any)._id)
-          );
+    const courseIdStr = (course as any)._id.toString();
+    const assignmentIdStr = (assignment as any)._id.toString();
 
-    const prefix = prefixAssignmentFile(courseObjectId, assignmentObjectId);
+    const prefix = prefixAssignmentFile(courseIdStr, assignmentIdStr);
     const { key, originalName, mimeType, size } = await uploadFile(file, prefix);
 
     assignment.fileKey = key;

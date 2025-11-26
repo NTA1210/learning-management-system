@@ -99,17 +99,9 @@ export const resubmitAssignment = async (
   const prefix = prefixSubmission(assignment.courseId, assignmentId, studentId);
 
   if (submission.key) {
-    try {
-      await removeFile(submission.key as string);
-    } catch (error) {
-      console.error("Failed to remove old submission file", error);
-    }
+    await removeFile(submission.key as string);
   } else {
-    try {
-      await deleteFilesByPrefix(prefix);
-    } catch (error) {
-      console.error("Failed to remove old submission files by prefix", error);
-    }
+    await deleteFilesByPrefix(prefix);
   }
 
   const {key,originalName,mimeType,size} = await uploadFile(file,prefix);

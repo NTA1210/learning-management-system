@@ -1,17 +1,15 @@
-import mongoose from "mongoose";
-
 export const prefixLessonMaterial = (
-  courseId: mongoose.Types.ObjectId,
-  lessonId: mongoose.Types.ObjectId
+  courseId: string,
+  lessonId: string
 ) => {
   return `courses/${courseId}/lessons/${lessonId}`;
 };
 
 export const prefixAssignmentFile = (
-  courseId: mongoose.Types.ObjectId,
-  assignmentId: mongoose.Types.ObjectId
+  courseId: string,
+  assignmentId: string
 ) => {
-  return `courses/${courseId.toHexString()}/assignments/${assignmentId.toHexString()}/files`;
+  return `courses/${courseId}/assignments/${assignmentId}/files`;
 };
 
 export const prefixSubmission = (
