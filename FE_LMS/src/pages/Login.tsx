@@ -68,7 +68,10 @@ const LoginPage: React.FC = () => {
       const redirectPath = searchParams.get('redirect');
       
       // Determine if student needs onboarding (no specialistIds yet)
-      const effectiveUser = (currentUser || resolvedUser) as any;
+      const effectiveUser = {
+        ...(resolvedUser as any),
+        ...(currentUser ?? {}),
+      } as any;
       const role = effectiveUser?.role;
       const hasSpecialists =
         Array.isArray(effectiveUser?.specialistIds) &&
