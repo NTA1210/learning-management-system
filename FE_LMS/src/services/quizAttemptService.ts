@@ -18,6 +18,17 @@ export interface QuizAnswer {
   answer: number[]; // Array of 0s and 1s
   correct?: boolean;
   pointsEarned?: number;
+  text?: string;
+  options?: string[];
+  type?: string;
+  images?: Array<{ url: string; fromDB?: boolean }>;
+  explanation?: string;
+  points?: number;
+}
+
+export interface QuizAnswerPayload {
+  questionId: string;
+  answer: number[];
 }
 
 export interface EnrollQuizInput {
@@ -27,7 +38,10 @@ export interface EnrollQuizInput {
 
 export interface SubmitQuizInput {
   quizAttemptId: string;
-  answers: QuizAnswer[];
+}
+
+export interface SaveQuizInput extends SubmitQuizInput {
+  answers: QuizAnswerPayload[];
 }
 
 export interface SubmitQuizResponse {
@@ -57,7 +71,7 @@ export const quizAttemptService = {
   submitQuiz: async (input: SubmitQuizInput): Promise<SubmitQuizResponse> => {
     const response = await http.put<SubmitQuizResponse>(
       `/quiz-attempts/${input.quizAttemptId}/submit`,
-      { answers: input.answers }
+      {}
     );
     return response.data;
   },
@@ -66,7 +80,7 @@ export const quizAttemptService = {
    * Save quiz attempt (auto-save during quiz)
    * PUT /quiz-attempts/:quizAttemptId/save
    */
-  saveQuiz: async (input: SubmitQuizInput): Promise<QuizAttempt> => {
+  saveQuiz: async (input: SaveQuizInput): Promise<QuizAttempt> => {
     const response = await http.put<QuizAttempt>(
       `/quiz-attempts/${input.quizAttemptId}/save`,
       { answers: input.answers }

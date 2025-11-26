@@ -6,7 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../hooks/useTheme";
 import { quizService, quizAttemptService } from "../services";
 import type { QuizResponse, SnapshotQuestion } from "../services/quizService";
-import type { QuizAnswer } from "../services/quizAttemptService";
+import type { QuizAnswer, QuizAnswerPayload } from "../services/quizAttemptService";
 import { Clock, Lock, CheckCircle, XCircle, ChevronLeft, ChevronRight, Book } from "lucide-react";
 
 export default function TakeQuizPage() {
@@ -31,6 +31,49 @@ export default function TakeQuizPage() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<any>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const restoredAttemptRef = useRef(false);
+  const storageKey = quizId ? `quizAttempt:${quizId}` : null;
+
+  const toAnswerPayloads = (source?: QuizAnswer[]): QuizAnswerPayload[] => {
+    if (!Array.isArray(source)) return [];
+    return source
+      .filter((ans): ans is QuizAnswer => Boolean(ans?.questionId))
+      .map((ans) => ({
+        questionId: ans.questionId,
+        answer: Array.isArray(ans.answer) ? ans.answer : [],
+      }));
+  };
+
+  const persistAttemptState = (attemptId: string, answersToStore: QuizAnswerPayload[] = []) => {
+    if (!storageKey) return;
+    const payload = {
+      attemptId,
+      answers: answersToStore.map((ans) => ({
+        questionId: ans.questionId,
+        answer: ans.answer,
+      })),
+    };
+    sessionStorage.setItem(storageKey, JSON.stringify(payload));
+  };
+
+  const clearPersistedAttempt = () => {
+    if (!storageKey) return;
+    sessionStorage.removeItem(storageKey);
+  };
+
+  const buildAnswerPayloads = (): QuizAnswerPayload[] => {
+    if (!quiz?.snapshotQuestions) return [];
+    return quiz.snapshotQuestions
+      .filter((q) => !q.isDeleted)
+      .map((q) => {
+        const questionId = q.id || "";
+        const optionLength = q.options?.length || 0;
+        return {
+          questionId,
+          answer: answers[questionId] || new Array(optionLength).fill(0),
+        };
+      });
+  };
 
   useEffect(() => {
     if (!quizId) {
@@ -71,7 +114,45 @@ export default function TakeQuizPage() {
     };
 
     fetchQuiz();
-  }, [quizId, navigate]);
+  }, [quizId, navigate, courseId]);
+
+  useEffect(() => {
+    if (!quiz || !storageKey || restoredAttemptRef.current) return;
+    const persisted = sessionStorage.getItem(storageKey);
+    if (!persisted) {
+      setShowPasswordModal(true);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(persisted) as {
+        attemptId?: string;
+        answers?: { questionId: string; answer: number[] }[];
+      };
+
+      if (parsed.attemptId) {
+        setQuizAttemptId(parsed.attemptId);
+        if (Array.isArray(parsed.answers)) {
+          const restored: Record<string, number[]> = {};
+          parsed.answers.forEach((ans) => {
+            if (ans?.questionId && Array.isArray(ans.answer)) {
+              restored[ans.questionId] = ans.answer;
+            }
+          });
+          if (Object.keys(restored).length) {
+            setAnswers((prev) => ({ ...prev, ...restored }));
+          }
+        }
+        setShowPasswordModal(false);
+        restoredAttemptRef.current = true;
+        return;
+      }
+    } catch {
+      sessionStorage.removeItem(storageKey);
+    }
+
+    setShowPasswordModal(true);
+  }, [quiz, storageKey]);
 
   useEffect(() => {
     if (quiz && quizAttemptId && !submitted) {
@@ -132,6 +213,17 @@ export default function TakeQuizPage() {
       });
 
       setQuizAttemptId(attempt._id);
+      if (quiz?.snapshotQuestions?.length) {
+        const restoredAnswers: Record<string, number[]> = {};
+        attempt.answers?.forEach((ans) => {
+          if (!ans?.questionId || !Array.isArray(ans.answer)) return;
+          restoredAnswers[ans.questionId] = ans.answer;
+        });
+        if (Object.keys(restoredAnswers).length) {
+          setAnswers((prev) => ({ ...prev, ...restoredAnswers }));
+        }
+      }
+      persistAttemptState(attempt._id, toAnswerPayloads(attempt.answers));
       setShowPasswordModal(false);
       setPassword("");
     } catch (err: any) {
@@ -156,19 +248,18 @@ export default function TakeQuizPage() {
 
   const saveProgressIfNeeded = async () => {
     if (!quizAttemptId || !answersChanged || savingProgress) return;
+    const answersArray = buildAnswerPayloads();
+    const hasUnanswered = answersArray.some((ans) => !ans.answer?.some((val) => val === 1));
+    if (hasUnanswered) {
+      return;
+    }
     try {
       setSavingProgress(true);
-      const answersArray: QuizAnswer[] =
-        quiz?.snapshotQuestions
-          ?.filter((q) => !q.isDeleted)
-          .map((q) => ({
-            questionId: q.id || "",
-            answer: answers[q.id || ""] || new Array(q.options?.length || 0).fill(0),
-          })) || [];
       await quizAttemptService.saveQuiz({
         quizAttemptId,
         answers: answersArray,
       });
+      persistAttemptState(quizAttemptId, answersArray);
       setAnswersChanged(false);
     } catch (err) {
       console.warn("Failed to auto-save quiz attempt:", err);
@@ -203,20 +294,21 @@ export default function TakeQuizPage() {
       setSubmitting(true);
 
       // Convert answers to the format expected by backend
-      const answersArray: QuizAnswer[] = quiz.snapshotQuestions!
-        .filter((q) => !q.isDeleted)
-        .map((q) => ({
-          questionId: q.id || "",
-          answer: answers[q.id || ""] || new Array(q.options?.length || 0).fill(0),
-        }));
+      const answersArray = buildAnswerPayloads();
+      const firstUnanswered = answersArray.find((ans) => !ans.answer?.some((val) => val === 1));
+      if (firstUnanswered) {
+        const idx =
+          questions.findIndex((q) => (q.id || "") === firstUnanswered.questionId) + 1;
+        alert(`Please answer question ${idx || ""} before submitting.`);
+        setSubmitting(false);
+        return;
+      }
 
-      const submitResult = await quizAttemptService.submitQuiz({
-        quizAttemptId,
-        answers: answersArray,
-      });
+      const submitResult = await quizAttemptService.submitQuiz({ quizAttemptId });
 
       setResult(submitResult);
       setSubmitted(true);
+      clearPersistedAttempt();
 
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -224,7 +316,15 @@ export default function TakeQuizPage() {
       }
     } catch (err: any) {
       console.error("Failed to submit quiz:", err);
-      const message = err?.message || "Failed to submit quiz. Please try again.";
+      const message =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to submit quiz. Please try again.";
+      if (message.toLowerCase().includes("quiz attempt not found")) {
+        clearPersistedAttempt();
+        setQuizAttemptId(null);
+        setShowPasswordModal(true);
+      }
       alert(message);
     } finally {
       setSubmitting(false);
@@ -238,13 +338,13 @@ export default function TakeQuizPage() {
     const type = (question?.type || "").toLowerCase();
     switch (type) {
       case "multichoice":
-        return "Multiple Choice";
+        return "Multiple Choice • Select all that apply";
       case "true_false":
         return "True / False";
       case "fill_blank":
         return "Fill in the Blank";
       default:
-        return "Single Choice";
+        return "Single Choice ";
     }
   };
 
