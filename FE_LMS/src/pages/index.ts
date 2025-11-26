@@ -24,10 +24,14 @@ export { default as QuizCoursePage } from "./QuizCoursePage";
 export { default as QuizCreatePage } from "./QuizCreatePage";
 export { default as CourseQuizzesPage } from "./CourseQuizzesPage";
 export { default as QuizQuestionsPage } from "./QuizQuestionsPage";
+export { default as TakeQuizPage } from "./TakeQuizPage";
 export { default as EnrollmentsListPage } from "./EnrollmentsList";
 export { default as CurriculumPage } from "./Curriculum";
 export { default as UserManagementPage } from "./UserManagement";
 export { default as UserBioPage } from "./UserBioPage";
 export { default as AttendancePage } from "./AttendancePage";
 export { default as MyEnrollmentsPage } from "./MyEnrollmentsPage";
-
+export { default as ForumPage } from "./ForumPage";
+export { default as ForumListPage } from "./ForumListPage";
+export { default as ForumDetailPage } from "./ForumDetailPage";
+export { default as ForumPostDetailPage } from "./ForumPostDetailPage";

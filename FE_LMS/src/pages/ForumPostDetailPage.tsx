@@ -1,0 +1,636 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import Navbar from "../components/Navbar";
+import Sidebar from "../components/Sidebar";
+import { useTheme } from "../hooks/useTheme";
+import { useAuth } from "../hooks/useAuth";
+import {
+  forumService,
+  type ForumResponse,
+  type ForumPost,
+  type ForumReply,
+} from "../services/forumService";
+import { ArrowLeft, Edit3, Loader2, MessageSquare, Trash2 } from "lucide-react";
+
+type SidebarRole = "admin" | "teacher" | "student";
+type ReplyNode = ForumReply & { children?: ReplyNode[] };
+
+const ForumPostDetailPage: React.FC = () => {
+  const { forumId = "", postId = "" } = useParams();
+  const navigate = useNavigate();
+  const { darkMode } = useTheme();
+  const { user } = useAuth();
+
+  const sidebarRole: SidebarRole =
+    user && ["admin", "teacher", "student"].includes(user.role) ? (user.role as SidebarRole) : "student";
+
+  const [forum, setForum] = useState<ForumResponse | null>(null);
+  const [post, setPost] = useState<ForumPost | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [replies, setReplies] = useState<ForumReply[]>([]);
+  const [repliesLoading, setRepliesLoading] = useState(false);
+  const [repliesError, setRepliesError] = useState<string | null>(null);
+  const [replyContent, setReplyContent] = useState("");
+  const [replySubmitting, setReplySubmitting] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
+  const [replyTarget, setReplyTarget] = useState<{ replyId: string | null; displayName?: string } | null>(null);
+  const [replyManagementError, setReplyManagementError] = useState<string | null>(null);
+  const [deletingReplyId, setDeletingReplyId] = useState<string | null>(null);
+  const [editingReply, setEditingReply] = useState<{ replyId: string; content: string } | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
+  const [expandedChildGroups, setExpandedChildGroups] = useState<Record<string, boolean>>({});
+  const [repliesExpanded, setRepliesExpanded] = useState(false);
+  const replyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const fetchForum = useCallback(async () => {
+    if (!forumId) return;
+    try {
+      const response = await forumService.getForumById(forumId);
+      setForum(response);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to load forum";
+      setError(message);
+    }
+  }, [forumId]);
+
+  const fetchPost = useCallback(async () => {
+    if (!forumId || !postId) return;
+    try {
+      setLoading(true);
+      const response = await forumService.getForumPostById(forumId, postId);
+      setPost(response);
+      setError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to load post";
+      setError(message);
+      setPost(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [forumId, postId]);
+
+  const fetchReplies = useCallback(async () => {
+    if (!forumId || !postId) return;
+    try {
+      setRepliesLoading(true);
+      const { replies: list } = await forumService.getReplies(forumId, postId);
+      setReplies(list);
+      setRepliesError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to load replies";
+      setReplies([]);
+      setRepliesError(message);
+    } finally {
+      setRepliesLoading(false);
+    }
+  }, [forumId, postId]);
+
+  useEffect(() => {
+    fetchForum();
+  }, [fetchForum]);
+
+  useEffect(() => {
+    fetchPost();
+    fetchReplies();
+  }, [fetchPost, fetchReplies]);
+
+  useEffect(() => {
+    if (replyTarget && replyTextareaRef.current) {
+      replyTextareaRef.current.focus();
+      replyTextareaRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [replyTarget]);
+
+  const formatDate = (value?: string | number | Date) => {
+    if (!value) return "—";
+    return new Date(value).toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+  };
+
+  const handleReplySubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!forumId || !postId || !post) return;
+    if (!replyContent.trim()) {
+      setReplyError("Please enter your reply before posting.");
+      return;
+    }
+    try {
+      setReplySubmitting(true);
+      await forumService.createReply(forumId, post._id, {
+        content: replyContent.trim(),
+        parentReplyId: replyTarget?.replyId || undefined,
+      });
+      setReplyContent("");
+      setReplyError(null);
+      if (replyTarget?.replyId) {
+        setExpandedChildGroups((prev) => ({ ...prev, [replyTarget.replyId as string]: true }));
+      }
+      setRepliesExpanded(true);
+      setReplyTarget(null);
+      fetchPost();
+      fetchReplies();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to add reply";
+      setReplyError(message);
+    } finally {
+      setReplySubmitting(false);
+    }
+  };
+
+  const toggleExpandReply = (replyId: string) => {
+    setExpandedReplies((prev) => ({ ...prev, [replyId]: !prev[replyId] }));
+  };
+
+  const toggleChildReplies = (replyId: string) => {
+    setExpandedChildGroups((prev) => ({ ...prev, [replyId]: !prev[replyId] }));
+  };
+
+  const beginReplyTo = (target?: ForumReply) => {
+    if (target) {
+      const displayName = target.author?.fullname || target.author?.username || "user";
+      setReplyTarget({ replyId: target._id, displayName });
+      setRepliesExpanded(true);
+    } else {
+      setReplyTarget(null);
+    }
+  };
+
+  const formatRoleLabel = (role?: string) => {
+    switch (role) {
+      case "admin":
+        return "Admin";
+      case "teacher":
+        return "Teacher";
+      case "student":
+        return "Student";
+      default:
+        return "Member";
+    }
+  };
+
+  const canDeleteReply = (reply: ForumReply) => {
+    if (!user) return false;
+    if (user.role === "admin" || user.role === "teacher") return true;
+    return reply.author?._id === user._id;
+  };
+
+  const canEditReply = (reply: ForumReply) => canDeleteReply(reply);
+
+  const beginEditReply = (reply: ForumReply) => {
+    if (!canEditReply(reply)) return;
+    setRepliesExpanded(true);
+    setEditError(null);
+    setEditingReply({ replyId: reply._id, content: reply.content });
+  };
+
+  const cancelEditReply = () => {
+    setEditingReply(null);
+    setEditError(null);
+  };
+
+  const handleUpdateReply = async () => {
+    if (!forumId || !postId || !editingReply) return;
+    const content = editingReply.content.trim();
+    if (!content) {
+      setEditError("Reply content cannot be empty.");
+      return;
+    }
+    try {
+      setEditSaving(true);
+      setEditError(null);
+      await forumService.updateReply(forumId, postId, editingReply.replyId, { content });
+      setEditingReply(null);
+      await Promise.all([fetchPost(), fetchReplies()]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to update reply";
+      setEditError(message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleDeleteReply = async (replyId: string) => {
+    if (!forumId || !postId) return;
+    try {
+      setReplyManagementError(null);
+      setDeletingReplyId(replyId);
+      await forumService.deleteReply(forumId, postId, replyId);
+      if (editingReply?.replyId === replyId) {
+        setEditingReply(null);
+        setEditError(null);
+      }
+      await Promise.all([fetchPost(), fetchReplies()]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to delete reply";
+      setReplyManagementError(message);
+    } finally {
+      setDeletingReplyId(null);
+    }
+  };
+
+  if (!forumId || !postId) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-slate-500">Post not found.</p>
+      </div>
+    );
+  }
+
+  const replyCount = post?.replyCount ?? replies.length;
+
+  const nestedReplies = useMemo<ReplyNode[]>(() => {
+    if (!replies.length) return [];
+    const nodes = new Map<string, ReplyNode>();
+    replies.forEach((reply) => {
+      nodes.set(reply._id, { ...reply, children: [] });
+    });
+    const roots: ReplyNode[] = [];
+    replies.forEach((reply) => {
+      const node = nodes.get(reply._id);
+      if (!node) return;
+      if (reply.parentReplyId) {
+        const parent = nodes.get(reply.parentReplyId);
+        if (parent) {
+          parent.children = parent.children || [];
+          parent.children.push(node);
+        } else {
+          roots.push(node);
+        }
+      } else {
+        roots.push(node);
+      }
+    });
+    return roots;
+  }, [replies]);
+
+  const renderReplyItem = (reply: ReplyNode, depth = 0): React.ReactNode => {
+    const displayName = reply.author?.fullname || reply.author?.username || "Anonymous";
+    const avatarUrl = reply.author?.avatar_url;
+    const initials =
+      displayName
+        .split(" ")
+        .filter(Boolean)
+        .map((segment) => segment[0]?.toUpperCase())
+        .slice(0, 2)
+        .join("") || "U";
+    const isExpanded = Boolean(expandedReplies[reply._id]);
+    const shouldClamp = reply.content.length > 320;
+    const childCount = reply.children?.length ?? 0;
+    const areChildrenExpanded = Boolean(expandedChildGroups[reply._id]);
+    const allowDelete = canDeleteReply(reply);
+    const allowEdit = canEditReply(reply);
+    const isDeleting = deletingReplyId === reply._id;
+    const isEditing = editingReply?.replyId === reply._id;
+
+    return (
+      <div
+        key={reply._id}
+        className={`space-y-3 ${depth > 0 ? "ml-10 border-l border-slate-200 dark:border-slate-700 pl-4" : ""}`}
+      >
+        <div
+          className={`rounded-3xl border px-4 py-4 ${
+            darkMode ? "bg-slate-900/60 border-slate-700" : "bg-white border-slate-200"
+          }`}
+        >
+          <div className="flex gap-3">
+            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-sky-500/10 flex items-center justify-center text-sm font-semibold text-indigo-600 overflow-hidden dark:text-indigo-200 dark:from-indigo-500/20 dark:to-sky-500/10">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+              ) : (
+                initials
+              )}
+            </div>
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="font-semibold text-base">{displayName}</span>
+                <span
+                  className={`text-[11px] px-2 py-0.5 rounded-full ${
+                    reply.author?.role === "admin"
+                      ? "bg-rose-100 text-rose-700"
+                      : reply.author?.role === "teacher"
+                      ? "bg-indigo-100 text-indigo-700"
+                      : "bg-emerald-100 text-emerald-700"
+                  }`}
+                >
+                  {formatRoleLabel(reply.author?.role)}
+                </span>
+                <span className="text-xs text-slate-400">{formatDate(reply.createdAt)}</span>
+              </div>
+              {isEditing ? (
+                <div className="mt-3 space-y-2">
+                  <textarea
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
+                      darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+                    }`}
+                    rows={4}
+                    value={editingReply.content}
+                    onChange={(event) =>
+                      setEditingReply((prev) =>
+                        prev && prev.replyId === reply._id ? { ...prev, content: event.target.value } : prev
+                      )
+                    }
+                  ></textarea>
+                  {editError && <p className="text-xs text-rose-500">{editError}</p>}
+                  <div className="flex items-center gap-3 text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={cancelEditReply}
+                      className="rounded-xl border px-4 py-2 text-slate-500 hover:text-slate-700 dark:border-slate-700 dark:hover:text-slate-200"
+                      disabled={editSaving}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleUpdateReply}
+                      className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-500 disabled:opacity-60"
+                      disabled={editSaving}
+                    >
+                      {editSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      Save changes
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className={`mt-3 rounded-2xl border px-4 py-3 text-sm leading-relaxed ${
+                    darkMode ? "bg-slate-800/60 border-slate-700" : "bg-slate-50 border-slate-200"
+                  }`}
+                >
+                  <div
+                    className={`prose max-w-none dark:prose-invert ${shouldClamp && !isExpanded ? "line-clamp-4" : ""}`}
+                  >
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{reply.content}</ReactMarkdown>
+                  </div>
+                </div>
+              )}
+              <div className="mt-3 flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-500">
+                {shouldClamp && (
+                  <button
+                    type="button"
+                    onClick={() => toggleExpandReply(reply._id)}
+                    className="hover:text-indigo-500 disabled:opacity-50"
+                    disabled={isEditing}
+                  >
+                    {isExpanded ? "Show less" : "Show more"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => beginReplyTo(reply)}
+                  className="hover:text-indigo-500 disabled:opacity-50"
+                  disabled={isEditing}
+                >
+                  Reply
+                </button>
+                {allowEdit && !isEditing && (
+                  <button
+                    type="button"
+                    onClick={() => beginEditReply(reply)}
+                    className="inline-flex items-center gap-1 text-indigo-500 hover:text-indigo-400"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Edit
+                  </button>
+                )}
+                {allowDelete && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteReply(reply._id)}
+                    className="inline-flex items-center gap-1 text-rose-500 hover:text-rose-400 disabled:opacity-60"
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                    {isDeleting ? "Deleting..." : "Delete"}
+                  </button>
+                )}
+                {isEditing && (
+                  <span className="text-[11px] font-semibold text-slate-400">Editing...</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+        {childCount > 0 && (
+          <div className="ml-10">
+            {!areChildrenExpanded ? (
+              <button
+                type="button"
+                onClick={() => toggleChildReplies(reply._id)}
+                className="text-xs font-semibold text-slate-500 hover:text-indigo-500"
+              >
+                View {childCount} {childCount === 1 ? "reply" : "replies"}
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-3">
+                  {reply.children?.map((child) => renderReplyItem(child, depth + 1))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleChildReplies(reply._id)}
+                  className="text-xs font-semibold text-slate-400 hover:text-indigo-500"
+                >
+                  Hide replies
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const backgroundStyles = {
+    backgroundColor: darkMode ? "#0f172a" : "#f8fafc",
+    color: darkMode ? "#e2e8f0" : "#0f172a",
+  };
+
+  return (
+    <div className="flex h-screen overflow-hidden relative" style={backgroundStyles}>
+      <Navbar />
+      <Sidebar role={sidebarRole} />
+
+      <div className="flex flex-col flex-1 w-0 overflow-hidden">
+        <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 mt-16 sm:pl-24 md:pl-28">
+          <div className="max-w-4xl mx-auto space-y-6 pb-16">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 dark:border-slate-700"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </button>
+              <Link
+                to={`/forums/${forumId}`}
+                className="text-xs font-semibold text-indigo-500 hover:text-indigo-400"
+              >
+                Forum overview
+              </Link>
+              {forum && <span className="text-xs text-slate-400">View post in {forum.title}</span>}
+            </div>
+
+            {loading ? (
+              <div className="flex items-center gap-3 text-slate-400">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Loading post...
+              </div>
+            ) : error ? (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-700">
+                <p className="font-semibold mb-2">Unable to load post</p>
+                <p className="text-sm">{error}</p>
+              </div>
+            ) : post ? (
+              <section
+                className={`rounded-2xl p-6 shadow-sm space-y-5 ${
+                  darkMode ? "bg-slate-900/70 border border-slate-700/60" : "bg-white border border-slate-100"
+                }`}
+              >
+                <div className="text-xs text-slate-400 flex items-center gap-2">
+                  {post.pinned && (
+                    <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">Pinned</span>
+                  )}
+                  <span>{formatDate(post.createdAt)}</span>
+                </div>
+                <h1 className="text-3xl font-bold">{post.title}</h1>
+                <div className="prose max-w-none dark:prose-invert">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.content}</ReactMarkdown>
+                </div>
+                {post.author && (
+                  <p className="text-xs text-slate-500">
+                    Posted by {post.author.fullname || post.author.username}
+                  </p>
+                )}
+
+                <div className="pt-4 border-t border-slate-100 space-y-4 dark:border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-lg font-semibold">Replies</h4>
+                      <p className="text-xs text-slate-500">{replyCount} replies</p>
+                    </div>
+                    <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      {replyCount}
+                    </span>
+                  </div>
+
+                  {repliesLoading ? (
+                    <div className="flex items-center gap-2 text-slate-400">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Loading replies...
+                    </div>
+                  ) : repliesError ? (
+                    <p className="text-sm text-rose-500">{repliesError}</p>
+                  ) : nestedReplies.length > 0 ? (
+                    <div className="space-y-4">
+                      {!repliesExpanded ? (
+                        <div className="flex justify-center">
+                          <button
+                            type="button"
+                            onClick={() => setRepliesExpanded(true)}
+                            className="text-sm font-semibold text-indigo-600 hover:text-indigo-500"
+                          >
+                            View replies ({replyCount})
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
+                            {nestedReplies.map((reply) => renderReplyItem(reply))}
+                          </div>
+                          <div className="flex justify-center">
+                            <button
+                              type="button"
+                              onClick={() => setRepliesExpanded(false)}
+                              className="text-xs font-semibold text-slate-500 hover:text-indigo-500"
+                            >
+                              Hide replies
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">No replies yet. Be the first to respond.</p>
+                  )}
+                  {replyManagementError && <p className="text-sm text-rose-500">{replyManagementError}</p>}
+
+                  <form className="space-y-3" onSubmit={handleReplySubmit}>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-semibold">Add reply</label>
+                      {replyTarget?.displayName && (
+                        <button
+                          type="button"
+                          onClick={() => beginReplyTo()}
+                          className="text-xs font-semibold text-indigo-500 hover:text-indigo-400"
+                        >
+                          Replying to @{replyTarget.displayName} • Cancel
+                        </button>
+                      )}
+                    </div>
+                    {replyTarget?.displayName && (
+                      <div
+                        className={`text-xs rounded-xl px-3 py-2 border ${
+                          darkMode ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-100" : "border-indigo-200 bg-indigo-50 text-indigo-600"
+                        }`}
+                      >
+                        You are replying to <span className="font-semibold">@{replyTarget.displayName}</span>
+                      </div>
+                    )}
+                    <textarea
+                      ref={replyTextareaRef}
+                      className={`w-full h-28 rounded-xl border px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
+                        darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+                      }`}
+                      placeholder="Share your thoughts, code snippets, or resources (Markdown supported)"
+                      value={replyContent}
+                      onChange={(event) => {
+                        setReplyContent(event.target.value);
+                        setReplyError(null);
+                      }}
+                    ></textarea>
+                    {replyError && <p className="text-sm text-rose-500">{replyError}</p>}
+                    <div className="flex items-center justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={() => navigate(-1)}
+                        className="rounded-xl border px-5 py-2 text-sm font-semibold border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
+                        disabled={replySubmitting}
+                      >
+                        {replySubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                        Send
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </section>
+            ) : null}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default ForumPostDetailPage;
+

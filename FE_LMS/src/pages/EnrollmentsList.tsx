@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { enrollmentService, courseService } from "../services";
 import http from "../utils/http";
+import useDebounce from "../hooks/useDebounce";
 import { userService } from "../services/userService";
 
 type Status =
@@ -58,6 +59,7 @@ const EnrollmentsListPage: React.FC = () => {
     const [limit, setLimit] = useState(10);
     const [status, setStatus] = useState<Status | "">("");
     const [search, setSearch] = useState("");
+const debouncedSearch = useDebounce(search, 500);
 const [showCreateModal, setShowCreateModal] = useState(false);
 const [creating, setCreating] = useState(false);
 const [createError, setCreateError] = useState("");
@@ -73,7 +75,7 @@ const [courseTeachers, setCourseTeachers] = useState<Record<string, string[]>>({
 const [updating, setUpdating] = useState<Record<string, boolean>>({});
 
     const filtered = useMemo(() => {
-        const term = search.trim().toLowerCase();
+        const term = debouncedSearch.trim().toLowerCase();
         if (!term) return items;
         return items.filter((it: any) => {
             const student = it?.studentId;
@@ -82,7 +84,7 @@ const [updating, setUpdating] = useState<Record<string, boolean>>({});
             const c1 = `${course?.title ?? ""} ${course?.description ?? ""}`.toLowerCase();
             return s1.includes(term) || c1.includes(term);
         });
-    }, [items, search]);
+    }, [items, debouncedSearch]);
 
     useEffect(() => {
         let mounted = true;

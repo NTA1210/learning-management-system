@@ -33,7 +33,7 @@ const defaultFormValues: AssignmentFormValues = {
   courseId: "",
   title: "",
   description: "",
-  maxScore: 100,
+  maxScore: 10,
   dueDate: "",
   allowLate: false,
 };

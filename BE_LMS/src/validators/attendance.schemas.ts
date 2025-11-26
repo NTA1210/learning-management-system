@@ -8,7 +8,6 @@ import { datePreprocess } from './helpers/date.schema';
 export const objectIdSchema = z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid MongoDB ObjectId');
 
 export const attendanceStatusSchema = z.enum([
-  AttendanceStatus.NOTYET,
   AttendanceStatus.PRESENT,
   AttendanceStatus.ABSENT,
 ] as const);
@@ -165,6 +164,16 @@ export const sendAbsenceNotificationSchema = z.object({
     .max(100, "Cannot send emails to more than 100 students at once"),
 });
 
+/* ----------------------------------------------------
+ *  Delete Attendance
+ * -------------------------------------------------- */
+export const deleteAttendanceSchema = z.object({
+  attendanceIds: z
+    .array(objectIdSchema)
+    .min(1, "At least one attendance ID is required")
+    .max(100, "Cannot delete more than 100 attendance records at once"),
+});
+
 export type MarkAttendanceInput = z.infer<typeof markAttendanceSchema>;
 export type UpdateAttendanceInput = z.infer<typeof updateAttendanceSchema>;
 export type ListAttendanceInput = z.infer<typeof listAttendanceQuerySchema>;
@@ -172,5 +181,6 @@ export type StudentHistoryInput = z.infer<typeof studentHistoryQuerySchema>;
 export type CourseStatsInput = z.infer<typeof courseStatsQuerySchema>;
 export type ExportAttendanceInput = z.infer<typeof exportAttendanceQuerySchema>;
 export type SendAbsenceNotificationInput = z.infer<typeof sendAbsenceNotificationSchema>;
+export type DeleteAttendanceInput = z.infer<typeof deleteAttendanceSchema>;
 
 

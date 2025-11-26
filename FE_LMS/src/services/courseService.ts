@@ -50,7 +50,6 @@ export const courseService = {
   // Get all courses with optional filters
   getAllCourses: async (filters?: CourseFilters): Promise<{ courses: Course[]; pagination: unknown }> => {
     const params = new URLSearchParams();
-    
     if (filters?.search) params.append("search", filters.search);
     if (filters?.category) params.append("category", filters.category);
     if (filters?.teacherId) params.append("teacherId", filters.teacherId);
@@ -65,12 +64,18 @@ export const courseService = {
 
     const queryString = params.toString();
     const url = `/courses${queryString ? `?${queryString}` : ""}`;
-    const response = await http.get<Course[]>(url);
-    
-    // Handle response format - response.data is always an array
-    const courses = Array.isArray(response.data) ? response.data : [];
-    const pagination = response.meta?.pagination;
-    
+    const response = await http.get<any>(url);
+
+    let courses: Course[] = [];
+    if (Array.isArray(response?.data)) {
+      courses = response.data as Course[];
+    } else if (Array.isArray(response?.data?.data)) {
+      courses = response.data.data as Course[];
+    } else if (Array.isArray(response)) {
+      courses = response as Course[];
+    }
+
+    const pagination = (response as any)?.pagination || response?.meta?.pagination;
     return { courses, pagination };
   },
 

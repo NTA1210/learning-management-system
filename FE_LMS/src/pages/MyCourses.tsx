@@ -5,6 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import http from "../utils/http";
+import useDebounce from "../hooks/useDebounce";
 import type { Course } from "../types/course";
 import { useNavigate } from "react-router-dom";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
@@ -17,6 +18,7 @@ const MyCoursesPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
+    const debouncedSearchTerm = useDebounce(searchTerm, 300);
     const [currentPage, setCurrentPage] = useState(1);
     const [pageLimit, setPageLimit] = useState(25);
     const [totalCourses, setTotalCourses] = useState(0);
@@ -30,7 +32,7 @@ const MyCoursesPage: React.FC = () => {
             const params: any = {
                 page: currentPage,
                 limit: pageLimit,
-                ...(searchTerm ? { search: searchTerm } : {}),
+                ...(debouncedSearchTerm ? { search: debouncedSearchTerm } : {}),
                 ...(isName ? { sortBy: 'title' } : {}),
                 ...(order ? { sortOrder: order } : {}),
             };
@@ -57,7 +59,7 @@ const MyCoursesPage: React.FC = () => {
     useEffect(() => {
         fetchMyCourses();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentPage, pageLimit, sortOption, searchTerm]);
+    }, [currentPage, pageLimit, sortOption, debouncedSearchTerm]);
 
     return (
         <div

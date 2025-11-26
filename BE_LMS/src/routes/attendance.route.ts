@@ -59,6 +59,12 @@ attendanceRoutes.patch(
 
 // Nghiệp vụ 3: Admin delete (Teacher same-day delete)
 attendanceRoutes.delete(
+  "/",
+  authorize(Role.ADMIN, Role.TEACHER),
+  deleteAttendanceController
+);
+
+attendanceRoutes.delete(
   "/:attendanceId",
   authorize(Role.ADMIN, Role.TEACHER),
   deleteAttendanceController
