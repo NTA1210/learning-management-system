@@ -8,10 +8,12 @@ import {
   SubmissionModal, 
   ViewSubmissionModal, 
   AllSubmissionsModal, 
-  GradeSubmissionModal 
+  GradeSubmissionModal,
+  AssignmentStatsModal,
+  AssignmentReportModal,
 } from "../components";
 import { httpClient } from "../utils/http";
-import { ArrowLeft, Calendar, User, Award, Clock, FileText, Upload, Eye } from "lucide-react";
+import { ArrowLeft, Calendar, User, Award, Clock, FileText, Upload, Eye, BarChart3, ClipboardList } from "lucide-react";
 
 interface Course {
   _id: string;
@@ -43,6 +45,31 @@ interface ApiResponse {
   success: boolean;
   message: string;
   data: Assignment;
+}
+
+interface AssignmentStatsData {
+  totalStudents?: number;
+  submissionRate?: string | number;
+  onTimeRate?: string | number;
+  averageGrade?: number;
+}
+
+interface SubmissionReportData {
+  stats?: AssignmentStatsData;
+  distribution?: Array<{
+    range: string;
+    count: number;
+    percentage: string;
+  }>;
+  details?: Array<{
+    _id: string;
+    grade?: number;
+    submittedAt?: string;
+    studentId?: {
+      fullname?: string;
+      email?: string;
+    };
+  }>;
 }
 
 const AssignmentDetailPage: React.FC = () => {
@@ -95,7 +122,14 @@ const AssignmentDetailPage: React.FC = () => {
   const [gradingGrade, setGradingGrade] = useState<string>("");
   const [gradingFeedback, setGradingFeedback] = useState<string>("");
   const [grading, setGrading] = useState(false);
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [loadingStats, setLoadingStats] = useState(false);
+  const [loadingReport, setLoadingReport] = useState(false);
+  const [statsData, setStatsData] = useState<AssignmentStatsData | null>(null);
+  const [reportData, setReportData] = useState<SubmissionReportData | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const normalizedRole = user?.role?.toLowerCase();
   const getSubmissionCacheKey = (assignmentId: string) => `submission:${assignmentId}`;
   const fetchSubmissionDetailsById = async (submissionId: string) => {
     try {
@@ -365,6 +399,92 @@ const AssignmentDetailPage: React.FC = () => {
     }
   };
 
+  const handleViewAssignmentReport = async () => {
+    if (!assignment?._id) {
+      await showSwalError("Assignment not found. Please reload the page and try again.");
+      return;
+    }
+    setShowReportModal(true);
+    setLoadingReport(true);
+    try {
+      const response = await httpClient.get(`/submissions/${assignment._id}/report`, {
+        withCredentials: true,
+      });
+      if (response.data?.success) {
+        const data = response.data.data;
+        const externalUrl = data?.publicURL || data?.url || data?.link || data?.reportUrl;
+        if (externalUrl) {
+          window.open(externalUrl, "_blank");
+          setShowReportModal(false);
+          setReportData(null);
+        } else {
+          setReportData(data || null);
+        }
+      } else {
+        setShowReportModal(false);
+        setReportData(null);
+        await showSwalError(scrubMessage(response.data?.message || "Failed to fetch report"));
+      }
+    } catch (error) {
+      console.error("Error fetching submission report:", error);
+      setShowReportModal(false);
+      setReportData(null);
+      let errorMessage = "Failed to fetch report";
+      if (error && typeof error === "object" && "response" in error) {
+        const axiosError = error as { response?: { data?: { message?: string } }; message?: string };
+        errorMessage = axiosError.response?.data?.message || axiosError.message || errorMessage;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      await showSwalError(scrubMessage(errorMessage));
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
+  const handleViewAssignmentStats = async () => {
+    if (!assignment?._id) {
+      await showSwalError("Assignment not found. Please reload the page and try again.");
+      return;
+    }
+    setShowStatsModal(true);
+    setLoadingStats(true);
+    try {
+      const response = await httpClient.get(`/submissions/${assignment._id}/stats`, {
+        withCredentials: true,
+      });
+      if (response.data?.success) {
+        const data = response.data.data;
+        const externalUrl = data?.publicURL || data?.url || data?.link || data?.statsUrl;
+        if (externalUrl) {
+          window.open(externalUrl, "_blank");
+          setShowStatsModal(false);
+          setStatsData(null);
+        } else {
+          setStatsData(data || null);
+        }
+      } else {
+        setShowStatsModal(false);
+        setStatsData(null);
+        await showSwalError(scrubMessage(response.data?.message || "Failed to fetch statistics"));
+      }
+    } catch (error) {
+      console.error("Error fetching submission statistics:", error);
+      setShowStatsModal(false);
+      setStatsData(null);
+      let errorMessage = "Failed to fetch statistics";
+      if (error && typeof error === "object" && "response" in error) {
+        const axiosError = error as { response?: { data?: { message?: string } }; message?: string };
+        errorMessage = axiosError.response?.data?.message || axiosError.message || errorMessage;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      await showSwalError(scrubMessage(errorMessage));
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
   const handleGradeSubmission = async (submissionId: string) => {
     if (!gradingGrade || gradingGrade === "") {
       await showSwalError("Please enter a grade");
@@ -477,7 +597,7 @@ const AssignmentDetailPage: React.FC = () => {
     const file = event.target.files?.[0];
     if (file) {
       // Kiểm tra kích thước file (5MB = 5 * 1024 * 1024 bytes)
-      const maxSize = 5 * 1024 * 1024; // 5MB
+      const maxSize = 20 * 1024 * 1024; // 5MB
       if (file.size > maxSize) {
         await showSwalError(`File size exceeds the maximum limit of 5MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB.`);
         if (fileInputRef.current) {
@@ -640,8 +760,8 @@ const AssignmentDetailPage: React.FC = () => {
                     >
                       {assignment.courseId.title}
                     </span>
-                    <div className="flex items-center gap-2">
-                      {user?.role?.toLowerCase() === "student" && submissionStatus?.status && submissionStatus.status !== "not_submitted" && (
+                    <div className="flex flex-wrap items-center gap-2 justify-end">
+                      {normalizedRole === "student" && submissionStatus?.status && submissionStatus.status !== "not_submitted" && (
                         <button
                           onClick={handleViewSubmission}
                           disabled={loadingSubmission}
@@ -665,16 +785,53 @@ const AssignmentDetailPage: React.FC = () => {
                           {loadingSubmission ? "Loading..." : "View Submit"}
                         </button>
                       )}
-                       <button
+
+                      {(normalizedRole === "teacher" || normalizedRole === "admin") && (
+                        <>
+                          <button
+                            onClick={handleViewAssignmentStats}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md"
+                            style={{
+                              backgroundColor: darkMode ? "rgba(16, 185, 129, 0.2)" : "#10b981",
+                              color: darkMode ? "#6ee7b7" : "#ffffff",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = darkMode ? "rgba(16, 185, 129, 0.3)" : "#059669";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = darkMode ? "rgba(16, 185, 129, 0.2)" : "#10b981";
+                            }}
+                          >
+                            <BarChart3 size={16} />
+                            Statistics
+                          </button>
+                          <button
+                            onClick={handleViewAssignmentReport}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md"
+                            style={{
+                              backgroundColor: darkMode ? "rgba(59, 130, 246, 0.2)" : "#2563eb",
+                              color: darkMode ? "#bfdbfe" : "#ffffff",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = darkMode ? "rgba(59, 130, 246, 0.3)" : "#1d4ed8";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = darkMode ? "rgba(59, 130, 246, 0.2)" : "#2563eb";
+                            }}
+                          >
+                            <ClipboardList size={16} />
+                            Report
+                          </button>
+                        </>
+                      )}
+
+                      <button
                         onClick={async () => {
-                          const userRole = user?.role?.toLowerCase();
-                          console.log("Button clicked - User role:", userRole);
-                          if (userRole === "admin" || userRole === "teacher") {
-                            // Teacher/Admin: mở modal để xem danh sách tất cả submissions
+                          console.log("Button clicked - User role:", normalizedRole);
+                          if (normalizedRole === "admin" || normalizedRole === "teacher") {
                             console.log("Opening all submissions modal for teacher/admin");
                             await handleViewAllSubmissions();
-                          } else if (userRole === "student") {
-                            // Student: mở modal để nộp bài
+                          } else if (normalizedRole === "student") {
                             setShowSubmissionModal(true);
                           } else {
                             await showSwalError(`Please log in to access assignments. Your current role is: ${user?.role || "unknown"}.`);
@@ -692,7 +849,7 @@ const AssignmentDetailPage: React.FC = () => {
                           e.currentTarget.style.backgroundColor = darkMode ? "rgba(99, 102, 241, 0.2)" : "#4f46e5";
                         }}
                       >
-                        {user?.role?.toLowerCase() === "admin" || user?.role?.toLowerCase() === "teacher" ? (
+                        {normalizedRole === "admin" || normalizedRole === "teacher" ? (
                           <>
                             <Eye size={16} />
                             View Submit
@@ -703,7 +860,7 @@ const AssignmentDetailPage: React.FC = () => {
                             {submissionStatus?.status && submissionStatus.status !== "not_submitted" ? "Resubmit" : "Submit"}
                           </>
                         )}
-                    </button>
+                      </button>
                     </div>
                   </div>
                   <h1
@@ -845,6 +1002,27 @@ const AssignmentDetailPage: React.FC = () => {
         onGradeChange={setGradingGrade}
         onFeedbackChange={setGradingFeedback}
         onSubmit={() => gradingSubmission && handleGradeSubmission(gradingSubmission._id)}
+      />
+
+      <AssignmentStatsModal
+        isOpen={showStatsModal}
+        loading={loadingStats}
+        data={statsData}
+        onClose={() => {
+          setShowStatsModal(false);
+          setStatsData(null);
+        }}
+      />
+
+      <AssignmentReportModal
+        isOpen={showReportModal}
+        loading={loadingReport}
+        data={reportData}
+        formatDate={formatDate}
+        onClose={() => {
+          setShowReportModal(false);
+          setReportData(null);
+        }}
       />
     </div>
   );

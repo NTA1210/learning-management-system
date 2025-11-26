@@ -16,6 +16,8 @@ export { default as ViewSubmissionModal } from './assignments/ViewSubmissionModa
 export { default as AllSubmissionsModal } from './assignments/AllSubmissionsModal';
 export { default as SubmissionCard } from './assignments/SubmissionCard';
 export { default as GradeSubmissionModal } from './assignments/GradeSubmissionModal';
+export { default as AssignmentStatsModal } from './assignments/AssignmentStatsModal';
+export { default as AssignmentReportModal } from './assignments/AssignmentReportModal';
 export { default as LessonCard } from './lessons/LessonCard';
 export { default as LessonFormModal } from './lessons/LessonFormModal';
 export { default as LessonSummary } from './materials/LessonSummary';
