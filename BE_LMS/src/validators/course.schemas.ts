@@ -22,6 +22,7 @@ export const listCoursesSchema = z
         message: 'Limit must be between 1 and 100',
       }),
     search: z.string().optional(),
+    slug: z.string().optional(), // Filter by slug (partial match)
     from: datePreprocess.optional(), // Date range start with validation
     to: datePreprocess.optional(), // Date range end with validation
     subjectId: z.string().regex(objectIdRegex, 'Invalid subject ID format').optional(), // Filter by subject ID

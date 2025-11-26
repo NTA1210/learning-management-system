@@ -15,11 +15,16 @@ import { EnrollmentStatus } from '../types/enrollment.type';
 import { uploadFile, removeFile } from '../utils/uploadFile';
 import { prefixCourseLogo } from '../utils/filePrefix';
 import { QuizModel } from '@/models';
+
+
 import {
   notifyAdminNewCourse,
   notifyTeacherCourseApproved,
   notifyTeacherAssigned,
 } from './helpers/notification.helper';
+
+import slugify from 'slugify';
+
 import { snapShotQuestion } from '@/validators/quiz.schemas';
 
 
@@ -70,6 +75,7 @@ export type ListCoursesParams = {
   page: number;
   limit: number;
   search?: string;
+  slug?: string; // Filter by slug (partial match)
   from?: Date; // Date range start for createdAt filtering
   to?: Date; // Date range end for createdAt filtering
   subjectId?: string; // ✅ NEW: Filter by subject instead of specialist
@@ -98,6 +104,7 @@ export const listCourses = async ({
   page,
   limit,
   search,
+  slug,
   from,
   to,
   subjectId,
@@ -224,6 +231,12 @@ export const listCourses = async ({
     if (to) filter.createdAt.$lte = to;
   }
 
+  // Filter by slug (partial match)
+  if (slug) {
+    const escapedSlug = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.slug = { $regex: escapedSlug, $options: 'i' };
+  }
+
   // Search by title or description (text search)
   if (search) {
     filter.$or = [
@@ -292,6 +305,33 @@ export const getCourseById = async (courseId: string) => {
   // ✅ SOFT DELETE: Only get non-deleted course
   const course = await CourseModel.findOne({
     _id: courseId,
+    isDeleted: false,
+  })
+    .populate('teacherIds', 'username email fullname avatar_url bio')
+    .populate('subjectId', 'name code slug description credits')
+    .populate('semesterId', 'name year type startDate endDate')
+    .populate('createdBy', 'username email fullname')
+    .lean();
+
+  appAssert(course, NOT_FOUND, 'Course not found');
+
+  return course;
+};
+
+/**
+ * Lấy thông tin chi tiết một khóa học theo Slug
+ * Hỗ trợ partial match: tìm "444" sẽ match với "444-rede44velopment-test-flug"
+ */
+export const getCourseBySlug = async (slug: string) => {
+  appAssert(slug, BAD_REQUEST, 'Slug is required');
+
+  // Escape special regex characters để tránh lỗi
+  const escapedSlug = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // ✅ SOFT DELETE: Only get non-deleted course
+  // Sử dụng regex để tìm kiếm partial match (case-insensitive)
+  const course = await CourseModel.findOne({
+    slug: { $regex: escapedSlug, $options: 'i' },
     isDeleted: false,
   })
     .populate('teacherIds', 'username email fullname avatar_url bio')
@@ -446,9 +486,25 @@ export const createCourse = async (
   const semester = await SemesterModel.findById(data.semesterId);
   appAssert(semester, BAD_REQUEST, 'Invalid semester ID');
 
+  // Generate slug from title
+  let slug = slugify(data.title, {
+    lower: true,
+    strict: true,
+    locale: 'vi',
+    trim: true
+  });
+
+  // Check for duplicate slug and make it unique if needed
+  const existingSlug = await CourseModel.findOne({ slug, isDeleted: false });
+  if (existingSlug) {
+    // Append timestamp to make it unique
+    slug = `${slug}-${Date.now().toString().slice(-6)}`;
+  }
+
   // Create course with createdBy
   const courseData = {
     ...data,
+    slug,
     startDate,
     endDate,
     status: finalStatus,
@@ -582,6 +638,28 @@ export const updateCourse = async (
       _id: { $ne: courseId }, // Exclude current course
     });
     appAssert(!existingCourse, BAD_REQUEST, 'A course with this title already exists');
+
+    // Regenerate slug when title changes
+    let newSlug = slugify(data.title, {
+      lower: true,
+      strict: true,
+      locale: 'vi',
+      trim: true
+    });
+
+    // Check for duplicate slug
+    const existingSlug = await CourseModel.findOne({
+      slug: newSlug,
+      isDeleted: false,
+      _id: { $ne: courseId }
+    });
+
+    if (existingSlug) {
+      newSlug = `${newSlug}-${Date.now().toString().slice(-6)}`;
+    }
+
+    // Add slug to update data
+    (data as any).slug = newSlug;
   }
 
   // Validate dates if provided
@@ -1075,6 +1153,7 @@ export const getMyCourses = async ({
     page,
     limit,
     search,
+    slug,
     subjectId,
     semesterId,
     isPublished,
@@ -1116,6 +1195,12 @@ export const getMyCourses = async ({
         { description: { $regex: search, $options: 'i' } },
       ],
     });
+  }
+
+  // Filter by slug (partial match)
+  if (slug) {
+    const escapedSlug = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.slug = { $regex: escapedSlug, $options: 'i' };
   }
 
   if (subjectId) filter.subjectId = subjectId;

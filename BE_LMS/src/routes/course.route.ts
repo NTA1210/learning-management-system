@@ -9,6 +9,7 @@ import {
   permanentDeleteCourseHandler,
   getMyCoursesHandler,
   getQuizzesHandler,
+  getCourseBySlugHandler,
 } from '../controller/course.controller';
 import authenticate from '../middleware/authenticate';
 import authorize from '../middleware/authorize';
@@ -27,6 +28,10 @@ courseRoutes.get('/my-courses', authenticate, getMyCoursesHandler);
 // GET /courses - List all courses with pagination and filters
 // ✅ Students must login to browse courses (university internal system)
 courseRoutes.get('/', authenticate, listCoursesHandler);
+
+// GET /courses/slug/:slug - Get course detail by Slug
+// ✅ Must be before /:id route to avoid conflict
+courseRoutes.get('/slug/:slug', authenticate, getCourseBySlugHandler);
 
 // GET /courses/:id - Get course detail by ID
 courseRoutes.get('/:id', authenticate, getCourseByIdHandler);
