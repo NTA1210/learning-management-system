@@ -27,7 +27,7 @@ const MessageSchema = new mongoose.Schema<IMessage>(
       ref: 'User',
       required: true,
     },
-    senderRole: { enum: Role, required: true },
+    senderRole: { type: String, enum: Role, required: true },
     content: { type: String, trim: true },
     file: { type: [FileSchema], default: [] },
   },

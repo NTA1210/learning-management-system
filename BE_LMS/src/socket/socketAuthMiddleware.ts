@@ -1,4 +1,4 @@
-import cookie from 'cookie';
+import * as cookie from 'cookie';
 import { UserModel } from '@/models';
 import { ExtendedError, Socket } from 'socket.io';
 import { verifyToken } from '@/utils/jwt';
@@ -9,7 +9,6 @@ export const socketAuthMiddleware = async (socket: Socket, next: (err?: Extended
   if (!cookies) {
     return next(new Error('No cookie found'));
   }
-
   const parsed = cookie.parse(cookies);
   const token = parsed.accessToken;
 
