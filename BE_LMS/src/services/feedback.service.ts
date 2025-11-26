@@ -1,4 +1,4 @@
-import { FeedbackModel, UserModel } from "@/models";
+import { FeedbackModel, UserModel, CourseModel } from "@/models";
 import { Types } from "mongoose";
 import { Role } from "@/types";
 import { FeedbackType } from "@/types/feedback.type";
@@ -7,6 +7,7 @@ import { BAD_REQUEST, FORBIDDEN, NOT_FOUND } from "@/constants/http";
 import appAssert from "@/utils/appAssert";
 import { uploadFile, removeFile } from "@/utils/uploadFile";
 import { CreateFeedbackInput, ListFeedbacksInput } from "@/validators/feedback.schemas";
+import { notifyNewSystemFeedback, notifyTeacherFeedback, notifyCourseFeedback } from "./helpers/notification.helper";
 
 /**
  * Prefix for feedback file uploads
@@ -75,6 +76,38 @@ export const createFeedback = async (
   // Populate targetId if it's a teacher feedback
   if (feedback.targetId && feedback.type === FeedbackType.TEACHER) {
     await feedback.populate("targetId", "username email fullname avatar_url role");
+  }
+
+  // Send notifications based on feedback type
+  try {
+    if (feedback.type === FeedbackType.SYSTEM) {
+      await notifyNewSystemFeedback(
+        feedback._id.toString(),
+        feedback.description || '',
+        user.fullname || user.username || 'Unknown User'
+      );
+    } else if (feedback.type === FeedbackType.TEACHER && feedback.targetId) {
+      await notifyTeacherFeedback(
+        feedback.targetId.toString(),
+        feedback.description || '',
+        feedback.rating,
+        user.fullname || user.username || 'Unknown User'
+      );
+    } else if (feedback.type === FeedbackType.OTHER && feedback.targetId) {
+      // Check if targetId is a course
+      const course = await CourseModel.findById(feedback.targetId);
+      if (course) {
+        await notifyCourseFeedback(
+          feedback.targetId.toString(),
+          feedback.description || '',
+          feedback.rating,
+          user.fullname || user.username || 'Unknown User'
+        );
+      }
+    }
+  } catch (notifError) {
+    // Log error but don't fail the feedback creation
+    console.error('Failed to send notification for feedback:', notifError);
   }
 
   return feedback;

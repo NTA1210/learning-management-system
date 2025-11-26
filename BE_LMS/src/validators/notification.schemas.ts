@@ -1,6 +1,6 @@
 import z from "zod";
-import {ObjectId} from "mongoose";
-import {datePreprocess} from "./helpers/date.schema";
+import { ObjectId } from "mongoose";
+import { datePreprocess } from "./helpers/date.schema";
 
 // ObjectId validation regex
 const objectIdRegex = /^[0-9a-fA-F]{24}$/;
@@ -10,22 +10,20 @@ export const createNotificationSchema = z
     .object({
         title: z.string().min(1, "Title is required").max(200, "Title too long"),
         message: z.string().min(1, "Message is required").max(1000, "Message too long"),
-        recipientType: z.enum(["user", "course", "all"]).default("user"),
+        recipientType: z.enum(["user", "system"]).default("user"),
         recipientUser: z.string().regex(objectIdRegex, "Invalid user ID format").optional(),
         recipientCourse: z.string().regex(objectIdRegex, "Invalid course ID format").optional(),
     })
     .refine(
         (data) => {
-            if (data.recipientType === "user" && !data.recipientUser) {
-                return false;
-            }
-            if (data.recipientType === "course" && !data.recipientCourse) {
+            // Both user and system types require recipientUser
+            if (!data.recipientUser) {
                 return false;
             }
             return true;
         },
         {
-            message: "Recipient ID is required based on recipient type",
+            message: "recipientUser is required",
         }
     );
 
@@ -38,7 +36,7 @@ export const listNotificationsSchema = z
             .string()
             .optional()
             .transform((val) => (val ? parseInt(val, 10) : 1))
-            .refine((val) => val > 0, {message: "Page must be greater than 0"}),
+            .refine((val) => val > 0, { message: "Page must be greater than 0" }),
         limit: z
             .string()
             .optional()
