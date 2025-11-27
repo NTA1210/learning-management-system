@@ -105,10 +105,12 @@ export const createLessonMaterialController = catchErrors(async (req, res) => {
 });
 
 // Update lesson material
-export const updateLessonMaterialController = catchErrors(async (req, res) => {
+export const updateLessonMaterialController = catchErrors(async (req: any, res) => {
   const { id } = req.params;
   const validatedParams = LessonMaterialByIdSchema.parse({ id });
   const data = UpdateLessonMaterialSchema.parse(req.body);
+
+  const file = req.file as Express.Multer.File | undefined;
 
   // Get user info from authentication middleware
   const userId = req.userId;
@@ -117,6 +119,7 @@ export const updateLessonMaterialController = catchErrors(async (req, res) => {
   const result = await updateLessonMaterial(
     validatedParams.id,
     data,
+    file,
     userId,
     userRole
   );

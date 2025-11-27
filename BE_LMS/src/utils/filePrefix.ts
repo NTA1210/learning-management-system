@@ -1,6 +1,7 @@
+
 export const prefixLessonMaterial = (
-  courseId: string,
-  lessonId: string
+  courseId: import("mongoose").Types.ObjectId|string,
+  lessonId: import("mongoose").Types.ObjectId|string
 ) => {
   return `courses/${courseId}/lessons/${lessonId}`;
 };
