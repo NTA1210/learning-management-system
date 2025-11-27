@@ -154,6 +154,16 @@ export const updateUserProfile = async (
     }
   }
 
+  if (userRole === Role.STUDENT) {
+    if (specialistIds && specialistIds.length) {
+      const specialists = await SpecialistModel.find({
+        _id: { $in: specialistIds },
+      });
+      appAssert(specialists.length === specialistIds.length, NOT_FOUND, 'Specialist not found');
+      user.specialistIds = specialists.map((spec: ISpecialist) => spec._id);
+    }
+  }
+
   const updatedUser = await user.save();
 
   return formatUserResponse(updatedUser.toObject(), userRole);
