@@ -60,7 +60,7 @@ const CourseManagement: React.FC = () => {
       endDate: string;
     }>
   >([]);
-  const [subjects, setSubjects] = useState<Array<{ _id: string; name: string }>>([]);
+  const [subjects, setSubjects] = useState<Array<{ _id: string; name: string; specialistIds?: string[] }>>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [selectedSemesterId, setSelectedSemesterId] = useState("");
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -93,6 +93,8 @@ const CourseManagement: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageLimit, setPageLimit] = useState(25);
   const [totalCourses, setTotalCourses] = useState(0);
+  const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
+  const [editLogoPreview, setEditLogoPreview] = useState("");
   const [sortOption, setSortOption] = useState<
     "name_asc" | "name_desc" | "date_asc" | "date_desc"
   >("date_desc");
@@ -226,7 +228,7 @@ const CourseManagement: React.FC = () => {
       try {
         const res = await subjectService.getAllSubjects({ limit: 200,  sortOrder: "asc" });
         const list = Array.isArray(res?.data) ? res.data : [];
-        setSubjects(list.map((s: any) => ({ _id: s._id, name: s.name })));
+        setSubjects(list as any);
       } catch {}
     })();
   }, []);
@@ -253,6 +255,28 @@ const CourseManagement: React.FC = () => {
   useEffect(() => {
     fetchTeachers();
   }, []);
+
+  useEffect(() => {
+    if (!showEditModal) return;
+    const subjId = formData.subjectId || ((editingCourse as any)?.subjectId?._id || (editingCourse as any)?.subjectId);
+    const selected = subjects.find((s: any) => s._id === subjId);
+    const raw = Array.isArray((selected as any)?.specialistIds)
+      ? (selected as any).specialistIds
+      : Array.isArray((selected as any)?.specialists)
+      ? (selected as any).specialists
+      : [ (selected as any)?.specialistId || (selected as any)?.specialist ].filter(Boolean);
+    const specIds = (Array.isArray(raw) ? raw : [])
+      .map((x: any) => (typeof x === 'string' ? x : x?._id))
+      .filter((id: any) => typeof id === 'string' && id);
+    (async () => {
+      try {
+        const { users } = await userService.getUsers({ role: 'teacher', specialistIds: specIds});
+        const normalized = (Array.isArray(users) ? users : []).map((u) => ({ _id: u._id, username: u.username, email: (u as any)?.email ?? '' }));
+        setAvailableTeachers(normalized);
+        setSelectedTeachers((prev) => prev.filter((id) => normalized.some((t) => t._id === id)));
+      } catch {}
+    })();
+  }, [showEditModal, formData.subjectId]);
 
   const changePageLimit = (limit: number) => {
     setPageLimit(limit);
@@ -362,7 +386,12 @@ const CourseManagement: React.FC = () => {
     setEditingCourse(course);
     setFormData({
       title: course.title || "",
-      subjectId: "",
+      subjectId: ((): string => {
+        const subj: any = (course as any).subjectId;
+        if (typeof subj === "string") return subj;
+        if (subj && typeof subj === "object" && subj._id) return subj._id;
+        return "";
+      })(),
       description: course.description || "",
       startDate: "",
       endDate: "",
@@ -378,6 +407,8 @@ const CourseManagement: React.FC = () => {
         return "";
       })(),
     });
+    setEditLogoPreview((course as any).logo || "");
+    setEditLogoFile(null);
     const normalizedTeacherIds = Array.isArray((course as any).teacherIds)
       ? (course as any).teacherIds
           .map((t: any) => (typeof t === "string" ? t : t?._id))
@@ -402,6 +433,7 @@ const CourseManagement: React.FC = () => {
         capacity: formData.capacity,
         semesterId: formData.semesterId,
         teacherIds: selectedTeachers,
+        logo: editLogoFile || undefined,
       });
       setShowEditModal(false);
       setEditingCourse(null);
@@ -1253,6 +1285,7 @@ const CourseManagement: React.FC = () => {
               <form onSubmit={handleUpdateCourse} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
+               
                     <label className="block mb-2 font-semibold">Title *</label>
                     <input
                       type="text"
@@ -1325,6 +1358,30 @@ const CourseManagement: React.FC = () => {
                       ))}
                     </select>
                   </div>
+
+                </div>
+                <div className="flex items-center gap-4 mb-3">
+                  <img
+                    src={editLogoPreview || (editingCourse as any)?.logo || ('https://api.dicebear.com/9.x/shapes/svg?seed=' + encodeURIComponent(formData.title || editingCourse?.title || 'course'))}
+                    alt="Logo"
+                    className="h-14 w-14 rounded object-cover border"
+                    style={{ borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb' }}
+                  />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setEditLogoFile(file);
+                      setEditLogoPreview(file ? URL.createObjectURL(file) : editLogoPreview);
+                    }}
+                    className="px-3 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                  />
                 </div>
                 <div className="col-span-2">
                   <label className="block mb-2 font-semibold">
