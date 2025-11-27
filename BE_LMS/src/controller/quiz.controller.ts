@@ -2,12 +2,18 @@ import { CREATED, OK } from '@/constants/http';
 import {
   createQuiz,
   deleteQuiz,
+  getQuizAttemptsByQuizId,
   getQuizById,
   getStatisticByQuizId,
   updateQuiz,
 } from '@/services/quiz.service';
 import { catchErrors } from '@/utils/asyncHandler';
-import { updateQuizSchema, createQuizSchema, quizIdSchema } from '@/validators/quiz.schemas';
+import {
+  updateQuizSchema,
+  createQuizSchema,
+  quizIdSchema,
+  getQuizAttemptsSchema,
+} from '@/validators/quiz.schemas';
 
 // POST /quizzes - Create a new quiz
 export const createQuizHandler = catchErrors(async (req, res) => {
@@ -78,5 +84,20 @@ export const getQuizByIdHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     data,
     message: 'Statistic retrieved successfully',
+  });
+});
+
+// GET /quizzes/:quizId/quiz-attempts
+export const getQuizAttemptsByQuizIdHandler = catchErrors(async (req, res) => {
+  const input = getQuizAttemptsSchema.parse({
+    ...req.query,
+    quizId: req.params.quizId,
+  });
+
+  const data = await getQuizAttemptsByQuizId(input);
+
+  return res.success(OK, {
+    data,
+    message: 'Quiz attempts retrieved successfully',
   });
 });

@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+<<<<<<< HEAD
 import {
   DashboardPage,
   StudentDashboardPage,
@@ -35,6 +36,46 @@ import {
   ForumDetailPage,
   ForumPostDetailPage,
 } from "../pages";
+=======
+import {DashboardPage ,
+      StudentDashboardPage,
+      TeacherDashboardPage,
+      LandingPage,
+      NotFoundPage,
+      EmailVerifyPage,
+      ForgotPasswordPage,
+      ResetPasswordPage,
+      LoginPage,
+      RegisterPage,
+      CourseManagementPage,
+      MyCoursesPage,
+      CourseDetailPage,
+      ListAllLessonsPage,
+      AboutUsPage,
+      FAQPage,
+      AssignmentPage,
+      QuizManagementPage,
+      QuizCreatePage,
+      CourseQuizzesPage,
+      QuizQuestionsPage,
+      TakeQuizPage,
+      FeedbackPage,
+      FeedbackListPage,
+      EnrollmentsListPage,
+      CurriculumPage,
+
+
+      UserManagementPage,
+      UserBioPage,
+      AttendancePage,
+      MyEnrollmentsPage,
+      ForumPage,
+      ForumListPage,
+      ForumDetailPage,
+      ForumPostDetailPage,
+      OnboardingPage,
+    } from "../pages";
+>>>>>>> c6e5313ce2743d30ac93fa72185b3d14de1d60da
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
 import AssignmentDetailPage from "../pages/AssignmentDetailPage";
@@ -69,6 +110,7 @@ function AppRoutes() {
         />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password/:code" element={<ResetPasswordPage />} />
+<<<<<<< HEAD
         <Route
           path="/dashboard"
           element={
@@ -93,6 +135,28 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
+=======
+        <Route path="/dashboard" element={
+          <ProtectedRoute requiredRole="admin">
+            <DashboardPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/onboarding" element={
+          <ProtectedRoute requiredRole="student">
+            <OnboardingPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/courses" element={
+          <ProtectedRoute requiredRole="admin">
+            <CourseManagementPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/courses" element={
+          <ProtectedRoute>
+            <CourseManagementPage />
+          </ProtectedRoute>
+        } />
+>>>>>>> c6e5313ce2743d30ac93fa72185b3d14de1d60da
 
         <Route
           path="/my-courses"
