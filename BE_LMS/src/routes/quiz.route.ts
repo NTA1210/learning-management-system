@@ -1,6 +1,7 @@
 import {
   createQuizHandler,
   deleteQuizHandler,
+  getQuizAttemptsByQuizIdHandler,
   getQuizByIdHandler,
   getStatisticByQuizIdHandler,
   updateQuizHandler,
@@ -12,9 +13,9 @@ const quizRoutes = Router();
 
 // prefix: /quizzes
 quizRoutes.post('/', createQuizHandler);
+quizRoutes.get('/:quizId/statistics', getStatisticByQuizIdHandler);
+quizRoutes.get('/:quizId/quiz-attempts', getQuizAttemptsByQuizIdHandler);
 quizRoutes.put('/:quizId', updateQuizHandler);
 quizRoutes.delete('/:quizId', deleteQuizHandler);
 quizRoutes.get('/:quizId', getQuizByIdHandler);
-quizRoutes.get('/:quizId/statistics', getStatisticByQuizIdHandler);
-
 export default quizRoutes;
