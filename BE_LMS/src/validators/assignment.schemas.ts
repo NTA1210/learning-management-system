@@ -69,12 +69,24 @@ export type CreateAssignmentInput = z.infer<typeof createAssignmentSchema>;
 export const updateAssignmentSchema = z.object({
   title: z.string().min(1).max(255).optional(),
   description: z.string().optional(),
-  maxScore: z.number().int().positive().optional(),
+  maxScore: z
+    .preprocess(
+      (val) => (val === "" || val === undefined ? undefined : Number(val)),
+      z.number().int().positive()
+    )
+    .optional(),
   dueDate: z
     .union([z.string(), z.date()])
     .optional()
     .transform((val) => (typeof val === "string" ? new Date(val) : val)),
-  allowLate: z.boolean().optional(),
+  allowLate: z
+    .preprocess((val) => {
+      if (val === undefined || val === "") return undefined;
+      if (val === "true" || val === true) return true;
+      if (val === "false" || val === false) return false;
+      return val;
+    }, z.boolean())
+    .optional(),
 });
 
 export type UpdateAssignmentInput = z.infer<typeof updateAssignmentSchema>;

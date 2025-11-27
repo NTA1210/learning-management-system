@@ -8,7 +8,7 @@ import {
 } from "react";
 import { format, formatDistanceToNow } from "date-fns";
 import { createPortal } from "react-dom";
-import { Loader2, Plus, RefreshCcw, Trash2 } from "lucide-react";
+import { Loader2, Plus, RefreshCcw, Trash2, Volume2, VolumeX } from "lucide-react";
 import { notificationService } from "../services/notificationService";
 import type {
   NotificationItem,
@@ -19,6 +19,7 @@ import { useAuth } from "../hooks/useAuth";
 import http from "../utils/http";
 import type { User } from "../types/auth";
 import type { Course } from "../types/course";
+import toast from "react-hot-toast";
 
 interface NotificationDropdownProps {
   isDarkMode: boolean;
@@ -92,6 +93,14 @@ export default function NotificationDropdown({
     ids: [],
   });
 
+  // Sound and mute state
+  const [isMuted, setIsMuted] = useState(() => {
+    const stored = localStorage.getItem("notification-sound-muted");
+    return stored === "true";
+  });
+  const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
+  const seenNotificationIdsRef = useRef<Set<string>>(new Set());
+
   const unreadCount = useMemo(
     () => items.filter((notification) => !notification.isRead).length,
     [items]
@@ -110,35 +119,105 @@ export default function NotificationDropdown({
   };
 
   const fetchNotifications = useCallback(
-    async (options?: { reset?: boolean }) => {
-      if (isLoading) return;
-      setIsLoading(true);
+    async (options?: { reset?: boolean; silent?: boolean }) => {
+      if (isLoading && !options?.silent) return;
+      if (!options?.silent) setIsLoading(true);
       setError(null);
       try {
-        const nextPage = options?.reset ? 1 : page;
+        // For polling (silent), always fetch page 1 to get latest notifications
+        // For reset, fetch page 1
+        // For normal pagination, use current page
+        const nextPage = options?.silent || options?.reset ? 1 : page;
         const response = await notificationService.getNotifications({
           page: nextPage,
           limit: LIMIT,
         });
         const newItems = response.data ?? [];
-        setItems((prev) =>
-          options?.reset ? newItems : [...prev, ...newItems.filter(
-              (item) => !prev.some((existing) => existing._id === item._id)
-            )]
-        );
-        setHasNext(response.pagination?.hasNext ?? false);
-        setPage(nextPage + 1);
+        
+        // Check for new notifications (not seen before) - only when polling silently
+        if (options?.silent && !options?.reset) {
+          const seenIds = seenNotificationIdsRef.current;
+          const newNotifications = newItems.filter(
+            (item) => !seenIds.has(item._id)
+          );
+
+          // Show toast and play sound for new notifications
+          newNotifications.forEach((notification) => {
+            seenIds.add(notification._id);
+            
+            // Show toast notification
+            toast(
+              () => (
+                <div className="flex flex-col gap-1">
+                  <div className="font-semibold text-sm">{notification.title}</div>
+                  <div className="text-xs opacity-90 line-clamp-2">
+                    {notification.message}
+                  </div>
+                </div>
+              ),
+              {
+                duration: 5000,
+                position: "top-right",
+                style: {
+                  background: isDarkMode ? "#1e293b" : "#ffffff",
+                  color: isDarkMode ? "#ffffff" : "#1f2937",
+                  border: `1px solid ${isDarkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb"}`,
+                  borderRadius: "0.75rem",
+                  padding: "12px 16px",
+                  boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                },
+                icon: "🔔",
+              }
+            );
+
+            // Play sound if not muted
+            if (!isMuted && notificationSoundRef.current) {
+              try {
+                notificationSoundRef.current.currentTime = 0;
+                notificationSoundRef.current.play().catch((err) => {
+                  console.warn("Failed to play notification sound:", err);
+                });
+              } catch (err) {
+                console.warn("Failed to play notification sound:", err);
+              }
+            }
+          });
+
+          // Update items list with new notifications (prepend to top)
+          setItems((prev) => {
+            const existingIds = new Set(prev.map((item) => item._id));
+            const toAdd = newItems.filter((item) => !existingIds.has(item._id));
+            return [...toAdd, ...prev];
+          });
+        } else {
+          // On reset or normal fetch, mark all as seen and update items normally
+          if (options?.reset) {
+            newItems.forEach((item) => {
+              seenNotificationIdsRef.current.add(item._id);
+            });
+          }
+          
+          setItems((prev) =>
+            options?.reset ? newItems : [...prev, ...newItems.filter(
+                (item) => !prev.some((existing) => existing._id === item._id)
+              )]
+          );
+          setHasNext(response.pagination?.hasNext ?? false);
+          setPage(nextPage + 1);
+        }
       } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load notifications. Please try again."
-        );
+        if (!options?.silent) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load notifications. Please try again."
+          );
+        }
       } finally {
-        setIsLoading(false);
+        if (!options?.silent) setIsLoading(false);
       }
     },
-    [page, isLoading]
+    [page, isLoading, isDarkMode, isMuted]
   );
 
   const handleToggleOpen = () => {
@@ -281,6 +360,44 @@ export default function NotificationDropdown({
     };
   }, [isOpen, detailNotification, confirmDelete.open]);
 
+  // Initialize notification sound
+  useEffect(() => {
+    notificationSoundRef.current = new Audio(
+      "https://admin.toandz.id.vn/fstudy/sound/notification.mp3"
+    );
+    notificationSoundRef.current.volume = 0.5;
+    notificationSoundRef.current.preload = "auto";
+
+    return () => {
+      if (notificationSoundRef.current) {
+        notificationSoundRef.current.pause();
+        notificationSoundRef.current = null;
+      }
+    };
+  }, []);
+
+  // Polling for new notifications every 5 seconds
+  useEffect(() => {
+    // Initial fetch
+    fetchNotifications({ reset: true, silent: true }).catch(() => undefined);
+
+    // Set up polling interval
+    const intervalId = setInterval(() => {
+      fetchNotifications({ silent: true }).catch(() => undefined);
+    }, 5000); // Poll every 5 seconds
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [fetchNotifications]);
+
+  // Handle mute/unmute toggle
+  const handleToggleMute = () => {
+    const newMutedState = !isMuted;
+    setIsMuted(newMutedState);
+    localStorage.setItem("notification-sound-muted", String(newMutedState));
+  };
+
   useEffect(() => {
     if (!isOpen || !hasNext || isLoading || error) return;
     const listElement = listRef.current;
@@ -359,6 +476,23 @@ export default function NotificationDropdown({
               </p>
             </div>
             <div className="flex items-center gap-2">
+              {/* Mute/Unmute Button */}
+              <button
+                onClick={handleToggleMute}
+                className={classNames(
+                  "inline-flex items-center justify-center rounded-full transition-colors w-7 h-7",
+                  isMuted
+                    ? "text-slate-400 hover:bg-slate-100/20"
+                    : "text-indigo-500 hover:bg-indigo-500/20"
+                )}
+                title={isMuted ? "Unmute notifications" : "Mute notifications"}
+              >
+                {isMuted ? (
+                  <VolumeX className="h-3.5 w-3.5" />
+                ) : (
+                  <Volume2 className="h-3.5 w-3.5" />
+                )}
+              </button>
               {canCreate && (
                 <button
                   onClick={() => setIsCreateOpen(true)}
@@ -450,34 +584,36 @@ export default function NotificationDropdown({
                     )}
                     style={{ animationDelay: `${index * 40}ms` }}
                 >
-                  <div className="flex items-center gap-3 flex-1">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
                     <div className="flex-shrink-0">
                       <div className="h-10 w-10 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-semibold">
                         {getSenderInitial(notification)}
                       </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-semibold text-sm truncate">
-                          {notification.title}
+                    <div className="flex-1 min-w-0 overflow-hidden pr-2">
+                      <div className="flex items-start justify-between gap-2 mb-1">
+                        <p className="font-semibold text-sm truncate flex-1 min-w-0" style={{ maxWidth: '200px' }}>
+                          {truncate(notification.title, 30)}
                         </p>
-                        <span className="text-[11px] opacity-60 whitespace-nowrap">
+                        <span className="text-[11px] opacity-60 whitespace-nowrap flex-shrink-0 ml-2" style={{ minWidth: '50px', textAlign: 'right' }}>
                           {formatRelativeTime(notification.createdAt)}
                         </span>
                       </div>
-                      <p className="text-xs opacity-80">
-                        {truncate(notification.message, 80)}
+                      <p className="text-xs opacity-80 line-clamp-2" style={{ maxWidth: '250px' }}>
+                        {truncate(notification.message, 50)}
                       </p>
                     </div>
                   </div>
                   {selectMode && (
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 cursor-pointer"
-                      checked={isSelected}
-                      onChange={() => handleSelect(notification._id)}
-                      onClick={(event) => event.stopPropagation()}
-                    />
+                    <div className="flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 cursor-pointer"
+                        checked={isSelected}
+                        onChange={() => handleSelect(notification._id)}
+                        onClick={(event) => event.stopPropagation()}
+                      />
+                    </div>
                   )}
                 </button>
               );

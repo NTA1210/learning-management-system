@@ -8,7 +8,7 @@ import { NOT_FOUND, FORBIDDEN } from "../constants/http";
 import { EnrollmentStatus } from "../types/enrollment.type";
 import { Role } from "../types";
 import { ensureTeacherAccessToCourse } from "./helpers/courseAccessHelpers";
-import { uploadFile } from "../utils/uploadFile";
+import { uploadFile, removeFile, getSignedUrl } from "../utils/uploadFile";
 import { prefixAssignmentFile } from "../utils/filePrefix";
 
 export type ListAssignmentsParams = {
@@ -190,8 +190,19 @@ export const getAssignmentById = async (
     userId,
     userRole,
   });
+//presigned cho file 
+  let publicURL: string | null = null;
+  const fileKey = (assignment as any).fileKey as string | undefined;
+  const fileOriginalName = (assignment as any).fileOriginalName as string | undefined;
 
-  return assignment;
+  if (fileKey) {
+    publicURL = await getSignedUrl(fileKey, fileOriginalName || "assignment-file");
+  }
+
+  return {
+    ...assignment,
+    publicURL,
+  };
 };
 
 export const createAssignment = async (
@@ -260,14 +271,13 @@ export const updateAssignment = async (
   assignmentId: string,
   data: any,
   userId?: mongoose.Types.ObjectId,
-  userRole?: Role
+  userRole?: Role,
+  file?: Express.Multer.File
 ) => {
-  if (userRole === Role.TEACHER && userId) {
-    const assignment = await AssignmentModel.findById(assignmentId).select(
-      "courseId"
-    );
-    appAssert(assignment, NOT_FOUND, "Assignment not found");
+  const assignment = await AssignmentModel.findById(assignmentId).select("courseId fileKey");
+  appAssert(assignment, NOT_FOUND, "Assignment not found");
 
+  if (userRole === Role.TEACHER && userId) {
     await ensureTeacherAccessToCourse({
       courseId: assignment.courseId as mongoose.Types.ObjectId,
       userId,
@@ -275,7 +285,27 @@ export const updateAssignment = async (
     });
   }
 
-  const assignment = await AssignmentModel.findByIdAndUpdate(
+  // Nếu có file mới: xóa file cũ (nếu tồn tại) và upload file mới
+  if (file) {
+    if (assignment.fileKey) {
+      await removeFile(assignment.fileKey);
+    }
+
+    const courseIdStr = (assignment.courseId as any).toString();
+    const assignmentIdStr = (assignment as any)._id.toString();
+    const prefix = prefixAssignmentFile(courseIdStr, assignmentIdStr);
+    const { key, originalName, mimeType, size } = await uploadFile(
+      file,
+      prefix
+    );
+
+    data.fileKey = key;
+    data.fileOriginalName = originalName;
+    data.fileMimeType = (mimeType as string) || undefined;
+    data.fileSize = size;
+  }
+
+  const updated = await AssignmentModel.findByIdAndUpdate(
     assignmentId,
     data,
     { new: true }
@@ -284,8 +314,8 @@ export const updateAssignment = async (
     .populate("createdBy", "username email fullname")
     .lean();
 
-  appAssert(assignment, NOT_FOUND, "Assignment not found");
-  return assignment;
+  appAssert(updated, NOT_FOUND, "Assignment not found");
+  return updated;
 };
 
 export const deleteAssignment = async (

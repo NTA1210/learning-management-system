@@ -2,6 +2,8 @@ import { QuizQuestionType } from '@/types/quizQuestion.type';
 import mongoose from 'mongoose';
 import z from 'zod';
 import { nonPastDateSchema } from './helpers/date.schema';
+import { listParamsSchema } from './helpers/listParams.schema';
+import { AttemptStatus } from '@/types';
 
 export const courseIdSchema = z.string().length(24, 'Invalid course ID');
 
@@ -102,3 +104,10 @@ export const updateQuizSchema = z
 export type UpdateQuiz = z.infer<typeof updateQuizSchema>;
 
 export const quizIdSchema = z.string().length(24, 'Invalid quiz ID');
+
+export const getQuizAttemptsSchema = listParamsSchema.safeExtend({
+  quizId: quizIdSchema,
+  attemptStatus: z.enum(AttemptStatus).optional(),
+});
+
+export type GetQuizAttempts = z.infer<typeof getQuizAttemptsSchema>;

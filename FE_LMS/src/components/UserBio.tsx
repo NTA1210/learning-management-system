@@ -1,6 +1,6 @@
 import React from "react";
 import { useTheme } from "../hooks/useTheme";
-import { Mail, Phone, Calendar, GraduationCap, Star, CheckCircle, XCircle, Clock, User as UserIcon } from "lucide-react";
+import { Mail, Phone, Calendar, GraduationCap, Star, CheckCircle, XCircle, Clock, User as UserIcon, Edit2 } from "lucide-react";
 
 export interface UserBioData {
   _id: string;
@@ -17,7 +17,10 @@ export interface UserBioData {
     name: string;
     description?: string;
     code?: string;
+    majorId?: string | { _id: string; name: string };
+    major?: { _id: string; name: string };
   }>;
+  major?: { _id: string; name: string };
   createdAt?: string;
   updatedAt?: string;
   avatar_url?: string;
@@ -27,9 +30,12 @@ interface UserBioProps {
   user: UserBioData;
   showFullDetails?: boolean;
   averageRating?: number;
+  canEdit?: boolean;
+  onEditFullname?: () => void;
+  onEditSpecialists?: () => void;
 }
 
-const UserBio: React.FC<UserBioProps> = ({ user, showFullDetails = true, averageRating }) => {
+const UserBio: React.FC<UserBioProps> = ({ user, showFullDetails = true, averageRating, canEdit = false, onEditFullname, onEditSpecialists }) => {
   const { darkMode } = useTheme();
 
   const getRoleBadgeColor = (role: string) => {
@@ -100,12 +106,26 @@ const UserBio: React.FC<UserBioProps> = ({ user, showFullDetails = true, average
           {/* User Info */}
           <div className="flex-1">
             <div className="flex flex-wrap items-center gap-3 mb-2">
-              <h2
-                className="text-2xl font-bold"
-                style={{ color: darkMode ? '#ffffff' : '#1f2937' }}
-              >
-                {user.fullname || user.username}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2
+                  className="text-2xl font-bold"
+                  style={{ color: darkMode ? '#ffffff' : '#1f2937' }}
+                >
+                  {user.fullname || user.username}
+                </h2>
+                {canEdit && onEditFullname && (
+                  <button
+                    onClick={onEditFullname}
+                    className="p-1 rounded hover:bg-opacity-20 transition-colors"
+                    style={{
+                      color: darkMode ? '#9ca3af' : '#6b7280',
+                    }}
+                    title="Edit fullname"
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                )}
+              </div>
               {user.fullname && (
                 <span
                   className="text-lg"
@@ -233,7 +253,25 @@ const UserBio: React.FC<UserBioProps> = ({ user, showFullDetails = true, average
               </div>
             )}
 
-            {user.specialistIds && user.specialistIds.length > 0 && (
+            {user.major && (
+              <div>
+                <label
+                  className="block text-sm font-medium mb-1 flex items-center gap-2"
+                  style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  Major
+                </label>
+                <p
+                  className="text-sm"
+                  style={{ color: darkMode ? '#e5e7eb' : '#374151' }}
+                >
+                  {user.major.name}
+                </p>
+              </div>
+            )}
+
+            {((user.specialistIds && user.specialistIds.length > 0) || (canEdit && onEditSpecialists)) && (
               <div className="md:col-span-2">
                 <label
                   className="block text-sm font-medium mb-2 flex items-center gap-2"
@@ -241,22 +279,40 @@ const UserBio: React.FC<UserBioProps> = ({ user, showFullDetails = true, average
                 >
                   <GraduationCap className="w-4 h-4" />
                   Specializations
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {user.specialistIds.map((specialist) => (
-                    <span
-                      key={specialist._id}
-                      className="px-3 py-1 text-sm rounded-lg"
+                  {canEdit && onEditSpecialists && (
+                    <button
+                      onClick={onEditSpecialists}
+                      className="p-1 rounded hover:bg-opacity-20 transition-colors ml-1"
                       style={{
-                        backgroundColor: darkMode ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)',
-                        color: darkMode ? '#93c5fd' : '#1e40af',
-                        border: `1px solid ${darkMode ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.2)'}`,
+                        color: darkMode ? '#9ca3af' : '#6b7280',
                       }}
+                      title="Edit specializations"
                     >
-                      {specialist.name}
-                    </span>
-                  ))}
-                </div>
+                      <Edit2 size={14} />
+                    </button>
+                  )}
+                </label>
+                {user.specialistIds && user.specialistIds.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {user.specialistIds.map((specialist) => (
+                      <span
+                        key={specialist._id}
+                        className="px-3 py-1 text-sm rounded-lg"
+                        style={{
+                          backgroundColor: darkMode ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)',
+                          color: darkMode ? '#93c5fd' : '#1e40af',
+                          border: `1px solid ${darkMode ? 'rgba(59, 130, 246, 0.3)' : 'rgba(59, 130, 246, 0.2)'}`,
+                        }}
+                      >
+                        {specialist.name}
+                      </span>
+                    ))}
+                  </div>
+                ) : canEdit && onEditSpecialists ? (
+                  <p className="text-sm" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                    No specializations. Click the edit icon to add.
+                  </p>
+                ) : null}
               </div>
             )}
 
@@ -279,6 +335,41 @@ const UserBio: React.FC<UserBioProps> = ({ user, showFullDetails = true, average
                     day: 'numeric',
                   })}
                 </p>
+                {(() => {
+                  const memberSince = new Date(user.createdAt);
+                  const today = new Date();
+                  const diffTime = Math.abs(today.getTime() - memberSince.getTime());
+                  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                  
+                  let displayText = '';
+                  if (diffDays === 0) {
+                    displayText = 'Today';
+                  } else if (diffDays === 1) {
+                    displayText = '1 day';
+                  } else if (diffDays < 30) {
+                    displayText = `${diffDays} days`;
+                  } else if (diffDays < 365) {
+                    const months = Math.floor(diffDays / 30);
+                    displayText = months === 1 ? '1 month' : `${months} months`;
+                  } else {
+                    const years = Math.floor(diffDays / 365);
+                    const remainingMonths = Math.floor((diffDays % 365) / 30);
+                    if (remainingMonths === 0) {
+                      displayText = years === 1 ? '1 year' : `${years} years`;
+                    } else {
+                      displayText = `${years} year${years > 1 ? 's' : ''} and ${remainingMonths} month${remainingMonths > 1 ? 's' : ''}`;
+                    }
+                  }
+                  
+                  return (
+                    <p
+                      className="text-xs mt-1 flex items-center gap-1"
+                      style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                    >
+                      Member for {displayText}
+                    </p>
+                  );
+                })()}
               </div>
             )}
 
