@@ -26,7 +26,7 @@ export const getChatRooms = async (userId: mongoose.Types.ObjectId) => {
         course: courseId,
         participants,
         lastMessage,
-        unreadCounts: unreadCounts.get(userId) || 0,
+        unreadCounts: unreadCounts,
       };
     }),
   ];

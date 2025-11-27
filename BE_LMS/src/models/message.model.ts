@@ -29,7 +29,7 @@ const MessageSchema = new mongoose.Schema<IMessage>(
     },
     senderRole: { type: String, enum: Role, required: true },
     content: { type: String, trim: true },
-    file: { type: [FileSchema], default: [] },
+    file: { type: FileSchema },
   },
   {
     timestamps: true,

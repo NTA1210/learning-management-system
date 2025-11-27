@@ -3,9 +3,9 @@ import mongoose from 'mongoose';
 export interface IParticipant {
   userId: mongoose.Types.ObjectId;
   username: string;
-  role: string;
-  avatarUrl: string;
-  joinedAt: Date;
+  role?: string;
+  avatarUrl?: string;
+  joinedAt?: Date;
 }
 
 export interface ILastMessage {

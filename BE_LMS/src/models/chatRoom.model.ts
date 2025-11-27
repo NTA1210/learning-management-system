@@ -10,8 +10,8 @@ const ParticipantSchema = new mongoose.Schema<IParticipant>(
     },
     username: { type: String, required: true },
     role: { type: String, required: true },
-    avatarUrl: { type: String, required: true },
-    joinedAt: { type: Date, required: true },
+    avatarUrl: { type: String },
+    joinedAt: { type: Date },
   },
   {
     _id: false,

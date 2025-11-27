@@ -17,7 +17,7 @@ export const getMessages = async ({ chatRoomId, cursor }: GetMessagesInput) => {
   let messages = await MessageModel.find(query)
     .sort({ createdAt: -1 })
     .limit(20)
-    .populate('senderId', 'username avatar_url')
+    .populate('senderId', '_id username avatar_url')
     .lean();
 
   const nextCursor =
