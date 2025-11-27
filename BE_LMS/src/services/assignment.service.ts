@@ -8,7 +8,7 @@ import { NOT_FOUND, FORBIDDEN } from "../constants/http";
 import { EnrollmentStatus } from "../types/enrollment.type";
 import { Role } from "../types";
 import { ensureTeacherAccessToCourse } from "./helpers/courseAccessHelpers";
-import { uploadFile, removeFile } from "../utils/uploadFile";
+import { uploadFile, removeFile, getSignedUrl } from "../utils/uploadFile";
 import { prefixAssignmentFile } from "../utils/filePrefix";
 
 export type ListAssignmentsParams = {
@@ -190,8 +190,19 @@ export const getAssignmentById = async (
     userId,
     userRole,
   });
+//presigned cho file 
+  let publicURL: string | null = null;
+  const fileKey = (assignment as any).fileKey as string | undefined;
+  const fileOriginalName = (assignment as any).fileOriginalName as string | undefined;
 
-  return assignment;
+  if (fileKey) {
+    publicURL = await getSignedUrl(fileKey, fileOriginalName || "assignment-file");
+  }
+
+  return {
+    ...assignment,
+    publicURL,
+  };
 };
 
 export const createAssignment = async (
