@@ -1,29 +1,30 @@
 import mongoose from 'mongoose';
-import { IForumReply } from '../types';
+import {IForumReply} from '../types';
 
 const ForumReplySchema = new mongoose.Schema<IForumReply>(
-  {
-    postId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'ForumPost',
-      required: true,
-      index: true,
+    {
+        postId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'ForumPost',
+            required: true,
+            index: true,
+        },
+        authorId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true,
+        },
+        content: {type: String, required: true, trim: true},
+        key: [{type: String}],
+        parentReplyId: {type: mongoose.Schema.Types.ObjectId, ref: 'ForumReply'},
     },
-    authorId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    content: { type: String, required: true, trim: true },
-    parentReplyId: { type: mongoose.Schema.Types.ObjectId, ref: 'ForumReply' },
-  },
-  { timestamps: true }
+    {timestamps: true}
 );
 
 //Indexes
-ForumReplySchema.index({ postId: 1, createdAt: 1 });
-ForumReplySchema.index({ parentReplyId: 1, createdAt: 1 });
-ForumReplySchema.index({ authorId: 1, createdAt: -1 });
+ForumReplySchema.index({postId: 1, createdAt: 1});
+ForumReplySchema.index({parentReplyId: 1, createdAt: 1});
+ForumReplySchema.index({authorId: 1, createdAt: -1});
 
 const ForumReplyModel = mongoose.model<IForumReply>('ForumReply', ForumReplySchema, 'forumReplies');
 

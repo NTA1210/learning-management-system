@@ -51,3 +51,27 @@ export const prefixCourseLogo = (courseId: string) => {
 export const prefixUserAvatar = (userId: string) => {
   return `users/${userId}/avatar`;
 };
+
+export const prefixForumFile = (
+  courseId: string,
+  forumId: string,
+) => {
+    return `courses/${courseId}/forums/${forumId}`;
+};
+
+export const prefixForumPostFile = (
+  courseId: string,
+  forumId: string,
+  postId: string,
+) => {
+    return `courses/${courseId}/forums/${forumId}/posts/${postId}`;
+};
+
+export const prefixForumReplyFile = (
+  courseId: string,
+  forumId: string,
+  postId: string,
+  replyId: string,
+) => {
+    return `courses/${courseId}/forums/${forumId}/posts/${postId}/replies/${replyId}`;
+};
