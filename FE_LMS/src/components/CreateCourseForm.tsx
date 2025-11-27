@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import http, { httpClient } from "../utils/http";
-import { subjectService } from "../services";
+import { subjectService, courseService } from "../services";
 import { userService } from "../services/userService";
 
 import type { User } from "../types/auth";
@@ -37,6 +37,7 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
     isPublished: false,
     capacity: 50,
     enrollRequiresApproval: true,
+    logo: null as File | null,
   });
 
   useEffect(() => {
@@ -94,14 +95,26 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
         .map((x: any) => (typeof x === "string" ? x : x?._id))
         .filter((id: any) => typeof id === "string" && id);
       setCurrentSpecialistIds(specIds);
+      console.log("specIds", specIds);
       void (async () => {
         try {
-          const params: any = { role: "teacher",  specialistIds: specIds };
+          const params: any = { role: "teacher", specialistIds: specIds };
           const res = await userService.getUsers(params);
-          setTeachers(res.users || []);
+          const list = res.users || [];
+          setTeachers(list);
+          const allowedIds = list.map((u: any) => u._id);
+          setForm(prev => ({
+            ...prev,
+            teacherIds: prev.teacherIds.filter(id => allowedIds.includes(id))
+          }));
         } catch (_e) {}
       })();
     }
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setForm(prev => ({ ...prev, logo: file }));
   };
 
   const toggleTeacher = (id: string) => {
@@ -118,22 +131,28 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
     setSuccessMsg("");
 
     try {
-      const payload = {
+      const slug = form.title
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9\s-]/g, "")
+        .replace(/\s+/g, "-");
+
+      await courseService.createCourse({
         title: form.title,
+        slug,
         subjectId: form.subjectId,
         description: form.description,
         startDate: form.startDate,
         endDate: form.endDate,
-        semesterId: form.semesterId ? [form.semesterId] : undefined,
+        semesterId: form.semesterId || undefined,
         teacherIds: form.teacherIds,
-        status: form.status,
+        status: form.status as any,
         isPublished: form.isPublished,
         capacity: form.capacity,
         enrollRequiresApproval: form.enrollRequiresApproval,
-      };
-
-      const res = await http.post("/courses", payload);
-      setSuccessMsg(res?.message || "Tạo khoá học thành công");
+        logo: form.logo || undefined,
+      });
+      setSuccessMsg("Tạo khoá học thành công");
       setForm({
         title: "",
         subjectId: "",
@@ -146,6 +165,7 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
         isPublished: false,
         capacity: 50,
         enrollRequiresApproval: true,
+        logo: null as File | null,
       });
       if (onCreated) await onCreated();
       if (onClose) onClose();
@@ -275,6 +295,23 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
             placeholder="50"
           />
         </div>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+          Logo
+        </label>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handleLogoChange}
+          className="w-full px-4 py-2 rounded-lg border"
+          style={{
+            backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
+            borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+            color: darkMode ? "#ffffff" : "#000000",
+          }}
+        />
       </div>
 
       <div className="mb-6">
