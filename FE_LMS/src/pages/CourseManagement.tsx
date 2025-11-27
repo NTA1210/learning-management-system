@@ -21,17 +21,21 @@ const CourseManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const debouncedSearchTerm = useDebounce(searchTerm, 500); // Reserved for future use
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+  const [_selectedTeacher] = useState(""); // Reserved for future use
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
-
+  const [availableCategories, setAvailableCategories] = useState<
+    { _id: string; name: string }[]
+  >([]);
   const [availableTeachers, setAvailableTeachers] = useState<
     { _id: string; username: string; email: string }[]
   >([]);
   const [selectedTeachers, setSelectedTeachers] = useState<string[]>([]);
   const [teacherSearchTerm, setTeacherSearchTerm] = useState("");
-
+  const [categorySearchTerm, setCategorySearchTerm] = useState("");
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [currentTeacherId, setCurrentTeacherId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: "",
