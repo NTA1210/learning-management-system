@@ -16,7 +16,7 @@ const defaultValues: AssignmentFormValues = {
   courseId: "",
   title: "",
   description: "",
-  maxScore: 100,
+  maxScore: 10,
   dueDate: "",
   allowLate: false,
 };
@@ -138,7 +138,7 @@ const AssignmentFormModal: React.FC<AssignmentFormModalProps> = ({
                   borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
                   color: darkMode ? "#ffffff" : "#000000",
                 }}
-                placeholder="100"
+                placeholder="10"
               />
             </div>
             <div>

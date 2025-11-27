@@ -6,6 +6,7 @@ import {
     updateAnnouncementHandler,
     deleteAnnouncementHandler,
     getAllAnnouncementsHandler,
+    getSystemAnnouncementsHandler,
 } from "../controller/announcement.controller";
 import authorize from "../middleware/authorize";
 import { Role } from "../types/user.type";
@@ -32,6 +33,12 @@ announcementRoutes.get(
 announcementRoutes.get(
     "/course/:courseId",
     getAnnouncementsByCourseHandler
+);
+
+// GET /announcements/system - Get system announcements (Authenticated users)
+announcementRoutes.get(
+    "/system",
+    getSystemAnnouncementsHandler
 );
 
 // GET /announcements/:id - Get announcement details

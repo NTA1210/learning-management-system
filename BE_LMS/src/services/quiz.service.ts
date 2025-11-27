@@ -10,7 +10,7 @@ import {
   Role,
 } from '@/types';
 import appAssert from '@/utils/appAssert';
-import { CreateQuiz, UpdateQuiz } from '@/validators/quiz.schemas';
+import { CreateQuiz, GetQuizAttempts, UpdateQuiz } from '@/validators/quiz.schemas';
 import { checkProperQuestionType } from './quizQuestion.service';
 import { TImage } from '@/models/quiz.model';
 import { getKeyFromPublicUrl, removeFiles } from '@/utils/uploadFile';
@@ -393,4 +393,93 @@ export const getQuizById = async (quizId: string, userId: mongoose.Types.ObjectI
   }
 
   return quiz;
+};
+
+export const getQuizAttemptsByQuizId = async ({
+  quizId,
+  attemptStatus,
+  page,
+  limit,
+  search,
+}: GetQuizAttempts) => {
+  const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId').lean();
+
+  appAssert(quiz, NOT_FOUND, 'Quiz not found');
+
+  const pipeline: any[] = [
+    {
+      $match: {
+        quizId: new mongoose.Types.ObjectId(quizId),
+        ...(attemptStatus ? { status: attemptStatus } : {}),
+      },
+    },
+
+    // Join với user (student)
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'studentId',
+        foreignField: '_id',
+        as: 'student',
+      },
+    },
+
+    // Unwind để dễ filter
+    { $unwind: '$student' },
+  ];
+
+  // Nếu có search → lọc trên: username, fullname, email
+  if (search) {
+    const regex = new RegExp(search, 'i');
+    pipeline.push({
+      $match: {
+        $or: [
+          { 'student.username': regex },
+          { 'student.fullname': regex },
+          { 'student.email': regex },
+        ],
+      },
+    });
+  }
+
+  // Pagination
+  pipeline.push(
+    { $skip: (page - 1) * limit },
+    { $limit: limit },
+
+    // Chỉ chọn field cần thiết
+    {
+      $project: {
+        _id: 1,
+        quizId: 1,
+        status: 1,
+        score: 1,
+        createdAt: 1,
+        'student._id': 1,
+        'student.username': 1,
+        'student.email': 1,
+        'student.fullname': 1,
+      },
+    }
+  );
+
+  const results = await QuizAttemptModel.aggregate(pipeline);
+
+  const totalQuestions = quiz.snapshotQuestions.length;
+
+  const enriched = results.map((attempt: any) => {
+    const completedQuestions =
+      attempt.answers?.filter(
+        (ans: any) =>
+          Array.isArray(ans.answer) && (ans.answer.includes(1) || ans.answer.includes('1'))
+      ).length || 0;
+
+    return {
+      ...attempt,
+      totalQuestions,
+      completedQuestions,
+    };
+  });
+
+  return enriched;
 };

@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import { AttemptStatus, IQuestionAnswer, IQuiz, IQuizAttempt } from '../types';
-import { Answer } from '@/validators/quizAttempt.schemas';
 import { QuizQuestionType } from '@/types/quizQuestion.type';
 import { ImageSchema } from './quiz.model';
 

@@ -9,10 +9,12 @@ import { useRef } from 'react';
 import DraggableMoon from '../components/DraggableMoon.tsx';
 import Particles from '../components/Particles.tsx';
 import { useTheme } from '../hooks/useTheme';
+import { useAuth } from '../hooks/useAuth';
 
 const LandingPage = () => {
   const { darkMode: isDarkMode } = useTheme();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [isLoaded, setIsLoaded] = useState(false);
   const [countStats, setCountStats] = useState({
@@ -33,6 +35,20 @@ const LandingPage = () => {
   const [bookMusicMuted, setBookMusicMuted] = useState(false);
   const [showBookHelper, setShowBookHelper] = useState(false);
   const bookMusicRef = useRef<HTMLAudioElement | null>(null);
+
+  // Redirect logged-in users to their dashboard
+  useEffect(() => {
+    if (user) {
+      const role = user.role;
+      if (role === 'admin') {
+        navigate('/dashboard', { replace: true });
+      } else if (role === 'teacher') {
+        navigate('/teacher-dashboard', { replace: true });
+      } else if (role === 'student') {
+        navigate('/student-dashboard', { replace: true });
+      }
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
     setIsLoaded(true);

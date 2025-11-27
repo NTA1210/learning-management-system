@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { KeyRound, LogOut, Moon, Settings2, Sun, UserRound, UsersRound, Paintbrush } from "lucide-react";
 import NotificationDropdown from "./NotificationDropdown";
+import { authService } from "../services";
 
 interface NavbarProps {
   onToggleSidebar?: () => void;
@@ -203,8 +204,25 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                       </div>
                       <button
                         className="flex items-center gap-3 w-full text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-xl px-2 py-2"
-                        onClick={() => {
-                          navigate("/profile");
+                        onClick={async () => {
+                          try {
+                            // Call /users/me API to get current user info
+                            const currentUser = await authService.getCurrentUser();
+                            
+                            if (currentUser?._id) {
+                              // Navigate to user profile page with user data passed via state
+                              navigate(`/user/${currentUser._id}`, {
+                                state: { userData: currentUser }
+                              });
+                            } else {
+                              // Fallback to profile if no ID found
+                              navigate("/profile");
+                            }
+                          } catch (error) {
+                            console.error("Failed to fetch current user:", error);
+                            // Fallback to profile on error
+                            navigate("/profile");
+                          }
                           setIsDropdownOpen(false);
                         }}
                       >
