@@ -370,7 +370,9 @@ export default function CourseQuizzesPage() {
                           }}
                           onClick={() => {
                             if (isStudent) {
-                              navigate(`/quizz/${courseId}/quiz/${quiz._id}`);
+                              navigate(`/quizz/${courseId}/quiz/${quiz._id}`, {
+                                state: { quiz },
+                              });
                             } else {
                               navigate(`/questionbank/questions/${quiz._id}`);
                             }
@@ -425,7 +427,9 @@ export default function CourseQuizzesPage() {
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         if (canTakeQuiz(quiz)) {
-                                          navigate(`/quizz/${courseId}/quiz/${quiz._id}`);
+                                          navigate(`/quizz/${courseId}/quiz/${quiz._id}`, {
+                                            state: { quiz },
+                                          });
                                         }
                                       }}
                                       disabled={!canTakeQuiz(quiz)}

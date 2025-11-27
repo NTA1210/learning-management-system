@@ -1,21 +1,64 @@
-import React, { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { useAuth } from "../hooks/useAuth";
-import { useTheme } from "../hooks/useTheme";
 import { quizService, quizAttemptService } from "../services";
 import type { QuizResponse, SnapshotQuestion } from "../services/quizService";
-import type { QuizAnswer, QuizAnswerPayload } from "../services/quizAttemptService";
+import type {
+  QuizAnswer,
+  QuizAnswerPayload,
+  SubmitQuizResponse,
+  QuizAttempt,
+} from "../services/quizAttemptService";
 import { Clock, Lock, CheckCircle, XCircle, ChevronLeft, ChevronRight, Book } from "lucide-react";
+
+const deriveResultFromAttempt = (
+  attempt: QuizAttempt,
+  quizData?: QuizResponse | null
+): SubmitQuizResponse | null => {
+  const quizInfo =
+    quizData ||
+    (typeof attempt.quizId === "object" ? (attempt.quizId as QuizResponse) : null);
+
+  const answered = attempt.answers || [];
+  if (!answered.length) {
+    return null;
+  }
+
+  const totalQuestions =
+    quizInfo?.snapshotQuestions?.length || answered.length || 0;
+  const totalQuizScore =
+    quizInfo?.snapshotQuestions?.reduce((sum, q) => sum + (q.points || 1), 0) ||
+    answered.reduce((sum, ans) => sum + (ans.pointsEarned || 0), 0) ||
+    totalQuestions;
+
+  const totalScore = answered.reduce((sum, ans) => sum + (ans.pointsEarned || 0), 0);
+
+  const passedQuestions = answered.filter((ans) => ans.correct);
+  const failedQuestions = answered.filter((ans) => !ans.correct);
+
+  const scorePercentage =
+    totalQuizScore > 0 ? (totalScore / totalQuizScore) * 10 : 0;
+
+  return {
+    totalQuestions,
+    totalScore,
+    totalQuizScore,
+    scorePercentage,
+    passedQuestions,
+    failedQuestions,
+    answersSubmitted: answered,
+  };
+};
 
 export default function TakeQuizPage() {
   const { courseId, quizId } = useParams<{ courseId?: string; quizId: string }>();
   const navigate = useNavigate();
+  const location = useLocation() as { state?: { quiz?: QuizResponse } };
   const { user } = useAuth();
-  const { darkMode } = useTheme();
 
-  const [quiz, setQuiz] = useState<QuizResponse | null>(null);
+  const [quiz, setQuiz] = useState<QuizResponse | null>(location.state?.quiz || null);
   const [loading, setLoading] = useState(true);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword] = useState("");
@@ -23,14 +66,18 @@ export default function TakeQuizPage() {
   const [enrolling, setEnrolling] = useState(false);
   const [quizAttemptId, setQuizAttemptId] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, number[]>>({});
-  const [answersChanged, setAnswersChanged] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [savingProgress, setSavingProgress] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<SubmitQuizResponse | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [attemptLoading, setAttemptLoading] = useState(false);
+  const [autoSaveState, setAutoSaveState] = useState<{
+    status: "idle" | "saving" | "saved" | "error";
+    message?: string;
+  }>({ status: "idle" });
   const restoredAttemptRef = useRef(false);
   const storageKey = quizId ? `quizAttempt:${quizId}` : null;
 
@@ -44,35 +91,103 @@ export default function TakeQuizPage() {
       }));
   };
 
-  const persistAttemptState = (attemptId: string, answersToStore: QuizAnswerPayload[] = []) => {
-    if (!storageKey) return;
-    const payload = {
-      attemptId,
-      answers: answersToStore.map((ans) => ({
-        questionId: ans.questionId,
-        answer: ans.answer,
-      })),
-    };
-    sessionStorage.setItem(storageKey, JSON.stringify(payload));
+  const mapAnswersFromAttempt = (source?: QuizAnswer[]): Record<string, number[]> => {
+    const restored: Record<string, number[]> = {};
+    if (!Array.isArray(source)) {
+      return restored;
+    }
+    source.forEach((ans) => {
+      if (!ans?.questionId) return;
+      restored[ans.questionId] = Array.isArray(ans.answer) ? ans.answer : [];
+    });
+    return restored;
   };
 
-  const clearPersistedAttempt = () => {
+  const initializeAnswersForQuiz = useCallback((quizData: QuizResponse) => {
+    if (!quizData.snapshotQuestions) return;
+    setAnswers((prev) => {
+      let changed = false;
+      const updated = { ...prev };
+      quizData.snapshotQuestions!.forEach((q) => {
+        const questionId = q.id || "";
+        if (!updated[questionId]) {
+          updated[questionId] = new Array(q.options?.length || 0).fill(0);
+          changed = true;
+        }
+      });
+      return changed ? updated : prev;
+    });
+  }, []);
+
+  const questions: SnapshotQuestion[] = useMemo(() => {
+    const snapshot = quiz?.snapshotQuestions?.filter((q) => !q.isDeleted);
+    return (snapshot as SnapshotQuestion[]) || [];
+  }, [quiz]);
+
+  const currentQuestion = questions[currentQuestionIndex];
+
+  const getQuestionTypeLabel = (question?: SnapshotQuestion) => {
+    const type = (question?.type || "").toLowerCase();
+    switch (type) {
+      case "multichoice":
+        return "Multiple Choice • Select all that apply";
+      case "true_false":
+        return "True / False";
+      case "fill_blank":
+        return "Fill in the Blank";
+      default:
+        return "Single Choice ";
+    }
+  };
+
+  const persistAttemptState = useCallback(
+    (attemptId: string, answersToStore: QuizAnswerPayload[] = []) => {
+      if (!storageKey) return;
+      const payload = {
+        attemptId,
+        answers: answersToStore.map((ans) => ({
+          questionId: ans.questionId,
+          answer: ans.answer,
+        })),
+      };
+      sessionStorage.setItem(storageKey, JSON.stringify(payload));
+    },
+    [storageKey]
+  );
+
+  const clearPersistedAttempt = useCallback(() => {
     if (!storageKey) return;
     sessionStorage.removeItem(storageKey);
-  };
+  }, [storageKey]);
 
-  const buildAnswerPayloads = (): QuizAnswerPayload[] => {
-    if (!quiz?.snapshotQuestions) return [];
-    return quiz.snapshotQuestions
-      .filter((q) => !q.isDeleted)
-      .map((q) => {
-        const questionId = q.id || "";
-        const optionLength = q.options?.length || 0;
-        return {
-          questionId,
-          answer: answers[questionId] || new Array(optionLength).fill(0),
-        };
+  const triggerAutoSave = async (questionId: string, answerArray: number[]) => {
+    if (!quizAttemptId) return;
+    setAutoSaveState({ status: "saving", message: "" });
+    try {
+      const response = await quizAttemptService.autoSaveAnswer({
+        quizAttemptId,
+        questionId,
+        answer: answerArray,
       });
+
+      if (response.attempt?.answers) {
+        persistAttemptState(quizAttemptId, toAnswerPayloads(response.attempt.answers));
+      }
+
+      setAutoSaveState({ status: "saved", message: "" });
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        setAutoSaveState({ status: "idle" });
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to auto-save answer:", error);
+      setAutoSaveState({
+        status: "error",
+        message: getErrorMessage(error, "Auto-save failed"),
+      });
+    }
   };
 
   useEffect(() => {
@@ -81,31 +196,23 @@ export default function TakeQuizPage() {
       return;
     }
 
+    if (quiz) {
+      initializeAnswersForQuiz(quiz);
+      setLoading(false);
+      if (!quizAttemptId) {
+        setShowPasswordModal(true);
+      }
+      return;
+    }
+
     const fetchQuiz = async () => {
       try {
         setLoading(true);
         const quizData = await quizService.getQuizById(quizId);
         setQuiz(quizData);
-        
-        // Initialize answers with empty arrays
-        if (quizData.snapshotQuestions) {
-          const initialAnswers: Record<string, number[]> = {};
-          quizData.snapshotQuestions.forEach((q) => {
-            if (!q.isDeleted) {
-              initialAnswers[q.id || ""] = new Array(q.options?.length || 0).fill(0);
-            }
-          });
-          setAnswers(initialAnswers);
-        }
-
-        // Show password modal
-        setShowPasswordModal(true);
-      } catch (err) {
-        console.error("Failed to fetch quiz:", err);
-        const message =
-          typeof err === "object" && err !== null && "message" in err
-            ? String((err as { message?: string }).message)
-            : "Failed to load quiz";
+      } catch (error) {
+        console.error("Failed to fetch quiz:", error);
+        const message = getErrorMessage(error, "Failed to load quiz");
         alert(message);
         navigate(courseId ? `/quizz/${courseId}` : "/quizz");
       } finally {
@@ -114,7 +221,7 @@ export default function TakeQuizPage() {
     };
 
     fetchQuiz();
-  }, [quizId, navigate, courseId]);
+  }, [quizId, navigate, courseId, quiz, quizAttemptId, initializeAnswersForQuiz]);
 
   useEffect(() => {
     if (!quiz || !storageKey || restoredAttemptRef.current) return;
@@ -155,35 +262,69 @@ export default function TakeQuizPage() {
   }, [quiz, storageKey]);
 
   useEffect(() => {
-    if (quiz && quizAttemptId && !submitted) {
-      // Start countdown timer
-      const endTime = new Date(quiz.endTime).getTime();
-      
-      const updateTimer = () => {
-        const now = Date.now();
-        const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
-        setTimeRemaining(remaining);
+    if (!quizAttemptId) return;
+    let cancelled = false;
 
-        if (remaining <= 0) {
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
+    const fetchAttempt = async () => {
+      try {
+        setAttemptLoading(true);
+        const attemptDetail = await quizAttemptService.getQuizAttempt(quizAttemptId);
+        if (cancelled) return;
+
+        let populatedQuiz: QuizResponse | undefined;
+        if (attemptDetail.quizId && typeof attemptDetail.quizId !== "string") {
+          populatedQuiz = attemptDetail.quizId as QuizResponse;
+          setQuiz(populatedQuiz);
+        }
+
+        if (Array.isArray(attemptDetail.answers)) {
+          const restored = mapAnswersFromAttempt(attemptDetail.answers);
+          if (Object.keys(restored).length) {
+            setAnswers((prev) => ({ ...prev, ...restored }));
           }
-          // Auto submit when time runs out
-          handleSubmit();
+          persistAttemptState(quizAttemptId, toAnswerPayloads(attemptDetail.answers));
         }
-      };
 
-      updateTimer();
-      intervalRef.current = setInterval(updateTimer, 1000);
-
-      return () => {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
+        if (attemptDetail.status === "submitted") {
+          const derived = deriveResultFromAttempt(
+            attemptDetail,
+            populatedQuiz || quiz
+          );
+          if (derived) {
+            setResult(derived);
+          }
+          setSubmitted(true);
+          setShowPasswordModal(false);
+          return;
         }
-      };
-    }
-  }, [quiz, quizAttemptId, submitted]);
+
+        setShowPasswordModal(false);
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Failed to load quiz attempt:", error);
+        setPasswordError(getErrorMessage(error, "Không thể tải bài làm. Vui lòng thử lại."));
+        setShowPasswordModal(true);
+      } finally {
+        if (!cancelled) {
+          setAttemptLoading(false);
+        }
+      }
+    };
+
+    fetchAttempt();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [quizAttemptId, persistAttemptState, quiz]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const formatTime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -196,6 +337,19 @@ export default function TakeQuizPage() {
   };
 
   const createMarkup = (content?: string) => ({ __html: content || "" });
+
+  const getErrorMessage = (error: unknown, fallback: string) => {
+    if (error instanceof Error) {
+      return error.message || fallback;
+    }
+    if (typeof error === "object" && error !== null && "message" in error) {
+      const maybeMessage = (error as { message?: string }).message;
+      if (maybeMessage) {
+        return String(maybeMessage);
+      }
+    }
+    return fallback;
+  };
 
   const handleEnroll = async () => {
     if (!quizId || !password.trim()) {
@@ -213,140 +367,138 @@ export default function TakeQuizPage() {
       });
 
       setQuizAttemptId(attempt._id);
-      if (quiz?.snapshotQuestions?.length) {
-        const restoredAnswers: Record<string, number[]> = {};
-        attempt.answers?.forEach((ans) => {
-          if (!ans?.questionId || !Array.isArray(ans.answer)) return;
-          restoredAnswers[ans.questionId] = ans.answer;
-        });
-        if (Object.keys(restoredAnswers).length) {
-          setAnswers((prev) => ({ ...prev, ...restoredAnswers }));
-        }
+      const restored = mapAnswersFromAttempt(attempt.answers);
+      if (Object.keys(restored).length) {
+        setAnswers((prev) => ({ ...prev, ...restored }));
       }
       persistAttemptState(attempt._id, toAnswerPayloads(attempt.answers));
       setShowPasswordModal(false);
       setPassword("");
-    } catch (err: any) {
-      console.error("Failed to enroll in quiz:", err);
-      const message =
-        err?.message || "Failed to enroll in quiz. Please check the password and try again.";
+    } catch (error) {
+      console.error("Failed to enroll in quiz:", error);
+      const message = getErrorMessage(
+        error,
+        "Failed to enroll in quiz. Please check the password and try again."
+      );
       setPasswordError(message);
     } finally {
       setEnrolling(false);
     }
   };
 
-  const handleAnswerChange = (questionId: string, optionIndex: number, checked: boolean) => {
-    setAnswers((prev) => {
-      const current = prev[questionId] || [];
-      const updated = [...current];
+  const handleAnswerChange = (question: SnapshotQuestion, optionIndex: number, checked: boolean) => {
+    if (!quizAttemptId) return;
+    const questionId = question.id || "";
+    const optionLength = question.options?.length || 0;
+    const current = answers[questionId] || new Array(optionLength).fill(0);
+    let updated = [...current];
+    const type = (question.type || "").toLowerCase();
+    const isMultiSelect = type === "multichoice";
+
+    if (isMultiSelect) {
       updated[optionIndex] = checked ? 1 : 0;
-      return { ...prev, [questionId]: updated };
-    });
-    setAnswersChanged(true);
-  };
-
-  const saveProgressIfNeeded = async () => {
-    if (!quizAttemptId || !answersChanged || savingProgress) return;
-    const answersArray = buildAnswerPayloads();
-    const hasUnanswered = answersArray.some((ans) => !ans.answer?.some((val) => val === 1));
-    if (hasUnanswered) {
-      return;
+    } else {
+      updated = new Array(optionLength).fill(0);
+      if (checked) {
+        updated[optionIndex] = 1;
+      }
     }
-    try {
-      setSavingProgress(true);
-      await quizAttemptService.saveQuiz({
-        quizAttemptId,
-        answers: answersArray,
-      });
-      persistAttemptState(quizAttemptId, answersArray);
-      setAnswersChanged(false);
-    } catch (err) {
-      console.warn("Failed to auto-save quiz attempt:", err);
-    } finally {
-      setSavingProgress(false);
-    }
+
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: updated,
+    }));
+    triggerAutoSave(questionId, updated);
   };
 
-  const goToQuestion = async (index: number) => {
-    if (index === currentQuestionIndex || !quiz?.snapshotQuestions) return;
-    await saveProgressIfNeeded();
-    setCurrentQuestionIndex(index);
+  const goToQuestion = (index: number) => {
+    if (index === currentQuestionIndex || !questions.length) return;
+    setCurrentQuestionIndex(Math.max(0, Math.min(index, questions.length - 1)));
   };
 
-  const handleNextQuestion = async () => {
-    if (!quiz?.snapshotQuestions) return;
-    await saveProgressIfNeeded();
-    setCurrentQuestionIndex((prev) => Math.min(prev + 1, quiz.snapshotQuestions!.length - 1));
+  const handleNextQuestion = () => {
+    if (!questions.length) return;
+    setCurrentQuestionIndex((prev) => Math.min(prev + 1, questions.length - 1));
   };
 
-  const handlePrevQuestion = async () => {
-    if (!quiz?.snapshotQuestions) return;
-    await saveProgressIfNeeded();
+  const handlePrevQuestion = () => {
+    if (!questions.length) return;
     setCurrentQuestionIndex((prev) => Math.max(prev - 1, 0));
   };
 
-  const handleSubmit = async () => {
-    if (!quizAttemptId || !quiz || submitted) return;
+  const handleSubmit = useCallback(
+    async (skipConfirm?: boolean) => {
+      if (!quizAttemptId || !quiz || submitted) return;
 
-    try {
-      await saveProgressIfNeeded();
-      setSubmitting(true);
-
-      // Convert answers to the format expected by backend
-      const answersArray = buildAnswerPayloads();
-      const firstUnanswered = answersArray.find((ans) => !ans.answer?.some((val) => val === 1));
-      if (firstUnanswered) {
-        const idx =
-          questions.findIndex((q) => (q.id || "") === firstUnanswered.questionId) + 1;
-        alert(`Please answer question ${idx || ""} before submitting.`);
-        setSubmitting(false);
-        return;
+      if (!skipConfirm) {
+        const answerCount = Object.values(answers).filter((arr) => arr?.some((i) => i === 1)).length;
+        if (answerCount < questions.length) {
+          const proceed = window.confirm(
+            "Bạn chưa trả lời hết tất cả câu hỏi. Bạn có chắc muốn nộp bài không?"
+          );
+          if (!proceed) {
+            return;
+          }
+        }
       }
 
-      const submitResult = await quizAttemptService.submitQuiz({ quizAttemptId });
+      try {
+        setSubmitting(true);
 
-      setResult(submitResult);
-      setSubmitted(true);
-      clearPersistedAttempt();
+        const submitResult = await quizAttemptService.submitQuiz({ quizAttemptId });
 
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    } catch (err: any) {
-      console.error("Failed to submit quiz:", err);
-      const message =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Failed to submit quiz. Please try again.";
-      if (message.toLowerCase().includes("quiz attempt not found")) {
+        setResult(submitResult);
+        setSubmitted(true);
         clearPersistedAttempt();
-        setQuizAttemptId(null);
-        setShowPasswordModal(true);
+
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+      } catch (error) {
+        console.error("Failed to submit quiz:", error);
+        const message = getErrorMessage(error, "Failed to submit quiz. Please try again.");
+        if (message.toLowerCase().includes("quiz attempt not found")) {
+          clearPersistedAttempt();
+          setQuizAttemptId(null);
+          setShowPasswordModal(true);
+        }
+        alert(message);
+      } finally {
+        setSubmitting(false);
       }
-      alert(message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    },
+    [quizAttemptId, quiz, submitted, clearPersistedAttempt, answers, questions]
+  );
 
-  const questions: SnapshotQuestion[] = (quiz?.snapshotQuestions?.filter((q) => !q.isDeleted) as SnapshotQuestion[]) || [];
-  const currentQuestion = questions[currentQuestionIndex];
+  useEffect(() => {
+    if (quiz && quizAttemptId && !submitted) {
+      const endTime = new Date(quiz.endTime).getTime();
 
-  const getQuestionTypeLabel = (question?: SnapshotQuestion) => {
-    const type = (question?.type || "").toLowerCase();
-    switch (type) {
-      case "multichoice":
-        return "Multiple Choice • Select all that apply";
-      case "true_false":
-        return "True / False";
-      case "fill_blank":
-        return "Fill in the Blank";
-      default:
-        return "Single Choice ";
+      const updateTimer = () => {
+        const now = Date.now();
+        const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
+        setTimeRemaining(remaining);
+
+        if (remaining <= 0) {
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          handleSubmit(true);
+        }
+      };
+
+      updateTimer();
+      intervalRef.current = setInterval(updateTimer, 1000);
+
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+      };
     }
-  };
+  }, [quiz, quizAttemptId, submitted, handleSubmit]);
 
   if (loading) {
     return (
@@ -466,8 +618,18 @@ export default function TakeQuizPage() {
               </div>
             )}
 
+            {quizAttemptId && !submitted && attemptLoading && (
+              <div
+                className="mb-6 p-4 rounded-lg flex items-center gap-3"
+                style={{ backgroundColor: "var(--card-surface)", border: "1px solid var(--card-border)" }}
+              >
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500" />
+                <span style={{ color: "var(--muted-text)" }}>Loading quiz attempt...</span>
+              </div>
+            )}
+
             {/* Quiz Form */}
-            {quizAttemptId && !submitted && currentQuestion && (
+            {quizAttemptId && !submitted && currentQuestion && !attemptLoading && (
               <>
                 <div className="mb-4 flex flex-wrap items-center gap-3">
                   <div className="flex items-center gap-2 px-3 py-1 rounded-full text-sm" style={{ backgroundColor: "var(--card-surface)", border: "1px solid var(--card-border)" }}>
@@ -521,9 +683,16 @@ export default function TakeQuizPage() {
                           style={{ backgroundColor: "var(--input-bg)" }}
                         >
                           <input
-                            type="checkbox"
+                            type={(currentQuestion.type || "").toLowerCase() === "multichoice" ? "checkbox" : "radio"}
+                            name={(currentQuestion.type || "").toLowerCase() === "multichoice" ? undefined : `question-${currentQuestion.id}`}
                             checked={(answers[currentQuestion.id || ""]?.[optIdx] || 0) === 1}
-                            onChange={(e) => handleAnswerChange(currentQuestion.id || "", optIdx, e.target.checked)}
+                            onChange={(e) =>
+                              handleAnswerChange(
+                                currentQuestion,
+                                optIdx,
+                                (currentQuestion.type || "").toLowerCase() === "multichoice" ? e.target.checked : true
+                              )
+                            }
                             className="w-4 h-4"
                           />
                           <span style={{ color: "var(--input-text)" }}>
@@ -541,17 +710,26 @@ export default function TakeQuizPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                   <button
                     onClick={handlePrevQuestion}
-                    disabled={currentQuestionIndex === 0 || savingProgress}
+                    disabled={currentQuestionIndex === 0}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
                     style={{ backgroundColor: "var(--card-surface)", border: "1px solid var(--card-border)" }}
                   >
                     <ChevronLeft className="w-4 h-4" />
                     Previous
                   </button>
-                  {savingProgress && <span className="text-xs" style={{ color: "var(--muted-text)" }}>Saving...</span>}
+                  {autoSaveState.status !== "idle" && (
+                    <span
+                      className="text-xs"
+                      style={{
+                        color: autoSaveState.status === "error" ? "#ef4444" : "var(--muted-text)",
+                      }}
+                    >
+
+                    </span>
+                  )}
                   <button
                     onClick={handleNextQuestion}
-                    disabled={currentQuestionIndex === questions.length - 1 || savingProgress}
+                    disabled={currentQuestionIndex === questions.length - 1}
                     className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
                     style={{ backgroundColor: "var(--card-surface)", border: "1px solid var(--card-border)" }}
                   >
@@ -562,7 +740,7 @@ export default function TakeQuizPage() {
 
                 <div className="flex justify-end gap-3">
                   <button
-                    onClick={handleSubmit}
+                    onClick={() => handleSubmit(false)}
                     disabled={submitting}
                     className="px-6 py-3 rounded-lg font-semibold text-white disabled:opacity-50"
                     style={{ backgroundColor: "#6d28d9" }}
@@ -638,7 +816,6 @@ export default function TakeQuizPage() {
 
                 <div className="mt-6 flex justify-center">
                   <button
-                    onClick={() => navigate(courseId ? `/quizz/${courseId}` : "/quizz")}
                     onClick={() => navigate(courseId ? `/quizz/${courseId}` : "/quizz")}
                     className="px-6 py-3 rounded-lg font-semibold text-white"
                     style={{ backgroundColor: "#6d28d9" }}
