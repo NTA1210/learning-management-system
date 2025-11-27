@@ -1,15 +1,17 @@
 import mongoose from "mongoose";
 
 export default interface IForum extends mongoose.Document {
-  courseId: mongoose.Types.ObjectId;
-  title: string;
-  description?: string;
-  forumType: ForumType;
-  isActive?: boolean;
-  isArchived?: boolean;
-  createdBy?: mongoose.Types.ObjectId;
-  createdAt?: Date;
-  updatedAt?: Date;
+    courseId: mongoose.Types.ObjectId;
+    title: string;
+    description?: string;
+    forumType: ForumType;
+    isActive?: boolean;
+    isArchived?: boolean;
+    /** Key for attachments */
+    key?: string | string[];
+    createdBy?: mongoose.Types.ObjectId;
+    createdAt?: Date;
+    updatedAt?: Date;
 }
 
 export enum ForumType {

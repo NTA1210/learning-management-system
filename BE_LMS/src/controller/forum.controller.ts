@@ -32,6 +32,7 @@ import {
     deleteForumReplyById,
 } from "../services/forum.service";
 import mongoose from "mongoose";
+import {parseFormData} from "@/utils/parseFormData";
 
 // ============= FORUM HANDLERS =============
 
@@ -74,16 +75,25 @@ export const getForumByIdHandler = catchErrors(async (req, res) => {
 });
 
 export const createForumHandler = catchErrors(async (req, res) => {
-    const data = createForumSchema.parse(req.body);
-
+    const data = createForumSchema.parse(parseFormData(req.body));
     // Get user ID from authenticated user
     const userId = req.userId;
+
+    let file: Express.Multer.File | Express.Multer.File[] | undefined;
+
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+        // Multiple files or single file in array
+        file = req.files.length === 1 ? req.files[0] : req.files;
+    } else if (req.file) {
+        // Single file (fallback for compatibility)
+        file = req.file;
+    }
 
     const forum = await createForum({
         ...data,
         courseId: data.courseId as unknown as mongoose.Types.ObjectId,
         createdBy: userId,
-    });
+    }, file);
 
     return res.success(CREATED, {
         message: "Forum created successfully",
@@ -93,9 +103,19 @@ export const createForumHandler = catchErrors(async (req, res) => {
 
 export const updateForumByIdHandler = catchErrors(async (req, res) => {
     const forumId = forumIdSchema.parse(req.params.id);
-    const data = updateForumSchema.parse(req.body);
+    const data = updateForumSchema.parse(parseFormData(req.body));
 
-    const forum = await updateForumById(forumId, data);
+    let file: Express.Multer.File | Express.Multer.File[] | undefined;
+
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+        // Multiple files or single file in array
+        file = req.files.length === 1 ? req.files[0] : req.files;
+    } else if (req.file) {
+        // Single file (fallback for compatibility)
+        file = req.file;
+    }
+
+    const forum = await updateForumById(forumId, data, file);
 
     return res.success(OK, {
         message: "Forum updated successfully",
@@ -156,16 +176,26 @@ export const getForumPostByIdHandler = catchErrors(async (req, res) => {
 
 export const createForumPostHandler = catchErrors(async (req, res) => {
     const forumId = forumIdSchema.parse(req.params.forumId);
-    const data = createForumPostSchema.parse(req.body);
+    const data = createForumPostSchema.parse(parseFormData(req.body));
 
     // Get user ID from authenticated user
     const userId = req.userId;
+
+    let file: Express.Multer.File | Express.Multer.File[] | undefined;
+
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+        // Multiple files or single file in array
+        file = req.files.length === 1 ? req.files[0] : req.files;
+    } else if (req.file) {
+        // Single file (fallback for compatibility)
+        file = req.file;
+    }
 
     const post = await createForumPost({
         ...data,
         forumId: forumId as unknown as mongoose.Types.ObjectId,
         authorId: userId,
-    });
+    }, file);
 
     return res.success(CREATED, {
         message: "Post created successfully",
@@ -176,12 +206,22 @@ export const createForumPostHandler = catchErrors(async (req, res) => {
 export const updateForumPostByIdHandler = catchErrors(async (req, res) => {
     const forumId = forumIdSchema.parse(req.params.forumId);
     const postId = postIdSchema.parse(req.params.id);
-    const data = updateForumPostSchema.parse(req.body);
+    const data = updateForumPostSchema.parse(parseFormData(req.body));
 
     // Get user ID from authenticated user
     const userId = req.userId;
 
-    const post = await updateForumPostById(forumId, postId, userId.toString(), data);
+    let file: Express.Multer.File | Express.Multer.File[] | undefined;
+
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+        // Multiple files or single file in array
+        file = req.files.length === 1 ? req.files[0] : req.files;
+    } else if (req.file) {
+        // Single file (fallback for compatibility)
+        file = req.file;
+    }
+
+    const post = await updateForumPostById(forumId, postId, userId.toString(), data, file);
 
     return res.success(OK, {
         message: "Post updated successfully",
@@ -195,8 +235,9 @@ export const deleteForumPostByIdHandler = catchErrors(async (req, res) => {
 
     // Get user ID from authenticated user
     const userId = req.userId;
+    const role = req.role;
 
-    const result = await deleteForumPostById(forumId, postId, userId.toString());
+    const result = await deleteForumPostById(forumId, postId, userId.toString(), role);
 
     return res.success(OK, {
         message: "Post deleted successfully",
@@ -245,17 +286,27 @@ export const getForumReplyByIdHandler = catchErrors(async (req, res) => {
 
 export const createForumReplyHandler = catchErrors(async (req, res) => {
     const postId = postIdSchema.parse(req.params.postId);
-    const data = createForumReplySchema.parse(req.body);
+    const data = createForumReplySchema.parse(parseFormData(req.body));
 
     // Get user ID from authenticated user
     const userId = req.userId;
+
+    let file: Express.Multer.File | Express.Multer.File[] | undefined;
+
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+        // Multiple files or single file in array
+        file = req.files.length === 1 ? req.files[0] : req.files;
+    } else if (req.file) {
+        // Single file (fallback for compatibility)
+        file = req.file;
+    }
 
     const reply = await createForumReply({
         ...data,
         postId: postId as unknown as mongoose.Types.ObjectId,
         authorId: userId,
         parentReplyId: data.parentReplyId as unknown as mongoose.Types.ObjectId,
-    });
+    }, file);
 
     return res.success(CREATED, {
         message: "Reply created successfully",
@@ -266,12 +317,22 @@ export const createForumReplyHandler = catchErrors(async (req, res) => {
 export const updateForumReplyByIdHandler = catchErrors(async (req, res) => {
     const postId = postIdSchema.parse(req.params.postId);
     const replyId = replyIdSchema.parse(req.params.id);
-    const data = updateForumReplySchema.parse(req.body);
+    const data = updateForumReplySchema.parse(parseFormData(req.body));
 
     // Get user ID from authenticated user
     const userId = req.userId;
 
-    const reply = await updateForumReplyById(postId, replyId, userId.toString(), data);
+    let file: Express.Multer.File | Express.Multer.File[] | undefined;
+
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+        // Multiple files or single file in array
+        file = req.files.length === 1 ? req.files[0] : req.files;
+    } else if (req.file) {
+        // Single file (fallback for compatibility)
+        file = req.file;
+    }
+
+    const reply = await updateForumReplyById(postId, replyId, userId.toString(), data, file);
 
     return res.success(OK, {
         message: "Reply updated successfully",

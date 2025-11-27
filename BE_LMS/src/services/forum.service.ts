@@ -1,11 +1,13 @@
-import {ForumModel, ForumPostModel, ForumReplyModel} from "../models";
+import {ForumModel, ForumPostModel, ForumReplyModel, UserModel} from "../models";
 import appAssert from "../utils/appAssert";
 import {CONFLICT, FORBIDDEN, NOT_FOUND} from "../constants/http";
 import {ListParams} from "@/types/dto";
 import {ForumType} from "@/types/forum.type";
-import {IForum, IForumPost, IForumReply, ISpecialist} from "@/types";
-import mongoose, {Types} from "mongoose";
+import {IForum, IForumPost, IForumReply, Role} from "@/types";
+import mongoose from "mongoose";
 import {CourseModel} from "@/models";
+import {prefixForumFile, prefixForumPostFile, prefixForumReplyFile} from "@/utils/filePrefix";
+import {createEntityWithFiles, updateEntityWithFiles} from "@/utils/entityFileUpload";
 
 // ============= FORUM INTERFACES =============
 export interface ListForumParams extends ListParams {
@@ -36,6 +38,43 @@ export interface ListForumReplyParams extends ListParams {
 }
 
 // ============= FORUM SERVICES =============
+/**
+ * Upload files to an existing forum
+ * This function adds files to a forum that already exists
+ *
+ * @param forumId - The ID of the forum
+ * @param files - Files to upload
+ * @returns Updated forum with new file keys
+ *
+ * @example
+ * // Can be used in a future endpoint like POST /forums/:id/files
+ * const forum = await uploadForumFiles(forumId, req.files);
+ */
+export const uploadForumFiles = async (
+    forumId: string,
+    files: Express.Multer.File | Express.Multer.File[]
+) => {
+    // Validate forum exists
+    const forum = await ForumModel.findById(forumId);
+    appAssert(forum, NOT_FOUND, "Forum not found");
+
+    // Use the helper to upload files and update the entity
+    await updateEntityWithFiles({
+        entityId: forumId,
+        files,
+        getPrefixFn: (forumId) => {
+            return prefixForumFile(forum.courseId.toString(), forumId);
+        },
+        updateEntity: async (fileKeys) => {
+            // Append new keys to existing keys (if any)
+            const existingKeys = forum.key || [];
+            forum.key = [...existingKeys, ...fileKeys];
+            await forum.save();
+        },
+    });
+
+    return forum;
+};
 
 export const listForumsOfACourse = async ({
     page = 1,
@@ -148,30 +187,87 @@ export const getForumById = async (forumId: string) => {
     return forum;
 };
 
-export const createForum = async (data: Omit<IForum, keyof mongoose.Document<mongoose.Types.ObjectId>>) => {
+export const createForum = async (
+    data: Omit<IForum, keyof mongoose.Document<mongoose.Types.ObjectId>>,
+    file?: Express.Multer.File | Express.Multer.File[]
+) => {
     // Validate courseId exists
     appAssert(data.courseId, NOT_FOUND, "Course ID is required");
     const courseId = await CourseModel.findById(data.courseId);
     appAssert(courseId, NOT_FOUND, "Course ID not found");
     appAssert(data.title, NOT_FOUND, "Forum title is required");
 
-    return await ForumModel.create({
-        ...data,
-        forumType: data.forumType || ForumType.DISCUSSION,
-        isActive: data.isActive !== undefined ? data.isActive : true,
-        isArchived: false,
+    // Use the helper to handle create → upload → update pattern
+    return await createEntityWithFiles({
+        // Step 1: Create the forum entity
+        createEntity: async () => {
+            return await ForumModel.create({
+                ...data,
+                forumType: data.forumType || ForumType.DISCUSSION,
+                isActive: data.isActive !== undefined ? data.isActive : true,
+                isArchived: false,
+            });
+        },
+
+        // Step 2: Provide files to upload (if any)
+        files: file,
+
+        // Step 3: Generate prefix using forum ID and course ID
+        getPrefixFn: (forumId) => {
+            return prefixForumFile(data.courseId.toString(), forumId);
+        },
+
+        // Step 4: Update forum with uploaded file keys
+        updateEntity: async (forum, fileKeys) => {
+            forum.key = fileKeys;
+            await forum.save();
+        },
+
+        // Step 5: Optional rollback if upload fails
+        rollbackEntity: async (forum) => {
+            await ForumModel.deleteOne({_id: forum._id});
+        },
     });
 };
 
+/**
+ * Update forum by ID
+ * Supports both data updates and file uploads
+ *
+ * @param forumId - The ID of the forum
+ * @param data - Partial forum data to update
+ * @param files - Optional files to upload
+ * @returns Updated forum
+ */
 export const updateForumById = async (
     forumId: string,
-    data: Partial<IForum>
+    data: Partial<IForum>,
+    files?: Express.Multer.File | Express.Multer.File[]
 ) => {
     const forum = await ForumModel.findById(forumId);
     appAssert(forum, NOT_FOUND, "Forum not found");
 
+    // Update basic data
     Object.assign(forum, data);
     await forum.save();
+
+    // If files are provided, upload them
+    if (files) {
+        await updateEntityWithFiles({
+            entityId: forumId,
+            files,
+            getPrefixFn: (forumId) => {
+                return prefixForumFile(forum.courseId.toString(), forumId);
+            },
+            updateEntity: async (fileKeys) => {
+                // Append new keys to existing keys
+                const existingKeys = forum.key || [];
+                forum.key = [...existingKeys, ...fileKeys];
+                await forum.save();
+            },
+        });
+    }
+
     return forum;
 };
 
@@ -299,7 +395,10 @@ export const getForumPostById = async (forumId: string, postId: string) => {
     return post;
 };
 
-export const createForumPost = async (data: Omit<IForumPost, keyof mongoose.Document<mongoose.Types.ObjectId>>) => {
+export const createForumPost = async (
+    data: Omit<IForumPost, keyof mongoose.Document<mongoose.Types.ObjectId>>,
+    file?: Express.Multer.File | Express.Multer.File[]
+) => {
     // Verify forum exists
     const forum = await ForumModel.findById(data.forumId);
     appAssert(forum, NOT_FOUND, "Forum not found");
@@ -314,10 +413,35 @@ export const createForumPost = async (data: Omit<IForumPost, keyof mongoose.Docu
 
     appAssert(data.content, NOT_FOUND, "Post content is required");
 
-    return await ForumPostModel.create({
-        ...data,
-        pinned: data.pinned || false,
-        replyCount: 0,
+    // Use the helper to handle create → upload → update pattern
+    return await createEntityWithFiles({
+        // Step 1: Create the forum post entity
+        createEntity: async () => {
+            return await ForumPostModel.create({
+                ...data,
+                pinned: data.pinned || false,
+                replyCount: 0,
+            });
+        },
+
+        // Step 2: Provide files to upload (if any)
+        files: file,
+
+        // Step 3: Generate prefix using forum post ID, forum ID and course ID
+        getPrefixFn: (forumPostId) => {
+            return prefixForumPostFile(forum.courseId.toString(), forum.id, forumPostId);
+        },
+
+        // Step 4: Update forum with uploaded file keys
+        updateEntity: async (forumPost, fileKeys) => {
+            forumPost.key = fileKeys;
+            await forumPost.save();
+        },
+
+        // Step 5: Optional rollback if upload fails
+        rollbackEntity: async (forumPost) => {
+            await ForumPostModel.deleteOne({_id: forumPost._id});
+        },
     });
 };
 
@@ -325,7 +449,8 @@ export const updateForumPostById = async (
     forumId: string,
     postId: string,
     authorId: string,
-    data: Partial<IForumPost>
+    data: Partial<IForumPost>,
+    files?: Express.Multer.File | Express.Multer.File[]
 ) => {
     // Verify forum exists
     const forum = await ForumModel.findById(forumId);
@@ -343,6 +468,24 @@ export const updateForumPostById = async (
 
     Object.assign(post, data);
     await post.save();
+
+    // If files are provided, upload them
+    if (files) {
+        await updateEntityWithFiles({
+            entityId: postId,
+            files,
+            getPrefixFn: (postId) => {
+                return prefixForumPostFile(forum.courseId.toString(), forumId, postId);
+            },
+            updateEntity: async (fileKeys) => {
+                // Append new keys to existing keys
+                const existingKeys = post.key || [];
+                post.key = [...existingKeys, ...fileKeys];
+                await post.save();
+            },
+        });
+    }
+
     return post;
 };
 
@@ -350,6 +493,7 @@ export const deleteForumPostById = async (
     forumId: string,
     postId: string,
     authorId: string,
+    role: Role
 ) => {
     // Verify forum exists
     const forum = await ForumModel.findById(forumId);
@@ -358,12 +502,16 @@ export const deleteForumPostById = async (
     const post = await ForumPostModel.findOne({_id: postId, forumId});
     appAssert(post, NOT_FOUND, "Post not found");
 
-    // Check if user is the author (authorization check - might be done in controller/middleware)
-    appAssert(
-        post.authorId.toString() === authorId,
-        FORBIDDEN,
-        "You can only delete your own posts"
-    );
+    if (role === Role.TEACHER || role === Role.ADMIN) {
+        // Allow deletion
+    } else {
+        // Check if user is the author (authorization check - might be done in controller/middleware)
+        appAssert(
+            post.authorId.toString() === authorId,
+            FORBIDDEN,
+            "You can only delete your own posts"
+        );
+    }
 
     // Delete all replies associated with this post
     await ForumReplyModel.deleteMany({postId});
@@ -468,7 +616,10 @@ export const getForumReplyById = async (postId: string, replyId: string) => {
     return reply;
 };
 
-export const createForumReply = async (data: Omit<IForumReply, keyof mongoose.Document<mongoose.Types.ObjectId>>) => {
+export const createForumReply = async (
+    data: Omit<IForumReply, keyof mongoose.Document<mongoose.Types.ObjectId>>,
+    file?: Express.Multer.File | Express.Multer.File[]
+) => {
     // Verify post exists
     const post = await ForumPostModel.findById(data.postId);
     appAssert(post, NOT_FOUND, "Post not found");
@@ -490,7 +641,32 @@ export const createForumReply = async (data: Omit<IForumReply, keyof mongoose.Do
 
     appAssert(data.content, NOT_FOUND, "Reply content is required");
 
-    const reply = await ForumReplyModel.create(data);
+    // Use the helper to handle create → upload → update pattern
+    const reply = await createEntityWithFiles({
+        // Step 1: Create the forum reply entity
+        createEntity: async () => {
+            return await ForumReplyModel.create(data);
+        },
+
+        // Step 2: Provide files to upload (if any)
+        files: file,
+
+        // Step 3: Generate prefix using forum reply ID, forum post ID, forum ID and course ID
+        getPrefixFn: (forumReplyId) => {
+            return prefixForumReplyFile(forum.courseId.toString(), forum.id, post.id, forumReplyId);
+        },
+
+        // Step 4: Update forum with uploaded file keys
+        updateEntity: async (forumReply, fileKeys) => {
+            forumReply.key = fileKeys;
+            await forumReply.save();
+        },
+
+        // Step 5: Optional rollback if upload fails
+        rollbackEntity: async (forumReply) => {
+            await ForumReplyModel.deleteOne({_id: forumReply._id});
+        },
+    });
 
     // Increment reply count in post
     await ForumPostModel.findByIdAndUpdate(data.postId, {
@@ -504,11 +680,15 @@ export const updateForumReplyById = async (
     postId: string,
     replyId: string,
     authorId: string,
-    data: Partial<IForumReply>
+    data: Partial<IForumReply>,
+    files?: Express.Multer.File | Express.Multer.File[]
 ) => {
     // Verify post exists
     const post = await ForumPostModel.findById(postId);
     appAssert(post, NOT_FOUND, "Post not found");
+
+    const forum = await ForumModel.findById(post.forumId);
+    appAssert(forum, NOT_FOUND, "Forum not found");
 
     const reply = await ForumReplyModel.findOne({_id: replyId, postId});
     appAssert(reply, NOT_FOUND, "Reply not found");
@@ -522,6 +702,24 @@ export const updateForumReplyById = async (
 
     Object.assign(reply, data);
     await reply.save();
+
+    // If files are provided, upload them
+    if (files) {
+        await updateEntityWithFiles({
+            entityId: replyId,
+            files,
+            getPrefixFn: (replyId) => {
+                return prefixForumReplyFile(forum.courseId.toString(), post.forumId.toString(), postId, replyId);
+            },
+            updateEntity: async (fileKeys) => {
+                // Append new keys to existing keys
+                const existingKeys = reply.key || [];
+                reply.key = [...existingKeys, ...fileKeys];
+                await reply.save();
+            },
+        });
+    }
+
     return reply;
 };
 
@@ -545,11 +743,11 @@ export const deleteForumReplyById = async (
     );
 
     // Delete nested replies
-    await ForumReplyModel.deleteMany({parentReplyId: replyId});
+    const children = await ForumReplyModel.deleteMany({parentReplyId: replyId});
 
     // Decrement reply count in post
     await ForumPostModel.findByIdAndUpdate(postId, {
-        $inc: {replyCount: -1},
+        $inc: {replyCount: -children.deletedCount},
     });
 
     return ForumReplyModel.deleteOne({_id: replyId});
