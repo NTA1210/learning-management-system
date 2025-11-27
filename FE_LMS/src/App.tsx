@@ -8,7 +8,7 @@ function App() {
     <AuthProvider>
       <ThemeProvider>
         <AppRoutes />
-        <ThemeToggle />
+        {/* <ThemeToggle /> */}
       </ThemeProvider>
     </AuthProvider>
   );
