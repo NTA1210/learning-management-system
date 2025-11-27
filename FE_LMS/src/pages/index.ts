@@ -31,6 +31,7 @@ export { default as UserManagementPage } from "./UserManagement";
 export { default as UserBioPage } from "./UserBioPage";
 export { default as AttendancePage } from "./AttendancePage";
 export { default as MyEnrollmentsPage } from "./MyEnrollmentsPage";
+export { default as DeletedCoursesPage } from "./DeletedCoursesPage";
 export { default as ForumPage } from "./ForumPage";
 export { default as ForumListPage } from "./ForumListPage";
 export { default as ForumDetailPage } from "./ForumDetailPage";
