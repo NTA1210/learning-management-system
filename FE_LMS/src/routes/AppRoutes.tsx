@@ -35,6 +35,7 @@ import {DashboardPage ,
       ForumListPage,
       ForumDetailPage,
       ForumPostDetailPage,
+      OnboardingPage,
     } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -66,6 +67,11 @@ function AppRoutes() {
         <Route path="/dashboard" element={
           <ProtectedRoute requiredRole="admin">
             <DashboardPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/onboarding" element={
+          <ProtectedRoute requiredRole="student">
+            <OnboardingPage />
           </ProtectedRoute>
         } />
         <Route path="/admin/courses" element={

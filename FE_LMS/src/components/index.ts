@@ -26,4 +26,5 @@ export { default as MaterialFormModal } from './materials/MaterialFormModal';
 export { default as AverageRating } from './AverageRating';
 export { default as SearchableSelect } from './common/SearchableSelect';
 export { default as UserBio } from './UserBio';
+export { default as MarkdownImage } from './MarkdownImage';
 

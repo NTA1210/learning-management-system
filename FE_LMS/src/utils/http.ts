@@ -53,11 +53,20 @@ httpClient.interceptors.response.use(
     const originalConfig = error.config as ExtendedAxiosRequestConfig | undefined;
     const status = error.response?.status;
 
+    // Check if user is on login/auth pages
+    const isOnAuthPage = typeof window !== "undefined" && 
+      (window.location.pathname === "/login" || 
+       window.location.pathname === "/register" ||
+       window.location.pathname === "/forgot-password" ||
+       window.location.pathname.startsWith("/reset-password") ||
+       window.location.pathname.startsWith("/auth/verify-email"));
+
     if (
       status === 401 &&
       originalConfig &&
       !originalConfig._retry &&
-      originalConfig.url !== "/auth/refresh"
+      originalConfig.url !== "/auth/refresh" &&
+      !isOnAuthPage
     ) {
       originalConfig._retry = true;
       try {

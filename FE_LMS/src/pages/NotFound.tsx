@@ -1,7 +1,17 @@
 import ElectricBorder from '../components/ElectricBorder'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 function NotFound() {
+  const navigate = useNavigate();
+
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/dashboard");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
       <ElectricBorder
@@ -31,12 +41,12 @@ function NotFound() {
           
           {/* CTA Button */}
           <div className="flex justify-center">
-            <Link 
-              to="/" 
-              className="bg-gradient-to-r from-blue-400 to-white text-gray-800 font-semibold px-8 py-3 rounded-xl hover:from-blue-300 hover:to-gray-100 transition-all duration-200 inline-block"
+            <button 
+              onClick={handleGoBack}
+              className="bg-gradient-to-r from-blue-400 to-white text-gray-800 font-semibold px-8 py-3 rounded-xl hover:from-blue-300 hover:to-gray-100 transition-all duration-200 inline-block cursor-pointer"
             >
-              Go Back Home
-            </Link>
+              Go Back
+            </button>
           </div>
         </div>
       </ElectricBorder>

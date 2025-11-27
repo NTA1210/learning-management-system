@@ -84,6 +84,29 @@ export const userService = {
     const response = await http.get(`/users/${userId}`);
     return response.data as UserDetail;
   },
+
+  updateUserSpecialists: async (
+    userId: string,
+    specialistIds: string[],
+  ): Promise<UserDetail> => {
+    const payload = { specialistIds };
+    const response = await http.put(`/users/${userId}`, payload);
+    return response.data as UserDetail;
+  },
+
+  updateUser: async (
+    userId: string,
+    data: {
+      fullname?: string;
+      specialistIds?: string[];
+    },
+  ): Promise<UserDetail> => {
+    const payload: { fullname?: string; specialistIds?: string[] } = {};
+    if (data.fullname !== undefined) payload.fullname = data.fullname;
+    if (data.specialistIds !== undefined) payload.specialistIds = data.specialistIds;
+    const response = await http.put(`/users/${userId}`, payload);
+    return response.data as UserDetail;
+  },
 };
 
 
