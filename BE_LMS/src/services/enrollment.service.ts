@@ -340,10 +340,14 @@ export const createEnrollment = async (data: {
 
       if (!hasCompletedPrerequisite) {
         const prerequisiteSubject = await SubjectModel.findById(prerequisiteSubjectId);
+        const subjectName = prerequisiteSubject?.name || "Unknown";
+        const errorMessage = method === EnrollmentMethod.SELF
+          ? `You must complete the prerequisite subject ${subjectName} before enrolling in this course.`
+          : `${student.username} must complete the prerequisite subject ${subjectName} before enrolling in this course.`;
         appAssert(
           false,
           BAD_REQUEST,
-          `${student.username} must complete the prerequisite subject ${prerequisiteSubject?.name || "Unknown"} before enrolling in this course.`
+          errorMessage
         );
       }
     }
@@ -442,14 +446,27 @@ export const createEnrollment = async (data: {
 
     // Xử lý các trường hợp không được re-enroll với message cụ thể
     let errorMessage = "Already enrolled in this course";
+
+    // Phân biệt message dựa trên method (self-enroll vs admin/teacher enroll)
+    const studentName = student.username;
+    const isSelfEnroll = method === EnrollmentMethod.SELF;
+
     if (existingEnrollment.status === EnrollmentStatus.DROPPED) {
-      errorMessage = "You have been dropped from this course. Please enroll in another course offering the same subject.";
+      errorMessage = isSelfEnroll
+        ? "You have been dropped from this course. Please enroll in another course offering the same subject."
+        : `${studentName} has been dropped from this course. Please enroll them in another course offering the same subject.`;
     } else if (existingEnrollment.status === EnrollmentStatus.COMPLETED) {
-      errorMessage = "You have already completed this course. Please enroll in another course offering the same subject.";
+      errorMessage = isSelfEnroll
+        ? "You have already completed this course. Please enroll in another course offering the same subject."
+        : `${studentName} has already completed this course. Please enroll them in another course offering the same subject.`;
     } else if (existingEnrollment.status === EnrollmentStatus.PENDING) {
-      errorMessage = "Your enrollment is pending approval.";
+      errorMessage = isSelfEnroll
+        ? "Your enrollment is pending approval."
+        : `${studentName}'s enrollment is pending approval.`;
     } else if (existingEnrollment.status === EnrollmentStatus.APPROVED) {
-      errorMessage = "You are already enrolled in this course.";
+      errorMessage = isSelfEnroll
+        ? "You are already enrolled in this course."
+        : `${studentName} is already enrolled in this course.`;
     }
 
     appAssert(false, CONFLICT, errorMessage);
@@ -493,7 +510,7 @@ export const createEnrollment = async (data: {
       {
         title: `Enrolled in ${courseData.title}`,
         message: `You have been enrolled in the course "${courseData.title}". ${status === EnrollmentStatus.APPROVED ? "You can now access the course materials." : "Your enrollment is pending approval."}`,
-        recipientType: "user",
+        recipientType: "system",
         recipientUser: studentData._id.toString(),
       },
       new Types.ObjectId(), // System notification
@@ -506,16 +523,23 @@ export const createEnrollment = async (data: {
     const courseData = enrollment.courseId as any;
     const studentData = enrollment.studentId as any;
 
-    await createNotification(
-      {
-        title: `New enrollment request for ${courseData.title}`,
-        message: `${studentData.username} has requested to enroll in your course "${courseData.title}". Please review and approve.`,
-        recipientType: "course",
-        recipientCourse: courseData._id.toString(),
-      },
-      studentData._id,
-      Role.STUDENT
-    );
+    // Get all teachers of the course
+    const courseWithTeachers = await CourseModel.findById(courseData._id).select("teacherIds");
+    if (courseWithTeachers && courseWithTeachers.teacherIds && courseWithTeachers.teacherIds.length > 0) {
+      // Send notification to each teacher individually
+      for (const teacherId of courseWithTeachers.teacherIds) {
+        await createNotification(
+          {
+            title: `New enrollment request for ${courseData.title}`,
+            message: `${studentData.username} has requested to enroll in your course "${courseData.title}". Please review and approve.`,
+            recipientType: "system",
+            recipientUser: teacherId.toString(),
+          },
+          studentData._id,
+          Role.STUDENT
+        );
+      }
+    }
   }
 
   return enrollment;
