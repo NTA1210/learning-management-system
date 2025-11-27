@@ -193,29 +193,29 @@ export const joinCourseByInvite = async (token: string, userId: Types.ObjectId) 
 
   const courseTitle = (invite.courseId as any).title;
 
-// 1. Notify student
-await createNotification(
-  {
-    title: `Successfully joined ${courseTitle}`,
-    message: `You have successfully joined the course "${courseTitle}" via invite link.`,
-    recipientType: "user",
-    recipientUser: userId.toString(),
-  },
-  invite.createdBy as any,
-  Role.ADMIN
-);
+  // 1. Notify student
+  await createNotification(
+    {
+      title: `Successfully joined ${courseTitle}`,
+      message: `You have successfully joined the course "${courseTitle}" via invite link.`,
+      recipientType: "system",
+      recipientUser: userId.toString(),
+    },
+    invite.createdBy as any,
+    Role.ADMIN
+  );
 
-// 2. Notify teacher/admin who created the invite
-await createNotification(
-  {
-    title: `New student joined ${courseTitle}`,
-    message: `${user.username} has joined your course "${courseTitle}" via invite link.`,
-    recipientType: "user",
-    recipientUser: invite.createdBy.toString(),
-  },
-  userId,
-  Role.STUDENT
-);
+  // 2. Notify teacher/admin who created the invite
+  await createNotification(
+    {
+      title: `New student joined ${courseTitle}`,
+      message: `${user.username} has joined your course "${courseTitle}" via invite link.`,
+      recipientType: "system",
+      recipientUser: invite.createdBy.toString(),
+    },
+    userId,
+    Role.STUDENT
+  );
 
   return {
     message: `Successfully joined the course "${(invite.courseId as any).title}".`,
