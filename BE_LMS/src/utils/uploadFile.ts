@@ -14,7 +14,12 @@ import slugify from "slugify";
  * @param originalName Tên file gốc từ client
  * @returns Tên file đã slugify, giữ extension
  */
-export const slugifyFileName = (originalName: string) => {
+const decodeOriginalName = (name: string) =>
+  Buffer.from(name, "latin1").toString("utf8");
+
+export const slugifyFileName = (originalNameRaw: string) => {
+    const originalName = decodeOriginalName(originalNameRaw);
+
   // Lấy extension
   const ext = path.extname(originalName); // ví dụ: '.png'
   const nameWithoutExt = path.basename(originalName, ext);
@@ -41,6 +46,7 @@ export const slugifyFileName = (originalName: string) => {
  */
 export const uploadFile = async (file: Express.Multer.File, prefix: string) => {
   try {
+        const decodedName = decodeOriginalName(file.originalname);
     const key = `${prefix}/${v4()}/${slugifyFileName(file.originalname)}`;
     await minioClient.putObject(BUCKET_NAME, key, file.buffer, file.size, {
       "Content-Type":
@@ -53,7 +59,7 @@ export const uploadFile = async (file: Express.Multer.File, prefix: string) => {
     return {
       publicUrl,
       key,
-      originalName: file.originalname,
+      originalName: decodedName,
       mimeType: mime.lookup(file.originalname),
       size: file.size,
     };

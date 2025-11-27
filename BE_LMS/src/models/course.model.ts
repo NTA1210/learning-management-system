@@ -10,6 +10,7 @@ const CourseSchema = new mongoose.Schema<ICourse>(
       required: true,
     },
     title: { type: String, required: true },
+    slug: { type: String, required: true, unique: true },
     // ✅ UNIVERSITY RULE: Course MUST belong to a Subject
     subjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject', required: true },
     logo: { type: String },
@@ -57,6 +58,7 @@ const CourseSchema = new mongoose.Schema<ICourse>(
 CourseSchema.index({ semesterId: 1, subjectId: 1 }, { unique: true });
 CourseSchema.index({ isPublished: 1, createdAt: -1 });
 CourseSchema.index({ teacherIds: 1, isPublished: 1, createdAt: -1 });
+CourseSchema.index({ slug: 1 }, { unique: true });
 CourseSchema.index({ isPublished: 1, title: 'text', description: 'text' });
 // Soft delete indexes
 CourseSchema.index({ isDeleted: 1, createdAt: -1 });

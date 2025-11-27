@@ -34,14 +34,34 @@ export const listAssignmentsSchema = z.object({
 export type ListAssignmentsQuery = z.infer<typeof listAssignmentsSchema>;
 
 export const createAssignmentSchema = z.object({
+  courseId: z
+    .string()
+    .min(24, "Course ID is required")
+    .max(24, "Course ID is invalid"),
   title: z.string().min(1, "Title is required").max(255),
   description: z.string().optional(),
-  maxScore: z.number().int().positive().optional().default(100),
+  //cần preprocess về number
+  maxScore: z
+    .preprocess(
+      (val) => (val === "" || val === undefined ? undefined : Number(val)),
+      z.number().int().positive()
+    )
+    .optional()
+    .default(10),
   dueDate: z
     .union([z.string(), z.date()])
     .optional()
     .transform((val) => (typeof val === "string" ? new Date(val) : val)),
-  allowLate: z.boolean().optional().default(false),
+  //convert về boolean
+  allowLate: z
+    .preprocess((val) => {
+      if (val === undefined || val === "") return undefined;
+      if (val === "true" || val === true) return true;
+      if (val === "false" || val === false) return false;
+      return val;
+    }, z.boolean())
+    .optional()
+    .default(false),
 });
 
 export type CreateAssignmentInput = z.infer<typeof createAssignmentSchema>;

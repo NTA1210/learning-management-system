@@ -14,6 +14,11 @@ const AssignmentSchema = new mongoose.Schema<IAssignment>(
     maxScore: { type: Number, default: 10 },
     dueDate: { type: Date },
     allowLate: { type: Boolean, default: false },
+    // Optional attached file metadata for the assignment (uploaded by teacher)
+    fileOriginalName: { type: String },
+    fileMimeType: { type: String },
+    fileKey: { type: String },
+    fileSize: { type: Number },
   },
   { timestamps: true }
 );

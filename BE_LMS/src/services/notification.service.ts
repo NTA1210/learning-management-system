@@ -15,152 +15,109 @@ import {
 
 /**
  * Create a notification
- * - For "user": send to a specific user
- * - For "course": send to all enrolled students in a course
- * - For "all": send to all users (admin only)
+ * - For "user": send to a specific user (from another user)
+ * - For "system": send to a specific user (from system)
  */
 export const createNotification = async (
   data: CreateNotificationInput,
   senderId: Types.ObjectId,
   senderRole: Role
 ) => {
-  const { title, message, recipientType, recipientUser, recipientCourse } =
-    data;
-
-  // Role-based guards
-  if (recipientType === "all") {
-    appAssert(
-      senderRole === Role.ADMIN,
-      FORBIDDEN,
-      "Only admins can send notifications to all users"
-    );
-  }
-
-  if (senderRole === Role.TEACHER) {
-    // Fetch teacher's active courses up front for later checks
-    const teacherCourses = await CourseModel.find({
-      teacherIds: senderId,
-    }).select("_id");
-
-    const teacherCourseIds = teacherCourses.map((course) =>
-      (course._id as Types.ObjectId).toString()
-    );
-    const teacherCourseObjectIds = teacherCourseIds.map(
-      (id) => new Types.ObjectId(id)
-    );
-
-    appAssert(
-      teacherCourseIds.length > 0,
-      FORBIDDEN,
-      "You are not assigned to any courses"
-    );
-
-    if (recipientType === "course" && recipientCourse) {
-      const ownsCourse = teacherCourseIds.includes(recipientCourse);
-      appAssert(
-        ownsCourse,
-        FORBIDDEN,
-        "You can only send notifications to courses you teach"
-      );
-    }
-
-    if (recipientType === "user" && recipientUser) {
-      const enrollment = await EnrollmentModel.exists({
-        studentId: recipientUser,
-        status: EnrollmentStatus.APPROVED,
-        courseId: { $in: teacherCourseObjectIds },
-      });
-
-      appAssert(
-        enrollment,
-        FORBIDDEN,
-        "You can only message students enrolled in your courses"
-      );
-    }
-  }
+  const { title, message, recipientType, recipientUser, recipientCourse } = data;
 
   // Validate recipient exists
-  if (recipientType === "user" && recipientUser) {
-    const user = await UserModel.findById(recipientUser);
-    appAssert(user, NOT_FOUND, "Recipient user not found");
+  if (!recipientUser) {
+    throw new Error("recipientUser is required");
   }
 
-  if (recipientType === "course" && recipientCourse) {
+  const user = await UserModel.findById(recipientUser);
+  appAssert(user, NOT_FOUND, "Recipient user not found");
+
+  // Validate recipientCourse if provided
+  if (recipientCourse) {
     const course = await CourseModel.findById(recipientCourse);
-    appAssert(course, NOT_FOUND, "Recipient course not found");
+    appAssert(course, NOT_FOUND, "Course not found");
   }
 
-  // Create notifications based on recipient type
-  if (recipientType === "user" && recipientUser) {
-    // Single user notification
+  // For "user" type: validate sender permissions
+  if (recipientType === "user") {
+    // Teacher can only send to students in their courses
+    if (senderRole === Role.TEACHER) {
+      const teacherCourses = await CourseModel.find({
+        teacherIds: senderId,
+      }).select("_id");
+
+      const teacherCourseObjectIds = teacherCourses.map(
+        (course) => course._id as Types.ObjectId
+      );
+
+      appAssert(
+        teacherCourseObjectIds.length > 0,
+        FORBIDDEN,
+        "You are not assigned to any courses"
+      );
+
+      // If a specific course is specified, check if teacher owns it and student is enrolled in it
+      if (recipientCourse) {
+        const isTeacherOfCourse = teacherCourseObjectIds.some((id) =>
+          id.equals(recipientCourse)
+        );
+        appAssert(
+          isTeacherOfCourse,
+          FORBIDDEN,
+          "You are not a teacher of this course"
+        );
+
+        const enrollment = await EnrollmentModel.exists({
+          studentId: recipientUser,
+          status: EnrollmentStatus.APPROVED,
+          courseId: recipientCourse,
+        });
+
+        appAssert(
+          enrollment,
+          FORBIDDEN,
+          "Student is not enrolled in this course"
+        );
+      } else {
+        // General message: check if student is enrolled in ANY of teacher's courses
+        const enrollment = await EnrollmentModel.exists({
+          studentId: recipientUser,
+          status: EnrollmentStatus.APPROVED,
+          courseId: { $in: teacherCourseObjectIds },
+        });
+
+        appAssert(
+          enrollment,
+          FORBIDDEN,
+          "You can only message students enrolled in your courses"
+        );
+      }
+    }
+
+    // Create notification with sender
     const notification = await NotificationModel.create({
       title,
       message,
       sender: senderId,
       recipientUser,
+      recipientCourse,
       recipientType: "user",
       isRead: false,
     });
+
     return notification;
-  } else if (recipientType === "course" && recipientCourse) {
-    // Get all enrolled students in the course
-    const enrollments = await EnrollmentModel.find({
-      courseId: recipientCourse,
-      status: EnrollmentStatus.APPROVED, // Only send to approved enrollments
-    }).select("studentId");
-
-    if (enrollments.length === 0) {
-      return { message: "No enrolled students found in this course" };
-    }
-
-    // Create notification objects for each enrolled student
-    const notificationsToInsert = enrollments.map((enrollment) => ({
+  } else if (recipientType === "system") {
+    // For "system" type: no sender, no permission check
+    const notification = await NotificationModel.create({
       title,
       message,
-      sender: senderId,
-      recipientUser: enrollment.studentId,
-      recipientCourse,
-      recipientType: "course",
+      recipientUser,
+      recipientType: "system",
       isRead: false,
-    }));
+    });
 
-    const notifications = await NotificationModel.insertMany(
-      notificationsToInsert
-    );
-
-    return {
-      notifications,
-      count: notifications.length,
-    };
-  } else if (recipientType === "all") {
-    // Get all active users
-    const users = await UserModel.find({
-      isVerified: true,
-      status: UserStatus.ACTIVE,
-    }).select("_id");
-
-    if (users.length === 0) {
-      return { message: "No active users found" };
-    }
-
-    // Create notification objects for each user
-    const notificationsToInsert = users.map((user) => ({
-      title,
-      message,
-      sender: senderId,
-      recipientUser: user._id,
-      recipientType: "all",
-      isRead: false,
-    }));
-
-    const notifications = await NotificationModel.insertMany(
-      notificationsToInsert
-    );
-
-    return {
-      notifications,
-      count: notifications.length,
-    };
+    return notification;
   }
 
   throw new Error("Invalid recipient type");

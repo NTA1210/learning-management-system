@@ -11,6 +11,7 @@ import CreateCourseForm from "../components/CreateCourseForm.tsx";
 import { Search, Trash } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import http, { httpClient } from "../utils/http";
+import useDebounce from "../hooks/useDebounce";
 
 const CourseManagement: React.FC = () => {
   const { darkMode } = useTheme();
@@ -20,6 +21,7 @@ const CourseManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const [_selectedTeacher] = useState(""); // Reserved for future use
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -256,7 +258,7 @@ const CourseManagement: React.FC = () => {
         | "desc";
 
       const filters: CourseFilters = {
-        ...(searchTerm && { search: searchTerm }),
+        ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
         page: currentPage,
         limit: pageLimit,
         ...(isName ? { sortBy: "title" } : {}),
@@ -420,7 +422,7 @@ const CourseManagement: React.FC = () => {
   useEffect(() => {
     fetchCourses();
     // eslint-disable-next-line
-  }, [currentPage, pageLimit, sortOption, searchTerm]);
+  }, [currentPage, pageLimit, sortOption, debouncedSearchTerm]);
   console.log("totalPage", totalCourses)
   return (
     <>
