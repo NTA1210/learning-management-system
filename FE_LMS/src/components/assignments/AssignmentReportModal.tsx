@@ -22,8 +22,8 @@ interface ReportDetail {
 interface SubmissionReport {
   stats?: {
     totalStudents?: number;
-    submissionRate?: string;
-    onTimeRate?: string;
+    submissionRate?: string | number;
+    onTimeRate?: string | number;
     averageGrade?: number;
   };
   distribution?: DistributionItem[];
