@@ -105,6 +105,21 @@ export default function CourseDetail() {
       },
     });
   };
+
+  const handleViewForumList = () => {
+    if (!course?._id) return;
+    const courseTitle = course.title ?? course.code ?? "Course";
+    const params = new URLSearchParams({ courseId: course._id });
+    if (courseTitle) {
+      params.set("courseTitle", courseTitle);
+    }
+    navigate(`/forum-list?${params.toString()}`, {
+      state: {
+        preselectedCourseId: course._id,
+        preselectedCourseTitle: courseTitle,
+      },
+    });
+  };
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -510,6 +525,13 @@ export default function CourseDetail() {
               <span className="text-sm opacity-70">{course?.title}</span>
             </div>
             <div className="flex gap-2">
+              <button
+                onClick={handleViewForumList}
+                disabled={!course?._id}
+                className="bg-[#4f46e5] text-white font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
+              >
+                View forum post
+              </button>
               <button
                 onClick={handleCreateForumPost}
                 disabled={!course?._id}

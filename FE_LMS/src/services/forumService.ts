@@ -22,9 +22,12 @@ export interface ForumResponse {
     _id: string;
     username?: string;
     fullname?: string;
+    avatar_url?: string;
+    role?: string;
   };
   updatedAt?: string;
   posts?: ForumPost[];
+  key?: string[];
 }
 
 export interface ForumQueryParams {
@@ -56,6 +59,7 @@ export interface ForumPost {
     role?: string;
   };
   replies?: ForumReply[];
+  key?: string[];
 }
 
 export interface ForumReply {
@@ -71,6 +75,7 @@ export interface ForumReply {
     avatar_url?: string;
     role?: string;
   };
+  key?: string[];
 }
 export interface CreateForumPostPayload {
   title: string;
@@ -98,6 +103,39 @@ export interface ReplyQueryParams {
   parentReplyId?: string;
 }
 
+type UploadableFiles = File | FileList | File[] | null | undefined;
+
+const buildMultipartPayload = (payload: Record<string, unknown>, files?: UploadableFiles) => {
+  const formData = new FormData();
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    if (value instanceof Blob) {
+      formData.append(key, value);
+      return;
+    }
+    if (typeof value === "object") {
+      formData.append(key, JSON.stringify(value));
+      return;
+    }
+    formData.append(key, String(value));
+  });
+
+  if (files) {
+    const normalizedFiles: File[] =
+      files instanceof FileList
+        ? Array.from(files).filter((file): file is File => Boolean(file))
+        : Array.isArray(files)
+        ? files.filter((file): file is File => Boolean(file))
+        : files instanceof File
+        ? [files]
+        : [];
+
+    normalizedFiles.forEach((file) => formData.append("files", file));
+  }
+
+  return formData;
+};
+
 export const forumService = {
   getForums: async (params?: ForumQueryParams): Promise<ForumResponse[]> => {
     const query = new URLSearchParams();
@@ -114,13 +152,19 @@ export const forumService = {
     return response.data as ForumResponse;
   },
 
-  createForum: async (payload: CreateForumPayload): Promise<ForumResponse> => {
-    const response = await http.post<ForumResponse>("/forums", payload);
+  createForum: async (payload: CreateForumPayload, files?: UploadableFiles): Promise<ForumResponse> => {
+    const formData = buildMultipartPayload(payload, files);
+    const response = await http.post<ForumResponse>("/forums", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
     return response.data as ForumResponse;
   },
 
-  updateForum: async (forumId: string, payload: UpdateForumPayload): Promise<ForumResponse> => {
-    const response = await http.patch<ForumResponse>(`/forums/${forumId}`, payload);
+  updateForum: async (forumId: string, payload: UpdateForumPayload, files?: UploadableFiles): Promise<ForumResponse> => {
+    const formData = buildMultipartPayload(payload, files);
+    const response = await http.patch<ForumResponse>(`/forums/${forumId}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
     return response.data as ForumResponse;
   },
 
@@ -128,8 +172,11 @@ export const forumService = {
     await http.del(`/forums/${forumId}`);
   },
 
-  createForumPost: async (forumId: string, payload: CreateForumPostPayload): Promise<ForumPost> => {
-    const response = await http.post<ForumPost>(`/forums/${forumId}/posts`, payload);
+  createForumPost: async (forumId: string, payload: CreateForumPostPayload, files?: UploadableFiles): Promise<ForumPost> => {
+    const formData = buildMultipartPayload(payload, files);
+    const response = await http.post<ForumPost>(`/forums/${forumId}/posts`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
     return response.data as ForumPost;
   },
 
@@ -150,9 +197,13 @@ export const forumService = {
   updateForumPost: async (
     forumId: string,
     postId: string,
-    payload: UpdateForumPostPayload
+    payload: UpdateForumPostPayload,
+    files?: UploadableFiles
   ): Promise<ForumPost> => {
-    const response = await http.patch<ForumPost>(`/forums/${forumId}/posts/${postId}`, payload);
+    const formData = buildMultipartPayload(payload, files);
+    const response = await http.patch<ForumPost>(`/forums/${forumId}/posts/${postId}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
     return response.data as ForumPost;
   },
 
@@ -160,8 +211,16 @@ export const forumService = {
     await http.del(`/forums/${forumId}/posts/${postId}`);
   },
 
-  createReply: async (forumId: string, postId: string, payload: CreateReplyPayload): Promise<ForumReply> => {
-    const response = await http.post<ForumReply>(`/forums/${forumId}/posts/${postId}/replies`, payload);
+  createReply: async (
+    forumId: string,
+    postId: string,
+    payload: CreateReplyPayload,
+    files?: UploadableFiles
+  ): Promise<ForumReply> => {
+    const formData = buildMultipartPayload(payload, files);
+    const response = await http.post<ForumReply>(`/forums/${forumId}/posts/${postId}/replies`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
     return response.data as ForumReply;
   },
 
@@ -190,9 +249,13 @@ export const forumService = {
     forumId: string,
     postId: string,
     replyId: string,
-    payload: UpdateReplyPayload
+    payload: UpdateReplyPayload,
+    files?: UploadableFiles
   ): Promise<ForumReply> => {
-    const response = await http.patch<ForumReply>(`/forums/${forumId}/posts/${postId}/replies/${replyId}`, payload);
+    const formData = buildMultipartPayload(payload, files);
+    const response = await http.patch<ForumReply>(`/forums/${forumId}/posts/${postId}/replies/${replyId}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
     return response.data as ForumReply;
   },
 

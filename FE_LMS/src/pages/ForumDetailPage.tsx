@@ -1,7 +1,5 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { useTheme } from "../hooks/useTheme";
@@ -10,20 +8,25 @@ import { forumService, type ForumResponse, type ForumPost } from "../services/fo
 import {
   Loader2,
   ArrowLeft,
-  UploadCloud,
   CheckCircle2,
   Edit3,
   Trash2,
   Eye,
   X,
+  PlusCircle,
+  Pin,
+  MessageSquare,
+  ShieldCheck,
+  Clock3,
+  RefreshCcw,
 } from "lucide-react";
+import MarkdownContent from "../components/MarkdownContent";
+import MarkdownComposer from "../components/MarkdownComposer";
+import AttachmentPreview from "../components/AttachmentPreview";
 
 type SidebarRole = "admin" | "teacher" | "student";
-interface PostFormState {
-  title: string;
-  content: string;
-  pinned: boolean;
-}
+
+const attachmentAcceptTypes = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.7z,image/*";
 
 const ForumDetailPage: React.FC = () => {
   const { forumId = "" } = useParams();
@@ -38,18 +41,26 @@ const ForumDetailPage: React.FC = () => {
   const [forum, setForum] = useState<ForumResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
-
-  const [form, setForm] = useState<PostFormState>({
-    title: "",
-    content: "",
-    pinned: false,
-  });
   const [pinnedPosts, setPinnedPosts] = useState<ForumPost[]>([]);
   const [unpinnedPosts, setUnpinnedPosts] = useState<ForumPost[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
   const [postsError, setPostsError] = useState<string | null>(null);
+  const [createModal, setCreateModal] = useState<{
+    title: string;
+    content: string;
+    pinned: boolean;
+    submitting: boolean;
+    error: string | null;
+    file: File | null;
+  }>({
+    title: "",
+    content: "",
+    pinned: false,
+    submitting: false,
+    error: null,
+    file: null,
+  });
 
   const [editModal, setEditModal] = useState<{
     open: boolean;
@@ -79,6 +90,9 @@ const ForumDetailPage: React.FC = () => {
     loading: false,
     error: null,
   });
+  const [lightboxImage, setLightboxImage] = useState<{ src: string; alt?: string } | null>(null);
+  const heroRef = useRef<HTMLElement | null>(null);
+  const [showStickyHeader, setShowStickyHeader] = useState(false);
 
   const fetchForum = useCallback(async () => {
     if (!forumId) return;
@@ -128,37 +142,66 @@ const ForumDetailPage: React.FC = () => {
     return () => clearTimeout(timeout);
   }, [toast]);
 
-  const handleInputChange = (field: keyof PostFormState, value: string | boolean) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
+  useEffect(() => {
+    if (!lightboxImage) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setLightboxImage(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [lightboxImage]);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    const target = heroRef.current;
+    if (!target) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowStickyHeader(!entry.isIntersecting);
+      },
+      { threshold: 0.6 }
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [forum]);
+
+  const resetCreateForm = () =>
+    setCreateModal({
+      title: "",
+      content: "",
+      pinned: false,
+      submitting: false,
+      error: null,
+      file: null,
+    });
+
+  const handleCreatePost = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!forumId) return;
-    if (!form.title.trim() || !form.content.trim()) {
-      setToast({ type: "error", message: "Please provide both a title and content." });
+    if (!createModal.title.trim() || !createModal.content.trim()) {
+      setCreateModal((prev) => ({ ...prev, error: "Please provide both a title and content." }));
       return;
     }
 
     try {
-      setSubmitting(true);
-      await forumService.createForumPost(forumId, {
-        title: form.title.trim(),
-        content: form.content,
-        pinned: canPin ? form.pinned : false,
-      });
+      setCreateModal((prev) => ({ ...prev, submitting: true, error: null }));
+      await forumService.createForumPost(
+        forumId,
+        {
+          title: createModal.title.trim(),
+          content: createModal.content,
+          pinned: canPin ? createModal.pinned : false,
+        },
+        createModal.file || undefined
+      );
       setToast({ type: "success", message: "Post published successfully." });
-      setForm({ title: "", content: "", pinned: false });
+      resetCreateForm();
       fetchForum();
       fetchPosts();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to create post";
-      setToast({ type: "error", message });
-    } finally {
-      setSubmitting(false);
+      setCreateModal((prev) => ({ ...prev, submitting: false, error: message }));
     }
   };
 
@@ -259,10 +302,13 @@ const ForumDetailPage: React.FC = () => {
     });
   };
   const totalPosts = pinnedPosts.length + unpinnedPosts.length;
-  const orderedPosts = [...pinnedPosts, ...unpinnedPosts];
+  const orderedPosts = useMemo(() => [...pinnedPosts, ...unpinnedPosts], [pinnedPosts, unpinnedPosts]);
+  const handleImagePreview = useCallback((payload: { src: string; alt?: string }) => {
+    setLightboxImage(payload);
+  }, []);
   return (
     <>
-    <div className="flex h-screen overflow-hidden relative" style={backgroundStyles}>
+      <div className="flex h-screen overflow-hidden relative" style={backgroundStyles}>
       <Navbar />
       <Sidebar role={sidebarRole} />
 
@@ -303,112 +349,65 @@ const ForumDetailPage: React.FC = () => {
               </div>
             ) : forum ? (
               <>
+                {showStickyHeader && forum && (
+                  <div className="sticky top-0 z-20 mb-4">
+                    <div
+                      className={`rounded-2xl px-4 py-3 shadow-lg border flex items-center gap-3 ${
+                        darkMode ? "border-slate-700/70 bg-slate-900/80 backdrop-blur" : "border-slate-200 bg-white"
+                      }`}
+                      aria-live="polite"
+                    >
+                      <MessageSquare className="w-4 h-4 text-indigo-500" />
+                      <div className="flex flex-col">
+                        <span className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">
+                          Discussion topic
+                        </span>
+                        <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{forum.title}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <section
+                  ref={heroRef}
                   className={`rounded-2xl p-6 shadow-sm ${
-                    darkMode ? "bg-slate-900/70 border border-slate-700/60" : "bg-white border border-slate-100"
+                    darkMode ? "bg-slate-900/80 border border-slate-700/70" : "bg-white border border-slate-100"
                   }`}
                 >
-                  <p className="text-xs uppercase tracking-wide text-indigo-500 font-semibold">
-                    {forum.forumType === "announcement" ? "Announcement" : "Discussion"}
-                  </p>
-                  <h1 className="text-3xl font-bold mt-2">{forum.title}</h1>
-                  <p className="text-slate-500 dark:text-slate-300 mt-3">{forum.description}</p>
-                  <div className="mt-4 text-xs text-slate-500 flex flex-wrap gap-4">
-                    <span>Forum ID: {forum._id}</span>
-                    <span>Active: {forum.isActive ? "Yes" : "No"}</span>
-                    {forum.createdAt && <span>Created: {formatDate(forum.createdAt)}</span>}
-                    {forum.updatedAt && <span>Updated: {formatDate(forum.updatedAt)}</span>}
-                  </div>
-                </section>
-
-                <section className="grid gap-6 lg:grid-cols-2">
-                  <div
-                    className={`rounded-2xl p-6 shadow-sm ${
-                      darkMode ? "bg-slate-900/70 border border-slate-700/60" : "bg-white border border-slate-100"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <p className="text-sm text-slate-400 uppercase">Create post</p>
-                        <h2 className="text-xl font-semibold">Share resources or questions</h2>
-                      </div>
-                      <UploadCloud className="w-8 h-8 text-indigo-400" />
+                  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-indigo-500 font-semibold flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4" />
+                        {forum.forumType === "announcement" ? "Announcement" : "Discussion"}
+                      </p>
+                      <h1 className="text-3xl font-bold mt-2">{forum.title}</h1>
+                      <p className="text-slate-500 dark:text-slate-300 mt-3">{forum.description}</p>
                     </div>
-                    <form className="space-y-4" onSubmit={handleSubmit}>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Title</label>
-                        <input
-                          type="text"
-                          className={`w-full rounded-xl border px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
-                            darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                          }`}
-                          placeholder="Example: UI design materials"
-                          value={form.title}
-                          onChange={(event) => handleInputChange("title", event.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Content (Markdown supported)</label>
-                        <textarea
-                          className={`w-full h-40 rounded-xl border px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
-                            darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                          }`}
-                          placeholder={"Share context, add bullet lists, or embed images using Markdown.\nExample:\n![Prototype](https://...)"}
-                          value={form.content}
-                          onChange={(event) => handleInputChange("content", event.target.value)}
-                        ></textarea>
-                        <p className="text-xs text-slate-500 mt-1">
-                          Tip: use <code>![alt text](https://image-url)</code> to attach screenshots.
-                        </p>
-                      </div>
-                      <label className={`flex items-center gap-3 ${canPin ? "" : "opacity-50"}`}>
-                        <input
-                          type="checkbox"
-                          className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                          checked={form.pinned && canPin}
-                          onChange={(event) => handleInputChange("pinned", event.target.checked)}
-                          disabled={!canPin}
-                        />
-                        <span className="text-sm">Pin this post to highlight important updates</span>
-                      </label>
-                      <button
-                        type="submit"
-                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
-                        disabled={submitting}
-                      >
-                        {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                        Publish post
-                      </button>
-                    </form>
-                  </div>
-
-                  <div
-                    className={`rounded-2xl p-6 shadow-sm space-y-4 ${
-                      darkMode ? "bg-slate-900/70 border border-slate-700/60" : "bg-white border border-slate-100"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-slate-400 uppercase">Live preview</p>
-                        <h2 className="text-xl font-semibold">What learners will see</h2>
-                      </div>
-                    </div>
-                    {form.content.trim() ? (
-                      <div
-                        className={`rounded-xl border p-4 prose max-w-none ${
-                          darkMode ? "border-slate-700 prose-invert" : "border-slate-200"
+                    <div className="flex items-center gap-3 text-xs font-semibold">
+                      <span
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 ${
+                          forum.isActive
+                            ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-200"
+                            : "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-200"
                         }`}
                       >
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{`# ${form.title || "Post title"}\n\n${form.content}`}</ReactMarkdown>
-                      </div>
-                    ) : (
-                      <div
-                        className={`rounded-xl border border-dashed p-4 text-sm text-slate-500 ${
-                          darkMode ? "border-slate-700" : "border-slate-200"
-                        }`}
-                      >
-                        Start typing to preview your Markdown formatting, code blocks, and images.
-                      </div>
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        {forum.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-3 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-2">
+                    {forum.createdAt && (
+                      <span className="inline-flex items-center gap-2">
+                        <Clock3 className="w-3.5 h-3.5 text-indigo-400" />
+                        Created: {formatDate(forum.createdAt)}
+                      </span>
+                    )}
+                    {forum.updatedAt && (
+                      <span className="inline-flex items-center gap-2">
+                        <RefreshCcw className="w-3.5 h-3.5 text-indigo-400" />
+                        Updated: {formatDate(forum.updatedAt)}
+                      </span>
                     )}
                   </div>
                 </section>
@@ -423,9 +422,32 @@ const ForumDetailPage: React.FC = () => {
                     <span className="text-sm text-slate-500">{totalPosts} item(s)</span>
                   </div>
                   {postsLoading ? (
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Loading posts...
+                    <div className="space-y-4">
+                      {[...Array(3)].map((_, index) => (
+                        <div
+                          key={`post-skeleton-${index}`}
+                          className={`rounded-3xl border p-5 ${
+                            darkMode ? "border-slate-800 bg-slate-900/40" : "border-slate-100 bg-white"
+                          } animate-pulse`}
+                        >
+                          <div className="flex gap-2 text-xs">
+                            <div className={`h-3 w-32 rounded-full ${darkMode ? "bg-slate-800" : "bg-slate-200"}`} />
+                            <div className={`h-3 w-20 rounded-full ${darkMode ? "bg-slate-800" : "bg-slate-200"}`} />
+                            <div className="ml-auto h-3 w-16 rounded-full bg-slate-200 dark:bg-slate-800" />
+                          </div>
+                          <div className="mt-4 space-y-3">
+                            <div className={`h-5 w-1/3 rounded-full ${darkMode ? "bg-slate-700" : "bg-slate-200"}`} />
+                            <div className="space-y-2">
+                              <div className={`h-3 w-full rounded-full ${darkMode ? "bg-slate-800" : "bg-slate-200"}`} />
+                              <div className={`h-3 w-5/6 rounded-full ${darkMode ? "bg-slate-800" : "bg-slate-200"}`} />
+                            </div>
+                            <div className="flex gap-2">
+                              <div className="h-24 w-32 rounded-2xl bg-slate-200 dark:bg-slate-800" />
+                              <div className="h-24 w-32 rounded-2xl bg-slate-200 dark:bg-slate-800" />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : postsError ? (
                     <p className="text-sm text-rose-500">{postsError}</p>
@@ -460,8 +482,14 @@ const ForumDetailPage: React.FC = () => {
                             <div className="space-y-2 flex-1 min-w-[200px]">
                               <h3 className="text-lg font-semibold">{post.title}</h3>
                               <div className="text-sm text-slate-600 dark:text-slate-300 line-clamp-2">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.content}</ReactMarkdown>
+                                <MarkdownContent content={post.content} onImageClick={handleImagePreview} />
                               </div>
+                              <AttachmentPreview
+                                files={post.key}
+                                size="sm"
+                                onImageClick={handleImagePreview}
+                                caption={post.title}
+                              />
                               {post.author && (
                                 <p className="text-xs text-slate-400">
                                   By {post.author.fullname || post.author.username}
@@ -504,13 +532,115 @@ const ForumDetailPage: React.FC = () => {
                     </div>
                   )}
                 </section>
+
+                <section
+                  className={`rounded-2xl p-6 shadow-sm space-y-6 ${
+                    darkMode ? "bg-slate-900/70 border border-slate-700/60" : "bg-white border border-slate-100"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center gap-2 text-sm uppercase tracking-wide text-indigo-500 font-semibold">
+                      <PlusCircle className="w-4 h-4" />
+                      Create post
+                    </div>
+
+                    {user && (
+                      <div className="mt-4 flex items-center gap-3">
+                        <div
+                          className={`h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden ${
+                            darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
+                          }`}
+                        >
+                          {user.avatar_url ? (
+                            <img
+                              src={user.avatar_url}
+                              alt={user.fullname || user.username || "User avatar"}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            (user.fullname || user.username || "You")
+                              .split(/\s+/)
+                              .map((segment) => segment[0]?.toUpperCase())
+                              .slice(0, 2)
+                              .join("") || "U"
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-slate-400">Posting as</p>
+                          <p className="text-sm font-semibold">{user.fullname || user.username || "You"}</p>
+                          <p className="text-xs text-slate-400 capitalize">{user.role}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <form className="space-y-6" onSubmit={handleCreatePost}>
+                    <div>
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <label className="block text-sm font-medium mb-0">Title</label>
+                        {canPin && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCreateModal((prev) => ({
+                                ...prev,
+                                pinned: !prev.pinned,
+                              }))
+                            }
+                            aria-pressed={createModal.pinned}
+                            className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1 text-xs font-semibold transition ${
+                              createModal.pinned
+                                ? "bg-amber-500/10 text-amber-600 border-amber-300 dark:text-amber-300 dark:border-amber-500/40"
+                                : "text-slate-500 border-slate-200 hover:bg-slate-50 dark:text-slate-300 dark:border-slate-600 dark:hover:bg-slate-800"
+                            }`}
+                          >
+                            <Pin className="w-4 h-4" />
+                            {createModal.pinned ? "Pinned" : "Pin this post"}
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        className={`w-full rounded-2xl border px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
+                          darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+                        }`}
+                        placeholder="Example: UI design materials"
+                        value={createModal.title}
+                        onChange={(event) => setCreateModal((prev) => ({ ...prev, title: event.target.value }))}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Content editor</label>
+                      <MarkdownComposer
+                        value={createModal.content}
+                        onChange={(next) => setCreateModal((prev) => ({ ...prev, content: next }))}
+                        placeholder="Share context, add bullet lists, or embed resources using Markdown shortcuts."
+                        darkMode={darkMode}
+                        attachment={createModal.file}
+                        onAttachmentChange={(file) => setCreateModal((prev) => ({ ...prev, file }))}
+                        attachmentAccept={attachmentAcceptTypes}
+                      />
+                    </div>
+                    {createModal.error && <p className="text-sm text-rose-500">{createModal.error}</p>}
+
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        className="inline-flex items-center justify-center rounded-2xl bg-indigo-600 px-5 py-2.5 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
+                        disabled={createModal.submitting}
+                      >
+                        {createModal.submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                        Publish post
+                      </button>
+                    </div>
+                  </form>
+                </section>
               </>
             ) : null}
           </div>
         </main>
       </div>
     </div>
-
     {editModal.open && editModal.post && (
       <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
         <div
@@ -614,6 +744,28 @@ const ForumDetailPage: React.FC = () => {
               Delete
             </button>
           </div>
+        </div>
+      </div>
+    )}
+
+    {lightboxImage && (
+      <div
+        className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+        onClick={() => setLightboxImage(null)}
+      >
+        <div className="max-h-full max-w-4xl w-full flex flex-col items-center gap-4" onClick={(event) => event.stopPropagation()}>
+          <img
+            src={lightboxImage.src}
+            alt={lightboxImage.alt || "Preview image"}
+            className="max-h-[80vh] w-full object-contain rounded-3xl border border-white/20 shadow-2xl"
+          />
+          <button
+            type="button"
+            onClick={() => setLightboxImage(null)}
+            className="rounded-full bg-white/90 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-white"
+          >
+            Close preview
+          </button>
         </div>
       </div>
     )}
