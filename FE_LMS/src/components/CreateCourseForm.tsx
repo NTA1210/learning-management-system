@@ -152,7 +152,10 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
         enrollRequiresApproval: form.enrollRequiresApproval,
         logo: form.logo || undefined,
       });
-      setSuccessMsg("Tạo khoá học thành công");
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({
+        toast: true, position: "top-end", icon: "success", title: "Create a successful course", showConfirmButton: false, timer: 2000 });
+      setSuccessMsg("Create a successful course");
       setForm({
         title: "",
         subjectId: "",
@@ -170,7 +173,10 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
       if (onCreated) await onCreated();
       if (onClose) onClose();
     } catch (e: any) {
-      setError(e?.message || "Tạo khoá học thất bại");
+      const msg = e?.response?.data?.message || e?.message || "Create a course failed";
+      setError(msg);
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({ toast: true, position: "top-end", icon: "error", title: msg, showConfirmButton: false, timer: 2500 });
     } finally {
       setLoading(false);
     }
