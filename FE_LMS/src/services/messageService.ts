@@ -28,6 +28,6 @@ export const messageService = {
     const response = await http.get(`/chat-rooms/${conversationId}/messages`, {
       params: { cursor },
     });
-    return response.data;
+    return (response as any).data;
   },
 };

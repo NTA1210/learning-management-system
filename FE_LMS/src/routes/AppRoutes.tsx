@@ -1,5 +1,4 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-
 import {
   DashboardPage,
   StudentDashboardPage,
@@ -36,6 +35,7 @@ import {
   ForumDetailPage,
   ForumPostDetailPage,
   OnboardingPage,
+  DeletedCoursesPage,
 } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";

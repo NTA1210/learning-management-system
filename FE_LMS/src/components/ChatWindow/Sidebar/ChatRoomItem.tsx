@@ -20,6 +20,10 @@ const ChatRoomItem = ({
   let displayTime = "";
 
   const isSelected = selectedChatRoom?.chatRoomId === chatRoomId;
+  const pronounce =
+    lastMessage?.senderId._id === (user as any)?._id
+      ? "You"
+      : lastMessage?.senderId?.username;
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("lms:user") || "{}");
@@ -94,7 +98,7 @@ const ChatRoomItem = ({
                 : "text-sm text-sky-500 truncate min-h-5"
             }
           >
-            {lastMessage?.content ?? ""}
+            {lastMessage?.content ? `${pronounce}: ${lastMessage.content}` : ""}
           </p>
           {user && unreadCounts[(user as any)?._id] > 0 && (
             <div className="flex items-center justify-center ml-2 text-xs text-white rounded-full bg-sky-500 size-5 shrink-0">

@@ -1,17 +1,17 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import MessageItem from "./MessageItem";
 
 import TypingIndicator from "./TypingIndicator";
 import { useChatRoomStore } from "../../stores/chatRoomStore";
-import { useAuthStore } from "../../stores/authStore";
 import { useMessages } from "../../hooks/useMessages";
 import { useSocketContext } from "../../context/SocketContext";
 import { useMessageListen } from "../../hooks/useMessageListen";
 import { useTypingListen } from "../../hooks/useTypingListen";
+import FileMessageItem from "./FileMessageItem";
 
 const MessageList: React.FC = () => {
   const { selectedChatRoom } = useChatRoomStore();
-  const { user } = useAuthStore();
+  const [user, setUser] = useState(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const { data, isLoading, isFetchingNextPage, handleLoadMore, hasNextPage } =
     useMessages(selectedChatRoom?.chatRoomId, containerRef);
@@ -19,11 +19,20 @@ const MessageList: React.FC = () => {
   const { socket } = useSocketContext();
   const previousChatRoomIdRef = useRef<string | null>(null);
 
+  console.log(data);
+
   const allMessages =
     data?.pages
       .slice()
       .reverse()
       .flatMap((page) => page.messages) ?? [];
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("lms:user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
 
   useEffect(() => {
     if (!selectedChatRoom?.chatRoomId) return;
@@ -43,16 +52,13 @@ const MessageList: React.FC = () => {
 
     socket?.emit("chatroom:mark-as-read", {
       chatRoomId: selectedChatRoom?.chatRoomId,
-      userId: user?.id,
+      userId: (user as any)?._id,
     });
   }, [data, selectedChatRoom, socket, user]);
 
   useMessageListen(selectedChatRoom?.chatRoomId, containerRef);
 
-  const { isTyping } = useTypingListen(
-    selectedChatRoom?.chatRoomId,
-    containerRef
-  );
+  const { isTyping } = useTypingListen((user as any)?._id, containerRef);
 
   if (isLoading) {
     return (
@@ -80,11 +86,13 @@ const MessageList: React.FC = () => {
         </div>
       )}
 
-      {allMessages.map((message, index) => (
-        <div key={index}>
-          <MessageItem {...message} />
-        </div>
-      ))}
+      {allMessages.map((message, index) => {
+        if ("content" in message) {
+          return <MessageItem key={index} {...message} />;
+        } else if ("file" in message) {
+          return <FileMessageItem key={index} {...(message as any)} />;
+        }
+      })}
 
       {isTyping && <TypingIndicator />}
     </div>

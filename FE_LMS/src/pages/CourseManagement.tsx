@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
-import { courseService, enrollmentService } from "../services";
+import { courseService, enrollmentService, subjectService } from "../services";
 import { userService } from "../services/userService";
 import type { Course } from "../types/course";
 import type { CourseFilters } from "../services/courseService";
@@ -60,6 +60,9 @@ const CourseManagement: React.FC = () => {
       endDate: string;
     }>
   >([]);
+  const [subjects, setSubjects] = useState<Array<{ _id: string; name: string; specialistIds?: string[] }>>([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState("");
+  const [selectedSemesterId, setSelectedSemesterId] = useState("");
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailCourse, setDetailCourse] = useState<Course | null>(null);
   const [enrollments, setEnrollments] = useState<
@@ -90,6 +93,8 @@ const CourseManagement: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageLimit, setPageLimit] = useState(25);
   const [totalCourses, setTotalCourses] = useState(0);
+  const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
+  const [editLogoPreview, setEditLogoPreview] = useState("");
   const [sortOption, setSortOption] = useState<
     "name_asc" | "name_desc" | "date_asc" | "date_desc"
   >("date_desc");
@@ -218,6 +223,16 @@ const CourseManagement: React.FC = () => {
     })();
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await subjectService.getAllSubjects({ limit: 200,  sortOrder: "asc" });
+        const list = Array.isArray(res?.data) ? res.data : [];
+        setSubjects(list as any);
+      } catch {}
+    })();
+  }, []);
+
   // Fetch teachers list from users API (role = teacher)
   const fetchTeachers = async () => {
     try {
@@ -241,6 +256,28 @@ const CourseManagement: React.FC = () => {
     fetchTeachers();
   }, []);
 
+  useEffect(() => {
+    if (!showEditModal) return;
+    const subjId = formData.subjectId || ((editingCourse as any)?.subjectId?._id || (editingCourse as any)?.subjectId);
+    const selected = subjects.find((s: any) => s._id === subjId);
+    const raw = Array.isArray((selected as any)?.specialistIds)
+      ? (selected as any).specialistIds
+      : Array.isArray((selected as any)?.specialists)
+      ? (selected as any).specialists
+      : [ (selected as any)?.specialistId || (selected as any)?.specialist ].filter(Boolean);
+    const specIds = (Array.isArray(raw) ? raw : [])
+      .map((x: any) => (typeof x === 'string' ? x : x?._id))
+      .filter((id: any) => typeof id === 'string' && id);
+    (async () => {
+      try {
+        const { users } = await userService.getUsers({ role: 'teacher', specialistIds: specIds});
+        const normalized = (Array.isArray(users) ? users : []).map((u) => ({ _id: u._id, username: u.username, email: (u as any)?.email ?? '' }));
+        setAvailableTeachers(normalized);
+        setSelectedTeachers((prev) => prev.filter((id) => normalized.some((t) => t._id === id)));
+      } catch {}
+    })();
+  }, [showEditModal, formData.subjectId]);
+
   const changePageLimit = (limit: number) => {
     setPageLimit(limit);
     setCurrentPage(1);
@@ -259,6 +296,8 @@ const CourseManagement: React.FC = () => {
 
       const filters: CourseFilters = {
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
+        ...(selectedSubjectId && { subjectId: selectedSubjectId }),
+        ...(selectedSemesterId && { semesterId: selectedSemesterId }),
         page: currentPage,
         limit: pageLimit,
         ...(isName ? { sortBy: "title" } : {}),
@@ -332,7 +371,11 @@ const CourseManagement: React.FC = () => {
     if (!confirm("Are you sure you want to delete this course?")) return;
 
     try {
-      await courseService.deleteCourse(id);
+      if (isAdmin) {
+        await courseService.deleteCoursePermanent(id);
+      } else if (isTeacher) {
+        await courseService.deleteCourse(id);
+      }
       await fetchCourses();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to delete course");
@@ -343,7 +386,12 @@ const CourseManagement: React.FC = () => {
     setEditingCourse(course);
     setFormData({
       title: course.title || "",
-      subjectId: "",
+      subjectId: ((): string => {
+        const subj: any = (course as any).subjectId;
+        if (typeof subj === "string") return subj;
+        if (subj && typeof subj === "object" && subj._id) return subj._id;
+        return "";
+      })(),
       description: course.description || "",
       startDate: "",
       endDate: "",
@@ -359,6 +407,8 @@ const CourseManagement: React.FC = () => {
         return "";
       })(),
     });
+    setEditLogoPreview((course as any).logo || "");
+    setEditLogoFile(null);
     const normalizedTeacherIds = Array.isArray((course as any).teacherIds)
       ? (course as any).teacherIds
           .map((t: any) => (typeof t === "string" ? t : t?._id))
@@ -383,6 +433,7 @@ const CourseManagement: React.FC = () => {
         capacity: formData.capacity,
         semesterId: formData.semesterId,
         teacherIds: selectedTeachers,
+        logo: editLogoFile || undefined,
       });
       setShowEditModal(false);
       setEditingCourse(null);
@@ -422,7 +473,7 @@ const CourseManagement: React.FC = () => {
   useEffect(() => {
     fetchCourses();
     // eslint-disable-next-line
-  }, [currentPage, pageLimit, sortOption, debouncedSearchTerm]);
+  }, [currentPage, pageLimit, sortOption, debouncedSearchTerm, selectedSubjectId, selectedSemesterId, darkMode]);
   console.log("totalPage", totalCourses)
   return (
     <>
@@ -537,31 +588,64 @@ const CourseManagement: React.FC = () => {
                       : "View and manage all courses in the system"}
                   </p>
                 </div>
-                <button
-                  className="px-4 py-2 rounded-lg text-white flex items-center transition-all duration-200 hover:opacity-90 hover:scale-105"
-                  style={{ backgroundColor: darkMode ? "#4c1d95" : "#4f46e5" }}
-                  onClick={fetchCourses}
-                >
-                  <svg
-                    className="w-4 h-4 mr-2"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+                <div className="flex gap-4">
+                  {isAdmin && (
+                    <button
+                      onClick={() => navigate("/admin/courses/deleted")}
+                      className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105"
+                      style={{
+                        backgroundColor: darkMode ? "#111827" : "#DC2627",
+                        border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
+                      }}
+                    >
+                      List Deleted
+                    </button>
+                  )}
+                  {canCreate && (
+                    <button
+                      onClick={() => {
+                        setShowCreateModal(true);
+                        if (isTeacher && currentTeacherId) {
+                          setSelectedTeachers([currentTeacherId]);
+                        } else {
+                          setSelectedTeachers([]);
+                        }
+                      }}
+                      className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105"
+                      style={{
+                        backgroundColor: darkMode ? "#059669" : "#10b981",
+                      }}
+                    >
+                      + Create Course
+                    </button>
+                  )}
+                  <button
+                    className="px-4 py-2 rounded-lg text-white flex items-center transition-all duration-200 hover:opacity-90 hover:scale-105"
+                    style={{ backgroundColor: darkMode ? "#4c1d95" : "#4f46e5" }}
+                    onClick={fetchCourses}
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                    ></path>
-                  </svg>
-                  Refresh
-                </button>
+                    <svg
+                      className="w-4 h-4 mr-2"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      ></path>
+                    </svg>
+                    Refresh
+                  </button>
+                </div>
+             
               </div>
 
               {/* Search and Filter Controls */}
-              <div className="mb-6 flex flex-col md:flex-row gap-4">
+              <div className="mb-6 flex flex-col flex-wrap md:flex-row gap-4">
                 <div className="flex-1">
                   <input
                     type="text"
@@ -588,6 +672,57 @@ const CourseManagement: React.FC = () => {
                 >
                   <Search size={20} />
                 </button>
+                <div className="relative">
+                  <select
+                    value={selectedSubjectId}
+                    onChange={(e) => { setSelectedSubjectId(e.target.value); setCurrentPage(1); }}
+                    className="appearance-none rounded-lg px-4 py-2 pr-10 border focus:outline-none focus:ring-2 transition-colors duration-200 shadow-sm"
+                    style={{
+                      width: 180,
+                      fontWeight: 600,
+                      background: darkMode ? "#152632" : "#ffffff",
+                      color: darkMode ? "#ffffff" : "#111827",
+                      borderColor: darkMode ? "#334155" : "#e5e7eb",
+                      boxShadow: darkMode ? "0 1px 2px rgba(0,0,0,0.25)" : "0 1px 2px rgba(0,0,0,0.06)",
+                    }}
+                  >
+                    <option value="">All Subjects</option>
+                    {subjects.map((s) => (
+                      <option key={s._id} value={s._id}>{s.name}</option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }} aria-hidden="true">
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.062l-4.24 4.24a.75.75 0 01-1.06 0L5.25 8.29a.75.75 0 01-.02-1.08z" clipRule="evenodd" />
+                    </svg>
+                  </span>
+                </div>
+                <div className="relative">
+                  <select
+                    value={selectedSemesterId}
+                    onChange={(e) => { setSelectedSemesterId(e.target.value); setCurrentPage(1); }}
+                    className="appearance-none rounded-lg px-4 py-2 pr-10 border focus:outline-none focus:ring-2 transition-colors duration-200 shadow-sm"
+                    style={{
+                      width: 180,
+                      fontWeight: 600,
+                      background: darkMode ? "#152632" : "#ffffff",
+                      color: darkMode ? "#ffffff" : "#111827",
+                      borderColor: darkMode ? "#334155" : "#e5e7eb",
+                      boxShadow: darkMode ? "0 1px 2px rgba(0,0,0,0.25)" : "0 1px 2px rgba(0,0,0,0.06)",
+                    }}
+                  >
+                    <option value="">All Semesters</option>
+                    {semesters.map((s) => (
+                      <option key={s._id} value={s._id}>{s.name}</option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }} aria-hidden="true">
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.062l-4.24 4.24a.75.75 0 01-1.06 0L5.25 8.29a.75.75 0 01-.02-1.08z" clipRule="evenodd" />
+                    </svg>
+                  </span>
+                </div>
+              
                 {/* Sort options: a-z, z-a, old->new, new->old */}
                 <div className="relative">
                   <select
@@ -717,24 +852,7 @@ const CourseManagement: React.FC = () => {
                   </button>
                 </div>
 
-                {canCreate && (
-                  <button
-                    onClick={() => {
-                      setShowCreateModal(true);
-                      if (isTeacher && currentTeacherId) {
-                        setSelectedTeachers([currentTeacherId]);
-                      } else {
-                        setSelectedTeachers([]);
-                      }
-                    }}
-                    className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105"
-                    style={{
-                      backgroundColor: darkMode ? "#059669" : "#10b981",
-                    }}
-                  >
-                    + Create Course
-                  </button>
-                )}
+              
               </div>
 
               {/* Loading State */}
@@ -781,15 +899,12 @@ const CourseManagement: React.FC = () => {
                       key={course._id}
                       className="rounded-xl p-6 transition-all duration-300 hover:scale-[1.02] neu-surface"
                       style={{
-                        // Use neumorphic surface background for light mode; keep subtle tone in dark
                         backgroundColor: darkMode
-                          ? "rgba(31, 41, 55, 0.8)"
-                          : "#f0f0f0",
+                          ? "rgba(55, 65, 81, 0.8)"
+                          : "#ffffff",
                         border: "none",
                         animationDelay: `${index * 100}ms`,
                         animation: "fadeInUp 0.6s ease-out forwards",
-                        opacity: 0,
-                        transform: "translateY(20px)",
                       }}
                     >
                       {/* Course Header */}
@@ -1170,6 +1285,7 @@ const CourseManagement: React.FC = () => {
               <form onSubmit={handleUpdateCourse} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
+               
                     <label className="block mb-2 font-semibold">Title *</label>
                     <input
                       type="text"
@@ -1242,6 +1358,30 @@ const CourseManagement: React.FC = () => {
                       ))}
                     </select>
                   </div>
+
+                </div>
+                <div className="flex items-center gap-4 mb-3">
+                  <img
+                    src={editLogoPreview || (editingCourse as any)?.logo || ('https://api.dicebear.com/9.x/shapes/svg?seed=' + encodeURIComponent(formData.title || editingCourse?.title || 'course'))}
+                    alt="Logo"
+                    className="h-14 w-14 rounded object-cover border"
+                    style={{ borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb' }}
+                  />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setEditLogoFile(file);
+                      setEditLogoPreview(file ? URL.createObjectURL(file) : editLogoPreview);
+                    }}
+                    className="px-3 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      color: darkMode ? '#ffffff' : '#000000',
+                    }}
+                  />
                 </div>
                 <div className="col-span-2">
                   <label className="block mb-2 font-semibold">

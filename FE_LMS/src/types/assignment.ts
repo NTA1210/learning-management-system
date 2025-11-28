@@ -21,6 +21,10 @@ export interface Assignment {
   allowLate: boolean;
   createdAt: string;
   updatedAt: string;
+  fileOriginalName?: string;
+  fileMimeType?: string;
+  fileKey?: string;
+  fileSize?: number;
 }
 
 export type AssignmentSortOption = 'name_asc' | 'name_desc' | 'date_asc' | 'date_desc';
@@ -32,5 +36,6 @@ export interface AssignmentFormValues {
   maxScore: number;
   dueDate: string;
   allowLate: boolean;
+  file?: File | null;
 }
 

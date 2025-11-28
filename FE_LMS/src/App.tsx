@@ -10,7 +10,7 @@ function App() {
       <ThemeProvider>
         <AppRoutes />
 
-        <ThemeToggle />
+        {/* <ThemeToggle /> */}
         <Toaster
           position="top-right"
           containerStyle={{

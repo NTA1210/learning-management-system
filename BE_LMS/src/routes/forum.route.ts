@@ -16,6 +16,7 @@ import {
     updateForumReplyByIdHandler,
     deleteForumReplyByIdHandler,
 } from "../controller/forum.controller";
+import upload from "@/config/multer";
 
 const forumPublicRoutes = Router();
 const forumProtectedRoutes = Router();
@@ -33,10 +34,10 @@ forumPublicRoutes.get("/:id", getForumByIdHandler);
 
 // Protected routes (authenticated users)
 // POST /forums - Create a new forum (teachers/admins only)
-forumProtectedRoutes.post("/", createForumHandler);
+forumProtectedRoutes.post("/", upload.array('files') , createForumHandler);
 
 // PATCH /forums/:id - Update forum by ID (teachers/admins only)
-forumProtectedRoutes.patch("/:id", updateForumByIdHandler);
+forumProtectedRoutes.patch("/:id", upload.array('files'), updateForumByIdHandler);
 
 // DELETE /forums/:id - Delete forum by ID (teachers/admins only)
 forumProtectedRoutes.delete("/:id", deleteForumByIdHandler);
@@ -50,10 +51,10 @@ forumPublicRoutes.get("/:forumId/posts", listForumPostsHandler);
 forumPublicRoutes.get("/:forumId/posts/:id", getForumPostByIdHandler);
 
 // POST /forums/:forumId/posts - Create a new post (authenticated users)
-forumProtectedRoutes.post("/:forumId/posts", createForumPostHandler);
+forumProtectedRoutes.post("/:forumId/posts", upload.array('files'), createForumPostHandler);
 
 // PATCH /forums/:forumId/posts/:id - Update post by ID (post author only)
-forumProtectedRoutes.patch("/:forumId/posts/:id", updateForumPostByIdHandler);
+forumProtectedRoutes.patch("/:forumId/posts/:id", upload.array('files'), updateForumPostByIdHandler);
 
 // DELETE /forums/:forumId/posts/:id - Delete post by ID (post author only)
 forumProtectedRoutes.delete("/:forumId/posts/:id", deleteForumPostByIdHandler);
@@ -67,10 +68,10 @@ forumPublicRoutes.get("/:forumId/posts/:postId/replies", listForumRepliesHandler
 forumPublicRoutes.get("/:forumId/posts/:postId/replies/:id", getForumReplyByIdHandler);
 
 // POST /forums/:forumId/posts/:postId/replies - Create a new reply (authenticated users)
-forumProtectedRoutes.post("/:forumId/posts/:postId/replies", createForumReplyHandler);
+forumProtectedRoutes.post("/:forumId/posts/:postId/replies", upload.array('files'), createForumReplyHandler);
 
 // PATCH /forums/:forumId/posts/:postId/replies/:id - Update reply by ID (reply author only)
-forumProtectedRoutes.patch("/:forumId/posts/:postId/replies/:id", updateForumReplyByIdHandler);
+forumProtectedRoutes.patch("/:forumId/posts/:postId/replies/:id", upload.array('files'), updateForumReplyByIdHandler);
 
 // DELETE /forums/:forumId/posts/:postId/replies/:id - Delete reply by ID (reply author only)
 forumProtectedRoutes.delete("/:forumId/posts/:postId/replies/:id", deleteForumReplyByIdHandler);

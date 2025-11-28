@@ -40,6 +40,7 @@ export interface CourseFilters {
   subjectId?: string;
   semesterId?: string;
   isPublished?: boolean;
+  onlyDeleted?: boolean;
   page?: number;
   limit?: number;
   sortBy?: "createdAt" | "title" | "updatedAt";
@@ -57,6 +58,7 @@ export const courseService = {
     if (filters?.subjectId) params.append("subjectId", filters.subjectId);
     if (filters?.semesterId) params.append("semesterId", filters.semesterId);
     if (filters?.isPublished !== undefined) params.append("isPublished", String(filters.isPublished));
+    if (filters?.onlyDeleted) params.append("onlyDeleted", "true");
     if (filters?.page) params.append("page", String(filters.page));
     if (filters?.limit) params.append("limit", String(filters.limit));
     if (filters?.sortBy) params.append("sortBy", filters.sortBy);
@@ -153,5 +155,10 @@ export const courseService = {
   // Permanent delete course
   deleteCoursePermanent: async (id: string): Promise<void> => {
     await httpClient.delete(`/courses/${id}/permanent`);
+  },
+
+  // Restore deleted course (admin only)
+  restoreCourse: async (id: string): Promise<void> => {
+    await httpClient.post(`/courses/${id}/restore`);
   },
 };

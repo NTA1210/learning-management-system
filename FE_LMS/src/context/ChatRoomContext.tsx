@@ -9,7 +9,7 @@ export type User = {
   fullname: string;
   username: string;
   email: string;
-  avatar_url: string;
+  avatarUrl: string;
 };
 
 export type Course = {
@@ -143,6 +143,10 @@ export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
     });
   };
 
+  const handleChatRoomSendMessageError = () => {
+    toast.error("Failed to send message");
+  };
+
   useEffect(() => {
     socket?.on("conversation:accept", handleNewConversation);
     socket?.on("conversation:request:error", handleErrorNewConversation);
@@ -155,6 +159,7 @@ export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
       "chatroom:update-unread-counts",
       handleChatRoomUpdateUnreadCounts
     );
+    socket?.on("chatroom:send-message:error", handleChatRoomSendMessageError);
 
     return () => {
       socket?.off("conversation:accept", handleNewConversation);

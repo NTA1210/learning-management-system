@@ -43,7 +43,7 @@ export interface UserDetail extends User {
   bio?: string;
   isVerified?: boolean;
   status?: string;
-  specialistIds?: any[];
+  specialistIds?: string[];
   createdAt?: string;
   updatedAt?: string;
   avatar_url?: string;
@@ -67,6 +67,9 @@ export const userService = {
     if (params?.status) queryParams.append("status", params.status);
     if (params?.username) queryParams.append("username", params.username);
     if (params?.email) queryParams.append("email", params.email);
+    if (params?.specialistIds && params.specialistIds.length > 0) {
+      queryParams.append("specialistIds", JSON.stringify(params.specialistIds));
+    }
     if (params?.fullname) queryParams.append("fullname", params.fullname);
 
     const queryString = queryParams.toString();

@@ -1,23 +1,23 @@
 const TypingIndicator: React.FC = () => {
   return (
     <div className="flex">
-      <img
+      {/* <img
         src="https://avatar.iran.liara.run/public"
         alt="User"
-        className="size-8 rounded-full object-cover mr-2"
-      />
-      <div className="bg-white p-3 rounded-2xl flex items-center">
+        className="object-cover mr-2 rounded-full size-8"
+      /> */}
+      <div className="flex items-center p-3 bg-white rounded-2xl">
         <div
-          className="size-2 bg-gray-400 rounded-full animate-pulse mr-1"
-          style={{ animationDelay: '0s' }}
+          className="mr-1 bg-gray-400 rounded-full size-2 animate-pulse"
+          style={{ animationDelay: "0s" }}
         ></div>
         <div
-          className="size-2 bg-gray-400 rounded-full animate-pulse mr-1"
-          style={{ animationDelay: '0.2s' }}
+          className="mr-1 bg-gray-400 rounded-full size-2 animate-pulse"
+          style={{ animationDelay: "0.2s" }}
         ></div>
         <div
-          className="size-2 bg-gray-400 rounded-full animate-pulse"
-          style={{ animationDelay: '0.4s' }}
+          className="bg-gray-400 rounded-full size-2 animate-pulse"
+          style={{ animationDelay: "0.4s" }}
         ></div>
       </div>
     </div>

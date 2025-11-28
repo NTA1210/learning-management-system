@@ -8,12 +8,16 @@ import {
 } from "react";
 import { format, formatDistanceToNow } from "date-fns";
 import { createPortal } from "react-dom";
-import { Loader2, Plus, RefreshCcw, Trash2, Volume2, VolumeX } from "lucide-react";
+import {
+  Loader2,
+  Plus,
+  RefreshCcw,
+  Trash2,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import { notificationService } from "../services/notificationService";
-import type {
-  NotificationItem,
-  RecipientType,
-} from "../types/notification";
+import type { NotificationItem, RecipientType } from "../types/notification";
 import "./NotificationDropdown.css";
 import { useAuth } from "../hooks/useAuth";
 import http from "../utils/http";
@@ -57,9 +61,7 @@ const getSenderInitial = (notification: NotificationItem) => {
 
 const getSenderDisplayName = (notification: NotificationItem) => {
   return (
-    notification.sender?.fullname ||
-    notification.sender?.username ||
-    "System"
+    notification.sender?.fullname || notification.sender?.username || "System"
   );
 };
 
@@ -109,7 +111,8 @@ export default function NotificationDropdown({
   const { user } = useAuth();
   const role =
     ((user?.role as "admin" | "teacher" | "student" | undefined) ??
-      "student") || "student";
+      "student") ||
+    "student";
   const canCreate = role === "admin" || role === "teacher";
 
   const closeDropdown = () => {
@@ -133,7 +136,7 @@ export default function NotificationDropdown({
           limit: LIMIT,
         });
         const newItems = response.data ?? [];
-        
+
         // Check for new notifications (not seen before) - only when polling silently
         if (options?.silent && !options?.reset) {
           const seenIds = seenNotificationIdsRef.current;
@@ -144,12 +147,14 @@ export default function NotificationDropdown({
           // Show toast and play sound for new notifications
           newNotifications.forEach((notification) => {
             seenIds.add(notification._id);
-            
+
             // Show toast notification
             toast(
               () => (
                 <div className="flex flex-col gap-1">
-                  <div className="font-semibold text-sm">{notification.title}</div>
+                  <div className="text-sm font-semibold">
+                    {notification.title}
+                  </div>
                   <div className="text-xs opacity-90 line-clamp-2">
                     {notification.message}
                   </div>
@@ -161,10 +166,13 @@ export default function NotificationDropdown({
                 style: {
                   background: isDarkMode ? "#1e293b" : "#ffffff",
                   color: isDarkMode ? "#ffffff" : "#1f2937",
-                  border: `1px solid ${isDarkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb"}`,
+                  border: `1px solid ${
+                    isDarkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb"
+                  }`,
                   borderRadius: "0.75rem",
                   padding: "12px 16px",
-                  boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+                  boxShadow:
+                    "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
                 },
                 icon: "🔔",
               }
@@ -196,11 +204,17 @@ export default function NotificationDropdown({
               seenNotificationIdsRef.current.add(item._id);
             });
           }
-          
+
           setItems((prev) =>
-            options?.reset ? newItems : [...prev, ...newItems.filter(
-                (item) => !prev.some((existing) => existing._id === item._id)
-              )]
+            options?.reset
+              ? newItems
+              : [
+                  ...prev,
+                  ...newItems.filter(
+                    (item) =>
+                      !prev.some((existing) => existing._id === item._id)
+                  ),
+                ]
           );
           setHasNext(response.pagination?.hasNext ?? false);
           setPage(nextPage + 1);
@@ -282,9 +296,7 @@ export default function NotificationDropdown({
         return next;
       });
       setTimeout(() => {
-        setItems((prev) =>
-          prev.filter((item) => !ids.includes(item._id))
-        );
+        setItems((prev) => prev.filter((item) => !ids.includes(item._id)));
         setRemovingIds((prev) => {
           const next = new Set(prev);
           ids.forEach((id) => next.delete(id));
@@ -384,7 +396,7 @@ export default function NotificationDropdown({
     // Set up polling interval
     const intervalId = setInterval(() => {
       fetchNotifications({ silent: true }).catch(() => undefined);
-    }, 5000); // Poll every 5 seconds
+    }, 500000); // Poll every 5 seconds
 
     return () => {
       clearInterval(intervalId);
@@ -496,7 +508,7 @@ export default function NotificationDropdown({
               {canCreate && (
                 <button
                   onClick={() => setIsCreateOpen(true)}
-                  className="inline-flex items-center justify-center rounded-full bg-indigo-500 text-white hover:bg-indigo-600 transition-colors w-7 h-7 text-xs font-semibold"
+                  className="inline-flex items-center justify-center text-xs font-semibold text-white transition-colors bg-indigo-500 rounded-full hover:bg-indigo-600 w-7 h-7"
                   title="Create notification"
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -504,7 +516,7 @@ export default function NotificationDropdown({
               )}
               <button
                 onClick={() => setSelectMode((prev) => !prev)}
-                className="text-xs px-3 py-1 rounded-full border border-indigo-400/60 text-indigo-500 hover:bg-indigo-500 hover:text-white transition-colors"
+                className="px-3 py-1 text-xs text-indigo-500 transition-colors border rounded-full border-indigo-400/60 hover:bg-indigo-500 hover:text-white"
               >
                 {selectMode ? "Cancel" : "Select"}
               </button>
@@ -525,7 +537,7 @@ export default function NotificationDropdown({
           </div>
 
           {selectMode && (
-            <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-200/30 text-xs">
+            <div className="flex items-center gap-2 px-4 py-2 text-xs border-b border-slate-200/30">
               <span className="opacity-70">
                 Selected {selectedIds.size} item
                 {selectedIds.size === 1 ? "" : "s"}
@@ -533,7 +545,7 @@ export default function NotificationDropdown({
               <button
                 disabled={!selectedIds.size}
                 onClick={handleMarkSelectedAsRead}
-                className="px-2 py-1 rounded-lg bg-emerald-500 text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-2 py-1 text-white rounded-lg bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Mark read
               </button>
@@ -553,12 +565,12 @@ export default function NotificationDropdown({
             ref={listRef}
           >
             {error && (
-              <div className="px-4 py-6 text-center text-sm text-rose-400">
+              <div className="px-4 py-6 text-sm text-center text-rose-400">
                 {error}
               </div>
             )}
             {!error && items.length === 0 && !isLoading && (
-              <div className="px-4 py-10 text-center text-sm opacity-70">
+              <div className="px-4 py-10 text-sm text-center opacity-70">
                 No notifications found
               </div>
             )}
@@ -573,33 +585,42 @@ export default function NotificationDropdown({
                       ? handleSelect(notification._id)
                       : handleOpenDetail(notification)
                   }
-                    className={classNames(
-                      "w-full flex items-start gap-3 px-4 py-3 text-left transition-all duration-150 border-b border-slate-200/20 hover:bg-slate-50/10 notification-item",
-                      notification.isRead
-                        ? "opacity-70"
-                        : "bg-indigo-500/5 border-l-4 border-indigo-400/80",
-                      selectMode && "pr-6",
-                      removingIds.has(notification._id) &&
-                        "notification-item-removing"
-                    )}
-                    style={{ animationDelay: `${index * 40}ms` }}
+                  className={classNames(
+                    "w-full flex items-start gap-3 px-4 py-3 text-left transition-all duration-150 border-b border-slate-200/20 hover:bg-slate-50/10 notification-item",
+                    notification.isRead
+                      ? "opacity-70"
+                      : "bg-indigo-500/5 border-l-4 border-indigo-400/80",
+                    selectMode && "pr-6",
+                    removingIds.has(notification._id) &&
+                      "notification-item-removing"
+                  )}
+                  style={{ animationDelay: `${index * 40}ms` }}
                 >
-                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <div className="flex items-start flex-1 min-w-0 gap-3">
                     <div className="flex-shrink-0">
-                      <div className="h-10 w-10 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-semibold">
+                      <div className="flex items-center justify-center w-10 h-10 font-semibold rounded-full bg-slate-200 text-slate-700">
                         {getSenderInitial(notification)}
                       </div>
                     </div>
-                    <div className="flex-1 min-w-0 overflow-hidden pr-2">
+                    <div className="flex-1 min-w-0 pr-2 overflow-hidden">
                       <div className="flex items-start justify-between gap-2 mb-1">
-                        <p className="font-semibold text-sm truncate flex-1 min-w-0" style={{ maxWidth: '200px' }}>
+                        <p
+                          className="flex-1 min-w-0 text-sm font-semibold truncate"
+                          style={{ maxWidth: "200px" }}
+                        >
                           {truncate(notification.title, 30)}
                         </p>
-                        <span className="text-[11px] opacity-60 whitespace-nowrap flex-shrink-0 ml-2" style={{ minWidth: '50px', textAlign: 'right' }}>
+                        <span
+                          className="text-[11px] opacity-60 whitespace-nowrap flex-shrink-0 ml-2"
+                          style={{ minWidth: "50px", textAlign: "right" }}
+                        >
                           {formatRelativeTime(notification.createdAt)}
                         </span>
                       </div>
-                      <p className="text-xs opacity-80 line-clamp-2" style={{ maxWidth: '250px' }}>
+                      <p
+                        className="text-xs opacity-80 line-clamp-2"
+                        style={{ maxWidth: "250px" }}
+                      >
                         {truncate(notification.message, 50)}
                       </p>
                     </div>
@@ -608,7 +629,7 @@ export default function NotificationDropdown({
                     <div className="flex-shrink-0">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 cursor-pointer"
+                        className="w-4 h-4 cursor-pointer"
                         checked={isSelected}
                         onChange={() => handleSelect(notification._id)}
                         onClick={(event) => event.stopPropagation()}
@@ -619,23 +640,23 @@ export default function NotificationDropdown({
               );
             })}
             {isLoading && (
-              <div className="px-4 py-4 text-center flex items-center justify-center gap-2 text-xs opacity-80">
-                <Loader2 className="h-4 w-4 animate-spin" />
+              <div className="flex items-center justify-center gap-2 px-4 py-4 text-xs text-center opacity-80">
+                <Loader2 className="w-4 h-4 animate-spin" />
                 Loading...
               </div>
             )}
             {!isLoading && hasNext && items.length > 0 && (
-              <div className="px-4 py-3 text-center text-xs opacity-60 animate-pulse">
+              <div className="px-4 py-3 text-xs text-center opacity-60 animate-pulse">
                 Scroll to load more...
               </div>
             )}
             <div ref={sentinelRef} />
           </div>
 
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200/30 text-xs">
+          <div className="flex items-center justify-between px-4 py-3 text-xs border-t border-slate-200/30">
             <button
               onClick={handleMarkAllAsRead}
-              className="text-indigo-500 hover:text-indigo-400 font-medium"
+              className="font-medium text-indigo-500 hover:text-indigo-400"
             >
               Mark all as read
             </button>
@@ -685,11 +706,7 @@ interface DetailModalProps {
   onClose: () => void;
 }
 
-function DetailModal({
-  notification,
-  isDarkMode,
-  onClose,
-}: DetailModalProps) {
+function DetailModal({ notification, isDarkMode, onClose }: DetailModalProps) {
   const modalContent: ReactNode = (
     <div
       className="fixed inset-0 z-[130] flex items-center justify-center bg-black/50 px-4 notification-modal-overlay"
@@ -715,22 +732,22 @@ function DetailModal({
           ✕
         </button>
         <div className="flex items-center gap-3 mb-4">
-          <div className="h-12 w-12 rounded-full bg-indigo-500 text-white flex items-center justify-center text-lg font-semibold">
+          <div className="flex items-center justify-center w-12 h-12 text-lg font-semibold text-white bg-indigo-500 rounded-full">
             {getSenderInitial(notification)}
           </div>
           <div>
-            <p className="text-sm uppercase tracking-wide text-indigo-400">
+            <p className="text-sm tracking-wide text-indigo-400 uppercase">
               {notification.recipientType === "course" ? "Course" : "System"}
             </p>
             <p className="text-xs opacity-70">
               {formatRelativeTime(notification.createdAt)}
             </p>
-            <p className="text-sm font-medium mt-1">
+            <p className="mt-1 text-sm font-medium">
               From: {getSenderDisplayName(notification)}
             </p>
           </div>
         </div>
-        <h3 className="text-xl font-semibold mb-3">{notification.title}</h3>
+        <h3 className="mb-3 text-xl font-semibold">{notification.title}</h3>
         <p className="text-sm leading-relaxed whitespace-pre-line">
           {notification.message}
         </p>
@@ -775,20 +792,20 @@ function ConfirmDeleteModal({
         )}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <h3 className="text-lg font-semibold mb-2">Remove notifications?</h3>
-        <p className="text-sm opacity-80 mb-6">
+        <h3 className="mb-2 text-lg font-semibold">Remove notifications?</h3>
+        <p className="mb-6 text-sm opacity-80">
           Do you want to remove {count} notification{count === 1 ? "" : "s"}?
         </p>
         <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded-lg border border-slate-300 hover:bg-slate-100/40 text-sm"
+            className="px-4 py-2 text-sm border rounded-lg border-slate-300 hover:bg-slate-100/40"
           >
             No, keep them
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 rounded-lg bg-rose-500 text-white text-sm hover:bg-rose-600"
+            className="px-4 py-2 text-sm text-white rounded-lg bg-rose-500 hover:bg-rose-600"
           >
             Yes, remove
           </button>
@@ -1205,7 +1222,9 @@ function CreateNotificationModal({
     }
   };
 
-  const modalBgClass = isDarkMode ? "bg-slate-900 text-white" : "bg-white text-slate-900";
+  const modalBgClass = isDarkMode
+    ? "bg-slate-900 text-white"
+    : "bg-white text-slate-900";
 
   const content = (
     <div
@@ -1232,19 +1251,19 @@ function CreateNotificationModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <label className="text-xs font-medium uppercase tracking-wide opacity-70">
+            <label className="text-xs font-medium tracking-wide uppercase opacity-70">
               Title
             </label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2 text-sm bg-transparent"
+              className="w-full px-3 py-2 text-sm bg-transparent border rounded-lg"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-medium uppercase tracking-wide opacity-70">
+            <label className="text-xs font-medium tracking-wide uppercase opacity-70">
               Message
             </label>
             <textarea
@@ -1255,7 +1274,7 @@ function CreateNotificationModal({
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-medium uppercase tracking-wide opacity-70">
+            <label className="text-xs font-medium tracking-wide uppercase opacity-70">
               Recipient type
             </label>
             <div className="flex gap-2">
@@ -1271,11 +1290,7 @@ function CreateNotificationModal({
                       : "border-slate-300 text-slate-600 hover:bg-slate-100/60"
                   )}
                 >
-                  {type === "all"
-                    ? "All"
-                    : type === "user"
-                    ? "User"
-                    : "Course"}
+                  {type === "all" ? "All" : type === "user" ? "User" : "Course"}
                 </button>
               ))}
             </div>
@@ -1283,7 +1298,7 @@ function CreateNotificationModal({
 
           {recipientType === "user" && (
             <div className="space-y-2">
-              <label className="text-xs font-medium uppercase tracking-wide opacity-70">
+              <label className="text-xs font-medium tracking-wide uppercase opacity-70">
                 Select users
               </label>
               <div className="flex items-center justify-between text-[11px] mb-1">
@@ -1308,11 +1323,11 @@ function CreateNotificationModal({
                 placeholder="Search by name or email..."
                 value={userSearchInput}
                 onChange={(e) => handleUserSearchInputChange(e.target.value)}
-                className="w-full rounded-lg border px-3 py-2 text-sm bg-transparent mb-2"
+                className="w-full px-3 py-2 mb-2 text-sm bg-transparent border rounded-lg"
               />
               <div
                 ref={userListRef}
-                className="max-h-40 overflow-y-auto border rounded-lg text-xs"
+                className="overflow-y-auto text-xs border rounded-lg max-h-40"
               >
                 {userState.items.map((u) => {
                   const isSelected = selectedUserIds.has(u._id);
@@ -1354,7 +1369,7 @@ function CreateNotificationModal({
                               )
                           }
                           alt={u.fullname || u.username}
-                          className="h-7 w-7 rounded-full object-cover flex-shrink-0"
+                          className="flex-shrink-0 object-cover rounded-full h-7 w-7"
                         />
                         <div className="flex flex-col text-left">
                           <span className="font-medium">
@@ -1377,7 +1392,7 @@ function CreateNotificationModal({
                 })}
                 {userState.loading && (
                   <div className="px-3 py-2 text-center text-[11px] opacity-70 flex items-center justify-center gap-1.5">
-                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <Loader2 className="w-3 h-3 animate-spin" />
                     Loading users...
                   </div>
                 )}
@@ -1400,7 +1415,7 @@ function CreateNotificationModal({
 
           {recipientType === "course" && (
             <div className="space-y-2">
-              <label className="text-xs font-medium uppercase tracking-wide opacity-70">
+              <label className="text-xs font-medium tracking-wide uppercase opacity-70">
                 Select courses
               </label>
               <div className="flex items-center justify-between text-[11px] mb-1">
@@ -1424,14 +1439,12 @@ function CreateNotificationModal({
                 type="text"
                 placeholder="Search by title or code..."
                 value={courseSearchInput}
-                onChange={(e) =>
-                  handleCourseSearchInputChange(e.target.value)
-                }
-                className="w-full rounded-lg border px-3 py-2 text-sm bg-transparent mb-2"
+                onChange={(e) => handleCourseSearchInputChange(e.target.value)}
+                className="w-full px-3 py-2 mb-2 text-sm bg-transparent border rounded-lg"
               />
               <div
                 ref={courseListRef}
-                className="max-h-40 overflow-y-auto border rounded-lg text-xs"
+                className="overflow-y-auto text-xs border rounded-lg max-h-40"
               >
                 {courseState.items.map((c) => {
                   const id = ((c as any)._id ?? (c as any).id) as string;
@@ -1473,7 +1486,7 @@ function CreateNotificationModal({
                               )
                           }
                           alt={(c as any).title || (c as any).code}
-                          className="h-8 w-8 rounded-md object-cover flex-shrink-0"
+                          className="flex-shrink-0 object-cover w-8 h-8 rounded-md"
                         />
                         <div className="flex flex-col text-left">
                           <span className="font-medium">
@@ -1496,7 +1509,7 @@ function CreateNotificationModal({
                 })}
                 {courseState.loading && (
                   <div className="px-3 py-2 text-center text-[11px] opacity-70 flex items-center justify-center gap-1.5">
-                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <Loader2 className="w-3 h-3 animate-spin" />
                     Loading courses...
                   </div>
                 )}
@@ -1517,26 +1530,22 @@ function CreateNotificationModal({
             </div>
           )}
 
-          {error && (
-            <p className="text-xs text-rose-500 mt-1">{error}</p>
-          )}
+          {error && <p className="mt-1 text-xs text-rose-500">{error}</p>}
 
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg border border-slate-300 text-sm hover:bg-slate-100/40"
+              className="px-4 py-2 text-sm border rounded-lg border-slate-300 hover:bg-slate-100/40"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-4 py-2 rounded-lg bg-indigo-500 text-white text-sm hover:bg-indigo-600 disabled:opacity-60 flex items-center gap-2"
+              className="flex items-center gap-2 px-4 py-2 text-sm text-white bg-indigo-500 rounded-lg hover:bg-indigo-600 disabled:opacity-60"
             >
-              {submitting && (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              )}
+              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
               Create
             </button>
           </div>
@@ -1551,4 +1560,3 @@ function CreateNotificationModal({
 
   return createPortal(content, document.body);
 }
-

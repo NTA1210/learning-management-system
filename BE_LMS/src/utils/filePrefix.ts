@@ -46,3 +46,19 @@ export const prefixUserAvatar = (userId: string) => {
 export const prefixChatRoomFile = (courseId: string, chatRoomId: string) => {
   return `courses/${courseId}/chatrooms/${chatRoomId}/files`;
 };
+export const prefixForumFile = (courseId: string, forumId: string) => {
+  return `courses/${courseId}/forums/${forumId}`;
+};
+
+export const prefixForumPostFile = (courseId: string, forumId: string, postId: string) => {
+  return `courses/${courseId}/forums/${forumId}/posts/${postId}`;
+};
+
+export const prefixForumReplyFile = (
+  courseId: string,
+  forumId: string,
+  postId: string,
+  replyId: string
+) => {
+  return `courses/${courseId}/forums/${forumId}/posts/${postId}/replies/${replyId}`;
+};

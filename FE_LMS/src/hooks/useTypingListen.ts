@@ -13,20 +13,12 @@ export function useTypingListen(
 ) {
   const { socket } = useSocketContext();
   const [isTyping, setIsTyping] = useState(false);
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem("lms:user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-  }, []);
 
   useEffect(() => {
     if (!socket || !userId || !containerRef) return;
 
     const handleTyping = (payload: { userId: string; isTyping: boolean }) => {
-      if (payload.userId === (user as any)._id) return;
+      if (payload.userId === userId) return;
 
       setIsTyping(payload.isTyping);
       const wasNearBottom = isNearBottom(containerRef);

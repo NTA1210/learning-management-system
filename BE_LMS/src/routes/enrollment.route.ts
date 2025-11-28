@@ -48,7 +48,7 @@ enrollmentRoutes.get(
 // POST /enrollments - Admin tạo enrollment cho student
 enrollmentRoutes.post(
   "/",
-  authorize(Role.ADMIN),
+  authorize(Role.ADMIN, Role.TEACHER),
   createEnrollmentHandler
 );
 

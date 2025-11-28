@@ -19,6 +19,7 @@ const defaultValues: AssignmentFormValues = {
   maxScore: 10,
   dueDate: "",
   allowLate: false,
+  file: null,
 };
 
 const AssignmentFormModal: React.FC<AssignmentFormModalProps> = ({
@@ -109,6 +110,32 @@ const AssignmentFormModal: React.FC<AssignmentFormModalProps> = ({
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+                Attachment (optional)
+              </label>
+              <input
+                type="file"
+                onChange={(e) =>
+                  setValues((prev) => ({
+                    ...prev,
+                    file: e.target.files && e.target.files[0] ? e.target.files[0] : null,
+                  }))
+                }
+                className="w-full px-4 py-2 rounded-lg border"
+                style={{
+                  backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
+                  borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                  color: darkMode ? "#ffffff" : "#000000",
+                }}
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,.rar,.jpg,.jpeg,.png,.mp4,.mp3,.xml"
+              />
+              {values.file && (
+                <p className="mt-2 text-xs" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                  Selected: {values.file.name} ({(values.file.size / 1024).toFixed(2)} KB)
+                </p>
+              )}
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
                 Description
               </label>
               <textarea
@@ -167,6 +194,7 @@ const AssignmentFormModal: React.FC<AssignmentFormModalProps> = ({
                 <span style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>Allow late submissions</span>
               </label>
             </div>
+            
           </div>
 
           <div className="flex justify-end gap-3 px-1">
