@@ -497,6 +497,7 @@ export default function CourseDetail() {
         )}
       </div>
 
+      {user?.role === 'student' ? null : (
       <div className="fixed bottom-4 left-0 right-0 pointer-events-none">
         <div className="max-w-[1200px] mx-auto px-4">
           <div
@@ -509,31 +510,34 @@ export default function CourseDetail() {
             <div className="truncate">
               <span className="text-sm opacity-70">{course?.title}</span>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleCreateForumPost}
-                disabled={!course?._id}
-                className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
-              >
-                Create Forum Post
-              </button>
-              <button
-                onClick={handleEnroll}
-                disabled={enrolling}
-                className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
-              >
-               {enrolling ? "Enrolling..." : "Enroll"}
-              </button>
-              <button
-                onClick={() => navigate(-1)}
-                className="bg-[#eaedff] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition"
-              >
-                Back
-              </button>
-            </div>
+          
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCreateForumPost}
+                  disabled={!course?._id}
+                  className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
+                >
+                  Create Forum Post
+                </button>
+                <button
+                  onClick={handleEnroll}
+                  disabled={enrolling}
+                  className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
+                >
+                 {enrolling ? "Enrolling..." : "Enroll"}
+                </button>
+                <button
+                  onClick={() => navigate(-1)}
+                  className="bg-[#eaedff] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition"
+                >
+                  Back
+                </button>
+              </div>
           </div>
         </div>
-      </div>
+        </div>
+      )}
+
     </div>
   );
 }
