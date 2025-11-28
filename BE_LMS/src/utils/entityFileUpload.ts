@@ -94,8 +94,8 @@ export async function createEntityWithFiles<T extends mongoose.Document>(
             ? await uploadFiles(files, prefix)
             : [await uploadFile(files, prefix)];
 
-        // Step 5: Extract file keys
-        const fileKeys = uploadResults.map((result) => result.key);
+        // Step 5: Extract file keys/public URL
+        const fileKeys = uploadResults.map((result) => result.publicUrl);
 
         // Step 6: Update entity with file keys
         await updateEntity(entity, fileKeys);
