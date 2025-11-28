@@ -20,6 +20,7 @@ import {DashboardPage ,
       QuizCreatePage,
       CourseQuizzesPage,
       QuizQuestionsPage,
+      QuizAttemptDetailPage,
       TakeQuizPage,
       FeedbackPage,
       FeedbackListPage,
@@ -163,6 +164,11 @@ function AppRoutes() {
         <Route path="/questionbank/questions/:quizId" element={
           <ProtectedRoute>
             <QuizQuestionsPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/quiz-attempts/:attemptId" element={
+          <ProtectedRoute requiredRole={["teacher","admin"]}>
+            <QuizAttemptDetailPage />
           </ProtectedRoute>
         } />
         <Route path="/quizz" element={

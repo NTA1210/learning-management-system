@@ -4,14 +4,27 @@ import type { QuizResponse } from "./quizService";
 export interface QuizAttempt {
   _id: string;
   quizId: string | QuizResponse;
-  studentId: string;
+  studentId:
+    | string
+    | {
+        _id: string;
+        fullName?: string;
+        fullname?: string;
+        username?: string;
+        email?: string;
+      };
   status: "in_progress" | "submitted" | "abandoned";
   startTime: string;
   submittedAt?: string;
+  startedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  durationSeconds?: number;
   answers?: QuizAnswer[];
   totalScore?: number;
   totalQuizScore?: number;
   scorePercentage?: number;
+  score?: number;
 }
 
 export interface QuizAnswer {
@@ -115,6 +128,30 @@ export const quizAttemptService = {
       total: response.total ?? 0,
       answeredTotal: response.answeredTotal ?? 0,
     };
+  },
+
+  /**
+   * Ban a quiz attempt (teacher/admin action)
+   * PUT /quiz-attempts/:quizAttemptId/ban
+   */
+  banQuizAttempt: async (quizAttemptId: string): Promise<QuizAttempt> => {
+    const response = await http.put<QuizAttempt>(`/quiz-attempts/${quizAttemptId}/ban`, {});
+    return response.data;
+  },
+
+  /**
+   * Get all attempts for a quiz (teacher/admin view)
+   * GET /quizzes/:quizId/quiz-attempts
+   */
+  getAttemptsByQuiz: async (quizId: string): Promise<QuizAttempt[]> => {
+    const response = await http.get<{ data: QuizAttempt[] }>(`/quizzes/${quizId}/quiz-attempts`);
+    if (Array.isArray(response.data?.data)) {
+      return response.data.data;
+    }
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+    return [];
   },
 };
 

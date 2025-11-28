@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
@@ -11,7 +11,7 @@ import type {
   SubmitQuizResponse,
   QuizAttempt,
 } from "../services/quizAttemptService";
-import { Clock, Lock, CheckCircle, XCircle, ChevronLeft, ChevronRight, Book } from "lucide-react";
+import { Clock, Lock, CheckCircle, XCircle, ChevronLeft, ChevronRight, Book, ShieldOff } from "lucide-react";
 
 const deriveResultFromAttempt = (
   attempt: QuizAttempt,
@@ -60,7 +60,6 @@ export default function TakeQuizPage() {
 
   const [quiz, setQuiz] = useState<QuizResponse | null>(location.state?.quiz || null);
   const [loading, setLoading] = useState(true);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [enrolling, setEnrolling] = useState(false);
@@ -80,6 +79,12 @@ export default function TakeQuizPage() {
   }>({ status: "idle" });
   const restoredAttemptRef = useRef(false);
   const storageKey = quizId ? `quizAttempt:${quizId}` : null;
+  const banStorageKey = quizId ? `quizBan:${quizId}` : null;
+  const [banInfo, setBanInfo] = useState<{
+    reason?: string;
+    timestamp?: string;
+    attemptId?: string;
+  } | null>(null);
 
   const toAnswerPayloads = (source?: QuizAnswer[]): QuizAnswerPayload[] => {
     if (!Array.isArray(source)) return [];
@@ -103,43 +108,6 @@ export default function TakeQuizPage() {
     return restored;
   };
 
-  const initializeAnswersForQuiz = useCallback((quizData: QuizResponse) => {
-    if (!quizData.snapshotQuestions) return;
-    setAnswers((prev) => {
-      let changed = false;
-      const updated = { ...prev };
-      quizData.snapshotQuestions!.forEach((q) => {
-        const questionId = q.id || "";
-        if (!updated[questionId]) {
-          updated[questionId] = new Array(q.options?.length || 0).fill(0);
-          changed = true;
-        }
-      });
-      return changed ? updated : prev;
-    });
-  }, []);
-
-  const questions: SnapshotQuestion[] = useMemo(() => {
-    const snapshot = quiz?.snapshotQuestions?.filter((q) => !q.isDeleted);
-    return (snapshot as SnapshotQuestion[]) || [];
-  }, [quiz]);
-
-  const currentQuestion = questions[currentQuestionIndex];
-
-  const getQuestionTypeLabel = (question?: SnapshotQuestion) => {
-    const type = (question?.type || "").toLowerCase();
-    switch (type) {
-      case "multichoice":
-        return "Multiple Choice • Select all that apply";
-      case "true_false":
-        return "True / False";
-      case "fill_blank":
-        return "Fill in the Blank";
-      default:
-        return "Single Choice ";
-    }
-  };
-
   const persistAttemptState = useCallback(
     (attemptId: string, answersToStore: QuizAnswerPayload[] = []) => {
       if (!storageKey) return;
@@ -160,8 +128,127 @@ export default function TakeQuizPage() {
     sessionStorage.removeItem(storageKey);
   }, [storageKey]);
 
+  const markAttemptAsBanned = useCallback(
+    ({ reason, attempt }: { reason?: string; attempt?: QuizAttempt | null } = {}) => {
+      setBanInfo((prev) => ({
+        attemptId: attempt?._id || prev?.attemptId || quizAttemptId || undefined,
+        reason:
+          reason ||
+          prev?.reason ||
+          "You have been banned from this quiz attempt. Please contact your instructor for more details.",
+        timestamp:
+          attempt?.updatedAt ||
+          attempt?.submittedAt ||
+          attempt?.startedAt ||
+          prev?.timestamp ||
+          new Date().toISOString(),
+      }));
+      clearPersistedAttempt();
+      if (banStorageKey) {
+        sessionStorage.setItem(banStorageKey, "true");
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      setTimeRemaining(null);
+    },
+    [quizAttemptId, clearPersistedAttempt, banStorageKey]
+  );
+
+  const applyAttemptSnapshot = useCallback(
+    (attempt?: QuizAttempt | null, reason?: string) => {
+      if (!attempt) return null;
+      setActiveAttempt(attempt);
+      if (attempt.status === "abandoned") {
+        markAttemptAsBanned({ reason, attempt });
+      }
+      return attempt;
+    },
+    [markAttemptAsBanned]
+  );
+
+  const [activeAttempt, setActiveAttempt] = useState<QuizAttempt | null>(null);
+
+  const buildSnapshotFromAttempt = useCallback((source?: QuizAnswer[]): SnapshotQuestion[] => {
+    if (!Array.isArray(source)) {
+      return [];
+    }
+    return source
+      .filter((ans): ans is QuizAnswer => Boolean(ans?.questionId))
+      .map((ans, idx) => ({
+        id: ans.questionId || `attempt-question-${idx}`,
+        text: ans.text || "",
+        type: ans.type || "mcq",
+        options: Array.isArray(ans.options) ? ans.options : [],
+        correctOptions: [],
+        points: ans.points ?? 1,
+        explanation: ans.explanation,
+        images: ans.images,
+        isExternal: true,
+        isNewQuestion: false,
+        isDeleted: false,
+        isDirty: false,
+      }));
+  }, []);
+
+  const questions: SnapshotQuestion[] = useMemo(() => {
+    const snapshot = quiz?.snapshotQuestions?.filter((q) => !q.isDeleted) || [];
+    if (snapshot.length) {
+      return snapshot as SnapshotQuestion[];
+    }
+    return buildSnapshotFromAttempt(activeAttempt?.answers);
+  }, [quiz, activeAttempt, buildSnapshotFromAttempt]);
+
+  useEffect(() => {
+    if (!questions.length) return;
+    setAnswers((prev) => {
+      let changed = false;
+      const updated = { ...prev };
+      questions.forEach((q) => {
+        const questionId = q.id || "";
+        const expectedLength = q.options?.length || 0;
+        if (!updated[questionId] || updated[questionId].length !== expectedLength) {
+          updated[questionId] = new Array(expectedLength).fill(0);
+          changed = true;
+        }
+      });
+      return changed ? updated : prev;
+    });
+  }, [questions]);
+
+  useEffect(() => {
+    if (banInfo) return;
+    if (banStorageKey && sessionStorage.getItem(banStorageKey) === "true") {
+      navigate(courseId ? `/quizz/${courseId}` : "/quizz", { replace: true });
+    }
+  }, [banInfo, banStorageKey, navigate, courseId]);
+
+  useEffect(() => {
+    setCurrentQuestionIndex((prev) => {
+      if (!questions.length) return 0;
+      return Math.min(prev, questions.length - 1);
+    });
+  }, [questions.length]);
+
+  const currentQuestion = questions[currentQuestionIndex];
+
+  const getQuestionTypeLabel = (question?: SnapshotQuestion) => {
+    const type = (question?.type || "").toLowerCase();
+    switch (type) {
+      case "multichoice":
+        return "Multiple Choice • Select all that apply";
+      case "true_false":
+        return "True / False";
+      case "fill_blank":
+        return "Fill in the Blank";
+      default:
+        return "Single Choice ";
+    }
+  };
+
   const triggerAutoSave = async (questionId: string, answerArray: number[]) => {
-    if (!quizAttemptId) return;
+    if (!quizAttemptId || banInfo) return;
     setAutoSaveState({ status: "saving", message: "" });
     try {
       const response = await quizAttemptService.autoSaveAnswer({
@@ -170,8 +257,11 @@ export default function TakeQuizPage() {
         answer: answerArray,
       });
 
-      if (response.attempt?.answers) {
-        persistAttemptState(quizAttemptId, toAnswerPayloads(response.attempt.answers));
+      if (response.attempt) {
+        const updatedAttempt = applyAttemptSnapshot(response.attempt);
+        if (updatedAttempt?.answers) {
+          persistAttemptState(quizAttemptId, toAnswerPayloads(updatedAttempt.answers));
+        }
       }
 
       setAutoSaveState({ status: "saved", message: "" });
@@ -183,9 +273,14 @@ export default function TakeQuizPage() {
       }, 2000);
     } catch (error) {
       console.error("Failed to auto-save answer:", error);
+      const message = getErrorMessage(error, "Auto-save failed");
+      if (isBannedMessage(message)) {
+        markAttemptAsBanned({ reason: message });
+        return;
+      }
       setAutoSaveState({
         status: "error",
-        message: getErrorMessage(error, "Auto-save failed"),
+        message,
       });
     }
   };
@@ -197,11 +292,7 @@ export default function TakeQuizPage() {
     }
 
     if (quiz) {
-      initializeAnswersForQuiz(quiz);
       setLoading(false);
-      if (!quizAttemptId) {
-        setShowPasswordModal(true);
-      }
       return;
     }
 
@@ -221,13 +312,12 @@ export default function TakeQuizPage() {
     };
 
     fetchQuiz();
-  }, [quizId, navigate, courseId, quiz, quizAttemptId, initializeAnswersForQuiz]);
+  }, [quizId, navigate, courseId, quiz]);
 
   useEffect(() => {
     if (!quiz || !storageKey || restoredAttemptRef.current) return;
     const persisted = sessionStorage.getItem(storageKey);
     if (!persisted) {
-      setShowPasswordModal(true);
       return;
     }
 
@@ -250,15 +340,12 @@ export default function TakeQuizPage() {
             setAnswers((prev) => ({ ...prev, ...restored }));
           }
         }
-        setShowPasswordModal(false);
         restoredAttemptRef.current = true;
         return;
       }
     } catch {
       sessionStorage.removeItem(storageKey);
     }
-
-    setShowPasswordModal(true);
   }, [quiz, storageKey]);
 
   useEffect(() => {
@@ -271,39 +358,46 @@ export default function TakeQuizPage() {
         const attemptDetail = await quizAttemptService.getQuizAttempt(quizAttemptId);
         if (cancelled) return;
 
+        const latestAttempt = applyAttemptSnapshot(attemptDetail);
+        if (!latestAttempt || latestAttempt.status === "abandoned") {
+          return;
+        }
+
         let populatedQuiz: QuizResponse | undefined;
-        if (attemptDetail.quizId && typeof attemptDetail.quizId !== "string") {
-          populatedQuiz = attemptDetail.quizId as QuizResponse;
+        if (latestAttempt.quizId && typeof latestAttempt.quizId !== "string") {
+          populatedQuiz = latestAttempt.quizId as QuizResponse;
           setQuiz(populatedQuiz);
         }
 
-        if (Array.isArray(attemptDetail.answers)) {
-          const restored = mapAnswersFromAttempt(attemptDetail.answers);
+        if (Array.isArray(latestAttempt.answers)) {
+          const restored = mapAnswersFromAttempt(latestAttempt.answers);
           if (Object.keys(restored).length) {
             setAnswers((prev) => ({ ...prev, ...restored }));
           }
-          persistAttemptState(quizAttemptId, toAnswerPayloads(attemptDetail.answers));
+          persistAttemptState(quizAttemptId, toAnswerPayloads(latestAttempt.answers));
         }
 
-        if (attemptDetail.status === "submitted") {
+        if (latestAttempt.status === "submitted") {
           const derived = deriveResultFromAttempt(
-            attemptDetail,
+            latestAttempt,
             populatedQuiz || quiz
           );
           if (derived) {
             setResult(derived);
           }
           setSubmitted(true);
-          setShowPasswordModal(false);
           return;
         }
 
-        setShowPasswordModal(false);
       } catch (error) {
         if (cancelled) return;
         console.error("Failed to load quiz attempt:", error);
-        setPasswordError(getErrorMessage(error, "Không thể tải bài làm. Vui lòng thử lại."));
-        setShowPasswordModal(true);
+        const message = getErrorMessage(error, "Không thể tải bài làm. Vui lòng thử lại.");
+        if (isBannedMessage(message)) {
+          markAttemptAsBanned({ reason: message });
+        } else {
+          setPasswordError(message);
+        }
       } finally {
         if (!cancelled) {
           setAttemptLoading(false);
@@ -316,7 +410,7 @@ export default function TakeQuizPage() {
     return () => {
       cancelled = true;
     };
-  }, [quizAttemptId, persistAttemptState, quiz]);
+  }, [quizAttemptId, persistAttemptState, quiz, applyAttemptSnapshot, markAttemptAsBanned]);
 
   useEffect(() => {
     return () => {
@@ -325,6 +419,10 @@ export default function TakeQuizPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    setBanInfo(null);
+  }, [quizId]);
 
   const formatTime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -351,6 +449,26 @@ export default function TakeQuizPage() {
     return fallback;
   };
 
+  const isBannedMessage = (message: string) => message.toLowerCase().includes("banned");
+
+  const confirmIncompleteSubmission = useCallback(async (): Promise<boolean> => {
+    const Swal = (await import("sweetalert2")).default;
+    const result = await Swal.fire({
+      title: "Submit unfinished quiz?",
+      text: "You have unanswered questions. Do you still want to submit?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Submit",
+      cancelButtonText: "Review",
+      reverseButtons: true,
+      focusCancel: true,
+      customClass: {
+        confirmButton: "bg-indigo-600",
+      },
+    });
+    return result.isConfirmed;
+  }, []);
+
   const handleEnroll = async () => {
     if (!quizId || !password.trim()) {
       setPasswordError("Please enter the quiz password");
@@ -366,13 +484,16 @@ export default function TakeQuizPage() {
         hashPassword: password.trim(),
       });
 
+      const latestAttempt = applyAttemptSnapshot(attempt);
+      if (latestAttempt?.status === "abandoned") {
+        return;
+      }
       setQuizAttemptId(attempt._id);
       const restored = mapAnswersFromAttempt(attempt.answers);
       if (Object.keys(restored).length) {
         setAnswers((prev) => ({ ...prev, ...restored }));
       }
       persistAttemptState(attempt._id, toAnswerPayloads(attempt.answers));
-      setShowPasswordModal(false);
       setPassword("");
     } catch (error) {
       console.error("Failed to enroll in quiz:", error);
@@ -380,14 +501,18 @@ export default function TakeQuizPage() {
         error,
         "Failed to enroll in quiz. Please check the password and try again."
       );
-      setPasswordError(message);
+      if (isBannedMessage(message)) {
+        markAttemptAsBanned({ reason: message });
+      } else {
+        setPasswordError(message);
+      }
     } finally {
       setEnrolling(false);
     }
   };
 
   const handleAnswerChange = (question: SnapshotQuestion, optionIndex: number, checked: boolean) => {
-    if (!quizAttemptId) return;
+    if (!quizAttemptId || banInfo) return;
     const questionId = question.id || "";
     const optionLength = question.options?.length || 0;
     const current = answers[questionId] || new Array(optionLength).fill(0);
@@ -412,30 +537,28 @@ export default function TakeQuizPage() {
   };
 
   const goToQuestion = (index: number) => {
-    if (index === currentQuestionIndex || !questions.length) return;
+    if (banInfo || index === currentQuestionIndex || !questions.length) return;
     setCurrentQuestionIndex(Math.max(0, Math.min(index, questions.length - 1)));
   };
 
   const handleNextQuestion = () => {
-    if (!questions.length) return;
+    if (!questions.length || banInfo) return;
     setCurrentQuestionIndex((prev) => Math.min(prev + 1, questions.length - 1));
   };
 
   const handlePrevQuestion = () => {
-    if (!questions.length) return;
+    if (!questions.length || banInfo) return;
     setCurrentQuestionIndex((prev) => Math.max(prev - 1, 0));
   };
 
   const handleSubmit = useCallback(
     async (skipConfirm?: boolean) => {
-      if (!quizAttemptId || !quiz || submitted) return;
+      if (!quizAttemptId || !quiz || submitted || banInfo) return;
 
       if (!skipConfirm) {
         const answerCount = Object.values(answers).filter((arr) => arr?.some((i) => i === 1)).length;
         if (answerCount < questions.length) {
-          const proceed = window.confirm(
-            "Bạn chưa trả lời hết tất cả câu hỏi. Bạn có chắc muốn nộp bài không?"
-          );
+          const proceed = await confirmIncompleteSubmission();
           if (!proceed) {
             return;
           }
@@ -458,21 +581,34 @@ export default function TakeQuizPage() {
       } catch (error) {
         console.error("Failed to submit quiz:", error);
         const message = getErrorMessage(error, "Failed to submit quiz. Please try again.");
+        if (isBannedMessage(message)) {
+          markAttemptAsBanned({ reason: message });
+          return;
+        }
         if (message.toLowerCase().includes("quiz attempt not found")) {
           clearPersistedAttempt();
           setQuizAttemptId(null);
-          setShowPasswordModal(true);
         }
         alert(message);
       } finally {
         setSubmitting(false);
       }
     },
-    [quizAttemptId, quiz, submitted, clearPersistedAttempt, answers, questions]
+    [
+      quizAttemptId,
+      quiz,
+      submitted,
+      clearPersistedAttempt,
+      answers,
+      questions,
+      confirmIncompleteSubmission,
+      banInfo,
+      markAttemptAsBanned,
+    ]
   );
 
   useEffect(() => {
-    if (quiz && quizAttemptId && !submitted) {
+    if (quiz && quizAttemptId && !submitted && !banInfo) {
       const endTime = new Date(quiz.endTime).getTime();
 
       const updateTimer = () => {
@@ -498,7 +634,7 @@ export default function TakeQuizPage() {
         }
       };
     }
-  }, [quiz, quizAttemptId, submitted, handleSubmit]);
+  }, [quiz, quizAttemptId, submitted, handleSubmit, banInfo]);
 
   if (loading) {
     return (
@@ -521,12 +657,147 @@ export default function TakeQuizPage() {
     return null;
   }
 
+  const needsPasswordGate = !quizAttemptId && !submitted && !banInfo;
+
+  if (banInfo) {
+    return (
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar role={(user?.role as "admin" | "teacher" | "student") || "student"} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Navbar />
+          <main
+            className="flex-1 overflow-y-auto px-6 pb-6 pt-32 flex items-center justify-center"
+            style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}
+          >
+            <div
+              className="w-full max-w-2xl text-center p-10 rounded-2xl border shadow-xl space-y-4"
+              style={{ backgroundColor: "var(--card-surface)", borderColor: "var(--card-border)" }}
+            >
+              <ShieldOff className="w-12 h-12 mx-auto" style={{ color: "#ef4444" }} />
+              <h1 className="text-2xl font-bold" style={{ color: "var(--heading-text)" }}>
+                Quiz attempt banned
+              </h1>
+              <p style={{ color: "var(--muted-text)" }}>
+                {banInfo.reason || "This attempt has been banned by your instructor."}
+              </p>
+              {banInfo.attemptId && (
+                <p className="text-sm font-mono" style={{ color: "var(--muted-text)" }}>
+                  Attempt ID: {banInfo.attemptId}
+                </p>
+              )}
+              <p className="text-xs" style={{ color: "var(--muted-text)" }}>
+                {banInfo.timestamp ? `Updated at ${new Date(banInfo.timestamp).toLocaleString()}` : ""}
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  onClick={() => navigate(courseId ? `/quizz/${courseId}` : "/quizz")}
+                  className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white"
+                  style={{ backgroundColor: "#6d28d9" }}
+                >
+                  Back to quizzes
+                </button>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  if (banInfo) {
+    return null;
+  }
+
+  if (needsPasswordGate) {
+    return (
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar role={(user?.role as "admin" | "teacher" | "student") || "student"} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Navbar />
+          <main
+            className="flex-1 overflow-y-auto px-6 pb-6 pt-32"
+            style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}
+          >
+            <div className="max-w-2xl mx-auto">
+              <button
+                onClick={() => navigate(courseId ? `/quizz/${courseId}` : "/quizz")}
+                className="flex items-center gap-2 text-sm mb-6 hover:underline"
+                style={{ color: "var(--muted-text)" }}
+              >
+                ← Back to Quizzes
+              </button>
+              <div
+                className="rounded-2xl p-8 shadow-xl border space-y-5 text-center"
+                style={{ backgroundColor: "var(--card-surface)", borderColor: "var(--card-border)" }}
+              >
+                <Lock className="w-10 h-10 mx-auto" style={{ color: "#6d28d9" }} />
+                <h1 className="text-2xl font-bold" style={{ color: "var(--heading-text)" }}>
+                  Enter Quiz Password
+                </h1>
+                <p className="text-sm" style={{ color: "var(--muted-text)" }}>
+                  This quiz is password protected. Provide the password to begin <strong>{quiz.title}</strong>.
+                </p>
+                <div className="text-left space-y-2">
+                  <label className="text-sm font-medium" style={{ color: "var(--heading-text)" }}>
+                    Quiz Password
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setPasswordError("");
+                    }}
+                    onKeyDown={(e) => e.key === "Enter" && handleEnroll()}
+                    placeholder="Enter password"
+                    className="w-full px-4 py-3 rounded-lg border"
+                    style={{
+                      backgroundColor: "var(--input-bg)",
+                      borderColor: passwordError ? "#ef4444" : "var(--input-border)",
+                      color: "var(--input-text)",
+                    }}
+                    autoFocus
+                  />
+                  {passwordError && (
+                    <p className="text-sm" style={{ color: "#ef4444" }}>
+                      {passwordError}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={() => navigate(courseId ? `/quizz/${courseId}` : "/quizz")}
+                    className="px-5 py-2.5 rounded-lg text-sm font-medium"
+                    style={{ backgroundColor: "var(--divider-color)", color: "var(--heading-text)" }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleEnroll}
+                    disabled={enrolling}
+                    className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+                    style={{ backgroundColor: "#6d28d9" }}
+                  >
+                    {enrolling ? "Verifying..." : "Unlock Quiz"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar role={(user?.role as "admin" | "teacher" | "student") || "student"} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
-        <main className="flex-1 overflow-y-auto p-6" style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}>
+        <main
+          className="flex-1 overflow-y-auto px-6 pb-6 pt-32"
+          style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}
+        >
           <div className="max-w-4xl mx-auto">
             {/* Header */}
             <div className="mb-6">
@@ -559,64 +830,6 @@ export default function TakeQuizPage() {
               </div>
             )}
 
-            {/* Password Modal */}
-            {showPasswordModal && (
-              <div className="fixed inset-0 z-[120] flex items-center justify-center px-4 bg-black/80">
-                <div
-                  className="w-full max-w-md rounded-xl shadow-xl p-6"
-                  style={{ backgroundColor: "var(--card-surface)", border: "1px solid var(--card-border)" }}
-                >
-                  <div className="flex items-center gap-3 mb-4">
-                    <Lock className="w-6 h-6" style={{ color: "var(--heading-text)" }} />
-                    <h2 className="text-xl font-semibold" style={{ color: "var(--heading-text)" }}>
-                      Enter Quiz Password
-                    </h2>
-                  </div>
-                  <p className="text-sm mb-4" style={{ color: "var(--muted-text)" }}>
-                    This quiz is password protected. Please enter the password to start.
-                  </p>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value);
-                      setPasswordError("");
-                    }}
-                    onKeyDown={(e) => e.key === "Enter" && handleEnroll()}
-                    placeholder="Enter password"
-                    className="w-full px-4 py-2 rounded-lg border mb-2"
-                    style={{
-                      backgroundColor: "var(--input-bg)",
-                      borderColor: passwordError ? "#ef4444" : "var(--input-border)",
-                      color: "var(--input-text)",
-                    }}
-                    autoFocus
-                  />
-                  {passwordError && (
-                    <p className="text-sm mb-4" style={{ color: "#ef4444" }}>
-                      {passwordError}
-                    </p>
-                  )}
-                  <div className="flex gap-3 justify-end">
-                    <button
-                      onClick={() => navigate(courseId ? `/quizz/${courseId}` : "/quizz")}
-                      className="px-4 py-2 rounded-lg text-sm font-medium"
-                      style={{ backgroundColor: "var(--divider-color)", color: "var(--heading-text)" }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleEnroll}
-                      disabled={enrolling}
-                      className="px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-50"
-                      style={{ backgroundColor: "#6d28d9" }}
-                    >
-                      {enrolling ? "Enrolling..." : "Start Quiz"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {quizAttemptId && !submitted && attemptLoading && (
               <div
