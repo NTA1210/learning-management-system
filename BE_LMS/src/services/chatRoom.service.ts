@@ -13,7 +13,7 @@ export const getChatRooms = async (userId: mongoose.Types.ObjectId) => {
     },
     {
       path: 'lastMessage.senderId',
-      select: 'fullname email avatar_url',
+      select: 'username fullname email avatar_url',
     },
   ]);
 

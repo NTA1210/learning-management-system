@@ -47,7 +47,7 @@ import {
   submissionRoutes,
   userRoutes,
 } from './routes';
-import { socketAuthMiddleware } from './socket/socketAuthMiddleware';
+import { socketAuthMiddleware } from './socket/middlewares/socketAuthMiddleware';
 import initializeSocket from './socket/initializeSocket';
 import messageRoutes from './routes/message.route';
 import chatRoomRoutes from './routes/chatRoom.route';

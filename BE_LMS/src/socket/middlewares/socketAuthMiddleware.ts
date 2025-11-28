@@ -7,12 +7,16 @@ export const socketAuthMiddleware = async (socket: Socket, next: (err?: Extended
   const cookies = socket.handshake.headers.cookie;
 
   if (!cookies) {
+    console.error('No cookie found');
+
     return next(new Error('No cookie found'));
   }
   const parsed = cookie.parse(cookies);
   const token = parsed.accessToken;
 
   if (!token) {
+    console.error('No token found');
+
     return next(new Error('No token found'));
   }
 
@@ -20,7 +24,9 @@ export const socketAuthMiddleware = async (socket: Socket, next: (err?: Extended
     const { payload } = verifyToken(token);
 
     if (!payload) {
-      return next(new Error('Invalid token'));
+      console.log('Invalid token 12313123');
+
+      return next(new Error('Token expired'));
     }
 
     const user = await UserModel.findById(payload.userId).select('-password');
@@ -32,9 +38,8 @@ export const socketAuthMiddleware = async (socket: Socket, next: (err?: Extended
     socket.userId = user.id;
 
     next();
-  } catch (error) {
-    console.error('Error in socketAuthMiddleware:', error);
-
-    return next(new Error('Unauthorized'));
+  } catch (error: any) {
+    console.error('Error in socketAuthMiddleware:', error.message);
+    next(new Error('Token expired')); // FE sẽ xử lý reconnect
   }
 };
