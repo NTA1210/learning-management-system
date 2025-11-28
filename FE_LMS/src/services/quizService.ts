@@ -52,6 +52,7 @@ export interface QuizResponse {
   isPublished?: boolean;
   isCompleted?: boolean;
   isDeleted?: boolean;
+  deletedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
   snapshotQuestions?: SnapshotQuestion[];
@@ -68,8 +69,8 @@ export interface GetQuizzesByCourseParams {
   isDeleted?: boolean;
   isCompleted?: boolean;
   isPublished?: boolean;
-  page?: number;
-  limit?: number;
+  page?: number | string;
+  limit?: number | string;
   search?: string;
 }
 
