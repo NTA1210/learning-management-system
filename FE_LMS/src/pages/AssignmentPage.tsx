@@ -265,22 +265,26 @@ const AssignmentPage: React.FC = () => {
     return defaultFormValues;
   };
 
+  const buildAssignmentFormData = (values: AssignmentFormValues) => {
+    const formData = new FormData();
+    formData.append("courseId", values.courseId);
+    formData.append("title", values.title);
+    formData.append("description", values.description || "");
+    formData.append("maxScore", String(values.maxScore));
+    if (values.dueDate) {
+      formData.append("dueDate", values.dueDate);
+    }
+    formData.append("allowLate", String(values.allowLate));
+    if (values.file) {
+      formData.append("file", values.file);
+    }
+    return formData;
+  };
+
   const handleModalSubmit = async (values: AssignmentFormValues) => {
     try {
       if (modalState?.mode === "create") {
-        const formData = new FormData();
-        formData.append("courseId", values.courseId);
-        formData.append("title", values.title);
-        formData.append("description", values.description || "");
-        formData.append("maxScore", String(values.maxScore));
-        if (values.dueDate) {
-          formData.append("dueDate", values.dueDate);
-        }
-        formData.append("allowLate", String(values.allowLate));
-        if (values.file) {
-          formData.append("file", values.file);
-        }
-
+        const formData = buildAssignmentFormData(values);
         await httpClient.post(`/assignments`, formData, {
           withCredentials: true,
           headers: {
@@ -289,15 +293,12 @@ const AssignmentPage: React.FC = () => {
         });
         await showSwalSuccess("Assignment created successfully");
       } else if (modalState?.mode === "edit" && modalState.assignment) {
-        await httpClient.put(`/assignments/${modalState.assignment._id}`, {
-          courseId: values.courseId,
-          title: values.title,
-          description: values.description,
-          maxScore: values.maxScore,
-          dueDate: values.dueDate,
-          allowLate: values.allowLate,
-        }, {
+        const formData = buildAssignmentFormData(values);
+        await httpClient.put(`/assignments/${modalState.assignment._id}`, formData, {
           withCredentials: true,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
         });
         await showSwalSuccess("Assignment updated successfully");
       }
