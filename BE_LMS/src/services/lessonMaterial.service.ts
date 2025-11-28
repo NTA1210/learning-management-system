@@ -627,6 +627,7 @@ export const createLessonMaterial = async (
 export const updateLessonMaterial = async (
   id: string,
   data: Partial<CreateLessonMaterialParams>,
+  file: Express.Multer.File | undefined,
   userId: mongoose.Types.ObjectId,
   userRole: Role
 ) => {
@@ -637,6 +638,12 @@ export const updateLessonMaterial = async (
   const material = await LessonMaterialModel.findById(id);
   appAssert(material, NOT_FOUND, "Material not found");
 
+  const lesson = await LessonModel.findById(material.lessonId).populate(
+    "courseId",
+    "teacherIds"
+  );
+  appAssert(lesson, NOT_FOUND, "Lesson not found");
+
   // Check if user has permission to update this material
   if (userRole === Role.STUDENT) {
     appAssert(false, FORBIDDEN, "Students cannot update lesson materials");
@@ -644,10 +651,6 @@ export const updateLessonMaterial = async (
     // Check if teacher uploaded this material or is instructor of the lesson's course
     const isUploader =
       material.uploadedBy && material.uploadedBy === userId;
-    const lesson = await LessonModel.findById(material.lessonId).populate(
-      "courseId",
-      "teacherIds"
-    );
     const isInstructor =
       lesson &&
       (lesson.courseId as any).teacherIds.includes(
@@ -684,6 +687,38 @@ export const updateLessonMaterial = async (
   if (data.mimeType !== undefined) updateData.mimeType = data.mimeType;
   if (data.size !== undefined) updateData.size = data.size;
   if (data.key !== undefined) updateData.key = data.key;
+
+  if (file) {
+    const courseIdRaw =
+      (lesson.courseId as any)._id || lesson.courseId;
+    const courseIdObj =
+      courseIdRaw instanceof mongoose.Types.ObjectId
+        ? courseIdRaw
+        : new mongoose.Types.ObjectId(courseIdRaw.toString());
+    const lessonIdObj =
+      material.lessonId instanceof mongoose.Types.ObjectId
+        ? material.lessonId
+      : new mongoose.Types.ObjectId((lesson._id as any).toString());
+
+    const uploadPrefix = prefixLessonMaterial(courseIdObj, lessonIdObj);
+    const uploadResult = await uploadFile(file, uploadPrefix);
+
+    if (
+      material.key &&
+      !material.key.startsWith("manual-materials/")
+    ) {
+      try {
+        await removeFile(material.key);
+      } catch (err) {
+        console.error("Failed to remove old material file:", err);
+      }
+    }
+
+    updateData.key = uploadResult.key;
+    updateData.originalName = uploadResult.originalName;
+    updateData.mimeType = uploadResult.mimeType;
+    updateData.size = file.size;
+  }
 
   const updatedMaterial = await LessonMaterialModel.findByIdAndUpdate(
     id,

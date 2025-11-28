@@ -25,8 +25,6 @@ import {DashboardPage ,
       FeedbackListPage,
       EnrollmentsListPage,
       CurriculumPage,
-
-
       UserManagementPage,
       UserBioPage,
       AttendancePage,
@@ -35,6 +33,8 @@ import {DashboardPage ,
       ForumListPage,
       ForumDetailPage,
       ForumPostDetailPage,
+      OnboardingPage,
+      DeletedCoursesPage,
     } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -68,9 +68,19 @@ function AppRoutes() {
             <DashboardPage />
           </ProtectedRoute>
         } />
+        <Route path="/onboarding" element={
+          <ProtectedRoute requiredRole="student">
+            <OnboardingPage />
+          </ProtectedRoute>
+        } />
         <Route path="/admin/courses" element={
           <ProtectedRoute requiredRole="admin">
             <CourseManagementPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin/courses/deleted" element={
+          <ProtectedRoute requiredRole="admin">
+            <DeletedCoursesPage />
           </ProtectedRoute>
         } />
         <Route path="/courses" element={

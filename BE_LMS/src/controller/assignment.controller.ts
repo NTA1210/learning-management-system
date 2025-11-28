@@ -75,10 +75,17 @@
   export const updateAssignmentHandler = catchErrors(async (req, res) => {
     const assignmentId = assignmentIdSchema.parse(req.params.id);
     const data = updateAssignmentSchema.parse(req.body);
-  const userId = req.userId;
-  const userRole = req.role;
+    const userId = req.userId;
+    const userRole = req.role;
+    const file = req.file as Express.Multer.File | undefined;
 
-  const assignment = await updateAssignment(assignmentId, data, userId, userRole);
+    const assignment = await updateAssignment(
+      assignmentId,
+      data,
+      userId,
+      userRole,
+      file
+    );
 
     return res.success(OK, {
       data: assignment,

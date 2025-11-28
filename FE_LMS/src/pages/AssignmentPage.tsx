@@ -36,6 +36,7 @@ const defaultFormValues: AssignmentFormValues = {
   maxScore: 10,
   dueDate: "",
   allowLate: false,
+  file: null,
 };
 
 const AssignmentPage: React.FC = () => {
@@ -267,12 +268,35 @@ const AssignmentPage: React.FC = () => {
   const handleModalSubmit = async (values: AssignmentFormValues) => {
     try {
       if (modalState?.mode === "create") {
-        await httpClient.post(`/assignments/course/${values.courseId}`, values, {
+        const formData = new FormData();
+        formData.append("courseId", values.courseId);
+        formData.append("title", values.title);
+        formData.append("description", values.description || "");
+        formData.append("maxScore", String(values.maxScore));
+        if (values.dueDate) {
+          formData.append("dueDate", values.dueDate);
+        }
+        formData.append("allowLate", String(values.allowLate));
+        if (values.file) {
+          formData.append("file", values.file);
+        }
+
+        await httpClient.post(`/assignments`, formData, {
           withCredentials: true,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
         });
         await showSwalSuccess("Assignment created successfully");
       } else if (modalState?.mode === "edit" && modalState.assignment) {
-        await httpClient.put(`/assignments/${modalState.assignment._id}`, values, {
+        await httpClient.put(`/assignments/${modalState.assignment._id}`, {
+          courseId: values.courseId,
+          title: values.title,
+          description: values.description,
+          maxScore: values.maxScore,
+          dueDate: values.dueDate,
+          allowLate: values.allowLate,
+        }, {
           withCredentials: true,
         });
         await showSwalSuccess("Assignment updated successfully");

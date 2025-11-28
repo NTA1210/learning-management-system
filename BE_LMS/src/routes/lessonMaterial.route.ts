@@ -36,7 +36,13 @@ lessonMaterialRoutes.post("/", authenticate, authorize(Role.TEACHER, Role.ADMIN)
 // Supports both single file (field: 'file') and multiple files (field: 'files')
 lessonMaterialRoutes.post("/upload", authenticate, authorize(Role.TEACHER, Role.ADMIN), upload.any(), uploadLessonMaterialController);
 // PATCH /lesson-material/id/:id - Cập nhật theo ID (Admin/Teacher only)
-lessonMaterialRoutes.patch("/:id", authenticate, authorize(Role.TEACHER, Role.ADMIN), updateLessonMaterialController);
+lessonMaterialRoutes.patch(
+  "/:id",
+  authenticate,
+  authorize(Role.TEACHER, Role.ADMIN),
+  upload.single("file"),
+  updateLessonMaterialController
+);
 // DELETE /lesson-material/id/:id - Xóa theo ID (Admin/Teacher only)
 lessonMaterialRoutes.delete("/:id", authenticate, authorize(Role.TEACHER, Role.ADMIN), deleteLessonMaterialController);
 // DELETE /lesson-material/id/:id/file - Xóa file tài liệu (Admin/Teacher only)

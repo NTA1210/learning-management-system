@@ -420,6 +420,16 @@ export const autoSaveQuizAttempt = async (
   return { data, total, answeredTotal };
 };
 
+/**
+ * Get a quiz attempt by id.
+ * @param  quizAttemptId - ID of the quiz attempt to get.
+ * @param  userId - ID of the user who is getting the quiz attempt.
+ * @param  role - Role of the user who is getting the quiz attempt.
+ * @returns  The quiz attempt.
+ * @throws  If the quiz attempt is not found.
+ * @throws  If the user is not the creator of the quiz and is a student.
+ * @throws  If the user is not a teacher of the course and is a teacher.
+ */
 export const getQuizAttemptById = async (
   quizAttemptId: string,
   userId: mongoose.Types.ObjectId,

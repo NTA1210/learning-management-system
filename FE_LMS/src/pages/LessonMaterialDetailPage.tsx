@@ -909,7 +909,7 @@ const LessonMaterialDetailPage: React.FC = () => {
                 >
                   <Minimize2 size={20} />
                 </button>
-                <button
+                {/* <button
                   onClick={() => selectedMaterial && handleDownload(selectedMaterial._id)}
                   className="p-2 rounded-lg transition-all duration-200 hover:shadow-lg"
                   style={{
@@ -920,7 +920,7 @@ const LessonMaterialDetailPage: React.FC = () => {
                   disabled={!selectedMaterial}
                 >
                   <Download size={20} />
-                </button>
+                </button> */}
                 <button
                   onClick={closeViewer}
                   className="p-2 rounded-lg transition-all duration-200 hover:shadow-lg"

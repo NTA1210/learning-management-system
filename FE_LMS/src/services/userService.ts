@@ -43,7 +43,7 @@ export interface UserDetail extends User {
   bio?: string;
   isVerified?: boolean;
   status?: string;
-  specialistIds?: any[];
+  specialistIds?: string[];
   createdAt?: string;
   updatedAt?: string;
   avatar_url?: string;
@@ -67,6 +67,9 @@ export const userService = {
     if (params?.status) queryParams.append("status", params.status);
     if (params?.username) queryParams.append("username", params.username);
     if (params?.email) queryParams.append("email", params.email);
+    if (params?.specialistIds && params.specialistIds.length > 0) {
+      queryParams.append("specialistIds", JSON.stringify(params.specialistIds));
+    }
     if (params?.fullname) queryParams.append("fullname", params.fullname);
 
     const queryString = queryParams.toString();
@@ -82,6 +85,29 @@ export const userService = {
 
   getUserById: async (userId: string): Promise<UserDetail> => {
     const response = await http.get(`/users/${userId}`);
+    return response.data as UserDetail;
+  },
+
+  updateUserSpecialists: async (
+    userId: string,
+    specialistIds: string[],
+  ): Promise<UserDetail> => {
+    const payload = { specialistIds };
+    const response = await http.put(`/users/${userId}`, payload);
+    return response.data as UserDetail;
+  },
+
+  updateUser: async (
+    userId: string,
+    data: {
+      fullname?: string;
+      specialistIds?: string[];
+    },
+  ): Promise<UserDetail> => {
+    const payload: { fullname?: string; specialistIds?: string[] } = {};
+    if (data.fullname !== undefined) payload.fullname = data.fullname;
+    if (data.specialistIds !== undefined) payload.specialistIds = data.specialistIds;
+    const response = await http.put(`/users/${userId}`, payload);
     return response.data as UserDetail;
   },
 };

@@ -8,6 +8,11 @@ import { FORBIDDEN, NOT_FOUND, BAD_REQUEST, TOO_MANY_REQUESTS } from "../constan
 import { Role } from "../types";
 import { EnrollmentStatus } from "../types/enrollment.type";
 
+// Cấu hình chống cheat
+const HEARTBEAT_MIN_INTERVAL = 12; // giây – không cho gửi quá nhanh
+const MAX_TIME_MULTIPLIER = 1.3;   // tối đa được cộng 1.3x thời gian thực tế trôi qua
+const COMPLETION_THRESHOLD = 0.95; // 95% → đánh dấu hoàn thành (giống Udemy)
+
 function calcProgressPercent(durationMinutes?: number | null, timeSpentSeconds?: number | null) {
   if (!durationMinutes || durationMinutes <= 0 || !timeSpentSeconds || timeSpentSeconds <= 0) return 0;
   const totalSeconds = durationMinutes * 60;
@@ -64,7 +69,7 @@ export const getLessonProgress = async (
  * - Nếu chưa có progress thì tạo mới.
  * - Chặn giá trị bất thường: incSeconds ∈ [1, 300].
  * - STUDENT: chỉ cập nhật của chính mình; TEACHER không cập nhật thay; ADMIN được phép.
- * - Auto-complete khi đạt 100% (nếu lesson có durationMinutes hợp lệ).
+ * - Auto-complete khi đạt 95% (nếu lesson có durationMinutes hợp lệ).
  */
 export const addTimeForLesson = async (
   lessonId: string,
@@ -73,63 +78,86 @@ export const addTimeForLesson = async (
   requesterRole: Role
 ) => {
   appAssert(mongoose.Types.ObjectId.isValid(lessonId), NOT_FOUND, "Invalid lesson ID");
-  appAssert(Number.isFinite(incSeconds) && incSeconds >= 1 && incSeconds <= 300, BAD_REQUEST, "Invalid time increment");
-
-  const lesson = await LessonModel.findById(lessonId).populate("courseId", "teacherIds").lean();
-  appAssert(lesson, NOT_FOUND, "Lesson not found");
-
-  // Only student self or admin can update time
-  if (requesterRole === Role.TEACHER) {
-    appAssert(false, FORBIDDEN, "Teacher cannot update student's time");
-  }
-
-  // Ensure enrollment for student
-  if (requesterRole === Role.STUDENT) { 
-    const enrolled = await EnrollmentModel.exists({
-      studentId: requesterId,
-      courseId: (lesson.courseId as any)._id,
-      status: EnrollmentStatus.APPROVED
-    });
-    appAssert(enrolled, FORBIDDEN, "Not enrolled in this course");
-  }
-
-  const now = new Date();
-  
-  // Check existing progress to validate rate limiting (60 seconds)
-  // Sử dụng lastAccessedAt để kiểm tra, nhưng chỉ áp dụng nếu đã có timeSpentSeconds > 0
-  // (để tránh chặn request đầu tiên hoặc sau khi completeLesson)
-  const existingProgress = await LessonProgressModel.findOne({
-    lessonId: new mongoose.Types.ObjectId(lessonId),
-    courseId: (lesson.courseId as any)._id,
-    studentId: new mongoose.Types.ObjectId(requesterId)
-  }).lean();
-
-  // Chỉ kiểm tra rate limiting nếu đã có thời gian học (tức là đã từng gọi addTimeForLesson)
-  if (existingProgress?.lastAccessedAt && existingProgress?.timeSpentSeconds && existingProgress.timeSpentSeconds > 0) {
-    const timeSinceLastUpdate = (now.getTime() - existingProgress.lastAccessedAt.getTime()) / 1000; // seconds
-    const minIntervalSeconds = 60;
-    appAssert(
-      timeSinceLastUpdate >= minIntervalSeconds,
-      TOO_MANY_REQUESTS,
-      `Please wait ${Math.ceil(minIntervalSeconds - timeSinceLastUpdate)} seconds before sending another request`
-    );
-  }
-
-  const progress = await LessonProgressModel.findOneAndUpdate(
-    { lessonId: new mongoose.Types.ObjectId(lessonId), courseId: (lesson.courseId as any)._id, studentId: new mongoose.Types.ObjectId(requesterId) },
-    { $setOnInsert: { isCompleted: false }, $inc: { timeSpentSeconds: incSeconds }, $set: { lastAccessedAt: now } },
-    { new: true, upsert: true }
+  appAssert(
+    Number.isInteger(incSeconds) && incSeconds >= 1 && incSeconds <= 300,
+    BAD_REQUEST,
+    "incSeconds must be integer 1-300"
   );
 
-  const progressPercent = calcProgressPercent((lesson as any).durationMinutes, progress?.timeSpentSeconds || 0);
-  if (progress && !progress.isCompleted && progressPercent >= 100) {
+  const lessonObjId = new mongoose.Types.ObjectId(lessonId);
+  const studentObjId = new mongoose.Types.ObjectId(requesterId);
+
+  const lesson = await LessonModel.findById(lessonObjId)
+    .populate<{ courseId: { _id: mongoose.Types.ObjectId } }>("courseId")
+    .lean();
+  appAssert(lesson, NOT_FOUND, "Lesson not found");
+
+  const courseId = (lesson.courseId as any)._id;
+
+  // Phân quyền
+  if (requesterRole === Role.STUDENT) {
+    const enrolled = await EnrollmentModel.exists({
+      studentId: studentObjId,
+      courseId,
+      status: EnrollmentStatus.APPROVED,
+    });
+    appAssert(enrolled, FORBIDDEN, "Not enrolled in this course");
+  } else if (requesterRole === Role.TEACHER) {
+    appAssert(false, FORBIDDEN, "Teacher cannot update student progress");
+  }
+  // ADMIN → được phép
+
+  const now = new Date();
+
+  // Kiểm tra progress hiện tại
+  const existing = await LessonProgressModel.findOne({
+    lessonId: lessonObjId,
+    courseId,
+    studentId: studentObjId,
+  }).lean();
+
+  if (existing?.lastAccessedAt) {
+    const secondsSinceLast = (now.getTime() - existing.lastAccessedAt.getTime()) / 1000;
+
+    // 1. Rate limit: không cho gửi quá nhanh
+    appAssert(
+      secondsSinceLast >= HEARTBEAT_MIN_INTERVAL,
+      TOO_MANY_REQUESTS,
+      `Please wait ${Math.ceil(HEARTBEAT_MIN_INTERVAL - secondsSinceLast)}s`
+    );
+
+    // 2. CHỐNG CHEAT: không cho cộng quá 1.3x thời gian thực tế
+    const maxAllowed = Math.floor(secondsSinceLast * MAX_TIME_MULTIPLIER);
+    if (incSeconds > maxAllowed) {
+      appAssert(false, BAD_REQUEST, "Time increment exceeds real elapsed time");
+    }
+  }
+
+  // Cộng thời gian
+  const progress = await LessonProgressModel.findOneAndUpdate(
+    { lessonId: lessonObjId, courseId, studentId: studentObjId },
+    {
+      $setOnInsert: { isCompleted: false},
+      $inc: { timeSpentSeconds: incSeconds },
+      $set: { lastAccessedAt: now },
+    },
+    { upsert: true, new: true }
+  );
+
+  // Auto complete khi đạt >= 95%
+  const percent = calcProgressPercent(lesson.durationMinutes, progress.timeSpentSeconds);
+  if (!progress.isCompleted && percent >= COMPLETION_THRESHOLD * 100) {
     progress.isCompleted = true;
-    (progress as any).completedAt = now;
+    progress.completedAt = now; // hook pre-save sẽ bắt nếu cần
     await progress.save();
   }
 
-  return { ...(progress.toObject()), progressPercent };
+  return {
+    ...progress.toObject(),
+    progressPercent: percent,
+  };
 };
+
 
 /**
  * Yêu cầu nghiệp vụ: Đánh dấu hoàn thành bài học.
