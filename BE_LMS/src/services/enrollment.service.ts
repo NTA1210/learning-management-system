@@ -661,7 +661,7 @@ export const updateEnrollment = async (
         {
           title: notificationTitle,
           message: notificationMessage,
-          recipientType: "user",
+          recipientType: "system",
           recipientUser: studentId._id.toString(),
         },
         updatedEnrollment.respondedBy as any || new Types.ObjectId(), // Use respondedBy or system
@@ -823,7 +823,7 @@ export const kickStudentFromCourse = async (
     {
       title: `You have been removed from course ${course.title}`,
       message: `Reason: ${reason}`,
-      recipientType: "user",
+      recipientType: "system",
       recipientUser: enrollment.studentId.toString(),
     },
     userId,
