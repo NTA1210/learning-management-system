@@ -30,7 +30,7 @@ const CourseSchema = new mongoose.Schema<ICourse>(
     status: {
       type: String,
       required: true,
-      enum: [CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED],
+      enum: CourseStatus,
       default: CourseStatus.DRAFT,
     },
     teacherIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],

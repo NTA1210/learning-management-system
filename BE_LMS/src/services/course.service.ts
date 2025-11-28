@@ -2,7 +2,7 @@ import CourseModel from '../models/course.model';
 import SpecialistModel from '../models/specialist.model';
 import UserModel from '../models/user.model';
 import EnrollmentModel from '../models/enrollment.model';
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import SubjectModel from '../models/subject.model';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import SemesterModel from '../models/semester.model'; // Required for Mongoose to register the model
@@ -14,8 +14,7 @@ import { Role, UserStatus } from '../types/user.type';
 import { EnrollmentStatus } from '../types/enrollment.type';
 import { uploadFile, removeFile } from '../utils/uploadFile';
 import { prefixCourseLogo } from '../utils/filePrefix';
-import { QuizModel } from '@/models';
-
+import { AssignmentModel, LessonModel, QuizModel } from '@/models';
 
 import {
   notifyAdminNewCourse,
@@ -26,7 +25,8 @@ import {
 import slugify from 'slugify';
 
 import { snapShotQuestion } from '@/validators/quiz.schemas';
-
+import { AttemptStatus } from '@/types';
+import { SubmissionStatus } from '@/types/submission.type';
 
 // ====================================
 // HELPER FUNCTIONS FOR LOGO MANAGEMENT
@@ -491,7 +491,7 @@ export const createCourse = async (
     lower: true,
     strict: true,
     locale: 'vi',
-    trim: true
+    trim: true,
   });
 
   // Check for duplicate slug and make it unique if needed
@@ -644,14 +644,14 @@ export const updateCourse = async (
       lower: true,
       strict: true,
       locale: 'vi',
-      trim: true
+      trim: true,
     });
 
     // Check for duplicate slug
     const existingSlug = await CourseModel.findOne({
       slug: newSlug,
       isDeleted: false,
-      _id: { $ne: courseId }
+      _id: { $ne: courseId },
     });
 
     if (existingSlug) {
@@ -896,11 +896,7 @@ export const updateCourse = async (
     // 1. Notify Teacher if Admin approved the course
     // Check if status changed from DRAFT to ONGOING (or isPublished changed from false to true)
     // Note: We use the *original* course state vs the *updateData* intent
-    if (
-      isAdmin &&
-      !course.isPublished &&
-      updateData.isPublished === true
-    ) {
+    if (isAdmin && !course.isPublished && updateData.isPublished === true) {
       // Notify all teachers of this course
       const teacherIds = updatedCourse.teacherIds.map((t: any) => t._id.toString());
       // Or just the creator? Usually the teachers assigned should know.
@@ -1325,5 +1321,364 @@ export const getQuizzes = async (
       hasNextPage,
       hasPrevPage,
     },
+  };
+};
+
+/**
+ * Hoàn thành khóa học
+ * - Tính tổng số học viên, lessons, quizzes, assignments cho course
+ * - Cập nhật progress, finalGrade & status cho tất cả học viên
+ * - Tính điểm trung bình theo progress
+ * - Kiểm tra điều kiện DROPPED
+ * - Cập nhật tất cả học viên cùng lúc
+ * - Cập nhật status của course
+ * @param courseId - ID của khóa học
+ * @returns Khoa học hoàn thành
+ */
+export const completeCourse = async (courseId: string) => {
+  const course = await CourseModel.findById(courseId)
+    .populate([
+      {
+        path: 'semesterId',
+        select: 'name year type',
+      },
+      {
+        path: 'teacherIds',
+        select: 'username email fullname avatar_url',
+      },
+    ])
+    .lean();
+  appAssert(course, NOT_FOUND, 'Course not found');
+
+  // If course id completed, don't need to do anything
+  appAssert(course.status !== CourseStatus.COMPLETED, BAD_REQUEST, 'Course is completed');
+
+  const stats = await EnrollmentModel.aggregate([
+    {
+      $match: {
+        courseId: course._id,
+        role: Role.STUDENT,
+        status: { $in: [EnrollmentStatus.APPROVED] },
+      },
+    },
+
+    // ======================
+    // USER INFO
+    // ======================
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'studentId',
+        foreignField: '_id',
+        pipeline: [
+          {
+            $project: {
+              password: 0,
+              email: 0,
+              phone: 0,
+              address: 0,
+              role: 0,
+              createdAt: 0,
+              updatedAt: 0,
+              isVerified: 0,
+              __v: 0,
+            },
+          },
+        ],
+        as: 'student',
+      },
+    },
+    { $set: { student: { $arrayElemAt: ['$student', 0] } } },
+
+    // ======================
+    // ATTENDANCE
+    // ======================
+    {
+      $lookup: {
+        from: 'attendances',
+        let: { sid: '$studentId', cid: '$courseId' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [{ $eq: ['$studentId', '$$sid'] }, { $eq: ['$courseId', '$$cid'] }],
+              },
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              total: { $sum: 1 },
+              present: {
+                $sum: { $cond: [{ $eq: ['$status', 'PRESENT'] }, 1, 0] },
+              },
+              absent: {
+                $sum: { $cond: [{ $eq: ['$status', 'ABSENT'] }, 1, 0] },
+              },
+            },
+          },
+        ],
+        as: 'attendanceStats',
+      },
+    },
+    {
+      $set: {
+        attendance: {
+          total: { $ifNull: [{ $arrayElemAt: ['$attendanceStats.total', 0] }, 0] },
+          present: { $ifNull: [{ $arrayElemAt: ['$attendanceStats.present', 0] }, 0] },
+          absent: { $ifNull: [{ $arrayElemAt: ['$attendanceStats.absent', 0] }, 0] },
+        },
+      },
+    },
+
+    // ======================
+    // QUIZ
+    // ======================
+    {
+      $lookup: {
+        from: 'quizzes',
+        localField: 'courseId',
+        foreignField: 'courseId',
+        as: 'quizzes',
+      },
+    },
+
+    {
+      $lookup: {
+        from: 'quizAttempts',
+        let: { quizIds: '$quizzes._id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $in: ['$quizId', '$$quizIds'] },
+            },
+          },
+          { $match: { status: AttemptStatus.SUBMITTED } },
+          {
+            $group: {
+              _id: null,
+              attempts: { $sum: 1 },
+              totalScore: { $sum: '$score' },
+            },
+          },
+        ],
+        as: 'quizAttempts',
+      },
+    },
+
+    {
+      $set: {
+        quiz: {
+          total: { $size: '$quizzes' },
+          totalAttempt: {
+            $ifNull: [{ $arrayElemAt: ['$quizAttempts.attempts', 0] }, 0],
+          },
+          totalScore: {
+            $ifNull: [{ $arrayElemAt: ['$quizAttempts.totalScore', 0] }, 0],
+          },
+        },
+      },
+    },
+
+    // ======================
+    // ASSIGNMENTS
+    // ======================
+    {
+      $lookup: {
+        from: 'assignments',
+        localField: 'courseId',
+        foreignField: 'courseId',
+        as: 'assignments',
+      },
+    },
+
+    {
+      $lookup: {
+        from: 'submissions',
+        let: { sid: '$studentId' },
+        pipeline: [
+          { $match: { $expr: { $eq: ['$studentId', '$$sid'] } } },
+          { $match: { status: SubmissionStatus.SUBMITTED } },
+          {
+            $group: {
+              _id: null,
+              submitted: { $sum: 1 },
+              totalGrade: { $sum: '$grade' },
+            },
+          },
+        ],
+        as: 'assignmentStats',
+      },
+    },
+
+    {
+      $set: {
+        assignment: {
+          total: { $size: '$assignments' },
+          submitted: {
+            $ifNull: [{ $arrayElemAt: ['$assignmentStats.submitted', 0] }, 0],
+          },
+          totalGrade: {
+            $ifNull: [{ $arrayElemAt: ['$assignmentStats.totalGrade', 0] }, 0],
+          },
+        },
+      },
+    },
+
+    // ======================
+    // LESSONS & PROGRESS
+    // ======================
+    {
+      $lookup: {
+        from: 'lessons',
+        localField: 'courseId',
+        foreignField: 'courseId',
+        as: 'lessons',
+      },
+    },
+
+    {
+      $lookup: {
+        from: 'lessonProgresses',
+        let: { sid: '$studentId', cid: '$courseId' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [{ $eq: ['$studentId', '$$sid'] }, { $eq: ['$courseId', '$$cid'] }],
+              },
+            },
+          },
+          { $match: { isCompleted: true } },
+          { $group: { _id: null, completed: { $sum: 1 } } },
+        ],
+        as: 'lessonStats',
+      },
+    },
+
+    {
+      $set: {
+        lesson: {
+          total: { $size: '$lessons' },
+          completed: {
+            $ifNull: [{ $arrayElemAt: ['$lessonStats.completed', 0] }, 0],
+          },
+        },
+      },
+    },
+
+    // ======================
+    // FINAL TOTAL SCORE
+    // ======================
+    {
+      $set: {
+        totalScore: {
+          $add: ['$quiz.totalScore', '$assignment.totalGrade'],
+        },
+      },
+    },
+
+    // Cleanup
+    {
+      $project: {
+        attendanceStats: 0,
+        quizAttempts: 0,
+        assignmentStats: 0,
+        lessonStats: 0,
+        quizzes: 0,
+        assignments: 0,
+        lessons: 0,
+      },
+    },
+  ]);
+
+  // ======================
+  // Cập nhật progress, finalGrade & status
+  // ======================
+  const bulkOps = stats.map((s) => {
+    // Tính progress
+    const progress = {
+      totalLessons: s.lesson.total,
+      completedLessons: s.lesson.completed,
+      totalQuizzes: s.quiz.total,
+      completedQuizzes: s.quiz.totalAttempt,
+      totalQuizScores: s.quiz.totalScore,
+      totalAssignments: s.assignment.total,
+      completedAssignments: s.assignment.submitted,
+      totalAssignmentScores: s.assignment.totalGrade,
+      totalAttendances: s.attendance.total,
+      completedAttendances: s.attendance.present,
+    };
+
+    // Tính điểm trung bình theo progress
+    const quizAvg =
+      progress.totalQuizzes > 0 ? progress.totalQuizScores / progress.totalQuizzes : 0;
+    const assignmentAvg =
+      progress.totalAssignments > 0
+        ? progress.totalAssignmentScores / progress.totalAssignments
+        : 0;
+    const attendanceAvg =
+      progress.totalAttendances > 0 ? progress.completedAttendances / progress.totalAttendances : 0;
+
+    // Tính final grade theo trọng số
+    const finalGrade = quizAvg * 0.4 + assignmentAvg * 0.4 + attendanceAvg * 0.2;
+
+    // Kiểm tra điều kiện DROPPED
+    const absent = progress.totalAttendances - progress.completedAttendances;
+    let status = EnrollmentStatus.APPROVED;
+
+    if (absent > 4 || finalGrade < 5) {
+      status = EnrollmentStatus.DROPPED;
+    }
+
+    return {
+      updateOne: {
+        filter: { _id: s._id },
+        update: {
+          $set: {
+            progress,
+            finalGrade,
+            status,
+            droppedAt: status === EnrollmentStatus.DROPPED ? new Date() : undefined,
+            completedAt: status !== EnrollmentStatus.DROPPED ? new Date() : undefined,
+          },
+        },
+      },
+    };
+  });
+
+  // Cập nhật tất cả học viên cùng lúc
+  if (bulkOps.length > 0) {
+    await EnrollmentModel.bulkWrite(bulkOps);
+  }
+
+  await CourseModel.findByIdAndUpdate(courseId, {
+    status: CourseStatus.COMPLETED,
+  });
+
+  // 4️⃣ Tính tổng số học viên, lessons, quizzes, assignments cho course
+  const totalStudents = stats.length;
+  // const [lessonsCount, quizzesCount, assignmentsCount] = await Promise.all([
+  //   LessonModel.countDocuments({ courseId }),
+  //   QuizModel.countDocuments({ courseId }),
+  //   AssignmentModel.countDocuments({ courseId }),
+  // ]);
+  // Tính tổng số lessons, quizzes, assignments từ stats
+  const lessonsCount = stats.reduce((acc, s) => acc + s.lesson.total, 0) / stats.length;
+  const quizzesCount = stats.reduce((acc, s) => acc + s.quiz.total, 0) / stats.length;
+  const assignmentsCount = stats.reduce((acc, s) => acc + s.assignment.total, 0) / stats.length;
+
+  return {
+    course: {
+      _id: course._id,
+      name: course.title,
+      semester: course.semesterId,
+      teachers: course.teacherIds,
+      totalStudents: stats.length,
+      totalLessons: lessonsCount,
+      totalQuizzes: quizzesCount,
+      totalAssignments: assignmentsCount,
+    },
+    stats,
   };
 };
