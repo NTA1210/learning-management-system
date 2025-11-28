@@ -24,10 +24,17 @@ export const ensureTeacherAccessToCourse = async ({
   userId,
   userRole,
 }: EnsureTeacherAccessParams) => {
+  if (userRole === Role.ADMIN) {
+    if (course) return course;
+    if (!courseId) return null;
+    return await CourseModel.findById(courseId).select("teacherIds title").lean();
+  }
+
   const courseDoc =
     course ??
     (courseId ? await CourseModel.findById(courseId).select("teacherIds title").lean() : null);
 
+  // Nếu không có userId hoặc không phải teacher thì không kiểm tra gán course
   if (!userId || userRole !== Role.TEACHER) {
     return courseDoc;
   }
