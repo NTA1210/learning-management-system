@@ -15,16 +15,17 @@ import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import UserBio from "../components/UserBio.tsx";
 import MarkdownImage from "../components/MarkdownImage.tsx";
+import Skeleton from "../components/common/Skeleton.tsx";
 import ReactMarkdown from "react-markdown";
-import { 
-  BookOpen, 
-  GraduationCap, 
-  MessageSquare, 
-  Calendar, 
-  Award, 
-  Star, 
-  CheckCircle, 
-  XCircle, 
+import {
+  BookOpen,
+  GraduationCap,
+  MessageSquare,
+  Calendar,
+  Award,
+  Star,
+  CheckCircle,
+  XCircle,
   Clock,
   ArrowLeft,
   User,
@@ -55,7 +56,7 @@ const UserBioPage: React.FC = () => {
   const [loading, setLoading] = useState(!userData);
   const [error, setError] = useState("");
   const [contentPaddingLeft, setContentPaddingLeft] = useState(window.innerWidth >= 640 ? 93 : 0);
-  
+
   // Activity states
   const [enrollments, setEnrollments] = useState<ApiEnrollmentRecord[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
@@ -65,7 +66,7 @@ const UserBioPage: React.FC = () => {
   const [averageRating, setAverageRating] = useState<number | undefined>();
   const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
-  
+
   // Session states
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
@@ -210,7 +211,7 @@ const UserBioPage: React.FC = () => {
         const results = await Promise.all(promises);
 
         let resultIndex = 0;
-        
+
         // Feedbacks written by user (always first)
         const feedbacksWrittenResult = results[resultIndex++];
         if (feedbacksWrittenResult?.feedbacks) {
@@ -318,8 +319,8 @@ const UserBioPage: React.FC = () => {
         if (userData?.specialistIds && userData.specialistIds.length > 0) {
           const firstSpecialist = userData.specialistIds[0];
           if (firstSpecialist?.majorId) {
-            const majorId = typeof firstSpecialist.majorId === 'string' 
-              ? firstSpecialist.majorId 
+            const majorId = typeof firstSpecialist.majorId === 'string'
+              ? firstSpecialist.majorId
               : firstSpecialist.majorId._id;
             setSelectedEditMajorId(majorId);
           }
@@ -372,10 +373,10 @@ const UserBioPage: React.FC = () => {
   useEffect(() => {
     if (isEditSpecialistsModalOpen && userData) {
       setEditSpecialistIds(
-        userData.specialistIds 
-          ? (userData.specialistIds as any[]).map((s: any) => 
-              typeof s === 'string' ? s : s._id
-            )
+        userData.specialistIds
+          ? (userData.specialistIds as any[]).map((s: any) =>
+            typeof s === 'string' ? s : s._id
+          )
           : []
       );
       setEditError("");
@@ -384,13 +385,13 @@ const UserBioPage: React.FC = () => {
 
   // Check if user can edit
   const canEdit = currentUser && userData && (
-    currentUser.role === 'admin' || 
+    currentUser.role === 'admin' ||
     currentUser._id === userData._id
   );
 
   // Check if specialist editing is allowed
   const canEditSpecialists = canEdit && (
-    userData.role === 'student' || 
+    userData.role === 'student' ||
     (userData.role === 'teacher' && currentUser.role === 'admin')
   );
 
@@ -625,21 +626,115 @@ const UserBioPage: React.FC = () => {
 
             {/* Loading State */}
             {loading && (
-              <div className="text-center py-12">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: darkMode ? '#ffffff' : '#000000' }}></div>
-                <p className="mt-4" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>Loading user information...</p>
+              <div className="space-y-6">
+                {/* User Bio Skeleton */}
+                <div
+                  className="rounded-lg border overflow-hidden"
+                  style={{
+                    backgroundColor: darkMode ? 'rgba(31, 41, 55, 0.8)' : '#ffffff',
+                    borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                  }}
+                >
+                  {/* Header Section */}
+                  <div
+                    className="p-6 border-b"
+                    style={{
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                      background: darkMode ? 'rgba(17, 24, 39, 0.5)' : '#f9fafb',
+                    }}
+                  >
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+                      {/* Avatar Skeleton */}
+                      <Skeleton className="h-32 w-32 rounded-full flex-shrink-0" />
+
+                      {/* User Info Skeleton */}
+                      <div className="flex-1 w-full">
+                        <div className="flex flex-col gap-3 mb-2">
+                          <Skeleton className="h-8 w-48" />
+                          <Skeleton className="h-5 w-32" />
+                        </div>
+                        <div className="flex gap-2 mb-3">
+                          <Skeleton className="h-6 w-20 rounded-full" />
+                          <Skeleton className="h-6 w-20 rounded-full" />
+                        </div>
+                        <div className="space-y-2">
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-4 w-3/4" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Details Section */}
+                  <div className="p-6">
+                    <Skeleton className="h-6 w-24 mb-4" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {[1, 2, 3, 4, 5, 6].map((i) => (
+                        <div key={i}>
+                          <Skeleton className="h-4 w-24 mb-2" />
+                          <Skeleton className="h-5 w-48" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Activities Skeleton */}
+                <div>
+                  <Skeleton className="h-8 w-32 mb-6" />
+                  <div
+                    className="rounded-lg border p-6"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(31, 41, 55, 0.8)' : '#ffffff',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                    }}
+                  >
+                    <Skeleton className="h-6 w-32 mb-4" />
+                    <div className="space-y-6">
+                      {[1, 2].map((i) => (
+                        <div key={i}>
+                          <Skeleton className="h-6 w-24 mb-3" />
+                          <div className="space-y-3">
+                            {[1, 2].map((j) => (
+                              <div
+                                key={j}
+                                className="p-4 rounded-lg border"
+                                style={{
+                                  backgroundColor: darkMode ? 'rgba(17, 24, 39, 0.5)' : '#f9fafb',
+                                  borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
+                                }}
+                              >
+                                <div className="flex items-start gap-4">
+                                  <Skeleton className="h-20 w-20 rounded-lg flex-shrink-0" />
+                                  <div className="flex-1">
+                                    <Skeleton className="h-6 w-3/4 mb-2" />
+                                    <Skeleton className="h-4 w-full mb-2" />
+                                    <div className="flex gap-3">
+                                      <Skeleton className="h-5 w-20" />
+                                      <Skeleton className="h-5 w-32" />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
             {/* User Bio */}
             {!loading && userData && (
               <>
-                <UserBio 
+                <UserBio
                   user={{
                     ...userData,
                     major: specialists.length > 0 && specialists[0]?.major ? specialists[0].major : undefined,
                   }}
-                  showFullDetails={true} 
+                  showFullDetails={true}
                   averageRating={averageRating}
                   canEdit={canEdit}
                   onEditFullname={canEdit ? () => setIsEditFullnameModalOpen(true) : undefined}
@@ -682,69 +777,69 @@ const UserBioPage: React.FC = () => {
                               </h4>
                               <div className="space-y-3">
                                 {group.items.map((enrollment) => (
-                            <div
-                              key={enrollment._id}
-                              className="p-4 rounded-lg border"
-                              style={{
-                                backgroundColor: darkMode ? 'rgba(17, 24, 39, 0.5)' : '#f9fafb',
-                                borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                              }}
-                            >
-                              <div className="flex items-start gap-4">
-                                {/* Course Logo */}
-                                {(enrollment.courseId as any)?.logo ? (
-                                  <img
-                                    className="h-20 w-20 rounded-lg object-cover flex-shrink-0"
-                                    src={(enrollment.courseId as any).logo}
-                                    alt={enrollment.courseId.title}
-                                  />
-                                ) : (
                                   <div
-                                    className="h-20 w-20 rounded-lg flex items-center justify-center text-2xl font-bold text-white flex-shrink-0"
+                                    key={enrollment._id}
+                                    className="p-4 rounded-lg border"
                                     style={{
-                                      backgroundColor: darkMode ? '#4c1d95' : '#4f46e5',
+                                      backgroundColor: darkMode ? 'rgba(17, 24, 39, 0.5)' : '#f9fafb',
+                                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
                                     }}
                                   >
-                                    {enrollment.courseId.title.charAt(0).toUpperCase()}
+                                    <div className="flex items-start gap-4">
+                                      {/* Course Logo */}
+                                      {(enrollment.courseId as any)?.logo ? (
+                                        <img
+                                          className="h-20 w-20 rounded-lg object-cover flex-shrink-0"
+                                          src={(enrollment.courseId as any).logo}
+                                          alt={enrollment.courseId.title}
+                                        />
+                                      ) : (
+                                        <div
+                                          className="h-20 w-20 rounded-lg flex items-center justify-center text-2xl font-bold text-white flex-shrink-0"
+                                          style={{
+                                            backgroundColor: darkMode ? '#4c1d95' : '#4f46e5',
+                                          }}
+                                        >
+                                          {enrollment.courseId.title.charAt(0).toUpperCase()}
+                                        </div>
+                                      )}
+                                      <div className="flex-1">
+                                        <Link
+                                          to={`/courses/${enrollment.courseId._id}`}
+                                          className="text-lg font-semibold hover:underline"
+                                          style={{ color: darkMode ? '#60a5fa' : '#2563eb' }}
+                                        >
+                                          {enrollment.courseId.title}
+                                        </Link>
+                                        {enrollment.courseId.description && (
+                                          <p className="text-sm mt-1" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                                            {enrollment.courseId.description}
+                                          </p>
+                                        )}
+                                        <div className="flex items-center gap-3 mt-2">
+                                          <span
+                                            className="px-2 py-1 text-xs font-semibold rounded flex items-center gap-1"
+                                            style={{
+                                              backgroundColor: enrollment.status === 'approved'
+                                                ? (darkMode ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.1)')
+                                                : (darkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)'),
+                                              color: enrollment.status === 'approved' ? (darkMode ? '#86efac' : '#16a34a') : (darkMode ? '#fca5a5' : '#dc2626'),
+                                            }}
+                                          >
+                                            {enrollment.status === 'approved' ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                                            {enrollment.status}
+                                          </span>
+                                          {enrollment.progress && (
+                                            <span className="text-xs flex items-center gap-1" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                                              <TrendingUp className="w-3 h-3" />
+                                              Progress: {enrollment.progress.completedLessons}/{enrollment.progress.totalLessons} lessons
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
                                   </div>
-                                )}
-                                <div className="flex-1">
-                                  <Link
-                                    to={`/courses/${enrollment.courseId._id}`}
-                                    className="text-lg font-semibold hover:underline"
-                                    style={{ color: darkMode ? '#60a5fa' : '#2563eb' }}
-                                  >
-                                    {enrollment.courseId.title}
-                                  </Link>
-                                  {enrollment.courseId.description && (
-                                    <p className="text-sm mt-1" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                                      {enrollment.courseId.description}
-                                    </p>
-                                  )}
-                                  <div className="flex items-center gap-3 mt-2">
-                                    <span
-                                      className="px-2 py-1 text-xs font-semibold rounded flex items-center gap-1"
-                                      style={{
-                                        backgroundColor: enrollment.status === 'approved' 
-                                          ? (darkMode ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.1)')
-                                          : (darkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)'),
-                                        color: enrollment.status === 'approved' ? (darkMode ? '#86efac' : '#16a34a') : (darkMode ? '#fca5a5' : '#dc2626'),
-                                      }}
-                                    >
-                                      {enrollment.status === 'approved' ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                                      {enrollment.status}
-                                    </span>
-                                    {enrollment.progress && (
-                                      <span className="text-xs flex items-center gap-1" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                                        <TrendingUp className="w-3 h-3" />
-                                        Progress: {enrollment.progress.completedLessons}/{enrollment.progress.totalLessons} lessons
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                                ))}
                               </div>
                             </div>
                           ))}
@@ -782,68 +877,68 @@ const UserBioPage: React.FC = () => {
                                 {group.items.map((item) => {
                                   const course = item.courseId || item;
                                   return (
-                            <div
-                              key={course._id}
-                              className="p-4 rounded-lg border"
-                              style={{
-                                backgroundColor: darkMode ? 'rgba(17, 24, 39, 0.5)' : '#f9fafb',
-                                borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
-                              }}
-                            >
-                              <div className="flex items-start gap-4">
-                                {/* Course Logo */}
-                                {course.logo ? (
-                                  <img
-                                    className="h-20 w-20 rounded-lg object-cover flex-shrink-0"
-                                    src={course.logo}
-                                    alt={course.title}
-                                  />
-                                ) : (
-                                  <div
-                                    className="h-20 w-20 rounded-lg flex items-center justify-center text-2xl font-bold text-white flex-shrink-0"
-                                    style={{
-                                      backgroundColor: darkMode ? '#4c1d95' : '#4f46e5',
-                                    }}
-                                  >
-                                    {course.title.charAt(0).toUpperCase()}
-                                  </div>
-                                )}
-                                <div className="flex-1">
-                                  <Link
-                                    to={`/courses/${course._id}`}
-                                    className="text-lg font-semibold hover:underline"
-                                    style={{ color: darkMode ? '#60a5fa' : '#2563eb' }}
-                                  >
-                                    {course.title}
-                                  </Link>
-                                  {course.description && (
-                                    <p className="text-sm mt-1" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                                      {course.description}
-                                    </p>
-                                  )}
-                                  <div className="flex items-center gap-3 mt-2">
-                                    <span
-                                      className="px-2 py-1 text-xs font-semibold rounded flex items-center gap-1"
+                                    <div
+                                      key={course._id}
+                                      className="p-4 rounded-lg border"
                                       style={{
-                                        backgroundColor: course.isPublished 
-                                          ? (darkMode ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.1)')
-                                          : (darkMode ? 'rgba(107, 114, 128, 0.2)' : 'rgba(107, 114, 128, 0.1)'),
-                                        color: course.isPublished ? (darkMode ? '#86efac' : '#16a34a') : (darkMode ? '#9ca3af' : '#6b7280'),
+                                        backgroundColor: darkMode ? 'rgba(17, 24, 39, 0.5)' : '#f9fafb',
+                                        borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb',
                                       }}
                                     >
-                                      {course.isPublished ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                                      {course.isPublished ? 'Published' : 'Draft'}
-                                    </span>
-                                    {course.status && (
-                                      <span className="text-xs flex items-center gap-1" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                                        <Award className="w-3 h-3" />
-                                        Status: {course.status}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
+                                      <div className="flex items-start gap-4">
+                                        {/* Course Logo */}
+                                        {course.logo ? (
+                                          <img
+                                            className="h-20 w-20 rounded-lg object-cover flex-shrink-0"
+                                            src={course.logo}
+                                            alt={course.title}
+                                          />
+                                        ) : (
+                                          <div
+                                            className="h-20 w-20 rounded-lg flex items-center justify-center text-2xl font-bold text-white flex-shrink-0"
+                                            style={{
+                                              backgroundColor: darkMode ? '#4c1d95' : '#4f46e5',
+                                            }}
+                                          >
+                                            {course.title.charAt(0).toUpperCase()}
+                                          </div>
+                                        )}
+                                        <div className="flex-1">
+                                          <Link
+                                            to={`/courses/${course._id}`}
+                                            className="text-lg font-semibold hover:underline"
+                                            style={{ color: darkMode ? '#60a5fa' : '#2563eb' }}
+                                          >
+                                            {course.title}
+                                          </Link>
+                                          {course.description && (
+                                            <p className="text-sm mt-1" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                                              {course.description}
+                                            </p>
+                                          )}
+                                          <div className="flex items-center gap-3 mt-2">
+                                            <span
+                                              className="px-2 py-1 text-xs font-semibold rounded flex items-center gap-1"
+                                              style={{
+                                                backgroundColor: course.isPublished
+                                                  ? (darkMode ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.1)')
+                                                  : (darkMode ? 'rgba(107, 114, 128, 0.2)' : 'rgba(107, 114, 128, 0.1)'),
+                                                color: course.isPublished ? (darkMode ? '#86efac' : '#16a34a') : (darkMode ? '#9ca3af' : '#6b7280'),
+                                              }}
+                                            >
+                                              {course.isPublished ? <CheckCircle className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                                              {course.isPublished ? 'Published' : 'Draft'}
+                                            </span>
+                                            {course.status && (
+                                              <span className="text-xs flex items-center gap-1" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                                                <Award className="w-3 h-3" />
+                                                Status: {course.status}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
                                   );
                                 })}
                               </div>
@@ -1207,13 +1302,13 @@ const UserBioPage: React.FC = () => {
                                         backgroundColor: attendance.status === 'present'
                                           ? (darkMode ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.1)')
                                           : attendance.status === 'late'
-                                          ? (darkMode ? 'rgba(251, 191, 36, 0.2)' : 'rgba(251, 191, 36, 0.1)')
-                                          : (darkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)'),
+                                            ? (darkMode ? 'rgba(251, 191, 36, 0.2)' : 'rgba(251, 191, 36, 0.1)')
+                                            : (darkMode ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)'),
                                         color: attendance.status === 'present'
                                           ? (darkMode ? '#86efac' : '#16a34a')
                                           : attendance.status === 'late'
-                                          ? (darkMode ? '#fbbf24' : '#d97706')
-                                          : (darkMode ? '#fca5a5' : '#dc2626'),
+                                            ? (darkMode ? '#fbbf24' : '#d97706')
+                                            : (darkMode ? '#fca5a5' : '#dc2626'),
                                       }}
                                     >
                                       {attendance.status === 'present' ? (
@@ -1268,7 +1363,7 @@ const UserBioPage: React.FC = () => {
                         {/* Search Bar */}
                         <div className="mb-4">
                           <div className="relative">
-                            <Search 
+                            <Search
                               className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4"
                               style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
                             />
@@ -1304,8 +1399,8 @@ const UserBioPage: React.FC = () => {
                           });
 
                           // Limit to 5 if not expanded
-                          const displayedSessions = showAllSessions 
-                            ? filteredSessions 
+                          const displayedSessions = showAllSessions
+                            ? filteredSessions
                             : filteredSessions.slice(0, 5);
                           const hasMore = filteredSessions.length > 5;
 
@@ -1327,7 +1422,7 @@ const UserBioPage: React.FC = () => {
                                       className="p-4 rounded-lg border"
                                       style={{
                                         backgroundColor: darkMode ? 'rgba(17, 24, 39, 0.5)' : '#f9fafb',
-                                        borderColor: isCurrent 
+                                        borderColor: isCurrent
                                           ? (darkMode ? 'rgba(59, 130, 246, 0.5)' : 'rgba(59, 130, 246, 0.3)')
                                           : (darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb'),
                                       }}
@@ -1340,8 +1435,8 @@ const UserBioPage: React.FC = () => {
                                               backgroundColor: darkMode ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)',
                                             }}
                                           >
-                                            <DeviceIcon 
-                                              className="w-6 h-6" 
+                                            <DeviceIcon
+                                              className="w-6 h-6"
                                               style={{ color: darkMode ? '#93c5fd' : '#1e40af' }}
                                             />
                                           </div>
