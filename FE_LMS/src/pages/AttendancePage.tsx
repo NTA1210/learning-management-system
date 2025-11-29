@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
@@ -8,9 +8,11 @@ import AttendanceStatsOverview from "../components/attendance/AttendanceStatsOve
 import AttendanceForm from "../components/attendance/AttendanceForm.tsx";
 import AttendanceProgressIndicator from "../components/attendance/AttendanceProgressIndicator.tsx";
 import StudentAttendanceModal from "../components/attendance/StudentAttendanceModal.tsx";
-import { 
-  semesterService, 
-  courseService, 
+import CourseGrid from "../components/common/CourseGrid.tsx";
+import { CourseCardSkeleton, AttendanceStatsSkeleton } from "../components/common/Skeleton.tsx";
+import {
+  semesterService,
+  courseService,
   attendanceService,
   type Semester,
   type CourseAttendanceStats,
@@ -30,17 +32,21 @@ export default function AttendancePage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [attendanceStats, setAttendanceStats] = useState<CourseAttendanceStats | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loadingCourses, setLoadingCourses] = useState(false);
+  const [loadingStats, setLoadingStats] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<{ id: string; name: string } | null>(null);
   const [exporting, setExporting] = useState(false);
 
+  // Track if we're setting selectedCourse from UI interaction (to prevent duplicate fetch)
+  const isSettingFromUI = useRef(false);
+
   // Find semester closest to current date
   const findClosestSemester = (semesters: Semester[]): Semester | null => {
     if (semesters.length === 0) return null;
-    
+
     const now = new Date();
     // Adjust to UTC+7
     const nowUTC7 = new Date(now.getTime() + (7 * 60 * 60 * 1000));
@@ -50,12 +56,12 @@ export default function AttendancePage() {
     for (const semester of semesters) {
       const startDate = new Date(semester.startDate);
       const endDate = new Date(semester.endDate);
-      
+
       // If current date is within semester range, prioritize it
       if (nowUTC7 >= startDate && nowUTC7 <= endDate) {
         return semester;
       }
-      
+
       // Otherwise, find the closest upcoming semester
       const diff = Math.abs(startDate.getTime() - nowUTC7.getTime());
       if (diff < minDiff && startDate >= nowUTC7) {
@@ -66,7 +72,7 @@ export default function AttendancePage() {
 
     // If no upcoming semester, return the most recent past semester
     if (!closest) {
-      return semesters.sort((a, b) => 
+      return semesters.sort((a, b) =>
         new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
       )[0];
     }
@@ -74,71 +80,87 @@ export default function AttendancePage() {
     return closest;
   };
 
-  // Fetch semesters
+
+  // Fetch semesters once on mount
   useEffect(() => {
     const fetchSemesters = async () => {
       try {
-        setLoading(true);
+        setLoadingCourses(true);
         const data = await semesterService.getAllSemesters();
         setSemesters(data);
-        
-        if (semesterId) {
-          const semester = data.find(s => s._id === semesterId);
-          if (semester) {
-            setSelectedSemester(semester);
-          } else {
-            const closest = findClosestSemester(data);
-            if (closest) {
-              setSelectedSemester(closest);
-              navigate(`/attendance/${closest._id}`, { replace: true });
-            }
-          }
-        } else {
-          const closest = findClosestSemester(data);
-          if (closest) {
-            setSelectedSemester(closest);
-            navigate(`/attendance/${closest._id}`, { replace: true });
-          }
-        }
       } catch (err: any) {
         setError(err.message || "Failed to fetch semesters");
       } finally {
-        setLoading(false);
+        setLoadingCourses(false);
       }
     };
 
     fetchSemesters();
-  }, [semesterId, navigate]);
+  }, []); // Empty dependency array - only run once on mount
 
-  // Fetch courses when semester is selected
+  // Select semester based on URL or default to closest
+  useEffect(() => {
+    if (semesters.length === 0) return;
+
+    if (semesterId) {
+      const semester = semesters.find(s => s._id === semesterId);
+      if (semester && semester._id !== selectedSemester?._id) {
+        setSelectedSemester(semester);
+      } else if (!semester) {
+        // semesterId in URL doesn't match any semester, fallback to closest
+        const closest = findClosestSemester(semesters);
+        if (closest) {
+          setSelectedSemester(closest);
+          navigate(`/attendance/${closest._id}`, { replace: true });
+        }
+      }
+    } else {
+      // No semesterId in URL, select closest semester
+      const closest = findClosestSemester(semesters);
+      if (closest) {
+        setSelectedSemester(closest);
+        navigate(`/attendance/${closest._id}`, { replace: true });
+      }
+    }
+  }, [semesterId, semesters, selectedSemester?._id, navigate]);
+
+  // Fetch courses when semester is selected (only when semester changes)
   useEffect(() => {
     const fetchCourses = async () => {
       if (!selectedSemester) return;
 
       try {
-        setLoading(true);
+        setLoadingCourses(true);
         const result = await courseService.getAllCourses({
           semesterId: selectedSemester._id,
           isPublished: true,
           limit: 100,
         });
         setCourses(result.courses || []);
-        
-        if (courseId) {
-          const course = result.courses?.find(c => c._id === courseId);
-          if (course) {
-            setSelectedCourse(course);
-          }
-        }
       } catch (err: any) {
         setError(err.message || "Failed to fetch courses");
       } finally {
-        setLoading(false);
+        setLoadingCourses(false);
       }
     };
 
     fetchCourses();
-  }, [selectedSemester, courseId]);
+  }, [selectedSemester]);
+
+  // Set selected course from URL parameter when courses are loaded
+  useEffect(() => {
+    if (!courseId || courses.length === 0 || isSettingFromUI.current) {
+      if (isSettingFromUI.current) {
+        isSettingFromUI.current = false;
+      }
+      return;
+    }
+
+    const course = courses.find(c => c._id === courseId);
+    if (course && course._id !== selectedCourse?._id) {
+      setSelectedCourse(course);
+    }
+  }, [courseId, courses, selectedCourse?._id]);
 
   // Fetch attendance stats when course is selected
   useEffect(() => {
@@ -149,7 +171,7 @@ export default function AttendancePage() {
       }
 
       try {
-        setLoading(true);
+        setLoadingStats(true);
         setError(null);
         const stats = await attendanceService.getCourseStats(selectedCourse._id);
         setAttendanceStats(stats);
@@ -157,7 +179,7 @@ export default function AttendancePage() {
         setError(err.message || "Failed to fetch attendance stats");
         setAttendanceStats(null);
       } finally {
-        setLoading(false);
+        setLoadingStats(false);
       }
     };
 
@@ -166,12 +188,15 @@ export default function AttendancePage() {
 
   const handleSemesterChange = (semester: Semester) => {
     setSelectedSemester(semester);
+    setCourses([]); // Clear old courses immediately to prevent flickering
     setSelectedCourse(null);
     setAttendanceStats(null);
     navigate(`/attendance/${semester._id}`);
   };
 
   const handleCourseClick = (course: Course) => {
+    // Set flag to prevent duplicate course fetch when URL changes
+    isSettingFromUI.current = true;
     setSelectedCourse(course);
     navigate(`/attendance/${selectedSemester?._id}/${course._id}`);
   };
@@ -189,7 +214,7 @@ export default function AttendancePage() {
       });
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
-      
+
       // Refresh stats after saving
       const stats = await attendanceService.getCourseStats(selectedCourse._id);
       setAttendanceStats(stats);
@@ -206,7 +231,7 @@ export default function AttendancePage() {
       setExporting(true);
       setError(null);
       const result = await attendanceService.exportAttendance();
-      
+
       // Create blob and download
       const blob = new Blob([result.csv], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
@@ -217,7 +242,7 @@ export default function AttendancePage() {
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
-      
+
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (err: any) {
@@ -330,11 +355,10 @@ export default function AttendancePage() {
                   <button
                     key={semester._id}
                     onClick={() => handleSemesterChange(semester)}
-                    className={`px-4 py-2 rounded-lg transition-all ${
-                      selectedSemester?._id === semester._id
-                        ? "ring-2 ring-indigo-500"
-                        : ""
-                    }`}
+                    className={`px-4 py-2 rounded-lg transition-all ${selectedSemester?._id === semester._id
+                      ? "ring-2 ring-indigo-500"
+                      : ""
+                      }`}
                     style={{
                       backgroundColor:
                         selectedSemester?._id === semester._id
@@ -342,8 +366,8 @@ export default function AttendancePage() {
                             ? "rgba(99, 102, 241, 0.2)"
                             : "rgba(99, 102, 241, 0.1)"
                           : darkMode
-                          ? "rgba(148, 163, 184, 0.1)"
-                          : "rgba(148, 163, 184, 0.1)",
+                            ? "rgba(148, 163, 184, 0.1)"
+                            : "rgba(148, 163, 184, 0.1)",
                       color: darkMode ? "#e2e8f0" : "#475569",
                     }}
                   >
@@ -371,78 +395,19 @@ export default function AttendancePage() {
                 >
                   Select Course
                 </label>
-                {loading ? (
-                  <div className="text-center py-8">
-                    <p style={{ color: darkMode ? "#94a3b8" : "#64748b" }}>Loading courses...</p>
-                  </div>
-                ) : courses.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p style={{ color: darkMode ? "#94a3b8" : "#64748b" }}>
-                      No courses available for this semester
-                    </p>
-                  </div>
+                {loadingCourses ? (
+                  <CourseCardSkeleton count={6} />
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {courses.map((course) => (
-                      <button
-                        key={course._id}
-                        onClick={() => handleCourseClick(course)}
-                        className={`p-4 rounded-lg text-left transition-all ${
-                          selectedCourse?._id === course._id
-                            ? "ring-2 ring-indigo-500"
-                            : ""
-                        }`}
-                        style={{
-                          backgroundColor:
-                            selectedCourse?._id === course._id
-                              ? darkMode
-                                ? "rgba(99, 102, 241, 0.2)"
-                                : "rgba(99, 102, 241, 0.1)"
-                              : darkMode
-                              ? "rgba(30, 41, 59, 0.5)"
-                              : "#ffffff",
-                          border: darkMode
-                            ? "1px solid rgba(148, 163, 184, 0.1)"
-                            : "1px solid rgba(148, 163, 184, 0.2)",
-                        }}
-                      >
-                        <div className="flex items-start gap-3">
-                          {course.logo && (
-                            <img
-                              src={course.logo}
-                              alt={course.title}
-                              className="w-12 h-12 rounded-lg object-cover"
-                            />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <h3
-                              className="font-semibold truncate"
-                              style={{ color: darkMode ? "#ffffff" : "#1e293b" }}
-                            >
-                              {course.title}
-                            </h3>
-                            {course.subjectId && typeof course.subjectId === "object" && (
-                              <p
-                                className="text-sm mt-1 truncate"
-                                style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
-                              >
-                                {course.subjectId.name}
-                              </p>
-                            )}
-                            {course.startDate && course.endDate && (
-                              <div className="mt-2">
-                                <AttendanceProgressIndicator
-                                  startDate={course.startDate}
-                                  endDate={course.endDate}
-                                  label=""
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+                  <CourseGrid
+                    courses={courses}
+                    loading={false}
+                    emptyMessage="No courses available for this semester"
+                    onCourseClick={handleCourseClick}
+                    selectedCourseId={selectedCourse?._id}
+                    showProgress={true}
+                    showDescription={false}
+                    showCode={false}
+                  />
                 )}
               </div>
             )}
@@ -462,8 +427,11 @@ export default function AttendancePage() {
               </div>
             )}
 
+            {/* Loading State for Attendance Stats */}
+            {selectedCourse && loadingStats && <AttendanceStatsSkeleton />}
+
             {/* Empty State */}
-            {selectedCourse && !attendanceStats && !loading && (
+            {selectedCourse && !attendanceStats && !loadingStats && (
               <div
                 className="p-8 rounded-lg text-center"
                 style={{
