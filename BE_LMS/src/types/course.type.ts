@@ -18,6 +18,28 @@ export default interface ICourse extends mongoose.Document {
   startDate: Date;
   endDate: Date;
   status: CourseStatus;
+
+  //new
+  statistics: {
+    totalStudents: number;
+    totalLessons: number;
+    totalQuizzes: number;
+    averageQuizScore: number;
+    totalAssignments: number;
+    averageAssignmentScore: number;
+    averageFinalGrade: number;
+    totalAttendances: number;
+    averageAttendance: number;
+    passRate: number;
+    droppedRate: number;
+  };
+  //
+  weight: {
+    quiz: number;
+    assignment: number;
+    attendance: number;
+  };
+
   /** Can be multiple teachers. */
   teacherIds: mongoose.Types.ObjectId[];
   isPublished: boolean;

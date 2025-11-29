@@ -18,24 +18,12 @@ const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
     },
     status: {
       type: String,
-      enum: [
-        EnrollmentStatus.PENDING,
-        EnrollmentStatus.APPROVED,
-        EnrollmentStatus.REJECTED,
-        EnrollmentStatus.CANCELLED,
-        EnrollmentStatus.DROPPED,
-        EnrollmentStatus.COMPLETED,
-      ],
+      enum: EnrollmentStatus,
       default: EnrollmentStatus.PENDING,
     },
     method: {
       type: String,
-      enum: [
-        EnrollmentMethod.SELF,
-        EnrollmentMethod.INVITED,
-        EnrollmentMethod.PASSWORD,
-        EnrollmentMethod.OTHER,
-      ],
+      enum: EnrollmentMethod,
       default: EnrollmentMethod.SELF,
     },
     role: {
