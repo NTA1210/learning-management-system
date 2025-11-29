@@ -63,6 +63,7 @@ const CourseManagement: React.FC = () => {
   const [subjects, setSubjects] = useState<Array<{ _id: string; name: string; specialistIds?: string[] }>>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [selectedSemesterId, setSelectedSemesterId] = useState("");
+  const [selectedTeacherId, setSelectedTeacherId] = useState("");
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailCourse, setDetailCourse] = useState<Course | null>(null);
   const [enrollments, setEnrollments] = useState<
@@ -156,6 +157,9 @@ const CourseManagement: React.FC = () => {
   };
 
   const [enrolling, setEnrolling] = useState<Record<string, boolean>>({});
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const showToastSuccess = async (message: string) => {
     try {
@@ -166,7 +170,7 @@ const CourseManagement: React.FC = () => {
         icon: "success",
         title: message,
         showConfirmButton: false,
-        timer: 2000,
+        timer: 1000,
       });
     } catch {}
   };
@@ -180,7 +184,7 @@ const CourseManagement: React.FC = () => {
         icon: "info",
         title: message,
         showConfirmButton: false,
-        timer: 2000,
+        timer: 1000,
       });
     } catch {}
   };
@@ -298,6 +302,7 @@ const CourseManagement: React.FC = () => {
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
         ...(selectedSubjectId && { subjectId: selectedSubjectId }),
         ...(selectedSemesterId && { semesterId: selectedSemesterId }),
+        ...(selectedTeacherId && { teacherId: selectedTeacherId }),
         page: currentPage,
         limit: pageLimit,
         ...(isName ? { sortBy: "title" } : {}),
@@ -367,18 +372,28 @@ const CourseManagement: React.FC = () => {
     fetchCourses();
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this course?")) return;
+  function openDeleteModal(id: string) {
+    setDeleteTargetId(id);
+    setShowDeleteModal(true);
+  }
 
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return;
+    setDeleteBusy(true);
     try {
-      if (isAdmin) {
-        await courseService.deleteCoursePermanent(id);
-      } else if (isTeacher) {
-        await courseService.deleteCourse(id);
-      }
+   
+        await courseService.deleteCourse(deleteTargetId);
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({ toast: true, position: "top-end", icon: "success", title: "Delete a successful course", showConfirmButton: false, timer: 1000 });
       await fetchCourses();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to delete course");
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || (err instanceof Error ? err.message : "Failed to delete course");
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({ toast: true, position: "top-end", icon: "error", title: msg, showConfirmButton: false, timer: 1500 });
+    } finally {
+      setDeleteBusy(false);
+      setShowDeleteModal(false);
+      setDeleteTargetId(null);
     }
   };
 
@@ -435,14 +450,19 @@ const CourseManagement: React.FC = () => {
         teacherIds: selectedTeachers,
         logo: editLogoFile || undefined,
       });
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({ toast: true, position: "top-end", icon: "success", title: "Update a successful course", showConfirmButton: false, timer: 1000 });
       setShowEditModal(false);
       setEditingCourse(null);
       setSelectedTeachers([]);
       setCategorySearchTerm("");
       setShowCategoryDropdown(false);
       await fetchCourses();
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to update course");
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || (err instanceof Error ? err.message : "Failed to update course");
+      setError(msg);
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({ toast: true, position: "top-end", icon: "error", title: msg, showConfirmButton: false, timer: 1500 });
     }
   };
 
@@ -473,7 +493,7 @@ const CourseManagement: React.FC = () => {
   useEffect(() => {
     fetchCourses();
     // eslint-disable-next-line
-  }, [currentPage, pageLimit, sortOption, debouncedSearchTerm, selectedSubjectId, selectedSemesterId, darkMode]);
+  }, [currentPage, pageLimit, sortOption, debouncedSearchTerm, selectedSubjectId, selectedSemesterId, selectedTeacherId, darkMode]);
   console.log("totalPage", totalCourses)
   return (
     <>
@@ -678,7 +698,7 @@ const CourseManagement: React.FC = () => {
                     onChange={(e) => { setSelectedSubjectId(e.target.value); setCurrentPage(1); }}
                     className="appearance-none rounded-lg px-4 py-2 pr-10 border focus:outline-none focus:ring-2 transition-colors duration-200 shadow-sm"
                     style={{
-                      width: 180,
+                      width: 150,
                       fontWeight: 600,
                       background: darkMode ? "#152632" : "#ffffff",
                       color: darkMode ? "#ffffff" : "#111827",
@@ -703,7 +723,7 @@ const CourseManagement: React.FC = () => {
                     onChange={(e) => { setSelectedSemesterId(e.target.value); setCurrentPage(1); }}
                     className="appearance-none rounded-lg px-4 py-2 pr-10 border focus:outline-none focus:ring-2 transition-colors duration-200 shadow-sm"
                     style={{
-                      width: 180,
+                      width: 170,
                       fontWeight: 600,
                       background: darkMode ? "#152632" : "#ffffff",
                       color: darkMode ? "#ffffff" : "#111827",
@@ -714,6 +734,31 @@ const CourseManagement: React.FC = () => {
                     <option value="">All Semesters</option>
                     {semesters.map((s) => (
                       <option key={s._id} value={s._id}>{s.name}</option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }} aria-hidden="true">
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.062l-4.24 4.24a.75.75 0 01-1.06 0L5.25 8.29a.75.75 0 01-.02-1.08z" clipRule="evenodd" />
+                    </svg>
+                  </span>
+                </div>
+                <div className="relative">
+                  <select
+                    value={selectedTeacherId}
+                    onChange={(e) => { setSelectedTeacherId(e.target.value); setCurrentPage(1); }}
+                    className="appearance-none rounded-lg px-4 py-2 pr-10 border focus:outline-none focus:ring-2 transition-colors duration-200 shadow-sm"
+                    style={{
+                      width: 150,
+                      fontWeight: 600,
+                      background: darkMode ? "#152632" : "#ffffff",
+                      color: darkMode ? "#ffffff" : "#111827",
+                      borderColor: darkMode ? "#334155" : "#e5e7eb",
+                      boxShadow: darkMode ? "0 1px 2px rgba(0,0,0,0.25)" : "0 1px 2px rgba(0,0,0,0.06)",
+                    }}
+                  >
+                    <option value="">All Teachers</option>
+                    {availableTeachers.map((t) => (
+                      <option key={t._id} value={t._id}>{t.username}</option>
                     ))}
                   </select>
                   <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
@@ -1120,7 +1165,7 @@ const CourseManagement: React.FC = () => {
                                 : "#fee2e2",
                               color: darkMode ? "#fca5a5" : "#dc2626",
                             }}
-                            onClick={() => handleDelete(course._id)}
+                            onClick={() => openDeleteModal(course._id)}
                           >
                             <Trash size={16} />
                           </button>
@@ -1179,6 +1224,21 @@ const CourseManagement: React.FC = () => {
             </div>
           </main>
         </div>
+
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-[9999] p-4 flex items-center justify-center bg-black/40" onClick={(e) => { if (e.target === e.currentTarget && !deleteBusy) { setShowDeleteModal(false); setDeleteTargetId(null); } }}>
+            <div className="w-full max-w-md rounded-xl shadow-2xl" style={{ backgroundColor: darkMode ? "#0b132b" : "#ffffff", border: "1px solid rgba(255,255,255,0.08)" }} onClick={(e) => e.stopPropagation()}>
+              <div className="px-6 py-4 border-b" style={{ borderColor: darkMode ? "rgba(255,255,255,0.06)" : "#eee" }}>
+                <h3 className="text-xl font-semibold" style={{ color: darkMode ? "#ffffff" : "#111827" }}>Confirm Delete</h3>
+              </div>
+              <div className="px-6 py-4 text-sm" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>Are you sure you want to delete this course?</div>
+              <div className="px-6 py-4 flex justify-end gap-2">
+                <button onClick={() => { setShowDeleteModal(false); setDeleteTargetId(null); }} disabled={deleteBusy} className="px-4 py-2 rounded-lg" style={{ backgroundColor: darkMode ? "#111827" : "#ffffff", border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>Cancel</button>
+                <button onClick={confirmDelete} disabled={deleteBusy || !deleteTargetId} className="px-4 py-2 rounded-lg bg-[#ef4444] text-white disabled:opacity-50">{deleteBusy ? "Deleting..." : "Delete"}</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showCreateModal && (
           <div
@@ -1242,6 +1302,8 @@ const CourseManagement: React.FC = () => {
                   setShowCategoryDropdown(false);
                 }}
                 onCreated={async () => {
+                  const Swal = (await import("sweetalert2")).default;
+                  await Swal.fire({ toast: true, position: "top-end", icon: "success", title: "Create a successful course", showConfirmButton: false, timer: 1000 });
                   await fetchCourses();
                 }}
                 presetTeacherId={

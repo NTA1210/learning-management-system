@@ -23,6 +23,8 @@ const MyCoursesPage: React.FC = () => {
     const [pageLimit, setPageLimit] = useState(25);
     const [totalCourses, setTotalCourses] = useState(0);
     const [sortOption, setSortOption] = useState<'name_asc' | 'name_desc' | 'date_asc' | 'date_desc'>('date_desc');
+    const [mySubjects, setMySubjects] = useState<Array<{ _id: string; name: string }>>([]);
+    const [selectedSubjectId, setSelectedSubjectId] = useState("");
 
     const fetchMyCourses = async () => {
         try {
@@ -33,6 +35,7 @@ const MyCoursesPage: React.FC = () => {
                 page: currentPage,
                 limit: pageLimit,
                 ...(debouncedSearchTerm ? { search: debouncedSearchTerm } : {}),
+                ...(selectedSubjectId ? { subjectId: selectedSubjectId } : {}),
                 ...(isName ? { sortBy: 'title' } : {}),
                 ...(order ? { sortOrder: order } : {}),
             };
@@ -59,7 +62,17 @@ const MyCoursesPage: React.FC = () => {
     useEffect(() => {
         fetchMyCourses();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentPage, pageLimit, sortOption, debouncedSearchTerm]);
+    }, [currentPage, pageLimit, sortOption, debouncedSearchTerm, selectedSubjectId]);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await http.get('/subjects/my-subjects');
+                const list = Array.isArray((res as any)?.data) ? (res as any).data : [];
+                setMySubjects(list.map((s: any) => ({ _id: s._id, name: s.name })));
+            } catch {}
+        })();
+    }, []);
 
     return (
         <div
@@ -109,6 +122,21 @@ const MyCoursesPage: React.FC = () => {
                             <option value="date_asc">Oldest</option>
                             <option value="name_asc">Title A-Z</option>
                             <option value="name_desc">Title Z-A</option>
+                        </select>
+                        <select
+                            value={selectedSubjectId}
+                            onChange={(e) => { setSelectedSubjectId(e.target.value); setCurrentPage(1); }}
+                            className="px-3 py-2 rounded-lg"
+                            style={{
+                                backgroundColor: darkMode ? "#1f2937" : "#ffffff",
+                                color: darkMode ? "#ffffff" : "#111827",
+                                border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
+                            }}
+                        >
+                            <option value="">All My Subjects</option>
+                            {mySubjects.map((s) => (
+                                <option key={s._id} value={s._id}>{s.name}</option>
+                            ))}
                         </select>
                     </div>
                     <select

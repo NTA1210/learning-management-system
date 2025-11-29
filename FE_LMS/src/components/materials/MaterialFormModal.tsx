@@ -66,9 +66,9 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
     }
     setValues((prev) => ({
       ...prev,
-      originalName: "",
-      mimeType: "",
-      size: 0,
+      originalName: mode === "edit" ? initialValues?.originalName || "" : "",
+      mimeType: mode === "edit" ? initialValues?.mimeType || "" : "",
+      size: mode === "edit" ? initialValues?.size || 0 : 0,
     }));
   };
 
@@ -146,6 +146,65 @@ const MaterialFormModal: React.FC<MaterialFormModalProps> = ({
                     </button>
                   </div>
                 )}
+              </div>
+            )}
+            {mode === "edit" && (
+              <div className="md:col-span-2 space-y-4">
+                <div
+                  className="rounded-lg px-4 py-3 border"
+                  style={{
+                    backgroundColor: darkMode ? "rgba(55, 65, 81, 0.4)" : "#f9fafb",
+                    borderColor: darkMode ? "rgba(75, 85, 99, 0.5)" : "#e5e7eb",
+                  }}
+                >
+                  <p className="text-sm font-medium mb-1" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+                    Current File
+                  </p>
+                  <p className="text-sm" style={{ color: darkMode ? "#e5e7eb" : "#111827" }}>
+                    {initialValues?.originalName || "No file"}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}>
+                    {initialValues?.mimeType || "Unknown type"} • {(initialValues?.size || 0).toLocaleString()} bytes
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+                    Replace File (Optional)
+                  </label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleFileChange}
+                    className="w-full px-4 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
+                      borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                      color: darkMode ? "#ffffff" : "#000000",
+                    }}
+                    accept="*/*"
+                  />
+                  {selectedFile && (
+                    <div
+                      className="flex items-center justify-between mt-2 p-3 rounded-lg"
+                      style={{ backgroundColor: darkMode ? "rgba(99, 102, 241, 0.1)" : "rgba(99, 102, 241, 0.05)" }}
+                    >
+                      <p className="text-sm flex-1" style={{ color: darkMode ? "#a5b4fc" : "#6366f1" }}>
+                        <span className="font-medium">{selectedFile.name}</span> ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                      </p>
+                      <button
+                        type="button"
+                        onClick={clearFile}
+                        className="ml-2 px-2 py-1 rounded text-sm"
+                        style={{
+                          backgroundColor: darkMode ? "rgba(239, 68, 68, 0.2)" : "#fee2e2",
+                          color: darkMode ? "#fca5a5" : "#dc2626",
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             <div className="md:col-span-2">

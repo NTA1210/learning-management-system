@@ -1,14 +1,27 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
-import { quizService, courseService } from "../services";
+import { quizService, courseService, quizAttemptService } from "../services";
 import type { QuizResponse } from "../services/quizService";
+import type { QuizAttempt } from "../services/quizAttemptService";
 import type { Course } from "../types/course";
-import { Clock, Calendar, CheckCircle, ArrowLeft, Trash2, Edit2, X } from "lucide-react";
+import {
+  Clock,
+  Calendar,
+  CheckCircle,
+  ArrowLeft,
+  Trash2,
+  Edit2,
+  X,
+  Users,
+  ShieldOff,
+  Loader2,
+} from "lucide-react";
 import QuizCoursePage from "./QuizCoursePage";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
+import { QuizPagination } from "../components/quiz/QuizPagination";
 
 interface EditQuizForm {
   title: string;
@@ -21,10 +34,15 @@ interface EditQuizForm {
 export default function CourseQuizzesPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { darkMode } = useTheme();
   const { user } = useAuth();
   const role = (user?.role as "admin" | "teacher" | "student") || "teacher";
   const isStudent = role === "student";
+  const isQuestionBankRoute = location.pathname.startsWith("/questionbank");
+  const QUIZZES_PER_PAGE = 5;
+  const wrapPaginationValue = (value: number) => `"${value}"`;
+  const QUIZZES_PER_PAGE_PARAM = wrapPaginationValue(QUIZZES_PER_PAGE);
 
   const [course, setCourse] = useState<Course | null>(null);
   const [quizzes, setQuizzes] = useState<QuizResponse[]>([]);
@@ -35,6 +53,22 @@ export default function CourseQuizzesPage() {
   const [editingQuiz, setEditingQuiz] = useState<QuizResponse | null>(null);
   const [editForm, setEditForm] = useState<EditQuizForm | null>(null);
   const [updatingQuizId, setUpdatingQuizId] = useState<string | null>(null);
+  const [attemptModal, setAttemptModal] = useState<{
+    quiz: QuizResponse | null;
+    attempts: QuizAttempt[];
+    loading: boolean;
+    error: string | null;
+  }>({ quiz: null, attempts: [], loading: false, error: null });
+  const [banProcessingId, setBanProcessingId] = useState<string | null>(null);
+  const [quizzesPage, setQuizzesPage] = useState(1);
+  const [quizzesPaginationInfo, setQuizzesPaginationInfo] = useState({
+    totalItems: 0,
+    currentPage: 1,
+    limit: QUIZZES_PER_PAGE,
+    totalPages: 1,
+    hasNext: false,
+    hasPrev: false,
+  });
 
   const getSwalBaseOptions = () => ({
     width: 360,
@@ -89,12 +123,124 @@ export default function CourseQuizzesPage() {
     });
   };
 
+  const filterActiveQuizzes = useCallback(
+    (data?: QuizResponse[]) => (data || []).filter((quiz) => !quiz.deletedAt),
+    []
+  );
+
+  const activeQuizzesRef = useRef<QuizResponse[]>([]);
+  const lastFetchedBackendPageRef = useRef(0);
+  const backendHasMoreRef = useRef(true);
+
+  const resetPaginationState = useCallback(() => {
+    activeQuizzesRef.current = [];
+    lastFetchedBackendPageRef.current = 0;
+    backendHasMoreRef.current = true;
+  }, []);
+
+  const fetchBackendPage = useCallback(
+    async (pageNumber: number) => {
+      if (!courseId) return null;
+      const params = {
+        isPublished: isStudent ? true : undefined,
+        page: wrapPaginationValue(pageNumber),
+        limit: QUIZZES_PER_PAGE_PARAM,
+      };
+      const result = await quizService.getQuizzesByCourseId(courseId, params);
+      return {
+        active: filterActiveQuizzes(result.data),
+        hasNext: Boolean(result.pagination?.hasNextPage ?? false),
+      };
+    },
+    [courseId, filterActiveQuizzes, isStudent, QUIZZES_PER_PAGE_PARAM]
+  );
+
+  const ensureActiveQuizzes = useCallback(
+    async (pageNumber: number) => {
+      if (!courseId) return;
+      const targetCount = pageNumber * QUIZZES_PER_PAGE;
+      let cache = [...activeQuizzesRef.current];
+      let backendPage = lastFetchedBackendPageRef.current;
+      let hasMore = backendHasMoreRef.current;
+
+      while (cache.length < targetCount && (hasMore || backendPage === 0)) {
+        const nextPage = backendPage + 1;
+        const response = await fetchBackendPage(nextPage);
+        if (!response) break;
+        cache = [...cache, ...response.active];
+        backendPage = nextPage;
+        hasMore = response.hasNext;
+        activeQuizzesRef.current = cache;
+        lastFetchedBackendPageRef.current = backendPage;
+        backendHasMoreRef.current = hasMore;
+        if (!hasMore) break;
+      }
+
+      const startIndex = Math.max(0, (pageNumber - 1) * QUIZZES_PER_PAGE);
+      const displayed = cache.slice(startIndex, startIndex + QUIZZES_PER_PAGE);
+      setQuizzes(displayed);
+
+      const hasPrev = pageNumber > 1;
+      const hasNext =
+        cache.length > startIndex + displayed.length || hasMore;
+      const totalPages = hasMore
+        ? Math.max(pageNumber + 1, Math.ceil(cache.length / QUIZZES_PER_PAGE))
+        : Math.max(1, Math.ceil(cache.length / QUIZZES_PER_PAGE));
+
+      setQuizzesPaginationInfo({
+        totalItems: cache.length,
+        currentPage: pageNumber,
+        limit: QUIZZES_PER_PAGE,
+        totalPages,
+        hasNext,
+        hasPrev,
+      });
+    },
+    [courseId, fetchBackendPage]
+  );
+
+  const goToPage = useCallback(
+    async (pageNumber: number, options?: { silent?: boolean }) => {
+      if (!courseId) return;
+      if (!options?.silent) {
+        setLoading(true);
+      }
+      setError(null);
+      try {
+        await ensureActiveQuizzes(pageNumber);
+      } catch (err) {
+        console.error("Failed to load quizzes:", err);
+        const message =
+          typeof err === "object" && err !== null && "message" in err
+            ? String((err as { message?: string }).message)
+            : "Failed to load quizzes";
+        setError(message);
+      } finally {
+        if (!options?.silent) {
+          setLoading(false);
+        }
+      }
+    },
+    [courseId, ensureActiveQuizzes]
+  );
+
   useEffect(() => {
     if (!courseId) {
       setError("Course ID is required");
       setLoading(false);
       return;
     }
+
+    if (isQuestionBankRoute) {
+      // Teacher/Admin accessing question bank subjects: skip course fetch and go straight to questions
+      setIsSubjectId(true);
+      setLoading(false);
+      setCourse(null);
+      setError(null);
+      return;
+    }
+
+    let cancelled = false;
 
     const fetchData = async () => {
       try {
@@ -106,20 +252,23 @@ export default function CourseQuizzesPage() {
           console.log("Fetching course with ID:", courseId);
           const courseData = await courseService.getCourseById(courseId);
           console.log("Course found:", courseData);
+          if (cancelled) return;
           setCourse(courseData);
-
-          // Fetch quizzes for this course (don't send isDeleted: false, let backend use default)
-          const result = await quizService.getQuizzesByCourseId(courseId, {
-            isPublished: isStudent ? true : undefined,
-          });
-          console.log("Quizzes fetched:", result.data);
-          setQuizzes(result.data || []);
           setIsSubjectId(false);
-        } catch (courseErr: any) {
+          resetPaginationState();
+          setQuizzesPage(1);
+          await goToPage(1, { silent: true });
+        } catch (courseErr) {
           // If course not found (404), treat it as a subjectId and render QuizCoursePage
           // http.ts throws error with status field, not response.status
-          const status = courseErr?.status || courseErr?.response?.status;
-          const errorMessage = courseErr?.message || courseErr?.response?.data?.message || "";
+          const courseError = courseErr as {
+            status?: number;
+            response?: { status?: number; data?: { message?: string } };
+            message?: string;
+          };
+          const status = courseError?.status || courseError?.response?.status;
+          const errorMessage =
+            courseError?.message || courseError?.response?.data?.message || "";
           const isNotFound = status === 404 || 
                             errorMessage.toLowerCase().includes("not found") ||
                             errorMessage.toLowerCase().includes("course not found");
@@ -144,12 +293,22 @@ export default function CourseQuizzesPage() {
         setError(message);
         setIsSubjectId(false);
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchData();
-  }, [courseId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    courseId,
+    goToPage,
+    isQuestionBankRoute,
+    resetPaginationState,
+  ]);
 
   const getQuizStatus = (quiz: QuizResponse) => {
     const now = new Date();
@@ -201,6 +360,20 @@ export default function CourseQuizzesPage() {
     return localDate.toISOString();
   };
 
+  const getStudentLabel = (attempt: QuizAttempt) => {
+    const student = attempt.studentId;
+    if (!student) return "Unknown student";
+    if (typeof student === "string") return student;
+    return (
+      student.fullName ||
+      student.fullname ||
+      student.username ||
+      student.email ||
+      student._id ||
+      "Unknown student"
+    );
+  };
+
   const handleOpenEditQuiz = (quiz: QuizResponse) => {
     setEditingQuiz(quiz);
     setEditForm({
@@ -217,6 +390,80 @@ export default function CourseQuizzesPage() {
     setEditForm(null);
   };
 
+  const handleOpenAttemptModal = async (quiz: QuizResponse) => {
+    setAttemptModal({
+      quiz,
+      attempts: [],
+      loading: true,
+      error: null,
+    });
+    try {
+      const data = await quizAttemptService.getAttemptsByQuiz(quiz._id);
+      setAttemptModal((prev) => ({
+        ...prev,
+        attempts: data,
+        loading: false,
+      }));
+    } catch (err) {
+      const message =
+        typeof err === "object" && err !== null && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Failed to load attempts";
+      setAttemptModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: message,
+      }));
+    }
+  };
+
+  const handleCloseAttemptModal = () => {
+    setAttemptModal({
+      quiz: null,
+      attempts: [],
+      loading: false,
+      error: null,
+    });
+  };
+
+  const handleBanAttempt = async (attempt: QuizAttempt) => {
+    const studentLabel = getStudentLabel(attempt);
+    const Swal = (await import("sweetalert2")).default;
+    const base = getSwalBaseOptions();
+    const confirmed = await Swal.fire({
+      ...base,
+      title: "Ban attempt?",
+      text: `The student "${studentLabel}" will be removed immediately.`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#dc2626",
+      cancelButtonColor: darkMode ? "#334155" : "#e2e8f0",
+      confirmButtonText: "Ban now",
+      cancelButtonText: "Cancel",
+      reverseButtons: true,
+      heightAuto: false,
+    });
+    if (!confirmed.isConfirmed) return;
+
+    try {
+      setBanProcessingId(attempt._id);
+      const updated = await quizAttemptService.banQuizAttempt(attempt._id);
+      setAttemptModal((prev) => ({
+        ...prev,
+        attempts: prev.attempts.map((a) => (a._id === updated._id ? updated : a)),
+      }));
+      await showSwalSuccess("Attempt banned successfully");
+    } catch (err) {
+      const message =
+        typeof err === "object" && err !== null && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Failed to ban attempt";
+      await showSwalError(message);
+    } finally {
+      setBanProcessingId(null);
+    }
+  };
+
   const handleUpdateQuiz = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingQuiz || !editForm) return;
@@ -231,32 +478,9 @@ export default function CourseQuizzesPage() {
         isPublished: editForm.isPublished,
       });
 
-      // Update the quiz in state immediately with the new values
-      setQuizzes((prevQuizzes) =>
-        prevQuizzes.map((q) =>
-          q._id === editingQuiz._id
-            ? {
-                ...q,
-                title: editForm.title.trim(),
-                description: editForm.description.trim() || undefined,
-                startTime: datetimeLocalToISO(editForm.startTime),
-                endTime: datetimeLocalToISO(editForm.endTime),
-                isPublished: editForm.isPublished,
-              }
-            : q
-        )
-      );
+      resetPaginationState();
+      await goToPage(quizzesPage);
 
-      // Small delay to ensure backend has processed the update
-      await new Promise((resolve) => setTimeout(resolve, 300));
-
-      // Refresh quizzes list to get latest data from backend
-      const result = await quizService.getQuizzesByCourseId(courseId!);
-      console.log("Refreshed quizzes after update:", result.data);
-      const updatedQuiz = result.data?.find((q) => q._id === editingQuiz._id);
-      console.log("Updated quiz isPublished:", updatedQuiz?.isPublished);
-      setQuizzes(result.data || []);
-      
       handleCloseEdit();
       await showSwalSuccess("Quiz updated successfully");
     } catch (err) {
@@ -280,10 +504,10 @@ export default function CourseQuizzesPage() {
     try {
       setDeletingQuizId(quizId);
       await quizService.deleteQuiz(quizId);
-      
-      // Refresh quizzes list
-      const result = await quizService.getQuizzesByCourseId(courseId!);
-      setQuizzes(result.data || []);
+      resetPaginationState();
+      const nextPage = quizzesPage > 1 && quizzes.length === 1 ? quizzesPage - 1 : quizzesPage;
+      setQuizzesPage(nextPage);
+      await goToPage(nextPage);
       await showSwalSuccess("Quiz deleted successfully");
     } catch (err) {
       console.error("Failed to delete quiz:", err);
@@ -297,6 +521,14 @@ export default function CourseQuizzesPage() {
     }
   };
 
+  const handlePaginationSelect = (page?: number) => {
+    if (!page || page === quizzesPage) {
+      return;
+    }
+    setQuizzesPage(page);
+    goToPage(page);
+  };
+
   // If it's a subjectId, render QuizCoursePage instead
   if (isSubjectId) {
     return <QuizCoursePage />;
@@ -307,18 +539,21 @@ export default function CourseQuizzesPage() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
-        <main className="flex-1 overflow-y-auto p-6" style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}>
+        <main className="flex-1 overflow-y-auto p-6 pt-12" style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}>
           <div className="max-w-6xl mx-auto">
             {/* Header */}
             <div className="mb-6">
-              <button
-                onClick={() => navigate("/quizz")}
-                className="flex items-center gap-2 text-sm mb-4 hover:underline"
-                style={{ color: "var(--muted-text)" }}
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Courses
-              </button>
+              <div className="flex flex-wrap items-center  p-6 pt-12">
+                <button
+                  onClick={() => navigate(-1)}
+                  className="flex items-center gap-2 text-sm hover:underline"
+                  style={{ color: "var(--muted-text)" }}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </button>
+              
+              </div>
               <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--heading-text)" }}>
                 {course ? course.title : "Loading..."}
               </h1>
@@ -370,7 +605,9 @@ export default function CourseQuizzesPage() {
                           }}
                           onClick={() => {
                             if (isStudent) {
-                              navigate(`/quizz/${courseId}/quiz/${quiz._id}`);
+                              navigate(`/quizz/${courseId}/quiz/${quiz._id}`, {
+                                state: { quiz },
+                              });
                             } else {
                               navigate(`/questionbank/questions/${quiz._id}`);
                             }
@@ -425,7 +662,9 @@ export default function CourseQuizzesPage() {
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         if (canTakeQuiz(quiz)) {
-                                          navigate(`/quizz/${courseId}/quiz/${quiz._id}`);
+                                          navigate(`/quizz/${courseId}/quiz/${quiz._id}`, {
+                                            state: { quiz },
+                                          });
                                         }
                                       }}
                                       disabled={!canTakeQuiz(quiz)}
@@ -436,6 +675,17 @@ export default function CourseQuizzesPage() {
                                     </button>
                                   ) : (
                                     <>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenAttemptModal(quiz);
+                                        }}
+                                        className="p-2 rounded hover:bg-purple-50 transition-colors"
+                                        style={{ color: "#6d28d9" }}
+                                        title="View active attempts"
+                                      >
+                                        <Users className="w-4 h-4" />
+                                      </button>
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -468,6 +718,27 @@ export default function CourseQuizzesPage() {
                       );
                     })}
                   </div>
+                )}
+                {quizzes.length > 0 && quizzesPaginationInfo.totalPages > 1 && (
+                  <QuizPagination
+                    currentPage={quizzesPaginationInfo.currentPage}
+                    totalPages={quizzesPaginationInfo.totalPages}
+                    textColor="var(--muted-text)"
+                    borderColor="var(--card-border)"
+                    hasPrev={quizzesPaginationInfo.hasPrev}
+                    hasNext={quizzesPaginationInfo.hasNext}
+                    pageOptions={Array.from(
+                      { length: Math.min(5, quizzesPaginationInfo.totalPages) },
+                      (_, index) => {
+                        const start = Math.max(1, quizzesPaginationInfo.currentPage - 2);
+                        return Math.min(start + index, quizzesPaginationInfo.totalPages);
+                      }
+                    )}
+                    sendStringParams
+                    onPrev={handlePaginationSelect}
+                    onNext={handlePaginationSelect}
+                    onSelectPage={handlePaginationSelect}
+                  />
                 )}
               </>
             )}
@@ -608,6 +879,112 @@ export default function CourseQuizzesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Attempt Modal */}
+      {!isStudent && attemptModal.quiz && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleCloseAttemptModal} />
+          <div
+            className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
+            style={{
+              backgroundColor: "var(--card-surface)",
+              color: "var(--heading-text)",
+              border: "1px solid var(--card-border)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm" style={{ color: "var(--muted-text)" }}>
+                  Active attempts
+                </p>
+                <h2 className="text-2xl font-semibold">
+                  {attemptModal.quiz?.title || "Quiz"}
+                </h2>
+              </div>
+              <button
+                onClick={handleCloseAttemptModal}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                style={{ color: "var(--heading-text)" }}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {attemptModal.loading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="w-6 h-6 animate-spin" />
+              </div>
+            ) : attemptModal.error ? (
+              <div
+                className="rounded-lg border p-4 text-center space-y-3"
+                style={{ borderColor: "var(--card-border)" }}
+              >
+                <p style={{ color: "#ef4444" }}>{attemptModal.error}</p>
+                <button
+                  onClick={() => attemptModal.quiz && handleOpenAttemptModal(attemptModal.quiz)}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+                  style={{ backgroundColor: "#6d28d9" }}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <>
+                {attemptModal.attempts.filter((a) => a.status === "in_progress").length === 0 ? (
+                  <div
+                    className="rounded-lg border  p-6 pt-12 text-center"
+                    style={{ borderColor: "var(--card-border)" }}
+                  >
+                    <p style={{ color: "var(--muted-text)" }}>
+                      No students are currently taking this quiz.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {attemptModal.attempts
+                      .filter((attempt) => attempt.status === "in_progress")
+                      .map((attempt) => (
+                        <div
+                          key={attempt._id}
+                          className="border rounded-xl p-4 flex flex-wrap items-center justify-between gap-4"
+                          style={{ borderColor: "var(--card-border)" }}
+                        >
+                          <div>
+                            <p className="font-semibold" style={{ color: "var(--heading-text)" }}>
+                              {getStudentLabel(attempt)}
+                            </p>
+                            <p className="text-xs" style={{ color: "var(--muted-text)" }}>
+                              Started: {attempt.startedAt ? new Date(attempt.startedAt).toLocaleString() : "—"}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => navigate(`/quiz-attempts/${attempt._id}`)}
+                              className="px-4 py-2 rounded-lg text-sm font-semibold"
+                              style={{ backgroundColor: "var(--card-row-bg)" }}
+                            >
+                              View
+                            </button>
+                            <button
+                              onClick={() => handleBanAttempt(attempt)}
+                              disabled={banProcessingId === attempt._id}
+                              className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 flex items-center gap-2"
+                              style={{ backgroundColor: "#dc2626" }}
+                            >
+                              <ShieldOff className="w-4 h-4" />
+                              {banProcessingId === attempt._id ? "Banning..." : "Ban"}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}

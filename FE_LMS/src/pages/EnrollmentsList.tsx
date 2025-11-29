@@ -73,6 +73,13 @@ const [users, setUsers] = useState<Array<{ _id: string; username: string; email:
 const [courses, setCourses] = useState<Array<{ _id: string; title: string; description?: string }>>([]);
 const [courseTeachers, setCourseTeachers] = useState<Record<string, string[]>>({});
 const [updating, setUpdating] = useState<Record<string, boolean>>({});
+const [showKickModal, setShowKickModal] = useState(false);
+const [kickReason, setKickReason] = useState("");
+const [kickTargetId, setKickTargetId] = useState<string | null>(null);
+const [showApproveModal, setShowApproveModal] = useState(false);
+const [approveTargetId, setApproveTargetId] = useState<string | null>(null);
+const [showRejectModal, setShowRejectModal] = useState(false);
+const [rejectTargetId, setRejectTargetId] = useState<string | null>(null);
 
     const filtered = useMemo(() => {
         const term = debouncedSearch.trim().toLowerCase();
@@ -141,7 +148,7 @@ useEffect(() => {
     try {
       const [{ users: userList }, { courses: courseList }] = await Promise.all([
         userService.getUsers({ role: "student", limit: 50 }),
-        courseService.getAllCourses({ limit: 50 }),
+        courseService.getAllCourses({ limit: 50, ...(user?.role === 'teacher' && user?._id ? { teacherId: user._id } : {}) }),
       ]);
       if (mounted) {
         setUsers(Array.isArray(userList) ? userList.map(u => ({ _id: u._id, username: u.username, email: (u as any)?.email ?? "", fullname: (u as any)?.fullname })) : []);
@@ -161,6 +168,15 @@ useEffect(() => {
                 status: form.status,
                 role: form.role,
             });
+            const Swal = (await import("sweetalert2")).default;
+            await Swal.fire({
+              toast: true,
+              position: "top-end",
+              icon: "success",
+              title: "Create enrollment successfully",
+              showConfirmButton: false,
+              timer: 2000,
+            });
             setShowCreateModal(false);
             setForm({ userId: "", courseId: "", status: "pending", role: "student" });
             setPage(1);
@@ -168,7 +184,18 @@ useEffect(() => {
             setItems(Array.isArray(data) ? data : []);
             setPagination(pg);
         } catch (e: any) {
-            setCreateError(e?.message || "Failed to create enrollment");
+            const backendMsg = e?.response?.data?.message || e?.data?.message;
+            const msg = backendMsg && typeof backendMsg === "string" ? backendMsg : (e?.message || "Failed to create enrollment");
+            setCreateError(msg);
+            const Swal = (await import("sweetalert2")).default;
+            await Swal.fire({
+              toast: true,
+              position: "top-end",
+              icon: "error",
+              title: msg,
+              showConfirmButton: false,
+              timer: 2500,
+            });
         } finally {
             setCreating(false);
         }
@@ -191,8 +218,108 @@ useEffect(() => {
         try {
             await http.put(`/enrollments/${id}`, { status: 'approved' });
             setItems(prev => prev.map((it: any) => it._id === id ? { ...it, status: 'approved', updatedAt: new Date().toISOString() } : it));
+        } catch (e: any) {
+            const msg = e?.response?.data?.message || e?.message || 'Approve failed';
+            const Swal = (await import('sweetalert2')).default;
+            await Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: msg, showConfirmButton: false, timer: 2500 });
         } finally {
             setUpdating(prev => ({ ...prev, [id]: false }));
+        }
+    }
+
+    async function handleReject(id: string) {
+        setUpdating(prev => ({ ...prev, [id]: true }));
+        try {
+            await http.put(`/enrollments/${id}`, { status: 'rejected' });
+            setItems(prev => prev.map((it: any) => it._id === id ? { ...it, status: 'rejected', updatedAt: new Date().toISOString() } : it));
+            const Swal = (await import("sweetalert2")).default;
+            await Swal.fire({
+                toast: true,
+                position: "top-end",
+                icon: "success",
+                title: "Reject enrollment successfully",
+                showConfirmButton: false,
+                timer: 2000,
+            });
+        } catch (e: any) {
+            const msg = e?.response?.data?.message || e?.message || 'Reject failed';
+            const Swal = (await import('sweetalert2')).default;
+            await Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: msg, showConfirmButton: false, timer: 2500 });
+        } finally {
+            setUpdating(prev => ({ ...prev, [id]: false }));
+        }
+    }
+
+    async function handleReload() {
+        try {
+            setLoading(true);
+            const { items: data, pagination: pg } = await enrollmentService.listAll({ page, limit, status: status || undefined });
+            setItems(Array.isArray(data) ? data : []);
+            setPagination(pg);
+            setError("");
+        } catch (e: any) {
+            setError(e?.message || "Failed to load enrollments");
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function openApproveModal(id: string) {
+        setApproveTargetId(id);
+        setShowApproveModal(true);
+    }
+
+    async function confirmApprove() {
+        if (!approveTargetId) return;
+        await handleApprove(approveTargetId);
+        setShowApproveModal(false);
+        setApproveTargetId(null);
+    }
+
+    function openRejectModal(id: string) {
+        setRejectTargetId(id);
+        setShowRejectModal(true);
+    }
+
+    async function confirmReject() {
+        if (!rejectTargetId) return;
+        await handleReject(rejectTargetId);
+        setShowRejectModal(false);
+        setRejectTargetId(null);
+    }
+
+    function openKickModal(id: string) {
+        setKickTargetId(id);
+        setKickReason("");
+        setShowKickModal(true);
+    }
+
+    async function confirmKick() {
+        if (!kickTargetId) return;
+        const reason = kickReason.trim();
+        if (!reason) return;
+        setUpdating(prev => ({ ...prev, [kickTargetId]: true }));
+        try {
+            await http.post(`/enrollments/${kickTargetId}/kick`, { reason });
+            setItems(prev => prev.filter((it: any) => it._id !== kickTargetId));
+            const Swal = (await import("sweetalert2")).default;
+            await Swal.fire({
+                toast: true,
+                position: "top-end",
+                icon: "success",
+                title: "Kick student successfully",
+                showConfirmButton: false,
+                timer: 2000,
+            });
+            setShowKickModal(false);
+            setKickTargetId(null);
+            setKickReason("");
+        } catch (e: any) {
+            const msg = e?.response?.data?.message || e?.message || 'Remove failed';
+            const Swal = (await import('sweetalert2')).default;
+            await Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: msg, showConfirmButton: false, timer: 2500 });
+        } finally {
+            setUpdating(prev => ({ ...prev, [kickTargetId]: false }));
         }
     }
 
@@ -270,6 +397,13 @@ useEffect(() => {
                                 </option>
                             ))}
                         </select>
+                        <button
+                            onClick={handleReload}
+                            className="px-4 py-2 rounded-lg"
+                            style={{ backgroundColor: darkMode ? "#111827" : "#ffffff", border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}
+                        >
+                            Reload
+                        </button>
                     </div>
                 </div>
 
@@ -358,6 +492,75 @@ useEffect(() => {
                                         {creating ? "Creating..." : "Create"}
                                     </button>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showKickModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-black/50" onClick={() => !updating[(kickTargetId||"")] && setShowKickModal(false)} />
+                        <div
+                            className="relative w-full max-w-md rounded-xl shadow-lg p-6"
+                            style={{
+                                backgroundColor: darkMode ? "#0b132b" : "#ffffff",
+                                border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
+                            }}
+                        >
+                            <div className="text-lg font-semibold mb-4" style={{ color: darkMode ? "#ffffff" : "#111827" }}>Remove Enrollment</div>
+                            <label className="text-sm mb-1 block">Reason</label>
+                            <textarea
+                                value={kickReason}
+                                onChange={(e) => setKickReason(e.target.value)}
+                                rows={3}
+                                className="w-full px-3 py-2 rounded-lg border"
+                                style={{ backgroundColor: darkMode ? "#1f2937" : "#ffffff", color: darkMode ? "#ffffff" : "#111827", border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}
+                                placeholder="Nhập lý do remove enrollment"
+                            />
+                            <div className="flex justify-end gap-2 pt-3">
+                                <button
+                                    onClick={() => setShowKickModal(false)}
+                                    disabled={!!updating[(kickTargetId||"")]}
+                                    className="px-4 py-2 rounded-lg"
+                                    style={{ backgroundColor: darkMode ? "#111827" : "#ffffff", border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmKick}
+                                    disabled={!kickReason.trim() || !!updating[(kickTargetId||"")]}
+                                    className="px-4 py-2 rounded-lg bg-[#ef4444] text-white disabled:opacity-50"
+                                >
+                                    {updating[(kickTargetId||"")] ? "Removing..." : "Remove"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showApproveModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-black/50" onClick={() => !approveTargetId || !updating[(approveTargetId as string)] ? setShowApproveModal(false) : null} />
+                        <div className="relative w-full max-w-md rounded-xl shadow-lg p-6" style={{ backgroundColor: darkMode ? "#0b132b" : "#ffffff", border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>
+                            <div className="text-lg font-semibold mb-2" style={{ color: darkMode ? "#ffffff" : "#111827" }}>Confirm Approve Enrollment</div>
+                            <div className="text-sm mb-4" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>Are you sure you want to approve this enrollment?</div>
+                            <div className="flex justify-end gap-2">
+                                <button onClick={() => setShowApproveModal(false)} disabled={!!(approveTargetId && updating[(approveTargetId as string)])} className="px-4 py-2 rounded-lg" style={{ backgroundColor: darkMode ? "#111827" : "#ffffff", border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>Cancel</button>
+                                <button onClick={confirmApprove} disabled={!approveTargetId || !!(approveTargetId && updating[(approveTargetId as string)])} className="px-4 py-2 rounded-lg bg-[#525fe1] text-white disabled:opacity-50">Approve</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showRejectModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-black/50" onClick={() => !rejectTargetId || !updating[(rejectTargetId as string)] ? setShowRejectModal(false) : null} />
+                        <div className="relative w-full max-w-md rounded-xl shadow-lg p-6" style={{ backgroundColor: darkMode ? "#0b132b" : "#ffffff", border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>
+                            <div className="text-lg font-semibold mb-2" style={{ color: darkMode ? "#ffffff" : "#111827" }}>Confirm Reject Enrollment</div>
+                            <div className="text-sm mb-4" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>Are you sure you want to reject this enrollment?</div>
+                            <div className="flex justify-end gap-2">
+                                <button onClick={() => setShowRejectModal(false)} disabled={!!(rejectTargetId && updating[(rejectTargetId as string)])} className="px-4 py-2 rounded-lg" style={{ backgroundColor: darkMode ? "#111827" : "#ffffff", border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>Cancel</button>
+                                <button onClick={confirmReject} disabled={!rejectTargetId || !!(rejectTargetId && updating[(rejectTargetId as string)])} className="px-4 py-2 rounded-lg bg-[#ef4444] text-white disabled:opacity-50">Reject</button>
                             </div>
                         </div>
                     </div>
@@ -453,13 +656,29 @@ useEffect(() => {
                                                     </td>
                                                     <td className="px-4 py-3">
                                                         {user?.role === 'student' ? null : (
-                                                          <button
-                                                            onClick={() => handleApprove(it._id)}
+                                                            <div className="flex gap-3">
+                                                                  <button
+                                                            onClick={() => openApproveModal(it._id)}
                                                             disabled={it?.status !== 'pending' || !canUpdateEnrollment(it) || !!updating[it._id]}
                                                             className="px-3 py-1 rounded-lg text-sm bg-[#525fe1] text-white disabled:opacity-50"
                                                           >
                                                             Approve
-                                                          </button>
+                                                            </button>
+                                                               <button
+                                                            onClick={() => openRejectModal(it._id)}
+                                                            disabled={!canUpdateEnrollment(it) || !!updating[it._id]}
+                                                            className="px-3 py-1 rounded-lg text-sm bg-[#ef4444] text-white disabled:opacity-50"
+                                                          >
+                                                            Reject
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => openKickModal(it._id)}
+                                                                    disabled={!canUpdateEnrollment(it) || !!updating[it._id]}
+                                                                    className="px-3 py-1 rounded-lg text-sm bg-[#9ca3af] text-white disabled:opacity-50"
+                                                                >
+                                                                    Remove
+                                                                </button>
+                                                        </div>
                                                         )}
                                                     </td>
                                                 </tr>
@@ -476,7 +695,7 @@ useEffect(() => {
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
-                                    // disabled={!pagination?.hasPrev && page <= 1}
+                                    disabled={page <= 1}
                                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                                     className="px-3 py-2 rounded-lg disabled:opacity-50"
                                     style={{
@@ -486,10 +705,10 @@ useEffect(() => {
                                 >
                                     Prev
                                 </button>
-                                <span className="text-sm">{page} / {pagination?.totalPages ?? Math.max(1, Math.ceil((pagination?.total ?? filtered.length) / limit))}</span>
+                                <span className="text-sm">{page} / {(pagination?.totalPages ?? Math.max(1, Math.ceil((pagination?.total ?? filtered.length) / limit)))}</span>
                                 <button
-                                    // disabled={!pagination?.hasNext && page >= (pagination?.totalPages ?? 1)}
-                                    onClick={() => setPage((p) => p + 1)}
+                                    disabled={page >= (pagination?.totalPages ?? Math.max(1, Math.ceil((pagination?.total ?? filtered.length) / limit)))}
+                                    onClick={() => setPage((p) => Math.min((pagination?.totalPages ?? Math.max(1, Math.ceil((pagination?.total ?? filtered.length) / limit))), p + 1))}
                                     className="px-3 py-2 rounded-lg disabled:opacity-50"
                                     style={{
                                         backgroundColor: darkMode ? "#111827" : "#ffffff",

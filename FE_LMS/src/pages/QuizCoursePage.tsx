@@ -51,6 +51,7 @@ export default function QuizCoursePage() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const resolvedRole = (user?.role as "admin" | "teacher" | "student") || "teacher";
+  const canManageQuestions = resolvedRole !== "teacher";
 
   const apiBase = import.meta.env.VITE_BASE_API || "";
   const handleToggleSidebar = () => {
@@ -210,6 +211,7 @@ export default function QuizCoursePage() {
 
         const result = await quizQuestionService.getAllQuizQuestions({
           subjectId: courseId,
+          type: "mcq",
           page: currentPage,
           limit: pageSize,
           option: "subjectId",
@@ -714,6 +716,7 @@ export default function QuizCoursePage() {
                           onImageNext={handleImageNext}
                           onEdit={handleOpenEditQuestion}
                           onDelete={handleDeleteQuestion}
+                        canManage={canManageQuestions}
                         />
                       ))}
                     </div>
