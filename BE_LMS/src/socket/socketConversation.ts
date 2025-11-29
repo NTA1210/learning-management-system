@@ -1,8 +1,12 @@
 import { Server, Socket } from 'socket.io';
 import SocketEvents from './socketEvents';
-import { ChatRoomModel, MessageModel } from '@/models';
+import { ChatRoomModel, MessageModel, NotificationModel, UserModel } from '@/models';
 import { uploadFile } from '@/utils/uploadFile';
 import { prefixChatRoomFile } from '@/utils/filePrefix';
+import mongoose from 'mongoose';
+import { Role } from '@/types';
+
+const urlRegex = /(https?:\/\/[^\s]+)/g;
 
 export const chatRoomSendMessage = async (io: Server, socket: Socket, data: any) => {
   try {
@@ -19,11 +23,14 @@ export const chatRoomSendMessage = async (io: Server, socket: Socket, data: any)
       return;
     }
 
+    const isLink = urlRegex.test(content);
+
     const message = await MessageModel.create({
       chatRoomId,
       senderId,
       content,
       senderRole,
+      isLink,
     });
 
     const messageData = {
@@ -35,6 +42,7 @@ export const chatRoomSendMessage = async (io: Server, socket: Socket, data: any)
         avatar_url: user.avatar_url,
       },
       content,
+      isLink,
       createdAt: message.createdAt,
     };
 
@@ -48,8 +56,6 @@ export const chatRoomSendMessage = async (io: Server, socket: Socket, data: any)
       }
     }
 
-    console.log(chatRoom.unreadCounts);
-
     chatRoom.lastMessage = {
       id: message.id,
       senderId,
@@ -61,6 +67,12 @@ export const chatRoomSendMessage = async (io: Server, socket: Socket, data: any)
 
     const room = chatRoom.id.toString();
     io.to(room).emit('chatroom:new-message', {
+      chatRoomId,
+      message: messageData,
+    });
+
+    socket.to(room).emit('chatroom:notification-new-message', {
+      chatRoomName: chatRoom.name,
       chatRoomId,
       message: messageData,
     });
@@ -222,5 +234,93 @@ export const chatRoomSendFile = async (io: Server, socket: Socket, data: any) =>
   } catch (error) {
     console.error('Error in chatRoomSendFile:', error);
     socket.emit('chatroom:send-message:error', 'Internal server error');
+  }
+};
+
+export const chatRoomInviteUser = async (io: Server, socket: Socket, data: any) => {
+  try {
+    const { chatRoomId, email } = data;
+    const userId = socket.userId;
+    const user = socket.user;
+
+    if (!userId || !user) return;
+
+    const chatRoom = await ChatRoomModel.findById(chatRoomId);
+
+    if (!chatRoom) {
+      socket.emit('chatroom:invite-user:error', 'Chat room not found');
+      return;
+    }
+
+    const exist = await UserModel.findOne({ email });
+
+    if (!exist) {
+      socket.emit('chatroom:invite-user:error', 'User not found');
+      return;
+    }
+
+    if (exist.role === Role.STUDENT) {
+      socket.emit('chatroom:invite-user:error', 'Unauthorized, user is a student');
+      return;
+    }
+
+    if (chatRoom.participants.some((p) => p.userId.toString() === exist.id.toString())) {
+      socket.emit('chatroom:invite-user:error', 'User already in chat room');
+      return;
+    }
+
+    chatRoom.participants.push({
+      userId: exist.id,
+      role: exist.role,
+      username: exist.username,
+      avatarUrl: exist.avatar_url,
+      joinedAt: new Date(),
+    });
+
+    for (const [userId, count] of chatRoom.unreadCounts.entries()) {
+      if (userId !== user.id.toString()) {
+        chatRoom.unreadCounts.set(userId, count + 1);
+      } else {
+        chatRoom.unreadCounts.set(userId, 0);
+      }
+    }
+
+    chatRoom.unreadCounts.set(user.id.toString(), 0);
+
+    chatRoom.lastMessage = {
+      id: new mongoose.Types.ObjectId(),
+      senderId: userId,
+      content: `${exist.username} joined the chat room`,
+      timestamp: new Date(),
+    };
+    await chatRoom.save();
+
+    await NotificationModel.create({
+      title: 'You have been invited to a chat room',
+      message: `${user.username} invited you to a chat room`,
+      recipientUser: exist.id,
+      sender: user.id,
+      recipientType: 'user',
+    });
+
+    const room = chatRoom.id.toString();
+    io.to(room).emit('chatroom:update-chatroom', {
+      chatRoomId,
+      lastMessage: {
+        id: new mongoose.Types.ObjectId(),
+        senderId: {
+          _id: userId,
+          username: user.username,
+          role: user,
+          avatar_url: user.avatar_url,
+        },
+        content: chatRoom.lastMessage.content,
+        timestamp: chatRoom.lastMessage.timestamp,
+      },
+      unreadCounts: chatRoom.unreadCounts,
+    });
+  } catch (error) {
+    console.error('Error in chatRoomSendFile:', error);
+    socket.emit('chatroom:invite-user:error', 'Internal server error');
   }
 };

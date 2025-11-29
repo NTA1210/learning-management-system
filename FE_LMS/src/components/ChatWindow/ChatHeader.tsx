@@ -5,31 +5,50 @@ import { useEffect, useState } from "react";
 import Modal from "./components/Modal";
 import { useDebounce } from "../../hooks";
 import { userService } from "../../services";
+import { useSocketContext } from "../../context/SocketContext";
 
 const ChatHeader: React.FC = () => {
   const { selectedChatRoom, setSelectedChatRoom } = useChatRoomStore();
-  const [open, setOpen] = useState<boolean>(true);
+  const [user, setUser] = useState<any>(null);
+  const [open, setOpen] = useState<boolean>(false);
   const [search, setSearch] = useState<string>("");
   const [users, setUsers] = useState<any[]>([]);
+  const { socket } = useSocketContext();
 
   const searchDebounce = useDebounce(search, 500);
 
   useEffect(() => {
+    const storedUser = localStorage.getItem("lms:user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  useEffect(() => {
     const fetchUsers = async () => {
       if (searchDebounce) {
-        const res = (await userService.getUsers({ username: search })) as any;
-        setUsers(res);
+        const res = (await userService.getUsers({
+          username: searchDebounce,
+        })) as any;
+        setUsers(res?.users);
       } else {
-        const res = (await userService.getUsers({ limit: 20 })) as any;
-        setUsers(res);
+        const res = (await userService.getUsers()) as any;
+        setUsers(res?.users);
       }
     };
 
     fetchUsers();
   }, [searchDebounce]);
 
-  console.log(users);
+  console.log(user);
 
+  const handleAddUser = (email: string): void => {
+    socket?.emit("chatroom:invite-user", {
+      chatRoomId: selectedChatRoom?.chatRoomId,
+      email,
+    });
+    setOpen(false);
+  };
   return (
     <div className="flex items-center justify-between p-4 border-b border-gray-200">
       <div className="flex items-center space-x-3">
@@ -43,9 +62,14 @@ const ChatHeader: React.FC = () => {
         </div>
       </div>
       <div className="flex space-x-4">
-        <button className="text-gray-500 cursor-pointer hover:text-gray-700">
-          <UserPlus className="size-5" />
-        </button>
+        {user?.role === "student" || (
+          <button
+            className="text-gray-500 cursor-pointer hover:text-gray-700"
+            onClick={() => setOpen(true)}
+          >
+            <UserPlus className="size-5" />
+          </button>
+        )}
         <button className="text-gray-500 cursor-pointer hover:text-gray-700">
           <EllipsisVertical className="size-5" />
         </button>
@@ -76,7 +100,10 @@ const ChatHeader: React.FC = () => {
               {users.map((user) => (
                 <span className="flex items-center justify-between w-full py-1 border-gray-400 border-b-1 items">
                   <p className="text-xs text-gray-500"> {user?.email}</p>
-                  <button className="px-2 py-1 text-xs border border-gray-400 rounded-sm cursor-pointer">
+                  <button
+                    className="px-2 py-1 text-xs border border-gray-400 rounded-sm cursor-pointer hover:bg-blue-400 hover:text-white"
+                    onClick={() => handleAddUser(user.email)}
+                  >
                     Add
                   </button>
                 </span>

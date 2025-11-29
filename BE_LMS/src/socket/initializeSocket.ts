@@ -1,6 +1,7 @@
 import { type Server, Socket } from 'socket.io';
 import SocketEvents from './socketEvents';
 import {
+  chatRoomInviteUser,
   chatRoomSendFile,
   chatRoomSendMessage,
   conversationMarkAsRead,
@@ -35,6 +36,10 @@ const initializeSocket = async (io: Server) => {
 
       socket.on('chatroom:send-file', (data) => {
         chatRoomSendFile(io, socket, data);
+      });
+
+      socket.on('chatroom:invite-user', (data) => {
+        chatRoomInviteUser(io, socket, data);
       });
     } catch (error) {
       console.error('Error in initializeSocket:', error);

@@ -4,7 +4,6 @@ import {
   useState,
   useEffect,
   type JSX,
-  useCallback,
 } from "react";
 import { io, Socket } from "socket.io-client";
 import { toast } from "react-hot-toast";
@@ -59,6 +58,15 @@ export const SocketProvider = ({
     socketClient.on("connect_error", (error) => {
       console.error("Socket connection error:", error);
       toast.error("Socket connection error");
+    });
+
+    socketClient.on("chatroom:notification-new-message", (data) => {
+      console.log("New message:", data);
+      toast(`New message in ${data.chatRoomName}`, {
+        icon: "📧",
+        className: "bg-sky-500 text-white",
+        duration: 3000,
+      });
     });
 
     socketClient.on("internal_error", (error) => {

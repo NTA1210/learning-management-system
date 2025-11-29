@@ -10,6 +10,7 @@ export type Message = {
   };
   senderRole: string;
   content: string;
+  isLink: boolean;
   file: string;
   createdAt: string;
 };

@@ -7,6 +7,7 @@ const MessageItem: React.FC<Message> = ({
   senderRole,
   content,
   file,
+  isLink,
   createdAt,
 }) => {
   const [user, setUser] = useState(null);
@@ -44,7 +45,13 @@ const MessageItem: React.FC<Message> = ({
           {senderId.username}
         </span>
         <div className="max-w-xs p-3 text-white bg-sky-500 lg:max-w-md rounded-2xl">
-          <p className="text-sm">{content}</p>
+          {isLink ? (
+            <a href={content} className="text-sm underline" target="_blank">
+              {content}
+            </a>
+          ) : (
+            <p className="text-sm">{content}</p>
+          )}
           <span className="flex items-center gap-1 mt-1 text-xs text-blue-100">
             {displayTime}
           </span>
@@ -64,7 +71,13 @@ const MessageItem: React.FC<Message> = ({
         className="object-cover mr-2 rounded-full size-8"
       />
       <div className="max-w-xs p-3 bg-white lg:max-w-md rounded-2xl">
-        <p className="text-sm">{content}</p>
+        {isLink ? (
+          <a href={content} className="text-sm underline" target="_blank">
+            {content}
+          </a>
+        ) : (
+          <p className="text-sm">{content}</p>
+        )}
         <span className="flex items-center gap-1 mt-1 text-xs text-gray-600">
           {displayTime}
         </span>

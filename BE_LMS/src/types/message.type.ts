@@ -14,6 +14,7 @@ export default interface IMessage extends mongoose.Document<mongoose.Types.Objec
   senderId: mongoose.Types.ObjectId;
   senderRole: Role;
   content: string;
+  isLink: boolean;
   file?: IFile;
   createdAt: Date;
   updatedAt: Date;

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useSocketContext } from "./SocketContext";
-import { toast } from "sonner";
+import { toast } from "react-hot-toast";
 import { useChatRooms } from "../hooks/useChatRooms";
 
 export type User = {
@@ -147,6 +147,10 @@ export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
     toast.error("Failed to send message");
   };
 
+  const handleChatRoomInviteError = (error: any) => {
+    toast.error(error || "Failed to invite user");
+  };
+
   useEffect(() => {
     socket?.on("conversation:accept", handleNewConversation);
     socket?.on("conversation:request:error", handleErrorNewConversation);
@@ -160,6 +164,9 @@ export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
       handleChatRoomUpdateUnreadCounts
     );
     socket?.on("chatroom:send-message:error", handleChatRoomSendMessageError);
+    socket?.on("chatroom:invite-user:error", (errorMessage) =>
+      handleChatRoomInviteError(errorMessage)
+    );
 
     return () => {
       socket?.off("conversation:accept", handleNewConversation);
@@ -173,6 +180,7 @@ export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
         "chatroom:update-unread-counts",
         handleChatRoomUpdateUnreadCounts
       );
+      socket?.off("chatroom:invite-user:error", handleChatRoomInviteError);
     };
   }, [socket]);
 

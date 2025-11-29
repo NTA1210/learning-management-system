@@ -1,6 +1,5 @@
 import { NOT_FOUND } from '@/constants/http';
 import { SpecialistModel } from '@/models';
-import EnrollmentModel from '@/models/enrollment.model';
 import UserModel from '@/models/user.model';
 import { ISpecialist, IUser, Role, UserStatus } from '@/types';
 import appAssert from '@/utils/appAssert';
@@ -21,8 +20,12 @@ export const getAllUsers = async (request: TGetAllUsersFilter, viewerRole: Role)
     if (status) query.status = status; // admin có thể lọc status cụ thể
   } else {
     if (viewerRole === Role.TEACHER) {
-      if (role !== Role.ADMIN) {
-        query.role = role;
+      if (role) {
+        if (role !== Role.ADMIN) {
+          query.role = role;
+        }
+      } else {
+        query.role = { $ne: Role.ADMIN };
       }
     }
     if (viewerRole === Role.STUDENT) {
@@ -34,6 +37,8 @@ export const getAllUsers = async (request: TGetAllUsersFilter, viewerRole: Role)
   if (email) query.email = { $regex: email, $options: 'i' };
   if (username) query.username = { $regex: username, $options: 'i' };
   if (specialistIds && specialistIds.length) query.specialistIds = { $in: specialistIds };
+
+  console.log(query);
 
   const [users, total] = await Promise.all([
     UserModel.find(query)

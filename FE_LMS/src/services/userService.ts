@@ -53,15 +53,18 @@ export interface UserDetail extends User {
 export const userService = {
   getUsers: async (params?: UserListParams): Promise<UserListResult> => {
     const queryParams = new URLSearchParams();
-    
+
     // Pass page and limit as quoted strings: "1" instead of 1
-    if (params?.page !== undefined) queryParams.append("page", `"${params.page}"`);
-    if (params?.limit !== undefined) queryParams.append("limit", `"${params.limit}"`);
+    if (params?.page !== undefined)
+      queryParams.append("page", `"${params.page}"`);
+    if (params?.limit !== undefined)
+      queryParams.append("limit", `"${params.limit}"`);
     if (params?.role) queryParams.append("role", params.role);
     if (params?.isVerified !== undefined) {
-      const isVerifiedValue = typeof params.isVerified === 'boolean' 
-        ? String(params.isVerified) 
-        : params.isVerified;
+      const isVerifiedValue =
+        typeof params.isVerified === "boolean"
+          ? String(params.isVerified)
+          : params.isVerified;
       queryParams.append("isVerified", isVerifiedValue);
     }
     if (params?.status) queryParams.append("status", params.status);
@@ -90,7 +93,7 @@ export const userService = {
 
   updateUserSpecialists: async (
     userId: string,
-    specialistIds: string[],
+    specialistIds: string[]
   ): Promise<UserDetail> => {
     const payload = { specialistIds };
     const response = await http.put(`/users/${userId}`, payload);
@@ -102,14 +105,13 @@ export const userService = {
     data: {
       fullname?: string;
       specialistIds?: string[];
-    },
+    }
   ): Promise<UserDetail> => {
     const payload: { fullname?: string; specialistIds?: string[] } = {};
     if (data.fullname !== undefined) payload.fullname = data.fullname;
-    if (data.specialistIds !== undefined) payload.specialistIds = data.specialistIds;
+    if (data.specialistIds !== undefined)
+      payload.specialistIds = data.specialistIds;
     const response = await http.put(`/users/${userId}`, payload);
     return response.data as UserDetail;
   },
 };
-
-
