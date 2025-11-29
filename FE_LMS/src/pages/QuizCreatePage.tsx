@@ -301,6 +301,8 @@ const normalizeSnapshotQuestion = (snapshot: SnapshotQuestion) => {
 
 const QuizCreatePage: React.FC = () => {
   const { user } = useAuth();
+  const resolvedRole = (user?.role as "admin" | "teacher" | "student") || "teacher";
+  const isTeacherOrAdmin = resolvedRole === "teacher" || resolvedRole === "admin";
   const { darkMode } = useTheme();
   const navigate = useNavigate();
 
@@ -575,12 +577,32 @@ const QuizCreatePage: React.FC = () => {
 
   const createDraftQuestion = async (draft: DraftQuestion) => {
     if (!draft.text.trim()) return null;
+
+    const sanitizedText = fixNestedPTags(draft.text.trim());
+    const sanitizedOptions = draft.options.map((opt) => fixNestedPTags(opt));
+    const normalizedCorrect = draft.correctOptions.map((flag) => (flag > 0 ? 1 : 0));
+    const selectedType = normalizedCorrect.filter((flag) => flag === 1).length > 1 ? "multichoice" : "mcq";
+
+    if (isTeacherOrAdmin) {
+      return {
+        _id: draft.id,
+        subjectId: selectedSubjectId,
+        text: sanitizedText,
+        type: selectedType,
+        options: sanitizedOptions,
+        correctOptions: normalizedCorrect,
+        points: 1,
+        explanation: undefined,
+      } as QuizQuestion;
+    }
+
     const formData = new FormData();
     formData.append("subjectId", selectedSubjectId);
-    formData.append("text", fixNestedPTags(draft.text.trim()));
-    formData.append("type", "mcq");
-    formData.append("options", JSON.stringify(draft.options.map(opt => fixNestedPTags(opt))));
-    formData.append("correctOptions", JSON.stringify(draft.correctOptions));
+    formData.append("text", sanitizedText);
+    formData.append("type", selectedType);
+    formData.append("options", JSON.stringify(sanitizedOptions));
+    formData.append("correctOptions", JSON.stringify(normalizedCorrect));
+
     const response = await fetch(quizUploadEndpoint, {
       method: "POST",
       body: formData,
@@ -592,12 +614,11 @@ const QuizCreatePage: React.FC = () => {
         result?.message || result?.error?.message || response.statusText || "Failed to create question";
       throw new Error(message);
     }
-    // Ensure all text fields are strings (API might return number)
     const created = result?.data as QuizQuestion;
     if (created) {
       created.text = String(created.text || "");
       if (Array.isArray(created.options)) {
-        created.options = created.options.map(opt => String(opt || ""));
+        created.options = created.options.map((opt) => String(opt || ""));
       }
       if (created.explanation) {
         created.explanation = String(created.explanation);
@@ -759,7 +780,7 @@ const QuizCreatePage: React.FC = () => {
       style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}
     >
       <Navbar />
-      <Sidebar role={(user?.role as "admin" | "teacher" | "student") || "teacher"} />
+      <Sidebar role={resolvedRole} />
 
       <div className="flex flex-col flex-1 w-0 overflow-hidden">
         <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 mt-16 sm:pl-24 md:pl-28">

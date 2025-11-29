@@ -17,7 +17,7 @@ function App() {
             top: "80px", // Add padding from top to avoid navbar
           }}
           toastOptions={{
-            duration: 5000,
+            duration: 15000,
             style: {
               background: "#363636",
               color: "#fff",

@@ -27,10 +27,32 @@ const CourseSchema = new mongoose.Schema<ICourse>(
         message: 'EndDate must be greater than StartDate',
       },
     },
+    // NEW — dùng để thống kê
+    statistics: {
+      totalStudents: { type: Number, default: 0 },
+      totalLessons: { type: Number, default: 0 },
+      totalQuizzes: { type: Number, default: 0 },
+      averageQuizScore: { type: Number, default: 0 },
+      totalAssignments: { type: Number, default: 0 },
+      averageAssignmentScore: { type: Number, default: 0 },
+      averageFinalGrade: { type: Number, default: 0 },
+      totalAttendances: { type: Number, default: 0 },
+      averageAttendance: { type: Number, default: 0 },
+      passRate: { type: Number, default: 0 },
+      droppedRate: { type: Number, default: 0 },
+    },
+    //
+    // optional: weight for scoring
+    weight: {
+      quiz: { type: Number, default: 0.3 },
+      assignment: { type: Number, default: 0.5 },
+      attendance: { type: Number, default: 0.2 },
+    },
+    //
     status: {
       type: String,
       required: true,
-      enum: [CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED],
+      enum: CourseStatus,
       default: CourseStatus.DRAFT,
     },
     teacherIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],

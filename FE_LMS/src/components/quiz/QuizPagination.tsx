@@ -6,10 +6,13 @@ interface QuizPaginationProps {
   hasPrev: boolean;
   hasNext: boolean;
   pageOptions: number[];
-  onPrev: () => void;
-  onNext: () => void;
-  onSelectPage: (page: number) => void;
+  onPrev: (page?: number, queryValue?: string) => void;
+  onNext: (page?: number, queryValue?: string) => void;
+  onSelectPage: (page: number, queryValue?: string) => void;
+  sendStringParams?: boolean;
 }
+
+const wrapPageValue = (page: number) => `"${page}"`;
 
 export function QuizPagination({
   currentPage,
@@ -22,7 +25,26 @@ export function QuizPagination({
   onPrev,
   onNext,
   onSelectPage,
+  sendStringParams = false,
 }: QuizPaginationProps) {
+  const buildQueryValue = (page: number) => (sendStringParams ? wrapPageValue(page) : undefined);
+
+  const handlePrev = () => {
+    if (!hasPrev) return;
+    const targetPage = Math.max(1, currentPage - 1);
+    onPrev?.(targetPage, buildQueryValue(targetPage));
+  };
+
+  const handleNext = () => {
+    if (!hasNext) return;
+    const targetPage = Math.min(totalPages, currentPage + 1);
+    onNext?.(targetPage, buildQueryValue(targetPage));
+  };
+
+  const handleSelect = (page: number) => {
+    onSelectPage(page, buildQueryValue(page));
+  };
+
   return (
     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mt-8 mb-12">
       <p className="text-sm" style={{ color: textColor }}>
@@ -30,7 +52,7 @@ export function QuizPagination({
       </p>
       <div className="flex flex-wrap gap-2 justify-center items-center">
         <button
-          onClick={onPrev}
+          onClick={handlePrev}
           disabled={!hasPrev}
           className="px-3 py-1.5 rounded-lg border transition-colors"
           style={{
@@ -44,7 +66,7 @@ export function QuizPagination({
         {pageOptions.map((page) => (
           <button
             key={`pagination-${page}`}
-            onClick={() => onSelectPage(page)}
+            onClick={() => handleSelect(page)}
             className={`px-3 py-1 rounded-lg border text-sm transition-colors ${
               currentPage === page ? "bg-indigo-500 text-white" : ""
             }`}
@@ -57,7 +79,7 @@ export function QuizPagination({
           </button>
         ))}
         <button
-          onClick={onNext}
+          onClick={handleNext}
           disabled={!hasNext}
           className="px-3 py-1.5 rounded-lg border transition-colors"
           style={{

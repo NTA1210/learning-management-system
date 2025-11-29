@@ -98,6 +98,7 @@ export const createEnrollmentHandler = catchErrors(async (req, res) => {
   const enrollment = await createEnrollment({
     ...data,
     status: data.status || EnrollmentStatus.APPROVED,
+    method: data.method || EnrollmentMethod.OTHER, // Default to OTHER for admin/teacher to bypass anti-spam
   });
   return res.success(CREATED, { data: enrollment, message: "Enrollment created successfully" });
 });

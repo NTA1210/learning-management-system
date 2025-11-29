@@ -16,6 +16,7 @@ interface QuizQuestionCardProps {
   onImageNext: (questionId: string) => void;
   onEdit: (question: QuizQuestion) => void;
   onDelete: (questionId: string) => void;
+  canManage?: boolean;
 }
 
 export function QuizQuestionCard({
@@ -33,6 +34,7 @@ export function QuizQuestionCard({
   onImageNext,
   onEdit,
   onDelete,
+  canManage = true,
 }: QuizQuestionCardProps) {
   const images = resolveImageSrc(question);
   const hasNext = currentImageIndex < images.length - 1;
@@ -57,33 +59,35 @@ export function QuizQuestionCard({
             <span className="mr-2">Question {startNumber + index}:</span>
             <span dangerouslySetInnerHTML={{ __html: question.text }} />
           </h3>
-          <div className="flex items-center gap-2 md:gap-3 md:ml-4 self-end md:self-auto md:flex-shrink-0">
-            <button
-              onClick={() => onEdit(question)}
-              className="p-1.5 sm:p-2 rounded-lg transition-colors flex items-center justify-center"
-              style={{
-                backgroundColor: darkMode ? "rgba(59,130,246,0.2)" : "#e0f2fe",
-                color: darkMode ? "#93c5fd" : "#0369a1",
-              }}
-              title="Edit question"
-            >
-              <Edit3 className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-            <button
-              onClick={() => onDelete(question._id)}
-              disabled={deletingId === question._id}
-              className="p-1.5 sm:p-2 rounded-lg transition-colors flex items-center justify-center"
-              style={{
-                backgroundColor: darkMode ? "rgba(239, 68, 68, 0.2)" : "#fee2e2",
-                color: darkMode ? "#fca5a5" : "#dc2626",
-                opacity: deletingId === question._id ? 0.5 : 1,
-                cursor: deletingId === question._id ? "not-allowed" : "pointer",
-              }}
-              title="Delete question"
-            >
-              <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-          </div>
+          {canManage && (
+            <div className="flex items-center gap-2 md:gap-3 md:ml-4 self-end md:self-auto md:flex-shrink-0">
+              <button
+                onClick={() => onEdit(question)}
+                className="p-1.5 sm:p-2 rounded-lg transition-colors flex items-center justify-center"
+                style={{
+                  backgroundColor: darkMode ? "rgba(59,130,246,0.2)" : "#e0f2fe",
+                  color: darkMode ? "#93c5fd" : "#0369a1",
+                }}
+                title="Edit question"
+              >
+                <Edit3 className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+              <button
+                onClick={() => onDelete(question._id)}
+                disabled={deletingId === question._id}
+                className="p-1.5 sm:p-2 rounded-lg transition-colors flex items-center justify-center"
+                style={{
+                  backgroundColor: darkMode ? "rgba(239, 68, 68, 0.2)" : "#fee2e2",
+                  color: darkMode ? "#fca5a5" : "#dc2626",
+                  opacity: deletingId === question._id ? 0.5 : 1,
+                  cursor: deletingId === question._id ? "not-allowed" : "pointer",
+                }}
+                title="Delete question"
+              >
+                <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+            </div>
+          )}
         </div>
         {images.length > 0 && (
           <div className="mt-4 relative">

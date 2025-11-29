@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+
 import {
   DashboardPage,
   StudentDashboardPage,
@@ -21,6 +22,7 @@ import {
   QuizCreatePage,
   CourseQuizzesPage,
   QuizQuestionsPage,
+  QuizAttemptDetailPage,
   TakeQuizPage,
   FeedbackPage,
   FeedbackListPage,
@@ -203,6 +205,7 @@ function AppRoutes() {
         />
 
         {/* Quiz Management */}
+
         <Route
           path="/questionbank"
           element={
@@ -224,6 +227,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <QuizQuestionsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/quiz-attempts/:attemptId"
+          element={
+            <ProtectedRoute requiredRole={["teacher", "admin"]}>
+              <QuizAttemptDetailPage />
             </ProtectedRoute>
           }
         />

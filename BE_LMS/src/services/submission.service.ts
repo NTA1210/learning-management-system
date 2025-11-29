@@ -471,8 +471,9 @@ export const getSubmissionStats = async ({
     const submissions = await SubmissionModel.find({ assignmentId });
 
     const submittedCount = submissions.length;
-    const onTime = submissions.filter((s) => s.status !== "overdue").length;
-    const late = submissions.filter((s) => s.status === "overdue").length;
+
+    const onTime = submissions.filter((s: any) => !s.isLate).length;
+    const late = submissions.filter((s: any) => s.isLate).length;
     const graded = submissions.filter((s) => s.grade !== undefined);
     const averageGrade = graded.length > 0 ? graded.reduce((sum, s) => sum + (s.grade ?? 0), 0) / graded.length : null;
     return {
@@ -501,14 +502,24 @@ export const getGradeDistribution = async (assignmentId: string) => {
     ];
 
     const total = submissions.length || 1;
-    return ranges.map((r) => {
-    const count = submissions.filter((s) => s.grade! >= r.min && s.grade! < r.max).length;
-        return {
-          range: r.key,
-          count,
-          percentage: `${((count / total) * 100).toFixed(2)}%`,
-          };
-        });
+
+    return ranges.map((r, index) => {
+      const isLastRange = index === ranges.length - 1;
+
+      const count = submissions.filter((s) => {
+        const grade = s.grade!;
+        if (isLastRange) {
+          return grade >= r.min && grade <= r.max;
+        }
+        return grade >= r.min && grade < r.max;
+      }).length;
+
+      return {
+        range: r.key,
+        count,
+        percentage: `${((count / total) * 100).toFixed(2)}%`,
+      };
+    });
 };
 
 export const getSubmissionReportByAssignment = async (

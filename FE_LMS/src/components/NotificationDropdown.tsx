@@ -396,7 +396,7 @@ export default function NotificationDropdown({
     // Set up polling interval
     const intervalId = setInterval(() => {
       fetchNotifications({ silent: true }).catch(() => undefined);
-    }, 500000); // Poll every 5 seconds
+    }, 15000); // Poll every 5 seconds
 
     return () => {
       clearInterval(intervalId);
