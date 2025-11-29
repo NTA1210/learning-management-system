@@ -1561,7 +1561,8 @@ export const completeCourse = async (courseId: string) => {
     const finalGrade = Math.round(rawFinal * 100) / 100; // 2 decimals
 
     const absent = progress.totalAttendances - progress.completedAttendances;
-    const isDropped = absent > 4 || finalGrade < 5;
+    const absentPercent = (absent / progress.totalAttendances) * 100;
+    const isDropped = absentPercent > 20 || finalGrade < 5;
     const status = isDropped ? EnrollmentStatus.DROPPED : EnrollmentStatus.APPROVED;
 
     // bulk update: set progress, finalGrade, status, and droppedAt/completedAt appropriately
@@ -1592,11 +1593,11 @@ export const completeCourse = async (courseId: string) => {
       enrollmentId: s._id,
       student: s.student
         ? {
-          _id: s.student._id,
-          username: s.student.username,
-          fullname: s.student.fullname,
-          avatar_url: s.student.avatar_url,
-        }
+            _id: s.student._id,
+            username: s.student.username,
+            fullname: s.student.fullname,
+            avatar_url: s.student.avatar_url,
+          }
         : null,
       progress: {
         lessons: {
@@ -1697,32 +1698,32 @@ export const completeCourse = async (courseId: string) => {
   const totalStudents = studentsOut.length;
   const averageFinalGrade = totalStudents
     ? Math.round((studentsOut.reduce((acc, x) => acc + x.finalGrade, 0) / totalStudents) * 100) /
-    100
+      100
     : 0;
   const droppedCount = studentsOut.filter((s) => s.status === EnrollmentStatus.DROPPED).length;
   const passCount = studentsOut.filter((s) => s.status !== EnrollmentStatus.DROPPED).length;
   const averageAttendance = totalStudents
     ? Math.round(
-      (studentsOut.reduce(
-        (acc, x) => acc + x.progress.attendance.present / (x.progress.attendance.total || 1),
-        0
-      ) /
-        totalStudents) *
-      100
-    )
+        (studentsOut.reduce(
+          (acc, x) => acc + x.progress.attendance.present / (x.progress.attendance.total || 1),
+          0
+        ) /
+          totalStudents) *
+          100
+      )
     : 0;
   const averageQuizScore = totalStudents
     ? Math.round(
-      (studentsOut.reduce((acc, x) => acc + (x.progress.quizzes.score || 0), 0) / totalStudents) *
-      100
-    ) / 100
+        (studentsOut.reduce((acc, x) => acc + (x.progress.quizzes.score || 0), 0) / totalStudents) *
+          100
+      ) / 100
     : 0;
   const averageAssignmentScore = totalStudents
     ? Math.round(
-      (studentsOut.reduce((acc, x) => acc + (x.progress.assignments.score || 0), 0) /
-        totalStudents) *
-      100
-    ) / 100
+        (studentsOut.reduce((acc, x) => acc + (x.progress.assignments.score || 0), 0) /
+          totalStudents) *
+          100
+      ) / 100
     : 0;
 
   const summary = {
