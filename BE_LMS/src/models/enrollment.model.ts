@@ -1,6 +1,36 @@
 import mongoose from 'mongoose';
 import { IEnrollment } from '../types';
-import { EnrollmentMethod, EnrollmentRole, EnrollmentStatus } from '../types/enrollment.type';
+import {
+  EnrollmentMethod,
+  EnrollmentRole,
+  EnrollmentStatus,
+  IAssignmentDetails,
+  IQuizDetails,
+} from '../types/enrollment.type';
+
+const quizDetailsSchema = new mongoose.Schema<IQuizDetails>(
+  {
+    quizId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    title: { type: String },
+    score: { type: Number },
+    isCompleted: { type: Boolean },
+  },
+  {
+    _id: false,
+  }
+);
+
+const assignmentDetailsSchema = new mongoose.Schema<IAssignmentDetails>(
+  {
+    assignmentId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    title: { type: String },
+    score: { type: Number },
+    isCompleted: { type: Boolean },
+  },
+  {
+    _id: false,
+  }
+);
 
 const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
   {
@@ -43,9 +73,17 @@ const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
       totalQuizzes: { type: Number, default: 0 },
       completedQuizzes: { type: Number, default: 0 },
       totalQuizScores: { type: Number, default: 0 },
+      quizDetails: {
+        type: [quizDetailsSchema],
+        default: [],
+      },
       totalAssignments: { type: Number, default: 0 },
       completedAssignments: { type: Number, default: 0 },
       totalAssignmentScores: { type: Number, default: 0 },
+      assignmentDetails: {
+        type: [assignmentDetailsSchema],
+        default: [],
+      },
       totalAttendances: { type: Number, default: 0 },
       completedAttendances: { type: Number, default: 0 },
     },
