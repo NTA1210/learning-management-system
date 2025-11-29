@@ -1592,11 +1592,11 @@ export const completeCourse = async (courseId: string) => {
       enrollmentId: s._id,
       student: s.student
         ? {
-            _id: s.student._id,
-            username: s.student.username,
-            fullname: s.student.fullname,
-            avatar_url: s.student.avatar_url,
-          }
+          _id: s.student._id,
+          username: s.student.username,
+          fullname: s.student.fullname,
+          avatar_url: s.student.avatar_url,
+        }
         : null,
       progress: {
         lessons: {
@@ -1697,32 +1697,32 @@ export const completeCourse = async (courseId: string) => {
   const totalStudents = studentsOut.length;
   const averageFinalGrade = totalStudents
     ? Math.round((studentsOut.reduce((acc, x) => acc + x.finalGrade, 0) / totalStudents) * 100) /
-      100
+    100
     : 0;
   const droppedCount = studentsOut.filter((s) => s.status === EnrollmentStatus.DROPPED).length;
   const passCount = studentsOut.filter((s) => s.status !== EnrollmentStatus.DROPPED).length;
   const averageAttendance = totalStudents
     ? Math.round(
-        (studentsOut.reduce(
-          (acc, x) => acc + x.progress.attendance.present / (x.progress.attendance.total || 1),
-          0
-        ) /
-          totalStudents) *
-          100
-      )
+      (studentsOut.reduce(
+        (acc, x) => acc + x.progress.attendance.present / (x.progress.attendance.total || 1),
+        0
+      ) /
+        totalStudents) *
+      100
+    )
     : 0;
   const averageQuizScore = totalStudents
     ? Math.round(
-        (studentsOut.reduce((acc, x) => acc + (x.progress.quizzes.score || 0), 0) / totalStudents) *
-          100
-      ) / 100
+      (studentsOut.reduce((acc, x) => acc + (x.progress.quizzes.score || 0), 0) / totalStudents) *
+      100
+    ) / 100
     : 0;
   const averageAssignmentScore = totalStudents
     ? Math.round(
-        (studentsOut.reduce((acc, x) => acc + (x.progress.assignments.score || 0), 0) /
-          totalStudents) *
-          100
-      ) / 100
+      (studentsOut.reduce((acc, x) => acc + (x.progress.assignments.score || 0), 0) /
+        totalStudents) *
+      100
+    ) / 100
     : 0;
 
   const summary = {
@@ -1770,5 +1770,52 @@ export const completeCourse = async (courseId: string) => {
     },
     summary,
     students: studentsOut,
+  };
+};
+
+/**
+ * Lấy thống kê khóa học
+ * @param courseId - ID của khóa học
+ * @returns Thống kê khóa học
+ */
+export const getCourseStatistics = async (courseId: string) => {
+  // Validate courseId format
+  appAssert(
+    courseId && courseId.match(/^[0-9a-fA-F]{24}$/),
+    BAD_REQUEST,
+    'Invalid course ID format'
+  );
+
+  // Lấy thông tin khóa học (chỉ lấy những khóa học chưa bị xóa)
+  const course = await CourseModel.findOne({
+    _id: courseId,
+    isDeleted: false,
+  })
+    .select('_id title statistics status semesterId teacherIds')
+    .populate('teacherIds', 'username fullname avatar_url')
+    .populate('semesterId', 'name year type')
+    .lean();
+
+  appAssert(course, NOT_FOUND, 'Course not found');
+
+  // Kiểm tra xem khóa học đã có thống kê chưa
+  if (!course.statistics || Object.keys(course.statistics).length === 0) {
+    return {
+      courseId: course._id,
+      courseName: course.title,
+      semester: course.semesterId,
+      teachers: course.teacherIds || [],
+      statistics: null,
+      message: 'Course statistics not available yet. Please complete the course first.',
+    };
+  }
+
+  // Trả về thống kê
+  return {
+    courseId: course._id,
+    courseName: course.title,
+    semester: course.semesterId,
+    teachers: course.teacherIds || [],
+    statistics: course.statistics,
   };
 };
