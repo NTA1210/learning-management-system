@@ -105,6 +105,21 @@ export default function CourseDetail() {
       },
     });
   };
+
+  const handleViewForumList = () => {
+    if (!course?._id) return;
+    const courseTitle = course.title ?? course.code ?? "Course";
+    const params = new URLSearchParams({ courseId: course._id });
+    if (courseTitle) {
+      params.set("courseTitle", courseTitle);
+    }
+    navigate(`/forum-list?${params.toString()}`, {
+      state: {
+        preselectedCourseId: course._id,
+        preselectedCourseTitle: courseTitle,
+      },
+    });
+  };
   useEffect(() => {
     let mounted = true;
     (async () => {
