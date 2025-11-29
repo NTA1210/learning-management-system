@@ -18,24 +18,12 @@ const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
     },
     status: {
       type: String,
-      enum: [
-        EnrollmentStatus.PENDING,
-        EnrollmentStatus.APPROVED,
-        EnrollmentStatus.REJECTED,
-        EnrollmentStatus.CANCELLED,
-        EnrollmentStatus.DROPPED,
-        EnrollmentStatus.COMPLETED,
-      ],
+      enum: EnrollmentStatus,
       default: EnrollmentStatus.PENDING,
     },
     method: {
       type: String,
-      enum: [
-        EnrollmentMethod.SELF,
-        EnrollmentMethod.INVITED,
-        EnrollmentMethod.PASSWORD,
-        EnrollmentMethod.OTHER,
-      ],
+      enum: EnrollmentMethod,
       default: EnrollmentMethod.SELF,
     },
     role: {
@@ -52,6 +40,14 @@ const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
     progress: {
       totalLessons: { type: Number, default: 0 },
       completedLessons: { type: Number, default: 0 },
+      totalQuizzes: { type: Number, default: 0 },
+      completedQuizzes: { type: Number, default: 0 },
+      totalQuizScores: { type: Number, default: 0 },
+      totalAssignments: { type: Number, default: 0 },
+      completedAssignments: { type: Number, default: 0 },
+      totalAssignmentScores: { type: Number, default: 0 },
+      totalAttendances: { type: Number, default: 0 },
+      completedAttendances: { type: Number, default: 0 },
     },
     finalGrade: { type: Number },
     completedAt: { type: Date },

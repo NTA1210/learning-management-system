@@ -25,7 +25,7 @@ quizQuestionRoutes.post(
   importXMLFileHandler
 );
 quizQuestionRoutes.get('/export/:subjectId', authorize(Role.ADMIN), exportXMLFileHandler);
-quizQuestionRoutes.get('/', authorize(Role.ADMIN), getAllQuizQuestionsHandler);
+quizQuestionRoutes.get('/', authorize(Role.ADMIN, Role.TEACHER), getAllQuizQuestionsHandler);
 quizQuestionRoutes.post(
   '/',
   authorize(Role.ADMIN),

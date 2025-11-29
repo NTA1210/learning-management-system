@@ -10,6 +10,7 @@ import {
   getMyCoursesHandler,
   getQuizzesHandler,
   getCourseBySlugHandler,
+  completeCourseHandler,
 } from '../controller/course.controller';
 import authenticate from '../middleware/authenticate';
 import authorize from '../middleware/authorize';
@@ -77,5 +78,13 @@ courseRoutes.delete(
 
 // get quizzes by courseId
 courseRoutes.get('/:courseId/quizzes', authenticate, getQuizzesHandler);
+
+// post complete course
+courseRoutes.post(
+  '/:courseId/statistics',
+  authenticate,
+  authorize(Role.ADMIN, Role.TEACHER),
+  completeCourseHandler
+);
 
 export default courseRoutes;
