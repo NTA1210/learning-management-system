@@ -42,9 +42,21 @@ export default interface IEnrollment extends mongoose.Document {
     totalQuizzes: number;
     completedQuizzes: number;
     totalQuizScores: number;
+    quizDetails: {
+      quizId: mongoose.Types.ObjectId;
+      title: string;
+      score: number;
+      isCompleted: boolean;
+    };
     totalAssignments: number;
     completedAssignments: number;
     totalAssignmentScores: number;
+    assignmentDetails: {
+      assignmentId: mongoose.Types.ObjectId;
+      title: string;
+      score: number;
+      isCompleted: boolean;
+    };
     totalAttendances: number;
     completedAttendances: number;
   };

@@ -96,4 +96,6 @@ courseRoutes.post(
   completeCourseHandler
 );
 
+//get final score of student in a course
+
 export default courseRoutes;

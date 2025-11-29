@@ -43,9 +43,25 @@ const EnrollmentSchema = new mongoose.Schema<IEnrollment>(
       totalQuizzes: { type: Number, default: 0 },
       completedQuizzes: { type: Number, default: 0 },
       totalQuizScores: { type: Number, default: 0 },
+      quizDetails: [
+        {
+          quizId: mongoose.Types.ObjectId,
+          title: String,
+          score: Number,
+          isCompleted: Boolean,
+        },
+      ],
       totalAssignments: { type: Number, default: 0 },
       completedAssignments: { type: Number, default: 0 },
       totalAssignmentScores: { type: Number, default: 0 },
+      assignmentDetails: [
+        {
+          assignmentId: mongoose.Types.ObjectId,
+          title: String,
+          score: Number,
+          isCompleted: Boolean,
+        },
+      ],
       totalAttendances: { type: Number, default: 0 },
       completedAttendances: { type: Number, default: 0 },
     },

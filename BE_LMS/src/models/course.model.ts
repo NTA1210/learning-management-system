@@ -32,9 +32,17 @@ const CourseSchema = new mongoose.Schema<ICourse>(
       totalStudents: { type: Number, default: 0 },
       totalLessons: { type: Number, default: 0 },
       totalQuizzes: { type: Number, default: 0 },
+      quizDetails: [
+        {
+          quizId: mongoose.Types.ObjectId,
+          title: String,
+          score: Number,
+          isCompleted: Boolean,
+        },
+      ],
       averageQuizScore: { type: Number, default: 0 },
       totalAssignments: { type: Number, default: 0 },
-      averageAssignmentScore: { type: Number, default: 0 },
+      completedAssignments: { type: Number, default: 0 },
       averageFinalGrade: { type: Number, default: 0 },
       totalAttendances: { type: Number, default: 0 },
       averageAttendance: { type: Number, default: 0 },
