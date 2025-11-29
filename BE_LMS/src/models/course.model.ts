@@ -10,7 +10,7 @@ const CourseSchema = new mongoose.Schema<ICourse>(
       required: true,
     },
     title: { type: String, required: true },
-    slug: { type: String, required: true, unique: true },
+    slug: { type: String, required: true },
     // ✅ UNIVERSITY RULE: Course MUST belong to a Subject
     subjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject', required: true },
     logo: { type: String },
