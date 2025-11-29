@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { useTheme } from "../hooks/useTheme";
@@ -13,9 +11,13 @@ import {
   type ForumReply,
 } from "../services/forumService";
 import { ArrowLeft, Edit3, Loader2, MessageSquare, Trash2 } from "lucide-react";
+import MarkdownContent from "../components/MarkdownContent";
+import AttachmentPreview from "../components/AttachmentPreview";
 
 type SidebarRole = "admin" | "teacher" | "student";
 type ReplyNode = ForumReply & { children?: ReplyNode[] };
+
+const attachmentAcceptTypes = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.7z,image/*";
 
 const ForumPostDetailPage: React.FC = () => {
   const { forumId = "", postId = "" } = useParams();
@@ -25,6 +27,14 @@ const ForumPostDetailPage: React.FC = () => {
 
   const sidebarRole: SidebarRole =
     user && ["admin", "teacher", "student"].includes(user.role) ? (user.role as SidebarRole) : "student";
+  const formatFileSize = (size: number) => {
+    if (!size || Number.isNaN(size)) return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    const exponent = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
+    const value = size / 1024 ** exponent;
+    const formatted = exponent === 0 || value >= 10 ? value.toFixed(0) : value.toFixed(1);
+    return `${formatted} ${units[exponent]}`;
+  };
 
   const [forum, setForum] = useState<ForumResponse | null>(null);
   const [post, setPost] = useState<ForumPost | null>(null);
@@ -34,6 +44,7 @@ const ForumPostDetailPage: React.FC = () => {
   const [repliesLoading, setRepliesLoading] = useState(false);
   const [repliesError, setRepliesError] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState("");
+  const [replyFile, setReplyFile] = useState<File | null>(null);
   const [replySubmitting, setReplySubmitting] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
   const [replyTarget, setReplyTarget] = useState<{ replyId: string | null; displayName?: string } | null>(null);
@@ -46,6 +57,7 @@ const ForumPostDetailPage: React.FC = () => {
   const [expandedChildGroups, setExpandedChildGroups] = useState<Record<string, boolean>>({});
   const [repliesExpanded, setRepliesExpanded] = useState(false);
   const replyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [lightboxImage, setLightboxImage] = useState<{ src: string; alt?: string } | null>(null);
 
   const fetchForum = useCallback(async () => {
     if (!forumId) return;
@@ -106,6 +118,17 @@ const ForumPostDetailPage: React.FC = () => {
     }
   }, [replyTarget]);
 
+  useEffect(() => {
+    if (!lightboxImage) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setLightboxImage(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [lightboxImage]);
+
   const formatDate = (value?: string | number | Date) => {
     if (!value) return "—";
     return new Date(value).toLocaleString("en-GB", {
@@ -118,6 +141,9 @@ const ForumPostDetailPage: React.FC = () => {
       hour12: false,
     });
   };
+  const handleImagePreview = useCallback((payload: { src: string; alt?: string }) => {
+    setLightboxImage(payload);
+  }, []);
 
   const handleReplySubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -128,11 +154,17 @@ const ForumPostDetailPage: React.FC = () => {
     }
     try {
       setReplySubmitting(true);
-      await forumService.createReply(forumId, post._id, {
-        content: replyContent.trim(),
-        parentReplyId: replyTarget?.replyId || undefined,
-      });
+      await forumService.createReply(
+        forumId,
+        post._id,
+        {
+          content: replyContent.trim(),
+          parentReplyId: replyTarget?.replyId || undefined,
+        },
+        replyFile || undefined
+      );
       setReplyContent("");
+      setReplyFile(null);
       setReplyError(null);
       if (replyTarget?.replyId) {
         setExpandedChildGroups((prev) => ({ ...prev, [replyTarget.replyId as string]: true }));
@@ -372,8 +404,14 @@ const ForumPostDetailPage: React.FC = () => {
                   <div
                     className={`prose max-w-none dark:prose-invert ${shouldClamp && !isExpanded ? "line-clamp-4" : ""}`}
                   >
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{reply.content}</ReactMarkdown>
+                    <MarkdownContent content={reply.content} onImageClick={handleImagePreview} />
                   </div>
+                  <AttachmentPreview
+                    files={reply.key}
+                    size="xs"
+                    onImageClick={handleImagePreview}
+                    caption={`Reply from ${displayName}`}
+                  />
                 </div>
               )}
               <div className="mt-3 flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-500">
@@ -459,7 +497,8 @@ const ForumPostDetailPage: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden relative" style={backgroundStyles}>
+    <>
+      <div className="flex h-screen overflow-hidden relative" style={backgroundStyles}>
       <Navbar />
       <Sidebar role={sidebarRole} />
 
@@ -508,8 +547,14 @@ const ForumPostDetailPage: React.FC = () => {
                 </div>
                 <h1 className="text-3xl font-bold">{post.title}</h1>
                 <div className="prose max-w-none dark:prose-invert">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.content}</ReactMarkdown>
+                  <MarkdownContent content={post.content} onImageClick={handleImagePreview} />
                 </div>
+                <AttachmentPreview
+                  files={post.key}
+                  size="md"
+                  onImageClick={handleImagePreview}
+                  caption={post.title}
+                />
                 {post.author && (
                   <p className="text-xs text-slate-500">
                     Posted by {post.author.fullname || post.author.username}
@@ -517,6 +562,86 @@ const ForumPostDetailPage: React.FC = () => {
                 )}
 
                 <div className="pt-4 border-t border-slate-100 space-y-4 dark:border-slate-800">
+                <form className="space-y-3" onSubmit={handleReplySubmit}>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-sm font-semibold">Add reply</label>
+                      {replyTarget?.displayName && (
+                        <button
+                          type="button"
+                          onClick={() => beginReplyTo()}
+                          className="text-xs font-semibold text-indigo-500 hover:text-indigo-400"
+                        >
+                          Replying to @{replyTarget.displayName} • Cancel
+                        </button>
+                      )}
+                    </div>
+                    {replyTarget?.displayName && (
+                      <div
+                        className={`text-xs rounded-xl px-3 py-2 border ${
+                          darkMode ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-100" : "border-indigo-200 bg-indigo-50 text-indigo-600"
+                        }`}
+                      >
+                        You are replying to <span className="font-semibold">@{replyTarget.displayName}</span>
+                      </div>
+                    )}
+                    <textarea
+                      ref={replyTextareaRef}
+                      className={`w-full h-28 rounded-xl border px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
+                        darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+                      }`}
+                      placeholder="Share your thoughts, code snippets, or resources (Markdown supported)"
+                      value={replyContent}
+                      onChange={(event) => {
+                        setReplyContent(event.target.value);
+                        setReplyError(null);
+                      }}
+                    ></textarea>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Attachment (optional)</label>
+                      <input
+                        type="file"
+                        accept={attachmentAcceptTypes}
+                        onChange={(event) => setReplyFile(event.target.files?.[0] || null)}
+                        className="w-full rounded-xl border px-4 py-2.5 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500 cursor-pointer"
+                      />
+                      {replyFile && (
+                        <div
+                          className={`mt-2 flex items-center justify-between rounded-xl px-3 py-2 text-xs ${
+                            darkMode ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          <span className="truncate pr-2">
+                            {replyFile.name} • {formatFileSize(replyFile.size)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setReplyFile(null)}
+                            className="text-rose-500 font-semibold hover:text-rose-400"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {replyError && <p className="text-sm text-rose-500">{replyError}</p>}
+                    <div className="flex items-center justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={() => navigate(-1)}
+                        className="rounded-xl border px-5 py-2 text-sm font-semibold border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
+                        disabled={replySubmitting}
+                      >
+                        {replySubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                        Send
+                      </button>
+                    </div>
+                  </form>
                   <div className="flex items-center justify-between">
                     <div>
                       <h4 className="text-lg font-semibold">Replies</h4>
@@ -569,66 +694,40 @@ const ForumPostDetailPage: React.FC = () => {
                   )}
                   {replyManagementError && <p className="text-sm text-rose-500">{replyManagementError}</p>}
 
-                  <form className="space-y-3" onSubmit={handleReplySubmit}>
-                    <div className="flex items-center justify-between">
-                      <label className="block text-sm font-semibold">Add reply</label>
-                      {replyTarget?.displayName && (
-                        <button
-                          type="button"
-                          onClick={() => beginReplyTo()}
-                          className="text-xs font-semibold text-indigo-500 hover:text-indigo-400"
-                        >
-                          Replying to @{replyTarget.displayName} • Cancel
-                        </button>
-                      )}
-                    </div>
-                    {replyTarget?.displayName && (
-                      <div
-                        className={`text-xs rounded-xl px-3 py-2 border ${
-                          darkMode ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-100" : "border-indigo-200 bg-indigo-50 text-indigo-600"
-                        }`}
-                      >
-                        You are replying to <span className="font-semibold">@{replyTarget.displayName}</span>
-                      </div>
-                    )}
-                    <textarea
-                      ref={replyTextareaRef}
-                      className={`w-full h-28 rounded-xl border px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
-                        darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                      }`}
-                      placeholder="Share your thoughts, code snippets, or resources (Markdown supported)"
-                      value={replyContent}
-                      onChange={(event) => {
-                        setReplyContent(event.target.value);
-                        setReplyError(null);
-                      }}
-                    ></textarea>
-                    {replyError && <p className="text-sm text-rose-500">{replyError}</p>}
-                    <div className="flex items-center justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={() => navigate(-1)}
-                        className="rounded-xl border px-5 py-2 text-sm font-semibold border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
-                        disabled={replySubmitting}
-                      >
-                        {replySubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                        Send
-                      </button>
-                    </div>
-                  </form>
+               
                 </div>
               </section>
             ) : null}
           </div>
         </main>
       </div>
-    </div>
+      </div>
+
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div
+            className="max-h-full max-w-4xl w-full flex flex-col items-center gap-4"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <img
+              src={lightboxImage.src}
+              alt={lightboxImage.alt || "Preview image"}
+              className="max-h-[80vh] w-full object-contain rounded-3xl border border-white/20 shadow-2xl"
+            />
+            <button
+              type="button"
+              onClick={() => setLightboxImage(null)}
+              className="rounded-full bg-white/90 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-white"
+            >
+              Close preview
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

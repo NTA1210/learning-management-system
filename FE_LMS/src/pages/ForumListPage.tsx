@@ -1,13 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import type { Course } from "../types/course";
 import { courseService } from "../services";
+import AttachmentPreview from "../components/AttachmentPreview";
 import { forumService, type ForumResponse, type ForumType } from "../services/forumService";
-import { Book, BookOpen, Edit3, Eye, Loader2, RefreshCcw, Trash2, X } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Book, BookOpen, Edit3, Eye, Loader2, PlusCircle, RefreshCcw, Trash2, X } from "lucide-react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 
 type SidebarRole = "admin" | "teacher" | "student";
 
@@ -16,17 +17,62 @@ const forumTypeLabels: Record<ForumType, string> = {
   announcement: "Announcement",
 };
 
+const attachmentAcceptTypes = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.7z,image/*";
+
+type CourseSnapshot = Pick<Course, "_id"> & Partial<Omit<Course, "_id">>;
+
+interface ForumListLocationState {
+  preselectedCourseId?: string;
+  preselectedCourseTitle?: string;
+}
+
 const ForumListPage: React.FC = () => {
   const { darkMode } = useTheme();
   const { user } = useAuth();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const locationState = (location.state as ForumListLocationState | null) ?? null;
+  const locationCourseId = locationState?.preselectedCourseId ?? "";
+  const locationCourseTitle = locationState?.preselectedCourseTitle ?? "";
+  const searchCourseId = searchParams.get("courseId") ?? "";
+  const searchCourseTitle = searchParams.get("courseTitle") ?? "";
   const sidebarRole: SidebarRole =
     user && ["admin", "teacher", "student"].includes(user.role) ? (user.role as SidebarRole) : "student";
   const canManage = user?.role === "admin" || user?.role === "teacher";
 
+  const formatFileSize = (size: number) => {
+    if (!size || Number.isNaN(size)) return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    const exponent = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
+    const value = size / 1024 ** exponent;
+    const formatted = exponent === 0 || value >= 10 ? value.toFixed(0) : value.toFixed(1);
+    return `${formatted} ${units[exponent]}`;
+  };
+
+  const getInitials = (input?: string) => {
+    if (!input) return "U";
+    const trimmed = input.trim();
+    if (!trimmed) return "U";
+    return (
+      trimmed
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((segment) => segment[0]?.toUpperCase() || "")
+        .join("") || "U"
+    );
+  };
+
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseLoading, setCourseLoading] = useState(true);
   const [courseError, setCourseError] = useState<string | null>(null);
-  const [selectedCourseId, setSelectedCourseId] = useState<string>("");
+  const [selectedCourseId, setSelectedCourseId] = useState(() => {
+    return localStorage.getItem("selectedCourseId") || null;
+  });
+  const [courseSearchQuery, setCourseSearchQuery] = useState("");
+  const [debouncedCourseSearch, setDebouncedCourseSearch] = useState("");
+  const [courseDropdownOpen, setCourseDropdownOpen] = useState(false);
+  const [selectedCourseSnapshot, setSelectedCourseSnapshot] = useState<CourseSnapshot | null>(null);
 
   const [forums, setForums] = useState<ForumResponse[]>([]);
   const [forumsLoading, setForumsLoading] = useState(false);
@@ -45,6 +91,7 @@ const ForumListPage: React.FC = () => {
     isActive: boolean;
     saving: boolean;
     error?: string | null;
+    file: File | null;
   }>({
     open: false,
     forum: null,
@@ -54,9 +101,9 @@ const ForumListPage: React.FC = () => {
     isActive: true,
     saving: false,
     error: null,
+    file: null,
   });
 
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [deleteModal, setDeleteModal] = useState<{
     open: boolean;
     forum: ForumResponse | null;
@@ -69,18 +116,75 @@ const ForumListPage: React.FC = () => {
     error: null,
   });
 
+  const [createModal, setCreateModal] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    forumType: ForumType;
+    isActive: boolean;
+    submitting: boolean;
+    error?: string | null;
+    file: File | null;
+  }>({
+    open: false,
+    title: "",
+    description: "",
+    forumType: "discussion",
+    isActive: true,
+    submitting: false,
+    error: null,
+    file: null,
+  });
+
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const courseDropdownRef = useRef<HTMLDivElement | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<{ src: string; alt?: string } | null>(null);
+  const handleAttachmentPreview = useCallback((payload: { src: string; alt?: string }) => {
+    setAttachmentPreview(payload);
+  }, []);
+
+  useEffect(() => {
+    const preselectedCourseId = locationCourseId || searchCourseId;
+    if (!preselectedCourseId) return;
+    setSelectedCourseId((current) => (current === preselectedCourseId ? current : preselectedCourseId));
+
+    const preselectedTitle = locationCourseTitle || searchCourseTitle;
+    if (preselectedTitle) {
+      setSelectedCourseSnapshot((prev) => {
+        if (prev && prev._id === preselectedCourseId && prev.title === preselectedTitle) {
+          return prev;
+        }
+        return {
+          ...(prev && prev._id === preselectedCourseId ? prev : {}),
+          _id: preselectedCourseId,
+          title: preselectedTitle,
+          description: prev?.description ?? "",
+        };
+      });
+    }
+  }, [locationCourseId, locationCourseTitle, searchCourseId, searchCourseTitle]);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         setCourseLoading(true);
-        const result = await courseService.getAllCourses({ limit: 100, sortBy: "title", sortOrder: "asc" });
+        const result = await courseService.getAllCourses({
+          limit: 20,
+          sortBy: "title",
+          sortOrder: "asc",
+          search: debouncedCourseSearch || undefined,
+        });
         const normalized = Array.isArray(result.courses) ? result.courses.filter(Boolean) : [];
         if (!mounted) return;
         setCourses(normalized);
         setCourseError(null);
-        if (normalized.length > 0) {
-          setSelectedCourseId((prev) => prev || normalized[0]._id);
+        if (!selectedCourseId && normalized.length > 0) {
+          setSelectedCourseId(normalized[0]._id);
+          setSelectedCourseSnapshot(normalized[0]);
+        } else if (selectedCourseId) {
+          const match = normalized.find((course) => course._id === selectedCourseId);
+          if (match) setSelectedCourseSnapshot(match);
         }
       } catch (error) {
         if (!mounted) return;
@@ -94,8 +198,19 @@ const ForumListPage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [debouncedCourseSearch, selectedCourseId]);
+  useEffect(() => {
+    if (selectedCourseId) {
+      localStorage.setItem("selectedCourseId", selectedCourseId);
+    }
+  }, [selectedCourseId]);
 
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedCourseSearch(courseSearchQuery.trim());
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [courseSearchQuery]);
   const refreshForums = useCallback(async () => {
     if (!selectedCourseId) {
       setForums([]);
@@ -119,16 +234,63 @@ const ForumListPage: React.FC = () => {
     refreshForums();
   }, [refreshForums]);
 
+  const selectedCourse = useMemo<CourseSnapshot | null>(() => {
+    const fromList = courses.find((course) => course._id === selectedCourseId);
+    if (fromList) return fromList;
+    if (selectedCourseSnapshot && selectedCourseSnapshot._id === selectedCourseId) {
+      return selectedCourseSnapshot;
+    }
+    return null;
+  }, [courses, selectedCourseId, selectedCourseSnapshot]);
+
   useEffect(() => {
     if (!toast) return;
     const timeout = setTimeout(() => setToast(null), 3500);
     return () => clearTimeout(timeout);
   }, [toast]);
 
-  const selectedCourse = useMemo(
-    () => courses.find((course) => course._id === selectedCourseId) ?? null,
-    [courses, selectedCourseId]
-  );
+  useEffect(() => {
+    if (courseDropdownOpen) return;
+    if (selectedCourse?.title) {
+      setCourseSearchQuery(selectedCourse.title);
+    } else if (!selectedCourse) {
+      setCourseSearchQuery("");
+    }
+  }, [selectedCourse, courseDropdownOpen]);
+
+  useEffect(() => {
+    if (!courseDropdownOpen) return;
+    const handler = (event: MouseEvent) => {
+      if (!courseDropdownRef.current) return;
+      if (!courseDropdownRef.current.contains(event.target as Node)) {
+        setCourseDropdownOpen(false);
+        if (selectedCourse?.title) {
+          setCourseSearchQuery(selectedCourse.title);
+        }
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [courseDropdownOpen, selectedCourse]);
+
+  useEffect(() => {
+    if (!attachmentPreview) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setAttachmentPreview(null);
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [attachmentPreview]);
+
+  const handleCourseSelect = (course: Course) => {
+    setSelectedCourseId(course._id);
+    setSelectedCourseSnapshot(course);
+    setCourseDropdownOpen(false);
+    setCourseSearchQuery(course.title);
+  };
 
   const openDetailModal = async (forumId: string) => {
     setDetailModal({ loading: true, forum: null });
@@ -155,6 +317,7 @@ const ForumListPage: React.FC = () => {
       isActive: forum.isActive,
       saving: false,
       error: null,
+      file: null,
     });
   };
 
@@ -168,6 +331,38 @@ const ForumListPage: React.FC = () => {
       isActive: true,
       saving: false,
       error: null,
+      file: null,
+    });
+
+  const openCreateModal = () => {
+    if (!canManage) return;
+    if (!selectedCourseId) {
+      setToast({ type: "error", message: "Select a course before creating a post." });
+      return;
+    }
+    setCreateModal((prev) => ({
+      ...prev,
+      open: true,
+      title: "",
+      description: "",
+      forumType: "discussion",
+      isActive: true,
+      submitting: false,
+      error: null,
+      file: null,
+    }));
+  };
+
+  const closeCreateModal = () =>
+    setCreateModal({
+      open: false,
+      title: "",
+      description: "",
+      forumType: "discussion",
+      isActive: true,
+      submitting: false,
+      error: null,
+      file: null,
     });
 
   const handleUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -175,12 +370,16 @@ const ForumListPage: React.FC = () => {
     if (!editModal.forum) return;
     try {
       setEditModal((prev) => ({ ...prev, saving: true, error: null }));
-      await forumService.updateForum(editModal.forum._id, {
-        title: editModal.title.trim(),
-        description: editModal.description.trim(),
-        forumType: editModal.forumType,
-        isActive: editModal.isActive,
-      });
+      await forumService.updateForum(
+        editModal.forum._id,
+        {
+          title: editModal.title.trim(),
+          description: editModal.description.trim(),
+          forumType: editModal.forumType,
+          isActive: editModal.isActive,
+        },
+        editModal.file || undefined
+      );
       setToast({ type: "success", message: "Forum updated successfully." });
       closeEditModal();
       refreshForums();
@@ -190,15 +389,45 @@ const ForumListPage: React.FC = () => {
     }
   };
 
+  const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedCourseId) {
+      setCreateModal((prev) => ({ ...prev, error: "Please choose a course first." }));
+      return;
+    }
+    if (!createModal.title.trim() || !createModal.description.trim()) {
+      setCreateModal((prev) => ({ ...prev, error: "Title and content are both required." }));
+      return;
+    }
+    try {
+      setCreateModal((prev) => ({ ...prev, submitting: true, error: null }));
+      await forumService.createForum(
+        {
+          courseId: selectedCourseId,
+          title: createModal.title.trim(),
+          description: createModal.description.trim(),
+          forumType: createModal.forumType,
+          isActive: createModal.isActive,
+        },
+        createModal.file || undefined
+      );
+      setToast({ type: "success", message: "Forum post created." });
+      closeCreateModal();
+      refreshForums();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to create forum post";
+      setCreateModal((prev) => ({ ...prev, submitting: false, error: message }));
+    }
+  };
+
   const openDeleteModal = (forum: ForumResponse) => {
     if (!canManage) return;
     setDeleteModal({ open: true, forum, loading: false, error: null });
   };
 
-  const closeDeleteModal = () =>
-    setDeleteModal({ open: false, forum: null, loading: false, error: null });
+  const closeDeleteModal = () => setDeleteModal({ open: false, forum: null, loading: false, error: null });
 
-  const handleConfirmDelete = async () => {
+  const handleDelete = async () => {
     if (!canManage || !deleteModal.forum) return;
     try {
       setDeleteModal((prev) => ({ ...prev, loading: true, error: null }));
@@ -220,25 +449,6 @@ const ForumListPage: React.FC = () => {
   const panelStyles = darkMode
     ? "bg-slate-900/70 border border-slate-700/60"
     : "bg-white border border-slate-100";
-  const formatDate = (value?: string | number | Date) => {
-    if (!value) return "—";
-    return new Date(value).toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
-  };
-  const getInitials = (title?: string) =>
-    title
-      ?.split(" ")
-      .filter(Boolean)
-      .map((segment) => segment[0]?.toUpperCase())
-      .slice(0, 2)
-      .join("") || "F";
 
   return (
     <div className="flex h-screen overflow-hidden relative" style={pageBackground}>
@@ -250,31 +460,30 @@ const ForumListPage: React.FC = () => {
           <div className="max-w-6xl mx-auto space-y-6 pb-16">
             <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-sm uppercase tracking-wide text-indigo-500 font-semibold">Forums</p>
-                <h1 className="text-3xl font-bold mt-1">All topics for your courses</h1>
-                <p className="text-slate-500 dark:text-slate-300 max-w-2xl mt-2">
-                  Filter by course, review existing conversations, and keep your class informed. Teachers and admins can
-                  edit or archive topics directly from here.
-                </p>
+                <p className="text-4x1 uppercase tracking-wide text-indigo-500 font-semibold">Forums</p>
+                <h1 className="text-2xl font-bold mt-1">All topics for your courses</h1>
+
               </div>
-              <button
-                type="button"
-                onClick={refreshForums}
-                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-white font-semibold hover:bg-indigo-500 disabled:opacity-60"
-                disabled={forumsLoading || !selectedCourseId}
-              >
-                <RefreshCcw className={`w-4 h-4 ${forumsLoading ? "animate-spin" : ""}`} />
-                Refresh list
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3">
+          
+                <button
+                  type="button"
+                  onClick={refreshForums}
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-white font-semibold hover:bg-indigo-500 disabled:opacity-60"
+                  disabled={forumsLoading || !selectedCourseId}
+                >
+                  <RefreshCcw className={`w-4 h-4 ${forumsLoading ? "animate-spin" : ""}`} />
+                 
+                </button>
+              </div>
             </header>
 
             {toast && (
               <div
-                className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${
-                  toast.type === "success"
+                className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${toast.type === "success"
                     ? "bg-emerald-50 border-emerald-200 text-emerald-800"
                     : "bg-rose-50 border-rose-200 text-rose-700"
-                }`}
+                  }`}
               >
                 <Book className="w-5 h-5" />
                 <span>{toast.message}</span>
@@ -288,21 +497,86 @@ const ForumListPage: React.FC = () => {
                   <h2 className="text-xl font-semibold">{selectedCourse?.title || "Select a course"}</h2>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                  <select
-                    className={`w-full sm:w-64 rounded-xl border px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
-                      darkMode ? "bg-slate-900 border-slate-700 text-slate-100" : "bg-white border-slate-200 text-slate-900"
-                    }`}
-                    value={selectedCourseId}
-                    onChange={(event) => setSelectedCourseId(event.target.value)}
-                    disabled={courseLoading || !courses.length}
-                  >
-                    {!courses.length && <option>No courses available</option>}
-                    {courses.map((course) => (
-                      <option key={course._id} value={course._id}>
-                        {course.title}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="w-full sm:w-80 space-y-2" ref={courseDropdownRef}>
+                    <label className="text-xs uppercase tracking-wide text-slate-400 font-semibold">Search course</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        className={`w-full rounded-2xl border px-4 py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700 text-slate-100" : "bg-white border-slate-200 text-slate-900"
+                          }`}
+                        placeholder="Type course title..."
+                        value={courseSearchQuery}
+                        onChange={(event) => {
+                          setCourseSearchQuery(event.target.value);
+                          setCourseDropdownOpen(true);
+                        }}
+                        onFocus={() => setCourseDropdownOpen(true)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            if (courses[0]) {
+                              handleCourseSelect(courses[0]);
+                            }
+                          }
+                          if (event.key === "Escape") {
+                            setCourseDropdownOpen(false);
+                            if (selectedCourse?.title) {
+                              setCourseSearchQuery(selectedCourse.title);
+                            }
+                          }
+                        }}
+                      />
+                      <span className="absolute inset-y-0 right-4 flex items-center text-slate-400">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          strokeWidth={1.5}
+                          stroke="currentColor"
+                          className="w-5 h-5"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M15.75 15.75 19.5 19.5m-3.75-3.75a6 6 0 1 0-8.485 0 6 6 0 0 0 8.485 0Z"
+                          />
+                        </svg>
+                      </span>
+                      {courseDropdownOpen && (
+                        <div
+                          className={`absolute z-20 mt-2 w-full max-h-64 overflow-y-auto rounded-2xl border shadow-lg ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+                            }`}
+                        >
+                          {courseLoading ? (
+                            <div className="flex items-center gap-2 px-4 py-3 text-sm text-slate-400">
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Searching courses...
+                            </div>
+                          ) : courses.length === 0 ? (
+                            <p className="px-4 py-3 text-sm text-slate-500">No courses found.</p>
+                          ) : (
+                            courses.map((course) => {
+                              const isSelected = course._id === selectedCourseId;
+                              return (
+                                <button
+                                  type="button"
+                                  key={course._id}
+                                  onClick={() => handleCourseSelect(course)}
+                                  className={`w-full text-left px-4 py-3 border-b last:border-b-0 ${darkMode ? "border-slate-800" : "border-slate-100"
+                                    } ${isSelected ? "bg-indigo-50/60 dark:bg-indigo-500/10" : "hover:bg-slate-50 dark:hover:bg-slate-800/70"}`}
+                                >
+                                  <p className="font-semibold text-sm">{course.title}</p>
+                                  {course.description && (
+                                    <p className="text-xs text-slate-500 line-clamp-1">{course.description}</p>
+                                  )}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
               {courseError && <p className="text-sm text-rose-500 mt-2">{courseError}</p>}
@@ -322,9 +596,8 @@ const ForumListPage: React.FC = () => {
                 <p className="text-sm text-rose-500">{forumsError}</p>
               ) : forums.length === 0 ? (
                 <div
-                  className={`border-2 border-dashed rounded-2xl p-8 text-center ${
-                    darkMode ? "border-slate-700 text-slate-400" : "border-slate-200 text-slate-500"
-                  }`}
+                  className={`border-2 border-dashed rounded-2xl p-8 text-center ${darkMode ? "border-slate-700 text-slate-400" : "border-slate-200 text-slate-500"
+                    }`}
                 >
                   <p className="font-semibold mb-2">No topics yet</p>
                   <p className="text-sm">
@@ -334,88 +607,93 @@ const ForumListPage: React.FC = () => {
               ) : (
                 <div className="space-y-4">
                   {forums.map((forum) => {
-                    const initials = getInitials(forum.title);
+                    const authorName = forum.createdBy?.fullname || forum.createdBy?.username || "Unknown author";
+                    const avatarUrl = forum.createdBy?.avatar_url;
+                    const authorRole = forum.createdBy?.role;
+                    const forumTitle = forum.title;
+
                     return (
                       <div
                         key={forum._id}
-                        className={`rounded-3xl border p-5 flex flex-col gap-4 transition hover:-translate-y-0.5 ${
-                          darkMode ? "border-slate-700 bg-slate-900/60" : "border-slate-200 bg-white"
+                        className={`rounded-2xl border p-5 flex flex-col gap-4 ${
+                          darkMode ? "border-slate-700" : "border-slate-200"
                         }`}
                       >
-                        <div className="flex gap-4">
+                        <div className="flex items-start gap-4">
                           <div
-                            className={`h-12 w-12 rounded-2xl flex items-center justify-center text-lg font-semibold ${
-                              darkMode ? "bg-slate-800 text-slate-100" : "bg-indigo-50 text-indigo-600"
+                            className={`h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden ${
+                              darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
                             }`}
                           >
-                            {initials}
+                            {avatarUrl ? (
+                              <img src={avatarUrl} alt={authorName} className="h-full w-full object-cover" />
+                            ) : (
+                              getInitials(authorName)
+                            )}
                           </div>
-                          <div className="flex-1 space-y-2">
-                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <div className="flex-1 min-w-[200px]">
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
                               <span
-                                className={`font-semibold px-3 py-1 rounded-full ${
+                                className={`text-xs font-semibold px-3 py-1 rounded-full ${
                                   forum.forumType === "announcement"
                                     ? "bg-amber-100 text-amber-700"
-                                    : "bg-emerald-100 text-emerald-700"
+                                    : "bg-indigo-100 text-indigo-700"
                                 }`}
                               >
                                 {forumTypeLabels[forum.forumType]}
                               </span>
-                              <span
-                                className={`px-3 py-1 rounded-full font-semibold ${
-                                  forum.isActive
-                                    ? "bg-indigo-100 text-indigo-700"
-                                    : "bg-slate-100 text-slate-500"
-                                }`}
-                              >
-                                {forum.isActive ? "Active" : "Archived"}
-                              </span>
-                              <span className="text-slate-400">{formatDate(forum.createdAt)}</span>
+                              <span>{forum.createdAt ? new Date(forum.createdAt).toLocaleString() : "—"}</span>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2 justify-between">
-                              <h4 className="text-xl font-semibold">{forum.title}</h4>
-                              <div className="flex gap-2 shrink-0">
+                            <h4 className="mt-2 text-2xl font-bold text-indigo-600 dark:text-indigo-300">{forumTitle}</h4>
+                            <p className="text-sm text-slate-500 mt-2 line-clamp-3">{forum.description}</p>
+                            <div className="mt-3 text-xs text-slate-400">
+                              <span className="font-semibold text-slate-600 dark:text-slate-200">{authorName}</span>
+                              {authorRole && (
+                                <span className="ml-2 uppercase tracking-wide text-[11px] text-indigo-500">
+                                  {authorRole}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <AttachmentPreview
+                          files={forum.key}
+                          size="sm"
+                          onImageClick={handleAttachmentPreview}
+                          caption={forumTitle}
+                        />
+
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="text-xs text-slate-400">
+                            Updated: {forum.updatedAt ? new Date(forum.updatedAt).toLocaleString() : "Awaiting update"}
+                          </div>
+                          <div className="flex gap-2 shrink-0">
+                            <Link
+                              to={`/forums/${forum._id}`}
+                              className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-semibold bg-white hover:bg-slate-100 hover:border-slate-400 active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                              View
+                            </Link>
+                            {canManage && (
+                              <>
                                 <button
                                   type="button"
-                                  onClick={() => openDetailModal(forum._id)}
-                                  className="inline-flex items-center justify-center rounded-full p-2 border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                                  onClick={() => openEditModal(forum)}
+                                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-semibold bg-white hover:bg-slate-100 hover:border-slate-400 active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                                 >
-                                  <Eye className="w-4 h-4" />
+                                  Edit
                                 </button>
-                                <Link
-                                  to={`/forums/${forum._id}`}
-                                  className="inline-flex items-center justify-center rounded-full p-2 border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+
+                                <button
+                                  type="button"
+                                  onClick={() => openDeleteModal(forum)}
+                                  className="inline-flex items-center justify-center rounded-lg px-3 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
                                 >
-                                  <BookOpen className="w-4 h-4" />
-                                </Link>
-                                {canManage && (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={() => openEditModal(forum)}
-                                      className="inline-flex items-center justify-center rounded-full p-2 border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                                    >
-                                      <Edit3 className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => openDeleteModal(forum)}
-                                      className="inline-flex items-center justify-center rounded-full p-2 border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <p className="text-sm text-slate-500 line-clamp-3">{forum.description}</p>
-                            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-                              {forum.createdBy && (
-                                <span>By {forum.createdBy.fullname || forum.createdBy.username}</span>
-                              )}
-                              {forum.updatedAt && <span>Updated {formatDate(forum.updatedAt)}</span>}
-                              <span>ID: {forum._id}</span>
-                            </div>
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -428,12 +706,160 @@ const ForumListPage: React.FC = () => {
         </main>
       </div>
 
+      {createModal.open && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
+          <div
+            className={`max-w-4xl w-full rounded-3xl p-6 md:p-8 relative ${darkMode ? "bg-slate-950 text-slate-100" : "bg-white text-slate-900"
+              }`}
+          >
+            <button className="absolute top-5 right-5" onClick={closeCreateModal}>
+              <X className="w-5 h-5" />
+            </button>
+            <form className="grid gap-6 md:grid-cols-2" onSubmit={handleCreate}>
+              <div className="space-y-5">
+                <div >
+                  <p className="text-2xl uppercase tracking-wide text-indigo-400 font-semibold">Create post</p>
+                  <h3 className="text-2xl font-semibold mt-1">Share resources or questions</h3>
+                  {selectedCourse && (
+                    <p className="text-sm text-slate-500 mt-1">
+                      Posting to <span className="font-medium">{selectedCourse.title}</span>
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Title</label>
+                  <input
+                    type="text"
+                    className={`w-full rounded-2xl border px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+                      }`}
+                    placeholder="Example: UI design materials"
+                    value={createModal.title}
+                    onChange={(event) => setCreateModal((prev) => ({ ...prev, title: event.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Content (Markdown supported)</label>
+                  <textarea
+                    className={`w-full h-36 rounded-2xl border px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+                      }`}
+                    placeholder="Share context, add bullet lists...."
+                    value={createModal.description}
+                    onChange={(event) => setCreateModal((prev) => ({ ...prev, description: event.target.value }))}
+                  ></textarea>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Attachment (optional)</label>
+                  <input
+                    type="file"
+                    accept={attachmentAcceptTypes}
+                    onChange={(event) =>
+                      setCreateModal((prev) => ({
+                        ...prev,
+                        file: event.target.files?.[0] || null,
+                      }))
+                    }
+                    className="w-full rounded-2xl border px-4 py-2.5 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500 cursor-pointer"
+                  />
+                  {createModal.file && (
+                    <div
+                      className={`mt-2 flex items-center justify-between rounded-xl px-3 py-2 text-xs ${darkMode ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-600"
+                        }`}
+                    >
+                      <span className="truncate pr-2">
+                        {createModal.file.name} • {formatFileSize(createModal.file.size)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCreateModal((prev) => ({ ...prev, file: null }))}
+                        className="text-rose-500 font-semibold hover:text-rose-400"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Topic type</p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {(["discussion", "announcement"] as ForumType[]).map((type) => {
+                      const isActive = createModal.forumType === type;
+                      return (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setCreateModal((prev) => ({ ...prev, forumType: type }))}
+                          className={`text-left p-4 rounded-2xl border transition ${isActive
+                              ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-500/20"
+                              : darkMode
+                                ? "border-slate-700 hover:border-slate-500"
+                                : "border-slate-200 hover:border-slate-300"
+                            }`}
+                        >
+                          <p className="font-semibold">{forumTypeLabels[type]}</p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            {type === "discussion"
+                              ? "Perfect for open questions or resource sharing."
+                              : "Use for important, single-source announcements."}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <label className="flex items-center gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    checked={createModal.isActive}
+                    onChange={(event) => setCreateModal((prev) => ({ ...prev, isActive: event.target.checked }))}
+                  />
+                  Allow everyone in the course to participate (active)
+                </label>
+                {createModal.error && <p className="text-sm text-rose-500">{createModal.error}</p>}
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                  <button
+                    type="submit"
+                    className="inline-flex items-center justify-center rounded-2xl bg-indigo-600 px-5 py-2.5 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
+                    disabled={createModal.submitting}
+                  >
+                    {createModal.submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    Publish post
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeCreateModal}
+                    className="rounded-2xl border px-5 py-2.5 font-semibold border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+              <div
+                className={`rounded-2xl border px-4 py-5 h-full ${darkMode ? "bg-slate-900 border-slate-800" : "bg-slate-50 border-slate-200"
+                  }`}
+              >
+                <p className="text-2xl uppercase tracking-wide text-indigo-400 font-semibold mb-2">Live preview</p>
+                <h4 className="text-xl font-semibold mb-3">What learners will see</h4>
+                <div
+                  className={`rounded-2xl border-dashed border px-4 py-6 min-h-[220px] ${darkMode ? "border-slate-700 text-slate-200" : "border-slate-300 text-slate-500"
+                    }`}
+                >
+                  <h5 className="text-lg font-semibold mb-2">
+                    {createModal.title || "Start typing to preview your Markdown formatting."}
+                  </h5>
+
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {detailModal.forum && (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4">
           <div
-            className={`max-w-lg w-full rounded-2xl p-6 relative ${
-              darkMode ? "bg-slate-900 text-slate-100" : "bg-white text-slate-900"
-            }`}
+            className={`max-w-lg w-full rounded-2xl p-6 relative ${darkMode ? "bg-slate-900 text-slate-100" : "bg-white text-slate-900"
+              }`}
           >
             <button className="absolute top-4 right-4" onClick={closeDetailModal}>
               <X className="w-5 h-5" />
@@ -443,12 +869,18 @@ const ForumListPage: React.FC = () => {
             </p>
             <h3 className="text-2xl font-semibold mb-2">{detailModal.forum.title}</h3>
             <p className="text-sm text-slate-500 mb-4">{detailModal.forum.description}</p>
+            <AttachmentPreview
+              files={detailModal.forum.key}
+              size="sm"
+              onImageClick={handleAttachmentPreview}
+              caption={detailModal.forum.title}
+            />
             <div className="text-sm text-slate-500 space-y-1">
               <p>ID: {detailModal.forum._id}</p>
               <p>Active: {detailModal.forum.isActive ? "Yes" : "No"}</p>
-              <p>Created at: {formatDate(detailModal.forum.createdAt)}</p>
+              <p>Created at: {detailModal.forum.createdAt ? new Date(detailModal.forum.createdAt).toLocaleString() : "—"}</p>
               {detailModal.forum.updatedAt && (
-                <p>Updated at: {formatDate(detailModal.forum.updatedAt)}</p>
+                <p>Updated at: {new Date(detailModal.forum.updatedAt).toLocaleString()}</p>
               )}
             </div>
           </div>
@@ -467,9 +899,8 @@ const ForumListPage: React.FC = () => {
       {editModal.open && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
           <div
-            className={`max-w-lg w-full rounded-2xl p-6 relative ${
-              darkMode ? "bg-slate-900 text-slate-100" : "bg-white text-slate-900"
-            }`}
+            className={`max-w-lg w-full rounded-2xl p-6 relative ${darkMode ? "bg-slate-900 text-slate-100" : "bg-white text-slate-900"
+              }`}
           >
             <button className="absolute top-4 right-4" onClick={closeEditModal}>
               <X className="w-5 h-5" />
@@ -480,9 +911,8 @@ const ForumListPage: React.FC = () => {
                 <label className="block text-sm font-medium mb-2">Title</label>
                 <input
                   type="text"
-                  className={`w-full rounded-xl border px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
-                    darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                  }`}
+                  className={`w-full rounded-xl border px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+                    }`}
                   value={editModal.title}
                   onChange={(event) => setEditModal((prev) => ({ ...prev, title: event.target.value }))}
                 />
@@ -490,12 +920,42 @@ const ForumListPage: React.FC = () => {
               <div>
                 <label className="block text-sm font-medium mb-2">Description</label>
                 <textarea
-                  className={`w-full h-28 rounded-xl border px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
-                    darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                  }`}
+                  className={`w-full h-28 rounded-xl border px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+                    }`}
                   value={editModal.description}
                   onChange={(event) => setEditModal((prev) => ({ ...prev, description: event.target.value }))}
                 ></textarea>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Update attachment</label>
+                <input
+                  type="file"
+                  accept={attachmentAcceptTypes}
+                  onChange={(event) =>
+                    setEditModal((prev) => ({
+                      ...prev,
+                      file: event.target.files?.[0] || null,
+                    }))
+                  }
+                  className="w-full rounded-xl border px-4 py-2.5 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500 cursor-pointer"
+                />
+                {editModal.file && (
+                  <div
+                    className={`mt-2 flex items-center justify-between rounded-xl px-3 py-2 text-xs ${darkMode ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-600"
+                      }`}
+                  >
+                    <span className="truncate pr-2">
+                      {editModal.file.name} • {formatFileSize(editModal.file.size)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setEditModal((prev) => ({ ...prev, file: null }))}
+                      className="text-rose-500 font-semibold hover:text-rose-400"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 {(["discussion", "announcement"] as ForumType[]).map((type) => {
@@ -505,13 +965,12 @@ const ForumListPage: React.FC = () => {
                       type="button"
                       key={type}
                       onClick={() => setEditModal((prev) => ({ ...prev, forumType: type }))}
-                      className={`text-left p-4 rounded-xl border transition-all ${
-                        isActive
+                      className={`text-left p-4 rounded-xl border transition-all ${isActive
                           ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-500/20"
                           : darkMode
-                          ? "border-slate-700 hover:border-slate-500"
-                          : "border-slate-200 hover:border-slate-300"
-                      }`}
+                            ? "border-slate-700 hover:border-slate-500"
+                            : "border-slate-200 hover:border-slate-300"
+                        }`}
                     >
                       <p className="font-semibold">{forumTypeLabels[type]}</p>
                     </button>
@@ -553,27 +1012,22 @@ const ForumListPage: React.FC = () => {
       {deleteModal.open && deleteModal.forum && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
           <div
-            className={`max-w-md w-full rounded-2xl p-6 relative ${
-              darkMode ? "bg-slate-900 text-slate-100" : "bg-white text-slate-900"
-            }`}
+            className={`max-w-md w-full rounded-2xl p-6 relative ${darkMode ? "bg-slate-900 text-slate-100" : "bg-white text-slate-900"
+              }`}
           >
             <button className="absolute top-4 right-4" onClick={closeDeleteModal}>
               <X className="w-5 h-5" />
             </button>
-            <h3 className="text-2xl font-semibold mb-2">Delete forum</h3>
-            <p className="text-sm text-slate-500">
-              This action cannot be undone. The topic and all of its posts will be removed for everyone.
+            <h3 className="text-xl font-semibold mb-2">Delete forum</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              Are you sure you want to delete this forum topic? This action cannot be undone.
             </p>
-            <div
-              className={`mt-4 rounded-2xl border px-4 py-3 ${
-                darkMode ? "border-rose-500/40 bg-rose-500/10" : "border-rose-100 bg-rose-50"
-              }`}
-            >
-              <p className="font-semibold">{deleteModal.forum.title}</p>
-              <p className="text-xs text-slate-500 line-clamp-2">{deleteModal.forum.description}</p>
+            <div className="rounded-xl border px-3 py-2 text-sm mb-4 border-slate-200 dark:border-slate-700">
+              <p className="font-semibold line-clamp-1">{deleteModal.forum.title}</p>
+              <p className="text-xs text-slate-500 line-clamp-2 mt-1">{deleteModal.forum.description}</p>
             </div>
-            {deleteModal.error && <p className="text-sm text-rose-500 mt-3">{deleteModal.error}</p>}
-            <div className="flex justify-end gap-3 mt-6">
+            {deleteModal.error && <p className="text-sm text-rose-500 mb-3">{deleteModal.error}</p>}
+            <div className="flex justify-end gap-3">
               <button
                 type="button"
                 onClick={closeDeleteModal}
@@ -584,7 +1038,7 @@ const ForumListPage: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={handleConfirmDelete}
+                onClick={handleDelete}
                 className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-5 py-2 text-white text-sm font-semibold hover:bg-rose-500 disabled:opacity-50"
                 disabled={deleteModal.loading}
               >
@@ -592,6 +1046,28 @@ const ForumListPage: React.FC = () => {
                 Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {attachmentPreview && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setAttachmentPreview(null)}
+        >
+          <div className="max-h-full max-w-4xl w-full flex flex-col items-center gap-4" onClick={(event) => event.stopPropagation()}>
+            <img
+              src={attachmentPreview.src}
+              alt={attachmentPreview.alt || "Attachment preview"}
+              className="max-h-[80vh] w-full object-contain rounded-3xl border border-white/20 shadow-2xl"
+            />
+            <button
+              type="button"
+              onClick={() => setAttachmentPreview(null)}
+              className="rounded-full bg-white/90 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-white"
+            >
+              Close preview
+            </button>
           </div>
         </div>
       )}

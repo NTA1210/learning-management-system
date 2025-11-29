@@ -521,7 +521,7 @@ export default function CourseQuizzesPage() {
     }
   };
 
-  const handlePaginationSelect = (page?: number, _queryValue?: string) => {
+  const handlePaginationSelect = (page?: number) => {
     if (!page || page === quizzesPage) {
       return;
     }
@@ -539,18 +539,21 @@ export default function CourseQuizzesPage() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
-        <main className="flex-1 overflow-y-auto p-6" style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}>
+        <main className="flex-1 overflow-y-auto p-6 pt-12" style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}>
           <div className="max-w-6xl mx-auto">
             {/* Header */}
             <div className="mb-6">
-              <button
-                onClick={() => navigate("/quizz")}
-                className="flex items-center gap-2 text-sm mb-4 hover:underline"
-                style={{ color: "var(--muted-text)" }}
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Courses
-              </button>
+              <div className="flex flex-wrap items-center  p-6 pt-12">
+                <button
+                  onClick={() => navigate(-1)}
+                  className="flex items-center gap-2 text-sm hover:underline"
+                  style={{ color: "var(--muted-text)" }}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </button>
+              
+              </div>
               <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--heading-text)" }}>
                 {course ? course.title : "Loading..."}
               </h1>
@@ -933,7 +936,7 @@ export default function CourseQuizzesPage() {
               <>
                 {attemptModal.attempts.filter((a) => a.status === "in_progress").length === 0 ? (
                   <div
-                    className="rounded-lg border p-6 text-center"
+                    className="rounded-lg border  p-6 pt-12 text-center"
                     style={{ borderColor: "var(--card-border)" }}
                   >
                     <p style={{ color: "var(--muted-text)" }}>

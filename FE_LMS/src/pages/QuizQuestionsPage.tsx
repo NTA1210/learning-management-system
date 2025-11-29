@@ -53,7 +53,7 @@ export default function QuizQuestionsPage() {
         <main className="flex-1 overflow-y-auto p-6" style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}>
           <div className="max-w-6xl mx-auto">
             {/* Header with Back Button */}
-            <div className="mb-6">
+            <div className="mb-6 p-6 pt-18 ">
               <button
                 onClick={() => navigate(-1)}
                 className="flex items-center gap-2 text-sm mb-4 hover:underline"

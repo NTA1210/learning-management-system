@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { useAuth } from "../hooks/useAuth";
@@ -312,7 +312,44 @@ const QuizCreatePage: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
-  const [coursesPage, setCoursesPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const parsePageParam = useCallback((value: string | null) => {
+    const pageNumber = Number(value);
+    if (!Number.isFinite(pageNumber) || pageNumber <= 0) {
+      return 1;
+    }
+    return Math.floor(pageNumber);
+  }, []);
+
+  const [coursesPage, setCoursesPageState] = useState(() => parsePageParam(searchParams.get("page")));
+
+  const setCoursesPage = useCallback(
+    (value: number | ((prev: number) => number)) => {
+      setCoursesPageState((prev) => {
+        const nextValue = typeof value === "function" ? (value as (p: number) => number)(prev) : value;
+        const normalized = Math.max(1, Math.floor(nextValue) || 1);
+        setSearchParams((prevParams) => {
+          const params = new URLSearchParams(prevParams);
+          if (normalized === 1) {
+            params.delete("page");
+          } else {
+            params.set("page", String(normalized));
+          }
+          return params;
+        });
+        return normalized;
+      });
+    },
+    [setSearchParams]
+  );
+
+  useEffect(() => {
+    const pageFromUrl = parsePageParam(searchParams.get("page"));
+    if (pageFromUrl !== coursesPage) {
+      setCoursesPageState(pageFromUrl);
+    }
+  }, [searchParams, parsePageParam, coursesPage]);
   const [coursesPageSize] = useState(10);
   const [coursesPagination, setCoursesPagination] = useState<{
     totalItems: number;

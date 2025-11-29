@@ -19,6 +19,7 @@ import {
   getQuizzes,
   getCourseBySlug,
   completeCourse,
+  getCourseStatistics,
 } from '../services/course.service';
 import { parseFormData } from '../utils/parseFormData';
 
@@ -265,5 +266,17 @@ export const completeCourseHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     data,
     message: 'Course completed successfully',
+  });
+});
+
+// GET /:courseId/statistics - Get course statistics
+export const getCourseStatisticsHandler = catchErrors(async (req, res) => {
+  const courseId = courseIdSchema.parse(req.params.courseId);
+
+  const data = await getCourseStatistics(courseId);
+
+  return res.success(OK, {
+    data,
+    message: data.statistics ? 'Course statistics retrieved successfully' : data.message,
   });
 });
