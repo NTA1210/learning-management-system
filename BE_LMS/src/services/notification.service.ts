@@ -4,6 +4,7 @@ import NotificationModel from "../models/notification.model";
 import EnrollmentModel from "../models/enrollment.model";
 import CourseModel from "../models/course.model";
 import UserModel from "../models/user.model";
+import AnnouncementModel from "../models/announcement.model";
 import appAssert from "../utils/appAssert";
 import { EnrollmentStatus } from "../types/enrollment.type";
 import { UserStatus } from "../types/user.type";
@@ -126,48 +127,104 @@ export const createNotification = async (
 /**
  * Get notifications for the current user
  * Supports pagination and filtering by read status and date range
+ * Includes both notifications and announcements (from enrolled courses + system announcements)
  */
 export const getNotifications = async (
   userId: Types.ObjectId,
   query: ListNotificationsQuery
 ) => {
   const { page = 1, limit = 10, isRead, from, to } = query;
-  const skip = (page - 1) * limit;
 
-  const filter: any = {
+  // Build notification filter
+  const notificationFilter: any = {
     recipientUser: userId,
-    // Only fetch non-deleted notifications
     isDeleted: false,
   };
 
   if (isRead !== undefined) {
-    filter.isRead = isRead;
+    notificationFilter.isRead = isRead;
   }
 
-  // Filter by date range (validation handled by schema)
+  // Filter by date range
   if (from || to) {
-    filter.createdAt = {};
-    if (from) filter.createdAt.$gte = from;
-    if (to) filter.createdAt.$lte = to;
+    notificationFilter.createdAt = {};
+    if (from) notificationFilter.createdAt.$gte = from;
+    if (to) notificationFilter.createdAt.$lte = to;
   }
 
-  const [notifications, total] = await Promise.all([
-    NotificationModel.find(filter)
+  // Get user's enrolled courses (approved only)
+  const enrollments = await EnrollmentModel.find({
+    studentId: userId,
+    status: EnrollmentStatus.APPROVED,
+  }).select("courseId");
+
+  const enrolledCourseIds = enrollments.map((e) => e.courseId);
+
+  // Build announcement filter
+  const announcementFilter: any = {
+    $or: [
+      { courseId: { $in: enrolledCourseIds } }, // Course announcements
+      { courseId: { $exists: false } }, // System announcements (no courseId)
+      { courseId: null }, // System announcements (null courseId)
+    ],
+  };
+
+  // Apply date range filter to announcements
+  if (from || to) {
+    announcementFilter.publishedAt = {};
+    if (from) announcementFilter.publishedAt.$gte = from;
+    if (to) announcementFilter.publishedAt.$lte = to;
+  }
+
+  // Fetch notifications and announcements in parallel
+  const [notifications, announcements] = await Promise.all([
+    NotificationModel.find(notificationFilter)
       .populate("sender", "username fullname avatar_url")
       .populate("recipientCourse", "title")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
       .lean(),
-    NotificationModel.countDocuments(filter),
+    AnnouncementModel.find(announcementFilter)
+      .populate("authorId", "username fullname avatar_url")
+      .populate("courseId", "title")
+      .lean(),
   ]);
+
+  // Transform notifications to include type
+  const transformedNotifications = notifications.map((notif: any) => ({
+    ...notif,
+    type: "notification",
+    message: notif.message,
+    createdAt: notif.createdAt,
+  }));
+
+  // Transform announcements to match notification structure
+  const transformedAnnouncements = announcements.map((announcement: any) => ({
+    _id: announcement._id,
+    type: "announcement",
+    title: announcement.title,
+    message: announcement.content,
+    sender: announcement.authorId,
+    recipientCourse: announcement.courseId,
+    createdAt: announcement.publishedAt || announcement.createdAt,
+    isRead: false, // Announcements don't have read status
+    readAt: null,
+    isDeleted: false,
+  }));
+
+  // Merge and sort by createdAt descending
+  const merged = [...transformedNotifications, ...transformedAnnouncements].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  // Apply pagination to merged results
+  const total = merged.length;
+  const paginatedResults = merged.slice((page - 1) * limit, page * limit);
 
   const totalPages = Math.ceil(total / limit);
   const hasNext = page < totalPages;
   const hasPrev = page > 1;
 
   return {
-    notifications,
+    notifications: paginatedResults,
     pagination: {
       total,
       page,

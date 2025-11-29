@@ -27,6 +27,7 @@ import slugify from 'slugify';
 import { snapShotQuestion } from '@/validators/quiz.schemas';
 import { AttemptStatus } from '@/types';
 import { SubmissionStatus } from '@/types/submission.type';
+import { AttendanceStatus } from '@/types/attendance.type';
 
 // ====================================
 // HELPER FUNCTIONS FOR LOGO MANAGEMENT
@@ -1347,7 +1348,7 @@ export const completeCourse = async (courseId: string) => {
   appAssert(course, NOT_FOUND, 'Course not found');
 
   // If already completed, error
-  appAssert(course.status !== CourseStatus.COMPLETED, BAD_REQUEST, 'Course is completed');
+  // appAssert(course.status !== CourseStatus.COMPLETED, BAD_REQUEST, 'Course is completed');
 
   // 2. Aggregate per-enrollment stats (your existing pipeline, slightly cleaned)
   const stats = await EnrollmentModel.aggregate([
@@ -1355,7 +1356,9 @@ export const completeCourse = async (courseId: string) => {
       $match: {
         courseId: course._id,
         role: Role.STUDENT,
-        status: { $in: [EnrollmentStatus.APPROVED] },
+        status: {
+          $in: [EnrollmentStatus.APPROVED, EnrollmentStatus.DROPPED, EnrollmentStatus.COMPLETED],
+        },
       },
     },
 
@@ -1400,8 +1403,8 @@ export const completeCourse = async (courseId: string) => {
             $group: {
               _id: null,
               total: { $sum: 1 },
-              present: { $sum: { $cond: [{ $eq: ['$status', 'PRESENT'] }, 1, 0] } },
-              absent: { $sum: { $cond: [{ $eq: ['$status', 'ABSENT'] }, 1, 0] } },
+              present: { $sum: { $cond: [{ $eq: ['$status', AttendanceStatus.PRESENT] }, 1, 0] } },
+              absent: { $sum: { $cond: [{ $eq: ['$status', AttendanceStatus.ABSENT] }, 1, 0] } },
             },
           },
         ],
@@ -1418,33 +1421,122 @@ export const completeCourse = async (courseId: string) => {
       },
     },
 
-    // quizzes & quizAttempts (only SUBMITTED)
+    /** -----------------------------------------
+     * QUIZ LIST
+     * -----------------------------------------*/
     {
-      $lookup: { from: 'quizzes', localField: 'courseId', foreignField: 'courseId', as: 'quizzes' },
+      $lookup: {
+        from: 'quizzes',
+        localField: 'courseId',
+        foreignField: 'courseId',
+        as: 'quizzes',
+      },
     },
+
+    /** -----------------------------------------
+     * QUIZ ATTEMPTS RAW (không group)
+     * -----------------------------------------*/
     {
       $lookup: {
         from: 'quizAttempts',
         let: { quizIds: '$quizzes._id', sid: '$studentId' },
         pipeline: [
-          { $match: { $expr: { $in: ['$quizId', '$$quizIds'] } } },
-          { $match: { status: AttemptStatus.SUBMITTED } },
-          { $group: { _id: null, attempts: { $sum: 1 }, totalScore: { $sum: '$score' } } },
+          {
+            $match: {
+              $expr: {
+                $and: [{ $eq: ['$studentId', '$$sid'] }, { $in: ['$quizId', '$$quizIds'] }],
+              },
+            },
+          },
+          { $match: { status: 'SUBMITTED' } },
         ],
-        as: 'quizAttempts',
+        as: 'quizAttemptsRaw',
       },
     },
+
+    /** -----------------------------------------
+     * QUIZ STATS: attempts count + totalScore
+     * -----------------------------------------*/
     {
-      $set: {
-        quiz: {
-          total: { $size: '$quizzes' },
-          completed: { $ifNull: [{ $arrayElemAt: ['$quizAttempts.attempts', 0] }, 0] },
-          totalScore: { $ifNull: [{ $arrayElemAt: ['$quizAttempts.totalScore', 0] }, 0] },
+      $addFields: {
+        quizStats: [
+          {
+            attempts: { $size: '$quizAttemptsRaw' },
+            totalScore: { $sum: '$quizAttemptsRaw.score' },
+          },
+        ],
+      },
+    },
+
+    /** -----------------------------------------
+     * QUIZ DETAILS (1 record / 1 quiz)
+     * -----------------------------------------*/
+    {
+      $addFields: {
+        quizDetails: {
+          $map: {
+            input: '$quizzes',
+            as: 'q',
+            in: {
+              quizId: '$$q._id',
+              title: '$$q.title',
+
+              score: {
+                $let: {
+                  vars: {
+                    att: {
+                      $first: {
+                        $filter: {
+                          input: '$quizAttemptsRaw',
+                          as: 'a',
+                          cond: { $eq: ['$$a.quizId', '$$q._id'] },
+                        },
+                      },
+                    },
+                  },
+                  in: { $ifNull: ['$$att.score', 0] },
+                },
+              },
+
+              isCompleted: {
+                $let: {
+                  vars: {
+                    att: {
+                      $first: {
+                        $filter: {
+                          input: '$quizAttemptsRaw',
+                          as: 'a',
+                          cond: { $eq: ['$$a.quizId', '$$q._id'] },
+                        },
+                      },
+                    },
+                  },
+                  in: { $cond: [{ $ifNull: ['$$att', false] }, true, false] },
+                },
+              },
+            },
+          },
         },
       },
     },
 
-    // assignments & submissions
+    /** -----------------------------------------
+     * QUIZ – FINAL OBJECT
+     * -----------------------------------------*/
+    {
+      $set: {
+        quiz: {
+          total: { $size: '$quizzes' },
+          completed: { $arrayElemAt: ['$quizStats.attempts', 0] },
+          totalScore: { $arrayElemAt: ['$quizStats.totalScore', 0] },
+          details: '$quizDetails',
+        },
+      },
+    },
+
+    /** -----------------------------------------
+     * ASSIGNMENT LIST
+     * -----------------------------------------*/
     {
       $lookup: {
         from: 'assignments',
@@ -1453,26 +1545,108 @@ export const completeCourse = async (courseId: string) => {
         as: 'assignments',
       },
     },
+
+    /** -----------------------------------------
+     * ASSIGNMENT SUBMISSIONS RAW
+     * -----------------------------------------*/
     {
       $lookup: {
         from: 'submissions',
-        let: { sid: '$studentId' },
+        let: { sid: '$studentId', assignmentIds: '$assignments._id' },
         pipeline: [
-          { $match: { $expr: { $eq: ['$studentId', '$$sid'] } } },
-          { $match: { status: SubmissionStatus.SUBMITTED } },
-          { $group: { _id: null, submitted: { $sum: 1 }, totalGrade: { $sum: '$grade' } } },
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$studentId', '$$sid'] },
+                  { $in: ['$assignmentId', '$$assignmentIds'] },
+                ],
+              },
+            },
+          },
+          { $match: { status: AttemptStatus.SUBMITTED } },
         ],
-        as: 'assignmentStats',
+        as: 'assignmentSubmissionsRaw',
       },
     },
+
+    /** -----------------------------------------
+     * ASSIGNMENT DETAILS
+     * -----------------------------------------*/
+    {
+      $addFields: {
+        assignmentDetails: {
+          $map: {
+            input: '$assignments',
+            as: 'a',
+            in: {
+              assignmentId: '$$a._id',
+              title: '$$a.title',
+
+              score: {
+                $let: {
+                  vars: {
+                    sub: {
+                      $first: {
+                        $filter: {
+                          input: '$assignmentSubmissionsRaw',
+                          as: 's',
+                          cond: { $eq: ['$$s.assignmentId', '$$a._id'] },
+                        },
+                      },
+                    },
+                  },
+                  in: { $ifNull: ['$$sub.grade', 0] },
+                },
+              },
+
+              isCompleted: {
+                $let: {
+                  vars: {
+                    sub: {
+                      $first: {
+                        $filter: {
+                          input: '$assignmentSubmissionsRaw',
+                          as: 's',
+                          cond: { $eq: ['$$s.assignmentId', '$$a._id'] },
+                        },
+                      },
+                    },
+                  },
+                  in: { $cond: [{ $ifNull: ['$$sub', false] }, true, false] },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+
+    /** -----------------------------------------
+     * ASSIGNMENT STATS
+     * -----------------------------------------*/
     {
       $set: {
         assignment: {
           total: { $size: '$assignments' },
-          submitted: { $ifNull: [{ $arrayElemAt: ['$assignmentStats.submitted', 0] }, 0] },
-          totalGrade: { $ifNull: [{ $arrayElemAt: ['$assignmentStats.totalGrade', 0] }, 0] },
+          submitted: { $size: '$assignmentSubmissionsRaw' },
+          totalGrade: { $sum: '$assignmentSubmissionsRaw.grade' },
+          details: '$assignmentDetails',
         },
       },
+    },
+
+    /** -----------------------------------------
+     * CLEANUP (optional)
+     * -----------------------------------------*/
+    {
+      $unset: [
+        'quizzes',
+        'quizAttemptsRaw',
+        'quizStats',
+        'assignments',
+        'assignmentSubmissionsRaw',
+      ],
     },
 
     // lessons & lessonProgresses
@@ -1533,9 +1707,11 @@ export const completeCourse = async (courseId: string) => {
       totalQuizzes: s.quiz.total,
       completedQuizzes: s.quiz.completed,
       totalQuizScores: s.quiz.totalScore,
+      quizDetails: s.quiz.details,
       totalAssignments: s.assignment.total,
       completedAssignments: s.assignment.submitted,
       totalAssignmentScores: s.assignment.totalGrade,
+      assignmentDetails: s.assignment.details,
       totalAttendances: s.attendance.total,
       completedAttendances: s.attendance.present,
       updatedAt: new Date(),
@@ -1554,14 +1730,15 @@ export const completeCourse = async (courseId: string) => {
     // final grade scale 0..10 (weights from course.weight if exists, otherwise default)
     const weight = course.weight ?? { quiz: 0.4, assignment: 0.4, attendance: 0.2 };
     const rawFinal =
-      (quizAvg * (weight.quiz ?? 0.4) +
-        assignmentAvg * (weight.assignment ?? 0.4) +
+      (quizAvg * (weight.quiz ?? 0.3) +
+        assignmentAvg * (weight.assignment ?? 0.5) +
         attendanceAvg * (weight.attendance ?? 0.2)) *
       10;
     const finalGrade = Math.round(rawFinal * 100) / 100; // 2 decimals
 
     const absent = progress.totalAttendances - progress.completedAttendances;
-    const isDropped = absent > 4 || finalGrade < 5;
+    const absentPercent = (absent / progress.totalAttendances) * 100;
+    const isDropped = absentPercent > 20 || finalGrade < 5;
     const status = isDropped ? EnrollmentStatus.DROPPED : EnrollmentStatus.APPROVED;
 
     // bulk update: set progress, finalGrade, status, and droppedAt/completedAt appropriately
@@ -1592,11 +1769,11 @@ export const completeCourse = async (courseId: string) => {
       enrollmentId: s._id,
       student: s.student
         ? {
-          _id: s.student._id,
-          username: s.student.username,
-          fullname: s.student.fullname,
-          avatar_url: s.student.avatar_url,
-        }
+            _id: s.student._id,
+            username: s.student.username,
+            fullname: s.student.fullname,
+            avatar_url: s.student.avatar_url,
+          }
         : null,
       progress: {
         lessons: {
@@ -1697,32 +1874,32 @@ export const completeCourse = async (courseId: string) => {
   const totalStudents = studentsOut.length;
   const averageFinalGrade = totalStudents
     ? Math.round((studentsOut.reduce((acc, x) => acc + x.finalGrade, 0) / totalStudents) * 100) /
-    100
+      100
     : 0;
   const droppedCount = studentsOut.filter((s) => s.status === EnrollmentStatus.DROPPED).length;
   const passCount = studentsOut.filter((s) => s.status !== EnrollmentStatus.DROPPED).length;
   const averageAttendance = totalStudents
     ? Math.round(
-      (studentsOut.reduce(
-        (acc, x) => acc + x.progress.attendance.present / (x.progress.attendance.total || 1),
-        0
-      ) /
-        totalStudents) *
-      100
-    )
+        (studentsOut.reduce(
+          (acc, x) => acc + x.progress.attendance.present / (x.progress.attendance.total || 1),
+          0
+        ) /
+          totalStudents) *
+          100
+      )
     : 0;
   const averageQuizScore = totalStudents
     ? Math.round(
-      (studentsOut.reduce((acc, x) => acc + (x.progress.quizzes.score || 0), 0) / totalStudents) *
-      100
-    ) / 100
+        (studentsOut.reduce((acc, x) => acc + (x.progress.quizzes.score || 0), 0) / totalStudents) *
+          100
+      ) / 100
     : 0;
   const averageAssignmentScore = totalStudents
     ? Math.round(
-      (studentsOut.reduce((acc, x) => acc + (x.progress.assignments.score || 0), 0) /
-        totalStudents) *
-      100
-    ) / 100
+        (studentsOut.reduce((acc, x) => acc + (x.progress.assignments.score || 0), 0) /
+          totalStudents) *
+          100
+      ) / 100
     : 0;
 
   const summary = {

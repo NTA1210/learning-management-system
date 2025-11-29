@@ -27,6 +27,20 @@ export enum EnrollmentMethod {
   OTHER = 'other',
 }
 
+export interface IQuizDetails {
+  quizId: mongoose.Types.ObjectId;
+  title: string;
+  score: number;
+  isCompleted: boolean;
+}
+
+export interface IAssignmentDetails {
+  assignmentId: mongoose.Types.ObjectId;
+  title: string;
+  score: number;
+  isCompleted: boolean;
+}
+
 export default interface IEnrollment extends mongoose.Document {
   studentId: mongoose.Types.ObjectId;
   courseId: mongoose.Types.ObjectId;
@@ -42,9 +56,11 @@ export default interface IEnrollment extends mongoose.Document {
     totalQuizzes: number;
     completedQuizzes: number;
     totalQuizScores: number;
+    quizDetails: IQuizDetails[];
     totalAssignments: number;
     completedAssignments: number;
     totalAssignmentScores: number;
+    assignmentDetails: IAssignmentDetails[];
     totalAttendances: number;
     completedAttendances: number;
   };
