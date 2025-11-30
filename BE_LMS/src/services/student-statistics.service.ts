@@ -21,9 +21,6 @@ type ObjectIdLike = Types.ObjectId | string;
  *   + Student: Chỉ xem được của chính mình.
  *   + Teacher: Chỉ xem được học sinh trong khóa mình dạy.
  *   + Admin: Xem được tất cả.
- * - Logic mới:
- *   + Bỏ qua check thời gian droppedAt.
- *   + Trả về chi tiết từng quiz và assignment (title, score, status).
  */
 export const getEnrollmentStatistics = async (params: {
     enrollmentId: string;
