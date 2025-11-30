@@ -31,6 +31,7 @@ const LastMessageSchema = new mongoose.Schema<ILastMessage>(
       required: true,
     },
     content: { type: String, trim: true },
+    isNotification: { type: Boolean, default: false },
     timestamp: { type: Date, required: true },
   },
   {
@@ -81,6 +82,7 @@ ChatRoomSchema.index({ 'participants.userId': 1, 'lastMessage.timestamp': -1 });
 ChatRoomSchema.index({ courseId: 1, createdAt: -1 });
 ChatRoomSchema.index({ name: 'text' });
 ChatRoomSchema.index({ courseId: 1, 'participants.userId': 1 });
+ChatRoomSchema.index({ courseId: 1, name: 1 }, { unique: true });
 
 const ChatRoomModel = mongoose.model<IChatRoom>('ChatRoom', ChatRoomSchema, 'chatRooms');
 

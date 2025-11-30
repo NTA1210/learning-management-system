@@ -11,6 +11,7 @@ export interface IParticipant {
 export interface ILastMessage {
   id: mongoose.Types.ObjectId;
   content?: string | null;
+  isNotification?: boolean;
   senderId: mongoose.Types.ObjectId;
   timestamp: Date;
 }

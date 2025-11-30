@@ -12,9 +12,9 @@ export interface IFile {
 export default interface IMessage extends mongoose.Document<mongoose.Types.ObjectId> {
   chatRoomId: mongoose.Types.ObjectId;
   senderId: mongoose.Types.ObjectId;
-  senderRole: Role;
   content: string;
   isLink: boolean;
+  isNotification: boolean;
   file?: IFile;
   createdAt: Date;
   updatedAt: Date;

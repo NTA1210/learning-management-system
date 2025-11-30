@@ -6,6 +6,7 @@ import {
   chatRoomSendMessage,
   conversationMarkAsRead,
   conversationTyping,
+  leaveChatRoom,
 } from './socketConversation';
 import { getChatRoom } from './helpers';
 
@@ -40,6 +41,10 @@ const initializeSocket = async (io: Server) => {
 
       socket.on('chatroom:invite-user', (data) => {
         chatRoomInviteUser(io, socket, data);
+      });
+
+      socket.on('chatroom:leave-chatroom', (data) => {
+        leaveChatRoom(io, socket, data);
       });
     } catch (error) {
       console.error('Error in initializeSocket:', error);
