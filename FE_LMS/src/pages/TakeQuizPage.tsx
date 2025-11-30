@@ -38,14 +38,15 @@ const deriveResultFromAttempt = (
   const passedQuestions = answered.filter((ans) => ans.correct);
   const failedQuestions = answered.filter((ans) => !ans.correct);
 
-  const scorePercentage =
+  // Calculate score out of 10
+  const scoreOutOf10 =
     totalQuizScore > 0 ? (totalScore / totalQuizScore) * 10 : 0;
 
   return {
     totalQuestions,
     totalScore,
     totalQuizScore,
-    scorePercentage,
+    scorePercentage: scoreOutOf10, // Keep for backward compatibility, but it's actually out of 10
     passedQuestions,
     failedQuestions,
     answersSubmitted: answered,
@@ -73,6 +74,7 @@ export default function TakeQuizPage() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [attemptLoading, setAttemptLoading] = useState(false);
+  const [loadingCompletedAttempt, setLoadingCompletedAttempt] = useState(false);
   const [autoSaveState, setAutoSaveState] = useState<{
     status: "idle" | "saving" | "saved" | "error";
     message?: string;
@@ -80,6 +82,7 @@ export default function TakeQuizPage() {
   const restoredAttemptRef = useRef(false);
   const storageKey = quizId ? `quizAttempt:${quizId}` : null;
   const banStorageKey = quizId ? `quizBan:${quizId}` : null;
+  const completedAttemptKey = quizId ? `quizCompleted:${quizId}` : null;
   const [banInfo, setBanInfo] = useState<{
     reason?: string;
     timestamp?: string;
@@ -285,6 +288,98 @@ export default function TakeQuizPage() {
     }
   };
 
+  // Load completed attempt from localStorage or API if exists
+  const loadCompletedAttempt = useCallback(async () => {
+    if (!quizId || !user?._id || submitted || quizAttemptId) return;
+
+    try {
+      setLoadingCompletedAttempt(true);
+      
+      // First, check localStorage for cached attempt
+      if (completedAttemptKey) {
+        const cached = localStorage.getItem(completedAttemptKey);
+        if (cached) {
+          try {
+            const cachedData = JSON.parse(cached);
+            if (cachedData.attemptId) {
+              // Try to load from cached attemptId first
+              try {
+                const attempt = await quizAttemptService.getQuizAttempt(cachedData.attemptId);
+                if (attempt.status === "submitted") {
+                  setQuizAttemptId(cachedData.attemptId);
+                  setLoadingCompletedAttempt(false);
+                  return; // Successfully loaded from cache
+                }
+              } catch {
+                // Cached attempt not found, continue to API call
+                localStorage.removeItem(completedAttemptKey);
+              }
+            }
+          } catch {
+            // Invalid cache, remove it
+            localStorage.removeItem(completedAttemptKey);
+          }
+        }
+      }
+
+      // If not in cache or cache invalid, get from API
+      const attempts = await quizAttemptService.getAttemptsByQuiz(quizId);
+      
+      // Find submitted attempt for current user
+      const userAttempt = attempts.find((attempt) => {
+        const studentId = typeof attempt.studentId === "string" 
+          ? attempt.studentId 
+          : attempt.studentId?._id;
+        return studentId === user._id && attempt.status === "submitted";
+      });
+
+      if (userAttempt) {
+        // Found completed attempt, load it directly
+        console.log("Found completed attempt:", userAttempt._id);
+        setQuizAttemptId(userAttempt._id);
+        
+        // Load attempt details immediately
+        try {
+          const attemptDetail = await quizAttemptService.getQuizAttempt(userAttempt._id);
+          const latestAttempt = applyAttemptSnapshot(attemptDetail);
+          
+          if (latestAttempt && latestAttempt.status === "submitted") {
+            // Restore answers
+            if (Array.isArray(latestAttempt.answers)) {
+              const restored = mapAnswersFromAttempt(latestAttempt.answers);
+              setAnswers(restored);
+            }
+            
+            // Derive and set result
+            const derived = deriveResultFromAttempt(latestAttempt, quiz);
+            if (derived) {
+              console.log("Setting result from completed attempt:", derived);
+              setResult(derived);
+            }
+            setSubmitted(true);
+          }
+        } catch (error) {
+          console.error("Failed to load attempt details:", error);
+          // Fallback: let useEffect handle it
+        }
+        
+        // Save to localStorage for future reference
+        if (completedAttemptKey) {
+          localStorage.setItem(completedAttemptKey, JSON.stringify({
+            attemptId: userAttempt._id,
+            submittedAt: userAttempt.submittedAt || new Date().toISOString(),
+            quizId: quizId,
+          }));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load completed attempt:", error);
+      // Silently fail - user can still enter password if needed
+    } finally {
+      setLoadingCompletedAttempt(false);
+    }
+  }, [quizId, user?._id, submitted, quizAttemptId, completedAttemptKey, quiz, applyAttemptSnapshot, mapAnswersFromAttempt, deriveResultFromAttempt]);
+
   useEffect(() => {
     if (!quizId) {
       navigate(courseId ? `/quizz/${courseId}` : "/quizz");
@@ -293,6 +388,8 @@ export default function TakeQuizPage() {
 
     if (quiz) {
       setLoading(false);
+      // Try to load completed attempt after quiz is loaded
+      loadCompletedAttempt();
       return;
     }
 
@@ -301,6 +398,8 @@ export default function TakeQuizPage() {
         setLoading(true);
         const quizData = await quizService.getQuizById(quizId);
         setQuiz(quizData);
+        // Try to load completed attempt after quiz is loaded
+        await loadCompletedAttempt();
       } catch (error) {
         console.error("Failed to fetch quiz:", error);
         const message = getErrorMessage(error, "Failed to load quiz");
@@ -312,7 +411,7 @@ export default function TakeQuizPage() {
     };
 
     fetchQuiz();
-  }, [quizId, navigate, courseId, quiz]);
+  }, [quizId, navigate, courseId, quiz, loadCompletedAttempt]);
 
   useEffect(() => {
     if (!quiz || !storageKey || restoredAttemptRef.current) return;
@@ -378,14 +477,20 @@ export default function TakeQuizPage() {
         }
 
         if (latestAttempt.status === "submitted") {
+          console.log("Loading submitted attempt, deriving result...", latestAttempt);
           const derived = deriveResultFromAttempt(
             latestAttempt,
             populatedQuiz || quiz
           );
+          console.log("Derived result:", derived);
           if (derived) {
             setResult(derived);
           }
           setSubmitted(true);
+          // Clear any persisted attempt state since it's already submitted
+          if (storageKey) {
+            sessionStorage.removeItem(storageKey);
+          }
           return;
         }
 
@@ -574,6 +679,15 @@ export default function TakeQuizPage() {
         setSubmitted(true);
         clearPersistedAttempt();
 
+        // Save completed attempt to localStorage for future reference
+        if (quizId && completedAttemptKey) {
+          localStorage.setItem(completedAttemptKey, JSON.stringify({
+            attemptId: quizAttemptId,
+            submittedAt: new Date().toISOString(),
+            quizId: quizId,
+          }));
+        }
+
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
           intervalRef.current = null;
@@ -636,7 +750,7 @@ export default function TakeQuizPage() {
     }
   }, [quiz, quizAttemptId, submitted, handleSubmit, banInfo]);
 
-  if (loading) {
+  if (loading || loadingCompletedAttempt) {
     return (
       <div className="flex h-screen overflow-hidden">
         <Sidebar />
@@ -645,7 +759,9 @@ export default function TakeQuizPage() {
           <main className="flex-1 overflow-y-auto p-6 flex items-center justify-center">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p style={{ color: "var(--muted-text)" }}>Loading quiz...</p>
+              <p style={{ color: "var(--muted-text)" }}>
+                {loadingCompletedAttempt ? "Checking for previous attempts..." : "Loading quiz..."}
+              </p>
             </div>
           </main>
         </div>
@@ -657,7 +773,7 @@ export default function TakeQuizPage() {
     return null;
   }
 
-  const needsPasswordGate = !quizAttemptId && !submitted && !banInfo;
+  const needsPasswordGate = !quizAttemptId && !submitted && !banInfo && !loadingCompletedAttempt;
 
   if (banInfo) {
     return (
@@ -973,11 +1089,8 @@ export default function TakeQuizPage() {
                     Quiz Submitted!
                   </h2>
                   <div className="text-4xl font-bold mb-2" style={{ color: "#6d28d9" }}>
-                    {result.scorePercentage?.toFixed(1)}%
+                    {result.scorePercentage?.toFixed(1)}
                   </div>
-                  <p className="text-lg" style={{ color: "var(--muted-text)" }}>
-                    Score: {result.totalScore} / {result.totalQuizScore} points
-                  </p>
                   <p className="text-sm mt-2" style={{ color: "var(--muted-text)" }}>
                     Passed: {result.passedQuestions?.length || 0} / {result.totalQuestions} questions
                   </p>
