@@ -25,13 +25,13 @@ export type ChatRoom = {
   chatRoomId: string;
   name: string;
   course: Course;
-  logo: string;
   unreadCounts: any;
   participants: User[];
   lastMessage: {
     senderId: any;
     content: string;
     timestamp: Date;
+    isNotification: boolean;
   };
 };
 
@@ -68,14 +68,6 @@ export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const { socket } = useSocketContext();
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem("lms:user");
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-  }, []);
 
   useEffect(() => {
     if (data) {
@@ -83,44 +75,54 @@ export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, [data]);
 
-  const handleNewConversation = (chatRoom: ChatRoom) => {
-    console.log("Conversation:accept", chatRoom);
+  console.log(chatRooms);
 
-    setChatRooms((prev: ChatRoom[]) => {
-      return [...prev, chatRoom];
-    });
-  };
-
-  const handleErrorNewConversation = () => {
-    toast.error("Couldn't create conversation");
-  };
   const handleConversationMarkAsReadError = () => {
     toast.error("Failed to mark conversation as read");
   };
 
   const handleChatRoomUpdate = ({
     chatRoomId,
+    name,
+    course,
+    participants,
     lastMessage,
     unreadCounts,
   }: {
     chatRoomId: string;
+    name: string;
+    course: any;
+    participants: any;
     lastMessage: any;
     unreadCounts: any;
   }) => {
-    console.log(unreadCounts);
-
-    setChatRooms((prev: ChatRoom[]) => {
-      return prev.map((chatRoom) => {
-        if (chatRoom.chatRoomId === chatRoomId) {
-          return {
-            ...chatRoom,
+    if (chatRooms.length === 0) {
+      return setChatRooms((prev: ChatRoom[] = []) => {
+        return [
+          {
+            chatRoomId,
+            name,
+            course,
+            participants,
             lastMessage,
             unreadCounts: unreadCounts,
-          };
-        }
-        return chatRoom;
+          },
+        ];
       });
-    });
+    } else {
+      setChatRooms((prev: ChatRoom[]) => {
+        return prev.map((chatRoom) => {
+          if (chatRoom.chatRoomId === chatRoomId) {
+            return {
+              ...chatRoom,
+              lastMessage,
+              unreadCounts: unreadCounts,
+            };
+          }
+          return chatRoom;
+        });
+      });
+    }
   };
 
   const handleChatRoomUpdateUnreadCounts = ({
@@ -130,7 +132,7 @@ export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
     chatRoomId: string;
     unreadCounts: any;
   }) => {
-    setChatRooms((prev: ChatRoom[]) => {
+    setChatRooms((prev: ChatRoom[] = []) => {
       return prev.map((chatRoom) => {
         if (chatRoom.chatRoomId === chatRoomId) {
           return {
@@ -151,9 +153,18 @@ export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
     toast.error(error || "Failed to invite user");
   };
 
+  const handleLeaveChatroomSuccess = ({
+    chatRoomId,
+  }: {
+    chatRoomId: string;
+  }) => {
+    setChatRooms((prev: ChatRoom[] = []) => {
+      if (prev && prev.length === 0) return prev;
+      return prev.filter((chatRoom) => chatRoom.chatRoomId !== chatRoomId);
+    });
+  };
+
   useEffect(() => {
-    socket?.on("conversation:accept", handleNewConversation);
-    socket?.on("conversation:request:error", handleErrorNewConversation);
     socket?.on(
       "conversation:mark-as-read:error",
       handleConversationMarkAsReadError
@@ -167,10 +178,9 @@ export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
     socket?.on("chatroom:invite-user:error", (errorMessage) =>
       handleChatRoomInviteError(errorMessage)
     );
+    socket?.on("chatroom:leave-chatroom:success", handleLeaveChatroomSuccess);
 
     return () => {
-      socket?.off("conversation:accept", handleNewConversation);
-      socket?.off("conversation:request:error", handleErrorNewConversation);
       socket?.off(
         "chatroom:mark-as-read:error",
         handleConversationMarkAsReadError
@@ -180,7 +190,16 @@ export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
         "chatroom:update-unread-counts",
         handleChatRoomUpdateUnreadCounts
       );
+      socket?.off(
+        "chatroom:send-message:error",
+        handleChatRoomSendMessageError
+      );
+
       socket?.off("chatroom:invite-user:error", handleChatRoomInviteError);
+      socket?.off(
+        "chatroom:leave-chatroom:success",
+        handleLeaveChatroomSuccess
+      );
     };
   }, [socket]);
 

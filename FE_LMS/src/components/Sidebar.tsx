@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { Link } from "react-router-dom";
 import { authService } from "../services";
+import { useUnreadChat } from "../hooks/useUnreadChat";
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -21,7 +22,10 @@ interface MenuItem {
   label: string;
 }
 
-const getMenuItems = (role: "admin" | "teacher" | "student"): MenuItem[] => {
+const getMenuItems = (
+  role: "admin" | "teacher" | "student",
+  isUnread: boolean
+): MenuItem[] => {
   const baseItems: MenuItem[] = [
     {
       href: role === "admin" ? "/dashboard" : `/${role}-dashboard`,
@@ -143,18 +147,29 @@ const getMenuItems = (role: "admin" | "teacher" | "student"): MenuItem[] => {
     {
       href: "/chat-rooms",
       icon: (
-        <svg
-          className="w-5 h-5 min-w-[1.25rem]"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path stroke-width="2" d="M12.005 10.5h.008m3.987 0h.009m-8 0h.009" />
-          <path
-            stroke-width="1.5"
-            d="M2 10.5c0-.77.013-1.523.04-2.25c.083-2.373.125-3.56 1.09-4.533c.965-.972 2.186-1.024 4.626-1.129A100 100 0 0 1 12 2.5c1.48 0 2.905.03 4.244.088c2.44.105 3.66.157 4.626 1.13c.965.972 1.007 2.159 1.09 4.532a64 64 0 0 1 0 4.5c-.083 2.373-.125 3.56-1.09 4.533c-.965.972-2.186 1.024-4.626 1.129q-1.102.047-2.275.07c-.74.014-1.111.02-1.437.145s-.6.358-1.148.828l-2.179 1.87A.73.73 0 0 1 8 20.77v-2.348l-.244-.01c-2.44-.105-3.66-.157-4.626-1.13c-.965-.972-1.007-2.159-1.09-4.532A64 64 0 0 1 2 10.5"
-          />
-        </svg>
+        <div className="relative">
+          <svg
+            className="w-5 h-5 min-w-[1.25rem]"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-width="2"
+              d="M12.005 10.5h.008m3.987 0h.009m-8 0h.009"
+            />
+            <path
+              stroke-width="1.5"
+              d="M2 10.5c0-.77.013-1.523.04-2.25c.083-2.373.125-3.56 1.09-4.533c.965-.972 2.186-1.024 4.626-1.129A100 100 0 0 1 12 2.5c1.48 0 2.905.03 4.244.088c2.44.105 3.66.157 4.626 1.13c.965.972 1.007 2.159 1.09 4.532a64 64 0 0 1 0 4.5c-.083 2.373-.125 3.56-1.09 4.533c-.965.972-2.186 1.024-4.626 1.129q-1.102.047-2.275.07c-.74.014-1.111.02-1.437.145s-.6.358-1.148.828l-2.179 1.87A.73.73 0 0 1 8 20.77v-2.348l-.244-.01c-2.44-.105-3.66-.157-4.626-1.13c-.965-.972-1.007-2.159-1.09-4.532A64 64 0 0 1 2 10.5"
+            />
+          </svg>
+          {isUnread && (
+            <>
+              <span className="absolute top-0 right-0 size-2.5 bg-red-500 rounded-full animate-ping"></span>
+              <span className="absolute top-0 right-0 bg-red-600 rounded-full size-2 "></span>
+            </>
+          )}
+        </div>
       ),
       label: "Chat Rooms",
     }
@@ -436,7 +451,8 @@ export default function Sidebar({
   onClose,
 }: SidebarProps) {
   const { darkMode } = useTheme();
-  const menuItems = getMenuItems(role);
+  const { isUnread } = useUnreadChat();
+  const menuItems = getMenuItems(role, isUnread);
   const feedbackLink = "/help/feedback-list";
   const [isExpanded, setIsExpanded] = useState(false);
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);

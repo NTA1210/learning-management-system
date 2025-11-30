@@ -8,9 +8,9 @@ export type Message = {
     username: string;
     avatar_url: string;
   };
-  senderRole: string;
   content: string;
   isLink: boolean;
+  isNotification: boolean;
   file: string;
   createdAt: string;
 };

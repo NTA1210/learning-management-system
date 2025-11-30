@@ -4,7 +4,7 @@ import ChatRoomItem from "./ChatRoomItem";
 import Header from "./Header";
 
 const ChatSidebar = (): JSX.Element => {
-  const { chatRooms, isLoading, isError } = useChatRoomsContext();
+  const { chatRooms = [], isLoading, isError } = useChatRoomsContext();
 
   if (isLoading) {
     return (
@@ -21,9 +21,9 @@ const ChatSidebar = (): JSX.Element => {
   return (
     <div>
       <Header />
-      {chatRooms.map((chatRoom) => {
+      {chatRooms.map((chatRoom, index) => {
         return (
-          <div key={chatRoom.chatRoomId} className="text-black">
+          <div key={chatRoom.chatRoomId || index} className="text-black">
             <ChatRoomItem {...chatRoom} />
           </div>
         );

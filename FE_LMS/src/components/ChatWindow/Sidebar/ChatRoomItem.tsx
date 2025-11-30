@@ -9,7 +9,6 @@ const ChatRoomItem = ({
   chatRoomId,
   name,
   course,
-  logo,
   participants,
   unreadCounts,
   lastMessage,
@@ -66,7 +65,6 @@ const ChatRoomItem = ({
             chatRoomId,
             name,
             course,
-            logo,
             participants,
             lastMessage,
             unreadCounts,
@@ -76,7 +74,7 @@ const ChatRoomItem = ({
     >
       <div className="relative">
         <img
-          src={logo || "https://shorturl.at/ARotg"}
+          src={course.logo || "https://shorturl.at/ARotg"}
           alt="User"
           className="object-cover rounded-full size-10"
         />
@@ -98,7 +96,11 @@ const ChatRoomItem = ({
                 : "text-sm text-sky-500 truncate min-h-5"
             }
           >
-            {lastMessage?.content ? `${pronounce}: ${lastMessage.content}` : ""}
+            {lastMessage?.content
+              ? lastMessage.isNotification
+                ? lastMessage.content
+                : `${pronounce}: ${lastMessage.content}`
+              : "There is no message yet"}
           </p>
           {user && unreadCounts[(user as any)?._id] > 0 && (
             <div className="flex items-center justify-center ml-2 text-xs text-white rounded-full bg-sky-500 size-5 shrink-0">

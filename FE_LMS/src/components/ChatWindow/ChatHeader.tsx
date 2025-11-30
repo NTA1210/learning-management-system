@@ -14,6 +14,7 @@ const ChatHeader: React.FC = () => {
   const [search, setSearch] = useState<string>("");
   const [users, setUsers] = useState<any[]>([]);
   const { socket } = useSocketContext();
+  const [isOpen, setIsOpen] = useState<boolean>(false);
 
   const searchDebounce = useDebounce(search, 500);
 
@@ -40,8 +41,6 @@ const ChatHeader: React.FC = () => {
     fetchUsers();
   }, [searchDebounce]);
 
-  console.log(user);
-
   const handleAddUser = (email: string): void => {
     socket?.emit("chatroom:invite-user", {
       chatRoomId: selectedChatRoom?.chatRoomId,
@@ -49,11 +48,19 @@ const ChatHeader: React.FC = () => {
     });
     setOpen(false);
   };
+
+  const handleLeaveTheChatroomEvent = () => {
+    socket?.emit("chatroom:leave-chatroom", {
+      chatRoomId: selectedChatRoom?.chatRoomId,
+    });
+    setSelectedChatRoom(null);
+    setIsOpen(false);
+  };
   return (
     <div className="flex items-center justify-between p-4 border-b border-gray-200">
       <div className="flex items-center space-x-3">
         <img
-          src={selectedChatRoom?.logo || "https://shorturl.at/ARotg"}
+          src={selectedChatRoom?.course?.logo || "https://shorturl.at/ARotg"}
           alt="User image"
           className="object-cover rounded-full size-10"
         />
@@ -70,8 +77,24 @@ const ChatHeader: React.FC = () => {
             <UserPlus className="size-5" />
           </button>
         )}
-        <button className="text-gray-500 cursor-pointer hover:text-gray-700">
+        <button
+          className="relative inline-block text-gray-500 cursor-pointer hover:text-gray-900"
+          onClick={() => setIsOpen(!isOpen)}
+        >
           <EllipsisVertical className="size-5" />
+          {isOpen && (
+            <div className="popup">
+              <span className="inline-block w-full px-4 py-2 text-sm rounded-md whitespace-nowrap hover:bg-gray-300 text-start">
+                Do something
+              </span>
+              <span
+                className="inline-block w-full px-4 py-2 text-sm text-red-500 rounded-md whitespace-nowrap hover:bg-gray-300 text-start"
+                onClick={handleLeaveTheChatroomEvent}
+              >
+                Leave the chatroom
+              </span>
+            </div>
+          )}
         </button>
         <button
           onClick={() => setSelectedChatRoom(null)}
@@ -98,7 +121,10 @@ const ChatHeader: React.FC = () => {
           {!(users.length > 0) || (
             <div className="flex flex-col gap-2 px-4 py-4 mt-5 border border-gray-400 rounded-lg users-list h-[200px] overflow-auto">
               {users.map((user) => (
-                <span className="flex items-center justify-between w-full py-1 border-gray-400 border-b-1 items">
+                <span
+                  className="flex items-center justify-between w-full py-1 border-gray-400 border-b-1 items"
+                  key={user._id.toString()}
+                >
                   <p className="text-xs text-gray-500"> {user?.email}</p>
                   <button
                     className="px-2 py-1 text-xs border border-gray-400 rounded-sm cursor-pointer hover:bg-blue-400 hover:text-white"

@@ -4,10 +4,10 @@ import type { Message } from "../../services/messageService";
 const MessageItem: React.FC<Message> = ({
   _id,
   senderId,
-  senderRole,
   content,
   file,
   isLink,
+  isNotification,
   createdAt,
 }) => {
   const [user, setUser] = useState(null);
@@ -37,6 +37,16 @@ const MessageItem: React.FC<Message> = ({
 
     setUser(user);
   }, []);
+
+  if (isNotification) {
+    console.log("ISNOTIFICATION", isNotification);
+
+    return (
+      <div className="flex items-center justify-center gap-2 mb-4">
+        <p className="text-xs text-gray-500">{content}</p>
+      </div>
+    );
+  }
 
   if (userIsSender) {
     return (
