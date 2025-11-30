@@ -7,9 +7,7 @@ export const CreateLessonSchema = z.object({
   title: z.string().min(1).max(255),
   courseId: z.string().min(1),
   content: z.string().optional(),
-  order: z.number().optional(),
   durationMinutes: z.number().optional(),
-  publishedAt: z.coerce.date().optional(),
   isPublished: z.boolean().optional(),
 });
 
