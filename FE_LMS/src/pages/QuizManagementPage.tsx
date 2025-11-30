@@ -4,7 +4,7 @@ import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
-import { PlusCircle, X, ImagePlus, CheckCircle, AlertCircle, Info, Upload, Download } from "lucide-react";
+import { PlusCircle, X, ImagePlus, CheckCircle, AlertCircle, Info, Upload, Download, FileText } from "lucide-react";
 import { subjectService, quizQuestionService, type QuizQuestion } from "../services";
 import type { Subject } from "../types/subject";
 import { useNavigate } from "react-router-dom";
@@ -34,6 +34,7 @@ export default function QuizManagementPage() {
     hasNext: boolean;
     hasPrev: boolean;
   } | null>(null);
+  const [questionCounts, setQuestionCounts] = useState<Record<string, number>>({});
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -138,6 +139,43 @@ export default function QuizManagementPage() {
       }
     })();
   }, [subjectsPage, subjectsPageSize]);
+
+  // Fetch question counts for each subject
+  useEffect(() => {
+    const fetchQuestionCounts = async () => {
+      if (subjects.length === 0) return;
+      
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        subjects.map(async (subject) => {
+          try {
+            // Fetch first page with large limit to get most questions
+            const result = await quizQuestionService.getAllQuizQuestions({
+              subjectId: subject._id,
+              limit: 100,
+              page: 1,
+            });
+            
+            // Use pagination total if available, otherwise count from data
+            const total = result.pagination?.totalItems;
+            if (total !== undefined && total !== null) {
+              counts[subject._id] = total;
+            } else {
+              // Fallback: count questions from first page
+              counts[subject._id] = (result.data || []).length;
+            }
+          } catch (err) {
+            console.error(`Failed to fetch question count for subject ${subject._id}:`, err);
+            counts[subject._id] = 0;
+          }
+        })
+      );
+      setQuestionCounts(counts);
+    };
+
+    fetchQuestionCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subjects]);
 
   const handlePickSubject = (subjectId: string) => {
     navigate(`/questionbank/${subjectId}`);
@@ -681,6 +719,7 @@ const handleImportQuiz = async () => {
                 ) : (
                   <div className="grid grid-cols-1 gap-4">
                     {subjects.map((subject) => {
+                      const questionCount = questionCounts[subject._id] ?? null;
                       return (
                         <div
                           key={subject._id}
@@ -697,6 +736,19 @@ const handleImportQuiz = async () => {
                           >
                             {subject.code} - {subject.name}
                           </h3>
+                          <div className="flex items-center gap-2 mb-2">
+                            <FileText className="w-4 h-4" style={{ color: darkMode ? "#a5b4fc" : "#6366f1" }} />
+                            <span
+                              className="text-sm"
+                              style={{ color: darkMode ? "#a5b4fc" : "#6366f1" }}
+                            >
+                              {questionCount === null
+                                ? "Loading..."
+                                : questionCount === 1
+                                ? "1 question"
+                                : `${questionCount} questions`}
+                            </span>
+                          </div>
                           <span
                             className="text-sm"
                             style={{ color: darkMode ? "#a5b4fc" : "#6366f1" }}
@@ -796,6 +848,7 @@ const handleImportQuiz = async () => {
                           <div className="grid grid-cols-1 gap-3 max-h-48 overflow-y-auto">
                             {subjects.map((subject) => {
                               const isSelected = selectedSubject?._id === subject._id;
+                              const questionCount = questionCounts[subject._id] ?? null;
                               return (
                                 <div
                                   key={subject._id}
@@ -815,6 +868,16 @@ const handleImportQuiz = async () => {
                                   }}
                                 >
                                   <div className="font-semibold">{subject.code} - {subject.name}</div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <FileText className="w-3 h-3" style={{ color: darkMode ? "#a5b4fc" : "#6366f1" }} />
+                                    <span className="text-xs" style={{ color: labelColor }}>
+                                      {questionCount === null
+                                        ? "Loading..."
+                                        : questionCount === 1
+                                        ? "1 question"
+                                        : `${questionCount} questions`}
+                                    </span>
+                                  </div>
                                   {subject.description && (
                                     <div className="text-xs mt-1" style={{ color: labelColor }}>
                                       {subject.description}

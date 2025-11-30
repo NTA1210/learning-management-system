@@ -148,9 +148,9 @@ export const quizService = {
     params?: GetQuizzesByCourseParams
   ): Promise<QuizzesResponse> => {
     // Filter out undefined/null values and boolean false values
-    // Backend expects boolean, but query params are strings in HTTP GET
-    // So we only send boolean params if they are true, or skip them entirely
-    const queryParams: Record<string, string | number | boolean> = {};
+    // Backend endpoint /courses/:courseId/quizzes expects ALL params as strings
+    // So we convert all number/boolean values to strings, but preserve strings as-is
+    const queryParams: Record<string, string> = {};
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
@@ -160,7 +160,19 @@ export const quizService = {
             // Don't send false boolean values
             return;
           }
+          // Convert values to string for this endpoint
+          // If already a string, use it as-is (may contain quotes like "5" for JSON string format)
+          // If number or boolean, convert to string
+          if (typeof value === 'string') {
           queryParams[key] = value;
+          } else if (typeof value === 'number') {
+            queryParams[key] = String(value);
+          } else if (typeof value === 'boolean') {
+            queryParams[key] = String(value);
+          } else {
+            // Fallback: convert anything else to string
+            queryParams[key] = String(value);
+          }
         }
       });
     }
@@ -266,6 +278,67 @@ export const quizService = {
    */
   deleteQuiz: async (quizId: string): Promise<void> => {
     await http.del(`/quizzes/${quizId}`);
+  },
+
+  /**
+   * Get quiz statistics
+   * @param quizId - Quiz ID
+   * @returns Quiz statistics
+   */
+  getQuizStatistics: async (quizId: string): Promise<{
+    totalStudents: number;
+    submittedCount: number;
+    averageScore: number;
+    medianScore: number;
+    minMax: {
+      min: number;
+      max: number;
+    };
+    standardDeviationScore: number;
+    scoreDistribution: Array<{
+      min: number;
+      max: number;
+      range: string;
+      count: number;
+      percentage: string;
+    }>;
+    students: Array<{
+      fullname: string;
+      email: string;
+      score: number;
+      durationSeconds: number;
+      rank: number;
+    }>;
+  }> => {
+    const response = await http.get<{
+      success: boolean;
+      data: {
+        totalStudents: number;
+        submittedCount: number;
+        averageScore: number;
+        medianScore: number;
+        minMax: {
+          min: number;
+          max: number;
+        };
+        standardDeviationScore: number;
+        scoreDistribution: Array<{
+          min: number;
+          max: number;
+          range: string;
+          count: number;
+          percentage: string;
+        }>;
+        students: Array<{
+          fullname: string;
+          email: string;
+          score: number;
+          durationSeconds: number;
+          rank: number;
+        }>;
+      };
+    }>(`/quizzes/${quizId}/statistics`);
+    return response.data;
   },
 };
 
