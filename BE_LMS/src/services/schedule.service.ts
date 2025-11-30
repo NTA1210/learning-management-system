@@ -1,7 +1,7 @@
 import TimeSlotModel from "../models/timeSlot.model";
 import ScheduleModel from "../models/schedule.model";
 import ScheduleExceptionModel from "../models/scheduleException.model";
-import {ScheduleStatus} from "../types/schedule.type";
+import ISchedule, {ScheduleStatus} from "../types/schedule.type";
 import {ExceptionStatus, ExceptionType} from "../types/scheduleException.type";
 import {DayOfWeek} from "../types/timeSlot.type";
 import appAssert from "../utils/appAssert";
@@ -43,8 +43,10 @@ export const createScheduleRequest = async (input: CreateScheduleInput) => {
 
     // Verify teacher is assigned to this course
     const isAssigned = courseData.teacherIds.some(
-        (id: mongoose.Types.ObjectId) => id === input.teacherId
+        (id: mongoose.Types.ObjectId) => id.toString() === input.teacherId.toString()
     );
+    console.log("isAssigned:", isAssigned);
+    console.log("teacher iDS: ", courseData.teacherIds)
     appAssert(isAssigned, BAD_REQUEST, "Teacher is not assigned to this course");
 
     // Check if slot is available for this teacher
@@ -79,7 +81,7 @@ export const getTeacherWeeklySchedule = async (
     teacherId: string,
     date?: string
 ) => {
-    const query: any = {
+    const query: mongoose.FilterQuery<ISchedule> = {
         teacherId,
         status: {$in: [ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
     };
@@ -87,10 +89,14 @@ export const getTeacherWeeklySchedule = async (
     // Filter by date range if provided
     if (date) {
         const targetDate = new Date(date);
-        query.effectiveFrom = {$lte: targetDate};
-        query.$or = [
-            {effectiveTo: {$exists: false}},
-            {effectiveTo: {$gte: targetDate}},
+        query.$and = [
+            {effectiveFrom: {$lte: targetDate}},
+            {
+                $or: [
+                    {effectiveTo: {$exists: false}},
+                    {effectiveTo: {$gte: targetDate}},
+                ],
+            },
         ];
     }
 
@@ -134,7 +140,7 @@ export const approveScheduleRequest = async (
     approvalNote?: string
 ) => {
     // Verify the admin ID is actually an admin
-    const admin = await UserModel.findById({adminId});
+    const admin = await UserModel.findById(adminId);
     appAssert(admin && admin.role === Role.ADMIN, NOT_FOUND, "Admin user not found");
 
     // FInd schedule
@@ -201,9 +207,10 @@ export const createScheduleException = async (input: CreateExceptionInput) => {
     const schedule = await ScheduleModel.findById(input.scheduleId);
     appAssert(schedule, NOT_FOUND, "Schedule not found");
 
+    console.log(input);
     // Verify requester is the teacher of this schedule
     appAssert(
-        schedule.teacherId === input.requestedBy,
+        schedule.teacherId.toString() === input.requestedBy.toString(),
         BAD_REQUEST,
         "You can only create exceptions for your own schedules"
     );
@@ -248,7 +255,7 @@ export const approveScheduleException = async (
     approvalNote?: string
 ) => {
     // Verify the admin ID is actually an admin
-    const admin = await UserModel.findById({adminId});
+    const admin = await UserModel.findById(adminId);
     appAssert(admin && admin.role === Role.ADMIN, NOT_FOUND, "Admin user not found");
 
     const exception = await ScheduleExceptionModel.findById(exceptionId);
