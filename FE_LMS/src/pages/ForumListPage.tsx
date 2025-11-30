@@ -648,16 +648,22 @@ const ForumListPage: React.FC = () => {
                                 backgroundSize: "cover",
                                 backgroundPosition: "center",
                                 backgroundRepeat: "no-repeat",
+                                filter: darkMode ? "none" : "brightness(1.1)",
                               }
                             : undefined
                         }
                       >
                         {hasBackgroundImage && (
-                          <div className="absolute inset-0 bg-black/40 dark:bg-black/60 z-0" />
+                          <div 
+                            className="absolute inset-0 z-0"
+                            style={{
+                              backgroundColor: darkMode ? "rgba(0, 0, 0, 0.4)" : "rgba(0, 0, 0, 0.3)",
+                            }}
+                          />
                         )}
                         <div className="relative z-10">
                           <div className="flex items-start gap-4 relative">
-                            <div className="relative group">
+                            <div className="relative group" style={{ zIndex: 100 }}>
                               <div
                                 className={`h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden cursor-pointer ${
                                   darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
@@ -670,7 +676,7 @@ const ForumListPage: React.FC = () => {
                                 )}
                               </div>
                               {/* Author Hover Popup */}
-                              <div className="absolute left-0 top-14 z-50 hidden group-hover:block w-64">
+                              <div className="absolute left-0 top-14 z-[9999] hidden group-hover:block w-64">
                                 <div className={`rounded-2xl shadow-2xl border p-4 ${
                                   darkMode 
                                     ? "bg-slate-900 border-slate-700 text-slate-100" 
@@ -696,7 +702,7 @@ const ForumListPage: React.FC = () => {
                                     </div>
                                   </div>
                                   {forum.createdBy?.username && (
-                                    <div className=" pt-12  flex items-center gap-2 text-xs text-slate-500 pt-2 border-t border-slate-200 dark:border-slate-700">
+                                    <div className="flex items-center gap-2 text-xs text-slate-500 pt-2 border-t border-slate-200 dark:border-slate-700">
                                       <User className="w-3 h-3" />
                                       <span>@{forum.createdBy.username}</span>
                                     </div>
@@ -706,18 +712,22 @@ const ForumListPage: React.FC = () => {
                             </div>
                             <div className="flex-1 min-w-[200px]">
                               <div className={`text-xs mb-2 ${
-                                hasBackgroundImage ? "text-white/90 drop-shadow" : "text-slate-400"
+                                hasBackgroundImage 
+                                  ? "text-white/90 drop-shadow"
+                                  : "text-slate-400"
                               }`}>
-                                <span className="relative inline-block group/name">
+                                <span className="relative inline-block group/name" style={{ zIndex: 100 }}>
                                   <span 
                                     className={`font-semibold cursor-pointer hover:underline ${
-                                      hasBackgroundImage ? "text-white" : "text-slate-600 dark:text-slate-200"
+                                      hasBackgroundImage 
+                                        ? "text-white"
+                                        : "text-slate-600 dark:text-slate-200"
                                     }`}
                                   >
                                     {authorName}
                                   </span>
                                   {/* Author Name Hover Popup */}
-                                  <div className="absolute left-0 top-6 z-50 hidden group-hover/name:block w-64">
+                                  <div className="absolute left-0 top-6 z-[9999] hidden group-hover/name:block w-64">
                                     <div className={`rounded-2xl shadow-2xl border p-4 ${
                                       darkMode 
                                         ? "bg-slate-900 border-slate-700 text-slate-100" 
@@ -756,11 +766,14 @@ const ForumListPage: React.FC = () => {
                                     {authorRole}
                                   </span>
                                 )}
-                                <span className={`ml-2 ${hasBackgroundImage ? "text-white/80" : "text-slate-500"}`}>
+                                <span className={`ml-2 ${
+                                  hasBackgroundImage 
+                                    ? "text-white/80"
+                                    : "text-slate-500"
+                                }`}>
                                   • Created: {forum.createdAt ? new Date(forum.createdAt).toLocaleString() : "—"}
                                   {forum.updatedAt && forum.updatedAt !== forum.createdAt && (
                                     <span className="ml-2">
-                                      • Updated: {new Date(forum.updatedAt).toLocaleString()}
                                     </span>
                                   )}
                                 </span>
@@ -776,25 +789,27 @@ const ForumListPage: React.FC = () => {
                                 {forumTitle}
                               </h4>
                               <p className={`text-sm mt-2 line-clamp-3 ${
-                                hasBackgroundImage ? "text-white/90 drop-shadow" : "text-slate-500"
+                                hasBackgroundImage 
+                                  ? "text-white/90 drop-shadow"
+                                  : "text-slate-500"
                               }`}>
                                 {forum.description}
                               </p>
                             </div>
                             <div className="absolute top-0 right-0">
-                              <span
-                                className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                                  hasBackgroundImage
-                                    ? forum.forumType === "announcement"
-                                      ? "bg-amber-500/90 text-white backdrop-blur-sm"
-                                      : "bg-indigo-500/90 text-white backdrop-blur-sm"
-                                    : forum.forumType === "announcement"
-                                      ? "bg-amber-100 text-amber-700"
-                                      : "bg-indigo-100 text-indigo-700"
-                                }`}
-                              >
-                                {forumTypeLabels[forum.forumType]}
-                              </span>
+                                <span
+                                  className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                                    hasBackgroundImage
+                                      ? forum.forumType === "announcement"
+                                        ? "bg-amber-500/90 text-white backdrop-blur-sm"
+                                        : "bg-indigo-500/90 text-white backdrop-blur-sm"
+                                      : forum.forumType === "announcement"
+                                        ? "bg-amber-100 text-amber-700"
+                                        : "bg-indigo-100 text-indigo-700"
+                                  }`}
+                                >
+                                  {forumTypeLabels[forum.forumType]}
+                                </span>
                             </div>
                           </div>
 
@@ -808,6 +823,13 @@ const ForumListPage: React.FC = () => {
                           )}
 
                           <div className="flex flex-wrap items-center justify-between gap-3 pt-12">
+                            <div className={`text-xs ${
+                              hasBackgroundImage 
+                                ? "text-white/80"
+                                : "text-slate-400"
+                            }`}>
+                              Updated: {forum.updatedAt ? new Date(forum.updatedAt).toLocaleString() : "Awaiting update"}
+                            </div>
                             <div className="flex gap-2 shrink-0">
                               <Link
                                 to={`/forums/${forum._id}`}
