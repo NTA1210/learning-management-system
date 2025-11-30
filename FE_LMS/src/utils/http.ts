@@ -12,6 +12,18 @@ export const httpClient = axios.create({
   baseURL: import.meta.env.VITE_BASE_API,
   timeout: 10000,
   withCredentials: true, // Enable cookies for authentication
+  paramsSerializer: (params: Record<string, any>) => {
+    // Custom serializer to ensure all params are strings
+    // This is critical for endpoints like /courses/:courseId/quizzes that require string params
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        // Convert all values to string (number, boolean, string all become string)
+        searchParams.append(key, String(value));
+      }
+    });
+    return searchParams.toString();
+  },
 });
 
 // ===============================
@@ -38,6 +50,42 @@ httpClient.interceptors.request.use(
     // Debug: Check if cookies will be sent
     console.log("Request to:", config.url);
     console.log("With credentials:", config.withCredentials);
+    
+    // Convert all query params to strings for endpoints that require string params
+    // This is especially important for /courses/:courseId/quizzes endpoint
+    // Backend expects ALL params as strings, so we convert everything to string
+    if (config.params) {
+      const originalParams = config.params;
+      console.log("Original params:", originalParams, "Type:", typeof originalParams);
+      
+      if (config.params instanceof URLSearchParams) {
+        // If it's already URLSearchParams, convert each value to string
+        const newParams = new URLSearchParams();
+        config.params.forEach((value, key) => {
+          // Ensure value is always a string
+          const stringValue = String(value);
+          console.log(`Converting param ${key}: ${value} (${typeof value}) -> ${stringValue} (string)`);
+          newParams.append(key, stringValue);
+        });
+        config.params = newParams;
+      } else if (typeof config.params === 'object' && !Array.isArray(config.params)) {
+        // If it's a plain object, convert all values to strings
+        // This ensures numbers, booleans, and strings are all converted to strings
+        const stringParams: Record<string, string> = {};
+        Object.entries(config.params).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            // Convert all values to string
+            // If already a string (including strings with quotes like "5"), keep as-is
+            // If number or boolean, convert to string
+            const stringValue = typeof value === 'string' ? value : String(value);
+            console.log(`Converting param ${key}: ${value} (${typeof value}) -> ${stringValue} (string)`);
+            stringParams[key] = stringValue;
+          }
+        });
+        config.params = stringParams;
+        console.log("Converted params:", config.params);
+      }
+    }
     
     // Ví dụ: thêm token nếu cần
     // const token = localStorage.getItem("token");
