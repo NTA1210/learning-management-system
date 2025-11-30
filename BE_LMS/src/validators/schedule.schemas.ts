@@ -2,14 +2,33 @@ import z from "zod";
 import {DayOfWeek} from "@/types/timeSlot.type";
 import {ExceptionType} from "@/types/scheduleException.type";
 import mongoose from "mongoose";
+import {ScheduleStatus} from "@/types";
 
-// Schema for creating a schedule request
-export const createScheduleSchema = z.object({
-    courseId: z.string().min(1, "Course ID is required"),
+// Schema for a single schedule slot (day + time combination)
+export const scheduleSlotSchema = z.object({
     dayOfWeek: z.enum(DayOfWeek, {
         message: "Invalid day of week",
     }),
     timeSlotId: z.string().min(1, "Time slot ID is required"),
+});
+
+// Schema for creating a schedule request (now supports multiple slots)
+export const createScheduleSchema = z.object({
+    courseId: z.string().min(1, "Course ID is required"),
+    slots: z.array(scheduleSlotSchema)
+        .min(1, "At least one schedule slot is required")
+        .refine(
+            (slots) => {
+                // Check for duplicate day-timeslot combinations
+                const uniqueSlots = new Set(
+                    slots.map(s => `${s.dayOfWeek}-${s.timeSlotId}`)
+                );
+                return uniqueSlots.size === slots.length;
+            },
+            {
+                message: "Duplicate day and time slot combinations are not allowed",
+            }
+        ),
     effectiveFrom: z.string().transform((val) => new Date(val)),
     effectiveTo: z.string().transform((val) => new Date(val)).optional(),
     location: z.string().optional(),
@@ -82,6 +101,27 @@ export type TimeSlotFilterQuery = z.infer<typeof timeSlotFilterSchema>;
 
 export const teacherScheduleQuerySchema = z.object({
     date: z.string().optional(),
+    status: z.union([
+        z.enum(ScheduleStatus),
+        z.array(z.enum(ScheduleStatus))
+    ])
+        .optional()
+        .transform((val) => {
+            if (!val) return undefined;
+            return Array.isArray(val) ? val : [val];
+        }),
+});
+
+export const courseScheduleQuerySchema = z.object({
+    status: z.union([
+        z.enum(ScheduleStatus),
+        z.array(z.enum(ScheduleStatus))
+    ])
+        .optional()
+        .transform((val) => {
+            if (!val) return undefined;
+            return Array.isArray(val) ? val : [val];
+        }),
 });
 
 export type TeacherScheduleQuery = z.infer<typeof teacherScheduleQuerySchema>;
