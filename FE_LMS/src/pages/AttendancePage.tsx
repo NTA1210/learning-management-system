@@ -14,8 +14,11 @@ import {
   semesterService,
   courseService,
   attendanceService,
+  enrollmentService,
   type Semester,
   type CourseAttendanceStats,
+  type StudentAttendanceStat,
+  type EnrollmentRecord,
 } from "../services";
 import type { Course } from "../types/course";
 import { Users, Download } from "lucide-react";
@@ -122,7 +125,7 @@ export default function AttendancePage() {
         navigate(`/attendance/${closest._id}`, { replace: true });
       }
     }
-  }, [semesterId, semesters, selectedSemester?._id, navigate]);
+  }, [semesterId, semesters, navigate]); // Removed selectedSemester._id to prevent circular updates
 
   // Fetch courses when semester is selected (only when semester changes)
   useEffect(() => {
@@ -131,6 +134,7 @@ export default function AttendancePage() {
 
       try {
         setLoadingCourses(true);
+        setCourses([]); // Clear old courses immediately to prevent flicker
         const result = await courseService.getAllCourses({
           semesterId: selectedSemester._id,
           isPublished: true,
@@ -145,7 +149,7 @@ export default function AttendancePage() {
     };
 
     fetchCourses();
-  }, [selectedSemester]);
+  }, [selectedSemester?._id]); // Only re-fetch when semester ID changes, not the whole object
 
   // Set selected course from URL parameter when courses are loaded
   useEffect(() => {
@@ -162,9 +166,9 @@ export default function AttendancePage() {
     }
   }, [courseId, courses, selectedCourse?._id]);
 
-  // Fetch attendance stats when course is selected
+  // Fetch attendance stats and enrollments when course is selected
   useEffect(() => {
-    const fetchAttendanceStats = async () => {
+    const fetchAttendanceData = async () => {
       if (!selectedCourse) {
         setAttendanceStats(null);
         return;
@@ -173,18 +177,108 @@ export default function AttendancePage() {
       try {
         setLoadingStats(true);
         setError(null);
-        const stats = await attendanceService.getCourseStats(selectedCourse._id);
-        setAttendanceStats(stats);
+
+        // Fetch both enrollments and stats in parallel
+        const [enrollmentsResult, stats] = await Promise.all([
+          enrollmentService.getByCourse(selectedCourse._id, {
+            status: 'approved',
+            limit: 1000
+          }),
+          attendanceService.getCourseStats(selectedCourse._id)
+        ]);
+
+        // Merge enrollments with stats to show all students
+        const mergedStudentStats = mergeEnrollmentsWithStats(
+          enrollmentsResult.enrollments,
+          stats
+        );
+
+        // Update the stats with merged student list
+        setAttendanceStats({
+          ...stats,
+          studentStats: mergedStudentStats,
+          totalStudents: mergedStudentStats.length,
+        });
       } catch (err: any) {
-        setError(err.message || "Failed to fetch attendance stats");
+        setError(err.message || "Failed to fetch attendance data");
         setAttendanceStats(null);
       } finally {
         setLoadingStats(false);
       }
     };
 
-    fetchAttendanceStats();
+    fetchAttendanceData();
   }, [selectedCourse]);
+
+  // Helper function to merge enrollments with stats
+  const mergeEnrollmentsWithStats = (
+    enrollments: EnrollmentRecord[],
+    stats: CourseAttendanceStats | null
+  ): StudentAttendanceStat[] => {
+    const enrollmentMap = new Map<string, EnrollmentRecord>();
+    const result: StudentAttendanceStat[] = [];
+
+    // Map approved enrollments by studentId
+    enrollments
+      .filter(enrollment => enrollment.status === 'approved')
+      .forEach(enrollment => {
+        enrollmentMap.set(enrollment.studentId._id, enrollment);
+      });
+
+    // Process all students from stats (historical data)
+    if (stats?.studentStats) {
+      stats.studentStats.forEach(stat => {
+        const isEnrolled = enrollmentMap.has(stat.studentId);
+        result.push({
+          ...stat,
+          isCurrentlyEnrolled: isEnrolled,
+        });
+        // Remove from map so we can track which enrollments we've processed
+        if (isEnrolled) {
+          enrollmentMap.delete(stat.studentId);
+        }
+      });
+    }
+
+    // Add remaining enrollments (students with no attendance history yet)
+    enrollmentMap.forEach(enrollment => {
+      result.push({
+        studentId: enrollment.studentId._id,
+        student: {
+          _id: enrollment.studentId._id,
+          username: enrollment.studentId.username,
+          email: enrollment.studentId.email,
+          fullname: enrollment.studentId.fullname,
+          avatar_url: enrollment.studentId.avatar_url,
+        },
+        totalSessions: 0,
+        counts: {
+          present: 0,
+          absent: 0,
+          notyet: 0,
+        },
+        attendanceRate: 0,
+        absentRate: 0,
+        longestAbsentStreak: 0,
+        alerts: {
+          highAbsence: false,
+        },
+        isCurrentlyEnrolled: true,
+      } as StudentAttendanceStat);
+    });
+
+    // Sort: Currently enrolled students first, then historical students
+    return result.sort((a, b) => {
+      if (a.isCurrentlyEnrolled === b.isCurrentlyEnrolled) {
+        // Same enrollment status, sort by name
+        const nameA = a.student.fullname || a.student.username;
+        const nameB = b.student.fullname || b.student.username;
+        return nameA.localeCompare(nameB);
+      }
+      // Currently enrolled students come first
+      return (b.isCurrentlyEnrolled ? 1 : 0) - (a.isCurrentlyEnrolled ? 1 : 0);
+    });
+  };
 
   const handleSemesterChange = (semester: Semester) => {
     setSelectedSemester(semester);
@@ -215,9 +309,26 @@ export default function AttendancePage() {
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
 
-      // Refresh stats after saving
-      const stats = await attendanceService.getCourseStats(selectedCourse._id);
-      setAttendanceStats(stats);
+      // Refresh stats AND enrollments after saving, then re-merge
+      const [enrollmentsResult, stats] = await Promise.all([
+        enrollmentService.getByCourse(selectedCourse._id, {
+          status: 'approved',
+          limit: 1000
+        }),
+        attendanceService.getCourseStats(selectedCourse._id)
+      ]);
+
+      // Re-merge to maintain isCurrentlyEnrolled flags
+      const mergedStudentStats = mergeEnrollmentsWithStats(
+        enrollmentsResult.enrollments,
+        stats
+      );
+
+      setAttendanceStats({
+        ...stats,
+        studentStats: mergedStudentStats,
+        totalStudents: mergedStudentStats.length,
+      });
     } catch (err: any) {
       setError(err.message || "Failed to save attendance");
       throw err;
@@ -459,6 +570,9 @@ export default function AttendancePage() {
           studentId={selectedStudent.id}
           studentName={selectedStudent.name}
           courseId={selectedCourse?._id}
+          courseTitle={selectedCourse?.title}
+          courseStartDate={selectedCourse?.startDate}
+          courseEndDate={selectedCourse?.endDate}
           onUpdate={handleAttendanceUpdate}
         />
       )}
