@@ -47,7 +47,7 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
   const submitLabel = mode === "create" ? "Create" : "Update";
 
   const numberInputHandler =
-    (field: "order" | "durationMinutes") =>
+    (field: "durationMinutes") =>
     (value: string): void => {
       if (value.trim() === "") {
         setValues((prev) => ({ ...prev, [field]: 0 }));
@@ -145,23 +145,6 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
             </div>
             <div>
               <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
-                Order
-              </label>
-              <input
-                type="text"
-                value={displayValue(values.order)}
-                onChange={(e) => numberInputHandler("order")(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border"
-                style={{
-                  backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                  borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
-                  color: darkMode ? "#ffffff" : "#000000",
-                }}
-                placeholder="Enter order number"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
                 Duration (minutes)
               </label>
               <input
@@ -175,22 +158,6 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
                   color: darkMode ? "#ffffff" : "#000000",
                 }}
                 placeholder="Enter duration in minutes"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
-                Published At
-              </label>
-              <input
-                type="date"
-                value={values.publishedAt}
-                onChange={(e) => setValues((prev) => ({ ...prev, publishedAt: e.target.value }))}
-                className="w-full px-4 py-2 rounded-lg border"
-                style={{
-                  backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                  borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
-                  color: darkMode ? "#ffffff" : "#000000",
-                }}
               />
             </div>
           </div>

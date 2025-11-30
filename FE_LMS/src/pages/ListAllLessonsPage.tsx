@@ -246,38 +246,26 @@ const ListAllLessonsPage: React.FC = () => {
         courseId: string;
         title: string;
         content?: string;
-        order?: number;
         durationMinutes?: number;
-        publishedAt?: string;
       } = {
       courseId: values.courseId,
       title: values.title,
     };
     if (values.content) payload.content = values.content;
-    if (values.order > 0) payload.order = values.order;
     if (values.durationMinutes > 0) payload.durationMinutes = values.durationMinutes;
-    if (values.publishedAt) payload.publishedAt = new Date(values.publishedAt).toISOString();
     return payload;
   };
 
   const getModalInitialValues = (): LessonFormValues => {
     if (modalState?.mode === "edit" && modalState.lesson) {
       const lesson = modalState.lesson;
-      let formattedDate = "";
-      if (lesson.publishedAt) {
-        const date = new Date(lesson.publishedAt);
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, "0");
-        const day = String(date.getDate()).padStart(2, "0");
-        formattedDate = `${year}-${month}-${day}`;
-      }
       return {
         courseId: lesson.courseId._id,
         title: lesson.title,
         content: lesson.content || "",
         order: lesson.order || 0,
         durationMinutes: lesson.durationMinutes || 0,
-        publishedAt: formattedDate,
+        publishedAt: "",
       };
     }
     return defaultFormValues;
