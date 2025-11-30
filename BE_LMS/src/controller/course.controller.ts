@@ -18,12 +18,14 @@ import {
   getMyCourses,
   getQuizzes,
   getCourseBySlug,
+  completeCourse,
+  getCourseStatistics,
 } from '../services/course.service';
 import { parseFormData } from '../utils/parseFormData';
 
 /**
  * GET / courses / my - courses - Get my courses
-  */
+ */
 export const getMyCoursesHandler = catchErrors(async (req, res) => {
   const query = listCoursesSchema.parse(req.query);
   const userId = (req as any).userId;
@@ -252,5 +254,29 @@ export const getQuizzesHandler = catchErrors(async (req, res) => {
     data: quizzes,
     pagination,
     message: 'Quizzes retrieved successfully',
+  });
+});
+
+// POST /:courseId/statistics - Complete course
+export const completeCourseHandler = catchErrors(async (req, res) => {
+  const courseId = courseIdSchema.parse(req.params.courseId);
+
+  const data = await completeCourse(courseId);
+
+  return res.success(OK, {
+    data,
+    message: 'Course completed successfully',
+  });
+});
+
+// GET /:courseId/statistics - Get course statistics
+export const getCourseStatisticsHandler = catchErrors(async (req, res) => {
+  const courseId = courseIdSchema.parse(req.params.courseId);
+
+  const data = await getCourseStatistics(courseId);
+
+  return res.success(OK, {
+    data,
+    message: data.statistics ? 'Course statistics retrieved successfully' : data.message,
   });
 });

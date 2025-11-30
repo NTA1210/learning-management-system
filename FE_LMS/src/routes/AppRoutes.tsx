@@ -1,41 +1,44 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import {DashboardPage ,
-      StudentDashboardPage,
-      TeacherDashboardPage,
-      LandingPage,
-      NotFoundPage,
-      EmailVerifyPage,
-      ForgotPasswordPage,
-      ResetPasswordPage,
-      LoginPage,
-      RegisterPage,
-      CourseManagementPage,
-      MyCoursesPage,
-      CourseDetailPage,
-      ListAllLessonsPage,
-      AboutUsPage,
-      FAQPage,
-      AssignmentPage,
-      QuizManagementPage,
-      QuizCreatePage,
-      CourseQuizzesPage,
-      QuizQuestionsPage,
-      TakeQuizPage,
-      FeedbackPage,
-      FeedbackListPage,
-      EnrollmentsListPage,
-      CurriculumPage,
-      UserManagementPage,
-      UserBioPage,
-      AttendancePage,
-      MyEnrollmentsPage,
-      ForumPage,
-      ForumListPage,
-      ForumDetailPage,
-      ForumPostDetailPage,
-      OnboardingPage,
-      DeletedCoursesPage,
-    } from "../pages";
+import {
+  DashboardPage,
+  StudentDashboardPage,
+  TeacherDashboardPage,
+  LandingPage,
+  NotFoundPage,
+  EmailVerifyPage,
+  ForgotPasswordPage,
+  ResetPasswordPage,
+  LoginPage,
+  RegisterPage,
+  CourseManagementPage,
+  MyCoursesPage,
+  MyCoursesV2Page,
+  CourseDetailPage,
+  ListAllLessonsPage,
+  AboutUsPage,
+  FAQPage,
+  AssignmentPage,
+  QuizManagementPage,
+  QuizCreatePage,
+  CourseQuizzesPage,
+  QuizQuestionsPage,
+  QuizAttemptDetailPage,
+  TakeQuizPage,
+  FeedbackPage,
+  FeedbackListPage,
+  EnrollmentsListPage,
+  CurriculumPage,
+  UserManagementPage,
+  UserBioPage,
+  AttendancePage,
+  MyEnrollmentsPage,
+  ForumPage,
+  ForumListPage,
+  ForumDetailPage,
+  ForumPostDetailPage,
+  OnboardingPage,
+  DeletedCoursesPage,
+} from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
 import AssignmentDetailPage from "../pages/AssignmentDetailPage";
@@ -48,14 +51,14 @@ function AppRoutes() {
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        
+
         {/* Course detail */}
         <Route path="/courses/:id" element={
           <ProtectedRoute>
             <CourseDetailPage />
           </ProtectedRoute>
         } />
-        
+
         {/* Auth routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -92,6 +95,16 @@ function AppRoutes() {
         <Route path="/my-courses" element={
           <ProtectedRoute requiredRole="student">
             <MyCoursesPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/my-courses-v2" element={
+          <ProtectedRoute requiredRole="student">
+            <MyCoursesV2Page />
+          </ProtectedRoute>
+        } />
+        <Route path="/my-courses-v2/:semesterId" element={
+          <ProtectedRoute requiredRole="student">
+            <MyCoursesV2Page />
           </ProtectedRoute>
         } />
         <Route path="/my-enrollments" element={
@@ -167,6 +180,11 @@ function AppRoutes() {
         <Route path="/questionbank/questions/:quizId" element={
           <ProtectedRoute>
             <QuizQuestionsPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/quiz-attempts/:attemptId" element={
+          <ProtectedRoute requiredRole={["teacher", "admin"]}>
+            <QuizAttemptDetailPage />
           </ProtectedRoute>
         } />
         <Route path="/quizz" element={

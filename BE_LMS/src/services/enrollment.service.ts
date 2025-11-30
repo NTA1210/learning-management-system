@@ -374,7 +374,7 @@ export const createEnrollment = async (data: {
   const existingEnrollment = await EnrollmentModel.findOne({
     studentId,
     courseId,
-  });
+  }).sort({ createdAt: -1 }); // lấy attempt mới nhất
 
   // Nếu đã có enrollment
   if (existingEnrollment) {
@@ -391,14 +391,18 @@ export const createEnrollment = async (data: {
       EnrollmentStatus.REJECTED,
       EnrollmentStatus.CANCELLED,
     ];
+    const isReEnrollable = reEnrollableStatuses.includes(
+      existingEnrollment.status as EnrollmentStatus
+    );
 
-    if (reEnrollableStatuses.includes(existingEnrollment.status as EnrollmentStatus)) {
+    if (isReEnrollable) {
       // Anti-spam: Chỉ áp dụng cho Student self-enroll
       // Admin/Teacher tạo enrollment sẽ bypass các giới hạn này
       if (method === EnrollmentMethod.SELF) {
         // 1. Check cooldown period: 30 phút
         const COOLDOWN_MINUTES = 30;
-        const nextAllowedTime = new Date(existingEnrollment.updatedAt);
+        const lastAttemptAt = existingEnrollment.createdAt ?? existingEnrollment.updatedAt;
+        const nextAllowedTime = new Date(lastAttemptAt);;
         nextAllowedTime.setMinutes(nextAllowedTime.getMinutes() + COOLDOWN_MINUTES);
 
         if (new Date() < nextAllowedTime) {
@@ -435,6 +439,14 @@ export const createEnrollment = async (data: {
         appAssert(isValidPassword, UNAUTHORIZED, "Invalid course password");
       }
 
+      // ⬇️ BLOCK NÀY GIỜ Ở NGOÀI IF PASSWORD, NHƯ VẬY ADMIN/COURSE KO PASSWORD CŨNG ĐI QUA
+      existingEnrollment.status = status;          // PENDING hoặc APPROVED
+      existingEnrollment.role = role;
+      existingEnrollment.method = method;
+      existingEnrollment.note = note ?? existingEnrollment.note;
+      existingEnrollment.updatedAt = new Date();   // cập nhật thời gian mới nhất
+
+      await existingEnrollment.save();
 
       await existingEnrollment.populate([
         { path: "studentId", select: "username email fullname avatar_url" },
@@ -442,36 +454,36 @@ export const createEnrollment = async (data: {
       ]);
 
       return existingEnrollment;
+    } else {
+
+      // Xử lý các trường hợp không được re-enroll với message cụ thể
+      let errorMessage = "Already enrolled in this course";
+
+      // Phân biệt message dựa trên method (self-enroll vs admin/teacher enroll)
+      const studentName = student.username;
+      const isSelfEnroll = method === EnrollmentMethod.SELF;
+
+      if (existingEnrollment.status === EnrollmentStatus.DROPPED) {
+        errorMessage = isSelfEnroll
+          ? "You have been dropped from this course. Please enroll in another course offering the same subject."
+          : `${studentName} has been dropped from this course. Please enroll them in another course offering the same subject.`;
+      } else if (existingEnrollment.status === EnrollmentStatus.COMPLETED) {
+        errorMessage = isSelfEnroll
+          ? "You have already completed this course. Please enroll in another course offering the same subject."
+          : `${studentName} has already completed this course. Please enroll them in another course offering the same subject.`;
+      } else if (existingEnrollment.status === EnrollmentStatus.PENDING) {
+        errorMessage = isSelfEnroll
+          ? "Your enrollment is pending approval."
+          : `${studentName}'s enrollment is pending approval.`;
+      } else if (existingEnrollment.status === EnrollmentStatus.APPROVED) {
+        errorMessage = isSelfEnroll
+          ? "You are already enrolled in this course."
+          : `${studentName} is already enrolled in this course.`;
+      }
+
+      appAssert(false, CONFLICT, errorMessage);
     }
-
-    // Xử lý các trường hợp không được re-enroll với message cụ thể
-    let errorMessage = "Already enrolled in this course";
-
-    // Phân biệt message dựa trên method (self-enroll vs admin/teacher enroll)
-    const studentName = student.username;
-    const isSelfEnroll = method === EnrollmentMethod.SELF;
-
-    if (existingEnrollment.status === EnrollmentStatus.DROPPED) {
-      errorMessage = isSelfEnroll
-        ? "You have been dropped from this course. Please enroll in another course offering the same subject."
-        : `${studentName} has been dropped from this course. Please enroll them in another course offering the same subject.`;
-    } else if (existingEnrollment.status === EnrollmentStatus.COMPLETED) {
-      errorMessage = isSelfEnroll
-        ? "You have already completed this course. Please enroll in another course offering the same subject."
-        : `${studentName} has already completed this course. Please enroll them in another course offering the same subject.`;
-    } else if (existingEnrollment.status === EnrollmentStatus.PENDING) {
-      errorMessage = isSelfEnroll
-        ? "Your enrollment is pending approval."
-        : `${studentName}'s enrollment is pending approval.`;
-    } else if (existingEnrollment.status === EnrollmentStatus.APPROVED) {
-      errorMessage = isSelfEnroll
-        ? "You are already enrolled in this course."
-        : `${studentName} is already enrolled in this course.`;
-    }
-
-    appAssert(false, CONFLICT, errorMessage);
   }
-
   // 4. Check course capacity
   if (course.capacity) {
     const enrolledCount = await EnrollmentModel.countDocuments({
@@ -661,7 +673,7 @@ export const updateEnrollment = async (
         {
           title: notificationTitle,
           message: notificationMessage,
-          recipientType: "user",
+          recipientType: "system",
           recipientUser: studentId._id.toString(),
         },
         updatedEnrollment.respondedBy as any || new Types.ObjectId(), // Use respondedBy or system
@@ -823,7 +835,7 @@ export const kickStudentFromCourse = async (
     {
       title: `You have been removed from course ${course.title}`,
       message: `Reason: ${reason}`,
-      recipientType: "user",
+      recipientType: "system",
       recipientUser: enrollment.studentId.toString(),
     },
     userId,

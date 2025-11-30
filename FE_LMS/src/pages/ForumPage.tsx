@@ -39,40 +39,21 @@ const forumTypeOptions: Array<{
   },
 ];
 
-const defaultActivities: ForumActivity[] = [
-  {
-    id: "demo-1",
-    title: "Study checklist for this week",
-    courseTitle: "Advanced Web Development",
-    preview: "Sharing a condensed cheat sheet for the React hooks section. Feel free to add more tips.",
-    author: "Alexis Nguyen",
-    replies: 8,
-    forumType: "discussion",
-    updatedAt: "10 minutes ago",
-  },
-  {
-    id: "demo-2",
-    title: "Mentoring session reminder",
-    courseTitle: "AI for Everyone",
-    preview: "Faculty will open a Zoom room at 8 PM tonight to answer project questions.",
-    author: "Instructor Huy",
-    replies: 12,
-    forumType: "announcement",
-    updatedAt: "1 hour ago",
-  },
-];
-
 interface ForumLocationState {
   preselectedCourseId?: string;
   preselectedCourseTitle?: string;
+}
+
+interface CreateForumFormState extends CreateForumPayload {
+  file: File | null;
 }
 
 const ForumPage: React.FC = () => {
   const { darkMode } = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const [searchParams] = useSearchParams();
+  const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams();
   const locationState = (location.state as ForumLocationState | null) ?? null;
   const searchCourseId = searchParams.get("courseId") ?? "";
   const searchCourseTitle = searchParams.get("courseTitle") ?? "";
@@ -81,21 +62,25 @@ const ForumPage: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseLoading, setCourseLoading] = useState(true);
   const [courseError, setCourseError] = useState<string | null>(null);
-  const [form, setForm] = useState<CreateForumPayload>({
+  const [form, setForm] = useState<CreateForumFormState>({
     courseId: initialCourseId || "",
     title: "",
     description: "",
     forumType: "discussion",
     isActive: true,
+    file: null,
   });
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const [recentActivity, setRecentActivity] = useState<ForumActivity[]>(defaultActivities);
 
-  useEffect(() => {
-    if (!initialCourseId) return;
-    setForm((prev) => (prev.courseId === initialCourseId ? prev : { ...prev, courseId: initialCourseId }));
-  }, [initialCourseId]);
+  const formatFileSize = (size: number) => {
+    if (!size || Number.isNaN(size)) return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    const exponent = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
+    const value = size / 1024 ** exponent;
+    const formatted = exponent === 0 || value >= 10 ? value.toFixed(0) : value.toFixed(1);
+    return `${formatted} ${units[exponent]}`;
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -132,10 +117,33 @@ const ForumPage: React.FC = () => {
     [courses, form.courseId]
   );
   const hasLockedCourse = Boolean(form.courseId);
-  const courseTitleDisplay = selectedCourse?.title || initialCourseTitle || (hasLockedCourse ? "Course" : "");
+  const lockedCourseTitle = selectedCourse?.title || initialCourseTitle || "";
+  const courseTitleDisplay = lockedCourseTitle || (hasLockedCourse ? "Course" : "");
   const courseDescriptionDisplay =
     selectedCourse?.description ||
     (hasLockedCourse ? "Forum topics are visible to every participant enrolled in this course." : "");
+
+  useEffect(() => {
+    if (!initialCourseId) return;
+    setForm((prev) => (prev.courseId === initialCourseId ? prev : { ...prev, courseId: initialCourseId }));
+  }, [initialCourseId]);
+
+  // Keep URL in sync so reloads preserve the locked course context.
+  useEffect(() => {
+    if (!initialCourseId) return;
+    const shouldUpdateCourseId = searchCourseId !== initialCourseId;
+    const shouldUpdateTitle = lockedCourseTitle ? searchCourseTitle !== lockedCourseTitle : Boolean(searchCourseTitle);
+    if (!shouldUpdateCourseId && !shouldUpdateTitle) return;
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("courseId", initialCourseId);
+    if (lockedCourseTitle) {
+      nextParams.set("courseTitle", lockedCourseTitle);
+    } else {
+      nextParams.delete("courseTitle");
+    }
+    setSearchParams(nextParams, { replace: true });
+  }, [initialCourseId, lockedCourseTitle, searchCourseId, searchCourseTitle, searchParams, setSearchParams]);
 
   const sidebarRole: SidebarRole =
     user && ["admin", "teacher", "student"].includes(user.role)
@@ -148,7 +156,7 @@ const ForumPage: React.FC = () => {
     setForm((prev) => (prev.forumType === "discussion" ? prev : { ...prev, forumType: "discussion" }));
   }, [isStudent]);
 
-  const setFormValue = <K extends keyof CreateForumPayload>(key: K, value: CreateForumPayload[K]) => {
+  const setFormValue = <K extends keyof CreateForumFormState>(key: K, value: CreateForumFormState[K]) => {
     setForm((prev) => ({
       ...prev,
       [key]: value,
@@ -178,13 +186,14 @@ const ForumPage: React.FC = () => {
         forumType: form.forumType,
         isActive: form.isActive,
       };
-      await forumService.createForum(payload);
+      await forumService.createForum(payload, form.file || undefined);
 
       setFeedback({ type: "success", message: "Forum topic created successfully." });
       setForm((prev) => ({
         ...prev,
         title: "",
         description: "",
+        file: null,
       }));
 
       const courseTitle = courseTitleDisplay || "Course";
@@ -198,8 +207,6 @@ const ForumPage: React.FC = () => {
         forumType: payload.forumType,
         updatedAt: "Just now",
       };
-
-      setRecentActivity((prev) => [newActivity, ...prev].slice(0, 6));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to create forum topic";
       setFeedback({ type: "error", message });
@@ -339,6 +346,41 @@ const ForumPage: React.FC = () => {
                         disabled={!hasLockedCourse}
                       ></textarea>
                     </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Cover image (optional)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={!hasLockedCourse}
+                    onChange={(event) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        file: event.target.files?.[0] || null,
+                      }))
+                    }
+                    className={`w-full rounded-xl border px-4 py-2.5 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500 cursor-pointer ${
+                      hasLockedCourse ? "" : "opacity-50 cursor-not-allowed"
+                    }`}
+                  />
+                  {form.file && (
+                    <div
+                      className={`mt-2 flex items-center justify-between rounded-xl px-3 py-2 text-xs ${
+                        darkMode ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      <span className="truncate pr-2">
+                        {form.file.name} • {formatFileSize(form.file.size)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setForm((prev) => ({ ...prev, file: null }))}
+                        className="text-rose-500 font-semibold hover:text-rose-400"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                     <div>
                       <label className="block text-sm font-medium mb-2">Topic type</label>
@@ -399,48 +441,6 @@ const ForumPage: React.FC = () => {
                   </form>
                 </div>
 
-                <div className={`rounded-2xl p-6 shadow-sm ${panelStyles}`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-semibold">Latest activity</h3>
-                    <span className="text-sm text-slate-500">Updates refresh in real time</span>
-                  </div>
-
-                  <div className="space-y-4">
-                    {recentActivity.map((activity) => (
-                      <div
-                        key={activity.id}
-                        className={`rounded-2xl p-4 border transition hover:-translate-y-0.5 ${
-                          darkMode ? "border-slate-700 hover:border-indigo-400" : "border-slate-100 hover:border-indigo-200"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span
-                            className={`text-xs font-medium px-3 py-1 rounded-full ${
-                              activity.forumType === "announcement"
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-emerald-100 text-emerald-700"
-                            }`}
-                          >
-                            {forumTypeOptions.find((item) => item.value === activity.forumType)?.label}
-                          </span>
-                          <span className="text-xs text-slate-400">{activity.updatedAt}</span>
-                        </div>
-                        <h4 className="text-lg font-semibold mt-3">{activity.title}</h4>
-                        <p className="text-sm text-slate-500">{activity.preview}</p>
-                        <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
-                          <span>{activity.author}</span>
-                          <div className="flex items-center gap-4">
-                            <span>{activity.courseTitle}</span>
-                            <span className="inline-flex items-center gap-1">
-                              <MessageSquareText className="w-4 h-4" />
-                              {activity.replies} replies
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </section>
 
               <aside className="space-y-6">

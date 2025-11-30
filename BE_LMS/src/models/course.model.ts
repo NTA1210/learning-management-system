@@ -10,7 +10,7 @@ const CourseSchema = new mongoose.Schema<ICourse>(
       required: true,
     },
     title: { type: String, required: true },
-    slug: { type: String, required: true, unique: true },
+    slug: { type: String, required: true },
     // ✅ UNIVERSITY RULE: Course MUST belong to a Subject
     subjectId: { type: mongoose.Schema.Types.ObjectId, ref: 'Subject', required: true },
     logo: { type: String },
@@ -27,10 +27,40 @@ const CourseSchema = new mongoose.Schema<ICourse>(
         message: 'EndDate must be greater than StartDate',
       },
     },
+    // NEW — dùng để thống kê
+    statistics: {
+      totalStudents: { type: Number, default: 0 },
+      totalLessons: { type: Number, default: 0 },
+      totalQuizzes: { type: Number, default: 0 },
+      quizDetails: [
+        {
+          quizId: mongoose.Types.ObjectId,
+          title: String,
+          score: Number,
+          isCompleted: Boolean,
+        },
+      ],
+      averageQuizScore: { type: Number, default: 0 },
+      totalAssignments: { type: Number, default: 0 },
+      completedAssignments: { type: Number, default: 0 },
+      averageFinalGrade: { type: Number, default: 0 },
+      totalAttendances: { type: Number, default: 0 },
+      averageAttendance: { type: Number, default: 0 },
+      passRate: { type: Number, default: 0 },
+      droppedRate: { type: Number, default: 0 },
+    },
+    //
+    // optional: weight for scoring
+    weight: {
+      quiz: { type: Number, default: 0.3 },
+      assignment: { type: Number, default: 0.5 },
+      attendance: { type: Number, default: 0.2 },
+    },
+    //
     status: {
       type: String,
       required: true,
-      enum: [CourseStatus.DRAFT, CourseStatus.ONGOING, CourseStatus.COMPLETED],
+      enum: CourseStatus,
       default: CourseStatus.DRAFT,
     },
     teacherIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],

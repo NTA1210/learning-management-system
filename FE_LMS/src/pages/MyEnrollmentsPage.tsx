@@ -50,6 +50,8 @@ const MyEnrollmentsPage: React.FC = () => {
     const [limit, setLimit] = useState(10);
     const [total, setTotal] = useState(0);
     const [updating, setUpdating] = useState<Record<string, boolean>>({});
+const [showCancelModal, setShowCancelModal] = useState(false);
+const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
 
     const fetchMyEnrollments = async () => {
         try {
@@ -68,7 +70,8 @@ const MyEnrollmentsPage: React.FC = () => {
             setTotal(pagination?.total ?? list.length);
             setError("");
         } catch (e: any) {
-            setError(e?.message || "Không thể tải enrollments");
+            const msg = e?.response?.data?.message || e?.message || "Không thể tải enrollments";
+            setError(msg);
         } finally {
             setLoading(false);
         }
@@ -81,11 +84,29 @@ const MyEnrollmentsPage: React.FC = () => {
     const handleCancel = async (id: string) => {
         setUpdating(prev => ({ ...prev, [id]: true }));
         try {
+            
             await http.put(`/enrollments/my-enrollments/${id}`, { status: "cancelled" });
             setItems(prev => prev.map(it => it._id === id ? { ...it, status: "cancelled", updatedAt: new Date().toISOString() } : it));
+            const Swal = (await import("sweetalert2")).default;
+            await Swal.fire({
+                toast: true,
+                position: "top-end",
+                icon: "success",
+                title: "Cancel enrollment successfully",
+                showConfirmButton: false,
+                timer: 2000,
+            });
+        } catch (e: any) {
+            const msg = e?.response?.data?.message || e?.message || "Cancel enrollment failed";
+            setError(msg);
         } finally {
             setUpdating(prev => ({ ...prev, [id]: false }));
         }
+    };
+
+    const openCancelModal = (id: string) => {
+        setCancelTargetId(id);
+        setShowCancelModal(true);
     };
 
     const totalPages = useMemo(() => {
@@ -157,6 +178,40 @@ const MyEnrollmentsPage: React.FC = () => {
                         </button>
                     </div>
                 </div>
+
+                {showCancelModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-black/50" onClick={() => { if (!cancelTargetId || !updating[(cancelTargetId as string)]) { setShowCancelModal(false); setCancelTargetId(null); } }} />
+                        <div
+                            className="relative w-full max-w-md rounded-xl shadow-lg p-6"
+                            style={{ backgroundColor: darkMode ? "#0b132b" : "#ffffff", border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}
+                        >
+                            <div className="text-lg font-semibold mb-2" style={{ color: darkMode ? "#ffffff" : "#111827" }}>
+                                {(items.find(it => it._id === cancelTargetId)?.status === 'pending') ? 'Confirm Cancel Enrollment' : 'Confirm Withdraw Enrollment'}
+                            </div>
+                            <div className="text-sm mb-4" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
+                                {(items.find(it => it._id === cancelTargetId)?.status === 'pending') ? 'Are you sure you want to cancel this enrollment?' : 'Are you sure you want to withdraw from this course?'}
+</div>
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    onClick={() => { setShowCancelModal(false); setCancelTargetId(null); }}
+                                    disabled={!!(cancelTargetId && updating[(cancelTargetId as string)])}
+                                    className="px-4 py-2 rounded-lg"
+                                    style={{ backgroundColor: darkMode ? "#111827" : "#ffffff", border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={async () => { if (cancelTargetId) { await handleCancel(cancelTargetId); } setShowCancelModal(false); setCancelTargetId(null); }}
+                                    disabled={!cancelTargetId || !!(cancelTargetId && updating[(cancelTargetId as string)])}
+                                    className="px-4 py-2 rounded-lg bg-[#ef4444] text-white disabled:opacity-50"
+                                >
+                                    {(items.find(it => it._id === cancelTargetId)?.status === 'pending') ? 'Confirm Cancel' : 'Confirm Withdraw'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {loading ? (
                     <div className="flex justify-center items-center py-16">
@@ -239,7 +294,7 @@ const MyEnrollmentsPage: React.FC = () => {
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <button
-                                            onClick={() => handleCancel(en._id)}
+                                            onClick={() => openCancelModal(en._id)}
                                             disabled={updating[en._id] || en.status === 'cancelled' || en.status === 'dropped' || en.status === 'completed'}
                                             className="px-3 py-2 rounded-lg text-sm disabled:opacity-50"
                                             style={{
@@ -248,7 +303,9 @@ const MyEnrollmentsPage: React.FC = () => {
                                                 border: darkMode ? '1px solid rgba(255,255,255,0.08)' : '1px solid #fecaca'
                                             }}
                                         >
-                                            {updating[en._id] ? 'Cancelling...' : 'Cancel'}
+                                            {updating[en._id]
+                                              ? (en.status === 'pending' ? 'Cancelling...' : 'Withdrawing...')
+                                              : (en.status === 'pending' ? 'Cancel' : 'Withdraw')}
                                         </button>
                                         <div className="text-sm" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
                                             {new Date(en.createdAt).toLocaleString()}

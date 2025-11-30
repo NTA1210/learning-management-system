@@ -3,7 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 
 interface ProtectedRouteProps {
   children: ReactNode;
-  requiredRole?: string;
+  requiredRole?: string | string[];
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole }) => {
@@ -35,8 +35,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
     return <Navigate to={`/login?redirect=${encodeURIComponent(currentPath)}`} replace />;
   }
 
-  if (requiredRole && getUserRole() !== requiredRole) {
+  if (requiredRole) {
+    const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+    if (!allowedRoles.includes(getUserRole())) {
     return <Navigate to="/" replace />;
+    }
   }
 
   return <>{children}</>;

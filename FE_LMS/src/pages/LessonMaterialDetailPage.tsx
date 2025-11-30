@@ -48,6 +48,9 @@ const LessonMaterialDetailPage: React.FC = () => {
   const [materialsLoading, setMaterialsLoading] = useState(true);
   const [error, setError] = useState("");
   const [materialsError, setMaterialsError] = useState("");
+  const [materialsCurrentPage, setMaterialsCurrentPage] = useState(1);
+  const [materialsPageLimit] = useState(2);
+  const [materialsTotal, setMaterialsTotal] = useState(0);
   const [selectedMaterial, setSelectedMaterial] = useState<LessonMaterial | null>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [viewerObjectUrl, setViewerObjectUrl] = useState<string | null>(null);
@@ -58,6 +61,9 @@ const LessonMaterialDetailPage: React.FC = () => {
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
   const [resizeMode, setResizeMode] = useState<"horizontal" | "vertical" | null>(null);
   const [materialModal, setMaterialModal] = useState<MaterialModalState>(null);
+  const [progressPercent, setProgressPercent] = useState<number>(0);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
 
   // >>> ADDED: refs & raf helpers for smooth resize
   const popupRef = React.useRef<HTMLDivElement | null>(null);
@@ -156,13 +162,73 @@ const LessonMaterialDetailPage: React.FC = () => {
     }
   };
 
+  const fetchProgress = React.useCallback(async () => {
+    if (!lessonId) return;
+    
+    try {
+      const response = await httpClient.get(`/lesson-progress/lessons/${lessonId}`, {
+        withCredentials: true,
+      });
+      if (response.data?.success && response.data?.data) {
+        const progressData = response.data.data;
+        // If lesson is completed, always show 100%
+        if (progressData.isCompleted) {
+          setProgressPercent(100);
+          setIsCompleted(true);
+        } else {
+          if (progressData.progressPercent !== undefined) {
+            setProgressPercent(progressData.progressPercent);
+          }
+          setIsCompleted(false);
+        }
+      }
+    } catch {
+      // Progress might not exist yet, set to 0
+      setProgressPercent(0);
+      setIsCompleted(false);
+    }
+  }, [lessonId]);
+
   useEffect(() => {
     if (lessonId) {
       fetchLesson();
       fetchMaterials();
+      fetchProgress();
+      setMaterialsCurrentPage(1); // Reset to first page when lesson changes
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lessonId]);
+  }, [lessonId, fetchProgress]);
+
+  // Auto-update progress periodically when viewing materials (only if not completed)
+  useEffect(() => {
+    if (!lessonId || !user || user.role !== 'student' || isCompleted) return;
+
+    const updateProgressInterval = setInterval(async () => {
+      // Double check if completed before updating
+      if (isCompleted) {
+        clearInterval(updateProgressInterval);
+        return;
+      }
+      
+      try {
+        await httpClient.patch(`/lesson-progress/lessons/${lessonId}/time`, 
+          { incSeconds: 10 }, // Add 10 seconds every interval
+          { withCredentials: true }
+        );
+        // Refresh progress after update
+        await fetchProgress();
+        
+        // Dispatch custom event to notify other components about progress update
+        window.dispatchEvent(new CustomEvent('lessonProgressUpdated', {
+          detail: { lessonId, progressPercent, isCompleted }
+        }));
+      } catch {
+        // Silently fail - progress might not exist or rate limited
+      }
+    }, 10000); // Update every 10 seconds
+
+    return () => clearInterval(updateProgressInterval);
+  }, [lessonId, user, fetchProgress, isCompleted, progressPercent]);
 
   // Close modal on ESC key
   useEffect(() => {
@@ -330,6 +396,8 @@ const LessonMaterialDetailPage: React.FC = () => {
     }
   };
 
+  const [allMaterials, setAllMaterials] = useState<LessonMaterial[]>([]);
+
   const fetchMaterials = async () => {
     if (!lessonId) return;
     
@@ -342,7 +410,10 @@ const LessonMaterialDetailPage: React.FC = () => {
 
       const data = response.data;
       if (data.success && data.data) {
-        setMaterials(data.data);
+        setAllMaterials(data.data);
+        setMaterialsTotal(data.data.length);
+        // Update displayed materials based on current page
+        updateDisplayedMaterials(data.data, materialsCurrentPage);
       } else {
         setMaterialsError(data.message || "Failed to load materials");
       }
@@ -358,6 +429,75 @@ const LessonMaterialDetailPage: React.FC = () => {
       setMaterialsError(errorMessage);
     } finally {
       setMaterialsLoading(false);
+    }
+  };
+
+  const updateDisplayedMaterials = (materialsList: LessonMaterial[], page: number) => {
+    const startIndex = (page - 1) * materialsPageLimit;
+    const endIndex = startIndex + materialsPageLimit;
+    setMaterials(materialsList.slice(startIndex, endIndex));
+  };
+
+  const handleMaterialsPageChange = (newPage: number) => {
+    setMaterialsCurrentPage(newPage);
+    updateDisplayedMaterials(allMaterials, newPage);
+    // Scroll to top of materials section
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+
+  const handleCompleteLesson = async () => {
+    if (!lessonId) return;
+    
+    setIsCompleting(true);
+    try {
+      const response = await httpClient.patch(`/lesson-progress/lessons/${lessonId}/complete`, {}, {
+        withCredentials: true,
+      });
+      
+      // Use progressPercent from response, or default to 100% if completed
+      const responseProgress = response.data?.data?.progressPercent;
+      const finalProgress = response.data?.data?.isCompleted ? 100 : (responseProgress || 100);
+      
+      // Immediately set to 100% and mark as completed
+      setProgressPercent(finalProgress);
+      setIsCompleted(true);
+      
+      await showSwalSuccess("Lesson completed successfully!");
+      
+      // Wait a bit before refreshing to ensure server has updated
+      setTimeout(async () => {
+        try {
+          const refreshResponse = await httpClient.get(`/lesson-progress/lessons/${lessonId}`, {
+            withCredentials: true,
+          });
+          if (refreshResponse.data?.success && refreshResponse.data?.data) {
+            const progressData = refreshResponse.data.data;
+            // Only update if still completed, otherwise keep 100%
+            if (progressData.isCompleted) {
+              setProgressPercent(100);
+              setIsCompleted(true);
+            }
+          }
+        } catch {
+          // If refresh fails, keep the 100% we set
+        }
+      }, 500);
+      
+      // Dispatch custom event to notify other components (like LessonCard) about progress update
+      window.dispatchEvent(new CustomEvent('lessonProgressUpdated', {
+        detail: { lessonId, progressPercent: 100, isCompleted: true }
+      }));
+    } catch (err) {
+      console.error("Error completing lesson:", err);
+      let errorMessage = "Failed to complete lesson";
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axiosError = err as { response?: { data?: { message?: string } }; message?: string };
+        errorMessage = axiosError.response?.data?.message || axiosError.message || errorMessage;
+      }
+      await showSwalError(errorMessage);
+    } finally {
+      setIsCompleting(false);
     }
   };
 
@@ -401,7 +541,7 @@ const LessonMaterialDetailPage: React.FC = () => {
         }
       }
 
-      // For Office docs we will use Google Docs viewer with direct signed URL (cannot use blob URL)
+      // For Office docs we will use Office Online Viewer with direct signed URL (cannot use blob URL)
       const mimeType = (material.mimeType || "").toLowerCase();
       const isOfficeDoc =
         mimeType.includes("word") ||
@@ -409,6 +549,11 @@ const LessonMaterialDetailPage: React.FC = () => {
         mimeType.includes("powerpoint") ||
         mimeType.includes("presentation") ||
         mimeType.includes("spreadsheet") ||
+        mimeType.includes("msword") ||
+        mimeType.includes("ms-excel") ||
+        mimeType.includes("ms-powerpoint") ||
+        mimeType.includes("vnd.openxmlformats-officedocument") ||
+        mimeType.includes("application/vnd.openxmlformats-officedocument") ||
         !!material.originalName?.match(/\.(doc|docx|xls|xlsx|ppt|pptx)$/i);
 
       setSelectedMaterial({ ...material, signedUrl });
@@ -542,23 +687,55 @@ const LessonMaterialDetailPage: React.FC = () => {
       );
     }
     
-    // Office documents - use Google Docs Viewer
-    if (
+    // Office documents - use Microsoft Office Online Viewer or Google Docs Viewer
+    const isOfficeDoc = 
       mimeType.includes('word') ||
       mimeType.includes('excel') ||
       mimeType.includes('powerpoint') ||
       mimeType.includes('presentation') ||
       mimeType.includes('spreadsheet') ||
-      material.originalName?.match(/\.(doc|docx|xls|xlsx|ppt|pptx)$/i)
-    ) {
-      const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(material.signedUrl!)}&embedded=true`;
+      mimeType.includes('msword') ||
+      mimeType.includes('ms-excel') ||
+      mimeType.includes('ms-powerpoint') ||
+      mimeType.includes('vnd.openxmlformats-officedocument') ||
+      mimeType.includes('application/vnd.openxmlformats-officedocument') ||
+      material.originalName?.match(/\.(doc|docx|xls|xlsx|ppt|pptx)$/i);
+    
+    if (isOfficeDoc && material.signedUrl) {
+      // Try Microsoft Office Online Viewer first (better for Office files)
+      const fileExtension = material.originalName?.split('.').pop()?.toLowerCase();
+      // Ensure URL is properly encoded
+      const encodedUrl = encodeURIComponent(material.signedUrl);
+      let viewerUrl = '';
+      
+      if (fileExtension === 'docx' || fileExtension === 'doc') {
+        viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
+      } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+        viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
+      } else if (fileExtension === 'pptx' || fileExtension === 'ppt') {
+        viewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
+      } else {
+        // Fallback to Google Docs Viewer
+        viewerUrl = `https://docs.google.com/viewer?url=${encodedUrl}&embedded=true`;
+      }
+      
       return (
-        <iframe
-          src={viewerUrl}
-          className="w-full h-full border-0"
-          title={material.title || 'Document Viewer'}
-          style={{ backgroundColor: '#fff' }}
-        />
+        <div className="w-full h-full flex flex-col">
+          <iframe
+            src={viewerUrl}
+            className="w-full flex-1 border-0"
+            title={material.title || 'Document Viewer'}
+            style={{ backgroundColor: '#fff', minHeight: '500px' }}
+            allow="fullscreen"
+            sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+          />
+          <div className="p-2 text-xs text-center border-t" style={{ 
+            color: darkMode ? '#9ca3af' : '#6b7280',
+            borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : 'rgba(229, 231, 235, 0.5)',
+          }}>
+            If the document doesn't load, the file may need to be downloaded. Office Online Viewer requires publicly accessible URLs.
+          </div>
+        </div>
       );
     }
     
@@ -646,52 +823,73 @@ const LessonMaterialDetailPage: React.FC = () => {
     return defaultMaterialValues;
   };
 
+  const inferMaterialType = (mimeType?: string) => {
+    if (!mimeType) return "other";
+    if (mimeType.includes("pdf")) return "pdf";
+    if (mimeType.includes("video")) return "video";
+    if (mimeType.includes("presentation") || mimeType.includes("powerpoint")) return "ppt";
+    if (mimeType.includes("link")) return "link";
+    return "other";
+  };
+
   const handleMaterialSubmit = async (values: MaterialFormValues, file?: File | null) => {
     if (!lessonId) return;
     
     try {
       if (materialModal?.mode === "create") {
         if (file) {
-        const formDataToSend = new FormData();
+          const formDataToSend = new FormData();
           formDataToSend.append("file", file);
           formDataToSend.append("lessonId", lessonId);
           formDataToSend.append("title", values.title);
           if (values.note) {
             formDataToSend.append("note", values.note);
-        }
-          let materialType = "other";
-          if (values.mimeType) {
-            if (values.mimeType.includes("pdf")) materialType = "pdf";
-            else if (values.mimeType.includes("video")) materialType = "video";
-            else if (values.mimeType.includes("presentation") || values.mimeType.includes("powerpoint")) materialType = "ppt";
-            else if (values.mimeType.includes("link")) materialType = "link";
-        }
+          }
+          const materialType = inferMaterialType(file.type || values.mimeType);
           formDataToSend.append("type", materialType);
 
-        await httpClient.post("/lesson-materials/upload", formDataToSend, {
-          withCredentials: true,
-          headers: {
+          await httpClient.post("/lesson-materials/upload", formDataToSend, {
+            withCredentials: true,
+            headers: {
               "Content-Type": "multipart/form-data",
-          },
-        });
-      } else {
+            },
+          });
+        } else {
           await httpClient.post(
             "/lesson-material/createMaterial",
             {
-          lessonId,
+              lessonId,
               ...values,
             },
             {
-          withCredentials: true,
+              withCredentials: true,
             }
           );
-      }
-      await showSwalSuccess("Material created successfully");
+        }
+        await showSwalSuccess("Material created successfully");
       } else if (materialModal?.mode === "edit" && materialModal.material) {
-        await httpClient.patch(`/lesson-materials/${materialModal.material._id}`, values, {
-        withCredentials: true,
-      });
-      await showSwalSuccess("Material updated successfully");
+        if (file) {
+          const formDataToSend = new FormData();
+          formDataToSend.append("file", file);
+          formDataToSend.append("title", values.title);
+          if (values.note) {
+            formDataToSend.append("note", values.note);
+          }
+          formDataToSend.append("lessonId", materialModal.material.lessonId._id);
+          const materialType = inferMaterialType(file.type || values.mimeType);
+          formDataToSend.append("type", materialType);
+          await httpClient.patch(`/lesson-materials/${materialModal.material._id}`, formDataToSend, {
+            withCredentials: true,
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          });
+        } else {
+          await httpClient.patch(`/lesson-materials/${materialModal.material._id}`, values, {
+            withCredentials: true,
+          });
+        }
+        await showSwalSuccess("Material updated successfully");
       }
 
       setMaterialModal(null);
@@ -757,7 +955,66 @@ const LessonMaterialDetailPage: React.FC = () => {
                   {error}
                 </div>
               ) : lesson ? (
-                <LessonSummary lesson={lesson} darkMode={darkMode} formatDuration={formatDuration} />
+                <>
+                  <LessonSummary lesson={lesson} darkMode={darkMode} formatDuration={formatDuration} />
+                  {user?.role === 'student' && lesson.hasAccess && (
+                    <div className="mt-4 p-4 rounded-lg border" style={{
+                      backgroundColor: darkMode ? "rgba(31, 41, 55, 0.6)" : "rgba(249, 250, 251, 0.8)",
+                      borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "rgba(229, 231, 235, 0.5)",
+                    }}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+                          Lesson Progress
+                        </span>
+                        <span className="text-sm font-semibold" style={{ color: darkMode ? "#a5b4fc" : "#4f46e5" }}>
+                          {Math.round(progressPercent)}%
+                        </span>
+                      </div>
+                      <div
+                        className="w-full h-3 rounded-full overflow-hidden mb-3"
+                        style={{
+                          backgroundColor: darkMode ? "rgba(55, 65, 81, 0.5)" : "rgba(229, 231, 235, 0.8)",
+                        }}
+                      >
+                        <div
+                          className="h-full transition-all duration-500 ease-out"
+                          style={{
+                            width: `${progressPercent}%`,
+                            backgroundColor: progressPercent >= 100 
+                              ? (darkMode ? "#10b981" : "#059669")
+                              : (darkMode ? "#6366f1" : "#4f46e5"),
+                          }}
+                        />
+                      </div>
+                      <button
+                        onClick={handleCompleteLesson}
+                        disabled={isCompleting || progressPercent >= 100}
+                        className="w-full px-4 py-2 rounded-lg text-white font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{
+                          backgroundColor: progressPercent >= 100
+                            ? (darkMode ? "#10b981" : "#059669")
+                            : (darkMode ? "#4c1d95" : "#4f46e5"),
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!e.currentTarget.disabled) {
+                            e.currentTarget.style.backgroundColor = progressPercent >= 100
+                              ? (darkMode ? "#059669" : "#047857")
+                              : (darkMode ? "#5b21b6" : "#4338ca");
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!e.currentTarget.disabled) {
+                            e.currentTarget.style.backgroundColor = progressPercent >= 100
+                              ? (darkMode ? "#10b981" : "#059669")
+                              : (darkMode ? "#4c1d95" : "#4f46e5");
+                          }
+                        }}
+                      >
+                        {isCompleting ? "Completing..." : progressPercent >= 100 ? "✓ Completed" : "Mark as Complete"}
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : null}
 
               <div className="flex items-center justify-between mb-4">
@@ -769,7 +1026,7 @@ const LessonMaterialDetailPage: React.FC = () => {
                     Lesson Materials
                   </h2>
                   <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
-                    {materials.length} material{materials.length !== 1 ? 's' : ''} available
+                    {materialsTotal} material{materialsTotal !== 1 ? 's' : ''} available
                   </p>
                 </div>
                 {canCreate && (
@@ -820,20 +1077,62 @@ const LessonMaterialDetailPage: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {materials.map((material) => (
-                  <MaterialCard
-                    key={material._id}
-                    material={material}
-                    darkMode={darkMode}
-                    canManage={canCreate}
-                    onView={handleView}
-                    onDownload={handleDownload}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="space-y-4 mb-6">
+                  {materials.map((material) => (
+                    <MaterialCard
+                      key={material._id}
+                      material={material}
+                      darkMode={darkMode}
+                      canManage={canCreate}
+                      onView={handleView}
+                      onDownload={handleDownload}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </div>
+                
+                {/* Pagination Controls */}
+                {materialsTotal > materialsPageLimit && (
+                  <div className="flex items-center justify-between mt-6 pt-4 border-t" style={{
+                    borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "rgba(229, 231, 235, 0.5)",
+                  }}>
+                    <div className="text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                      Showing {((materialsCurrentPage - 1) * materialsPageLimit) + 1} - {Math.min(materialsCurrentPage * materialsPageLimit, materialsTotal)} of {materialsTotal}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleMaterialsPageChange(materialsCurrentPage - 1)}
+                        disabled={materialsCurrentPage <= 1}
+                        className="px-4 py-2 rounded-lg border disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        style={{
+                          backgroundColor: darkMode ? "#1f2937" : "#ffffff",
+                          borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                          color: darkMode ? "#e5e7eb" : "#111827",
+                        }}
+                      >
+                        Previous
+                      </button>
+                      <span className="text-sm px-4" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                        Page {materialsCurrentPage} of {Math.ceil(materialsTotal / materialsPageLimit)}
+                      </span>
+                      <button
+                        onClick={() => handleMaterialsPageChange(materialsCurrentPage + 1)}
+                        disabled={materialsCurrentPage * materialsPageLimit >= materialsTotal}
+                        className="px-4 py-2 rounded-lg border disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        style={{
+                          backgroundColor: darkMode ? "#1f2937" : "#ffffff",
+                          borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                          color: darkMode ? "#e5e7eb" : "#111827",
+                        }}
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </main>
