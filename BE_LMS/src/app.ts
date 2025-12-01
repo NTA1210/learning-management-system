@@ -45,7 +45,6 @@ import {
   subjectRoutes,
   submissionRoutes,
   userRoutes,
-  studentStatisticsRoutes,
 } from './routes';
 
 export const createApp = () => {
@@ -107,7 +106,6 @@ export const createApp = () => {
   app.use('/quiz-attempts', authenticate, quizAttemptRoutes);
   app.use('/attendances', authenticate, attendanceRoutes);
   app.use('/semesters', semesterRoutes);
-  app.use('/', studentStatisticsRoutes); // Register at root level since route path includes /enrollments
 
   //error handler
   app.use(errorHandler);
