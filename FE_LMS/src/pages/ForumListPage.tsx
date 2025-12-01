@@ -624,7 +624,7 @@ const ForumListPage: React.FC = () => {
                   <p className="text-sm">
                     Start from a course detail page using the <span className="font-medium">"Create Forum Post"</span> button.
                   </p>
-                </div>
+                </div>  
               ) : (
                 <div className="space-y-4">
                   {forums.map((forum) => {

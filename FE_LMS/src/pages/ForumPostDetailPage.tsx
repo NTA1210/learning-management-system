@@ -516,11 +516,11 @@ const ForumPostDetailPage: React.FC = () => {
               </button>
               <Link
                 to={`/forums/${forumId}`}
-                className="text-xs font-semibold text-indigo-500 hover:text-indigo-400"
+                className="text-22xl font-semibold text-indigo-500 hover:text-indigo-400"
               >
                 Forum overview
               </Link>
-              {forum && <span className="text-xs text-slate-400">View post in {forum.title}</span>}
+              {forum && <span className="text-1xl text-slate-600">View post in {forum.title}</span>}
             </div>
 
             {loading ? (
@@ -597,12 +597,12 @@ const ForumPostDetailPage: React.FC = () => {
                       }}
                     ></textarea>
                     <div>
-                      <label className="block text-sm font-medium mb-2">Attachment (optional)</label>
+                      <label className="block text-sm font-medium mb-2"></label>
                       <input
                         type="file"
                         accept={attachmentAcceptTypes}
                         onChange={(event) => setReplyFile(event.target.files?.[0] || null)}
-                        className="w-full rounded-xl border px-4 py-2.5 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500 cursor-pointer"
+                        className="w-full rounded-xl  text-sm file:mr-4 file:rounded-full file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500 cursor-pointer"
                       />
                       {replyFile && (
                         <div

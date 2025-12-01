@@ -371,22 +371,21 @@ const ForumDetailPage: React.FC = () => {
                   {showStickyHeader && forum && (() => {
                     const backgroundImageUrl = getFirstImageUrl(forum.key);
                     const hasBackgroundImage = Boolean(backgroundImageUrl);
-                    
+
                     return (
                       <div className="sticky top-0 z-20 mb-4">
                         <div
-                          className={`rounded-2xl px-4 py-3 shadow-lg border flex items-center gap-3 relative overflow-hidden ${
-                            darkMode ? "border-slate-700/70" : "border-slate-200"
-                          }`}
+                          className={`rounded-2xl px-4 py-3 shadow-lg border flex items-center gap-3 relative overflow-hidden ${darkMode ? "border-slate-700/70" : "border-slate-200"
+                            }`}
                           style={
                             hasBackgroundImage
                               ? {
-                                  backgroundImage: `url(${backgroundImageUrl})`,
-                                  backgroundSize: "cover",
-                                  backgroundPosition: "center",
-                                  backgroundRepeat: "no-repeat",
-                                  filter: darkMode ? "none" : "brightness(1.1)",
-                                }
+                                backgroundImage: `url(${backgroundImageUrl})`,
+                                backgroundSize: "cover",
+                                backgroundPosition: "center",
+                                backgroundRepeat: "no-repeat",
+                                filter: darkMode ? "none" : "brightness(1.1)",
+                              }
                               : darkMode
                                 ? { backgroundColor: "rgba(15, 23, 42, 0.8)", backdropFilter: "blur(8px)" }
                                 : { backgroundColor: "white", backdropFilter: "blur(8px)" }
@@ -394,7 +393,7 @@ const ForumDetailPage: React.FC = () => {
                           aria-live="polite"
                         >
                           {hasBackgroundImage && (
-                            <div 
+                            <div
                               className="absolute inset-0 z-0"
                               style={{
                                 backgroundColor: darkMode ? "rgba(0, 0, 0, 0.4)" : "rgba(0, 0, 0, 0.3)",
@@ -402,24 +401,21 @@ const ForumDetailPage: React.FC = () => {
                             />
                           )}
                           <div className="relative z-10 flex items-center gap-3 w-full">
-                            <MessageSquare className={`w-4 h-4 ${
-                              hasBackgroundImage 
+                            <MessageSquare className={`w-4 h-4 ${hasBackgroundImage
                                 ? "text-indigo-200"
                                 : "text-indigo-500"
-                            }`} />
+                              }`} />
                             <div className="flex flex-col">
-                              <span className={`text-[11px] uppercase tracking-wide font-semibold ${
-                                hasBackgroundImage
+                              <span className={`text-[11px] uppercase tracking-wide font-semibold ${hasBackgroundImage
                                   ? "text-indigo-200 drop-shadow"
                                   : "text-indigo-500"
-                              }`}>
+                                }`}>
                                 Discussion topic
                               </span>
-                              <span className={`text-sm font-semibold ${
-                                hasBackgroundImage
+                              <span className={`text-sm font-semibold ${hasBackgroundImage
                                   ? "text-white drop-shadow"
                                   : "text-slate-900 dark:text-slate-100"
-                              }`}>
+                                }`}>
                                 {forum.title}
                               </span>
                             </div>
@@ -432,29 +428,28 @@ const ForumDetailPage: React.FC = () => {
                   {(() => {
                     const backgroundImageUrl = getFirstImageUrl(forum.key);
                     const hasBackgroundImage = Boolean(backgroundImageUrl);
-                    
+
                     return (
                       <section
                         ref={heroRef}
-                        className={`rounded-2xl p-6 shadow-sm relative overflow-hidden ${
-                          darkMode ? "border border-slate-700/70" : "border border-slate-100"
-                        }`}
-                          style={
-                            hasBackgroundImage
-                              ? {
-                                  backgroundImage: `url(${backgroundImageUrl})`,
-                                  backgroundSize: "cover",
-                                  backgroundPosition: "center",
-                                  backgroundRepeat: "no-repeat",
-                                  filter: darkMode ? "none" : "brightness(1.1)",
-                                }
-                              : darkMode
-                                ? { backgroundColor: "rgba(15, 23, 42, 0.8)" }
-                                : { backgroundColor: "white" }
-                          }
+                        className={`rounded-2xl p-6 shadow-sm relative overflow-hidden ${darkMode ? "border border-slate-700/70" : "border border-slate-100"
+                          }`}
+                        style={
+                          hasBackgroundImage
+                            ? {
+                              backgroundImage: `url(${backgroundImageUrl})`,
+                              backgroundSize: "cover",
+                              backgroundPosition: "center",
+                              backgroundRepeat: "no-repeat",
+                              filter: darkMode ? "none" : "brightness(1.1)",
+                            }
+                            : darkMode
+                              ? { backgroundColor: "rgba(15, 23, 42, 0.8)" }
+                              : { backgroundColor: "white" }
+                        }
                       >
                         {hasBackgroundImage && (
-                          <div 
+                          <div
                             className="absolute inset-0 z-0"
                             style={{
                               backgroundColor: darkMode ? "rgba(0, 0, 0, 0.4)" : "rgba(0, 0, 0, 0.3)",
@@ -464,68 +459,61 @@ const ForumDetailPage: React.FC = () => {
                         <div className="relative z-10">
                           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                             <div>
-                              <p className={`text-xs uppercase tracking-wide font-semibold flex items-center gap-2 ${
-                                hasBackgroundImage
+                              <p className={`text-xs uppercase tracking-wide font-semibold flex items-center gap-2 ${hasBackgroundImage
                                   ? "text-indigo-200 drop-shadow"
                                   : "text-indigo-500"
-                              }`}>
+                                }`}>
                                 <MessageSquare className="w-4 h-4" />
                                 {forum.forumType === "announcement" ? "Announcement" : "Discussion"}
                               </p>
-                              <h1 className={`text-3xl font-bold mt-2 ${
-                                hasBackgroundImage
+                              <h1 className={`text-3xl font-bold mt-2 ${hasBackgroundImage
                                   ? "text-white drop-shadow-lg"
                                   : ""
-                              }`}>
+                                }`}>
                                 {forum.title}
                               </h1>
-                              <p className={`mt-3 ${
-                                hasBackgroundImage
+                              <p className={`mt-3 ${hasBackgroundImage
                                   ? "text-white/90 drop-shadow"
                                   : "text-slate-500 dark:text-slate-300"
-                              }`}>
+                                }`}>
                                 {forum.description}
                               </p>
                             </div>
                             <div className="flex items-center gap-3 text-xs font-semibold">
                               <span
-                                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 ${
-                                  hasBackgroundImage
+                                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 ${hasBackgroundImage
                                     ? forum.isActive
                                       ? "bg-emerald-500/90 text-white backdrop-blur-sm"
                                       : "bg-rose-500/90 text-white backdrop-blur-sm"
                                     : forum.isActive
                                       ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-200"
                                       : "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-200"
-                                }`}
+                                  }`}
                               >
                                 <ShieldCheck className="w-3.5 h-3.5" />
                                 {forum.isActive ? "Active" : "Inactive"}
                               </span>
                             </div>
                           </div>
-                          <div className={`mt-4 grid gap-3 text-xs sm:grid-cols-2 ${
-                            hasBackgroundImage
+                          <div className={`mt-4 grid gap-3 text-xs sm:grid-cols-2 ${hasBackgroundImage
                               ? "text-white/80"
                               : "text-slate-500 dark:text-slate-400"
-                          }`}>
+                            }`}>
                             {forum.createdAt && (
                               <span className="inline-flex items-center gap-2">
-                                <Clock3 className={`w-3.5 h-3.5 ${
-                                  hasBackgroundImage 
+                                <Clock3 className={`w-3.5 h-3.5 ${hasBackgroundImage
                                     ? "text-indigo-200"
                                     : "text-indigo-400"
-                                }`} />
+                                  }`} />
                                 Created: {formatDate(forum.createdAt)}
                               </span>
                             )}
                             {forum.updatedAt && (
                               <span className="inline-flex items-center gap-2">
-                                <RefreshCcw className={`w-3.5 h-3.5 ${
-                                  hasBackgroundImage 
+                                <RefreshCcw className={`w-3.5 h-3.5 ${hasBackgroundImage
                                     ? "text-indigo-200"
                                     : "text-indigo-400"
-                                }`} />
+                                  }`} />
                                 Updated: {formatDate(forum.updatedAt)}
                               </span>
                             )}
@@ -540,8 +528,8 @@ const ForumDetailPage: React.FC = () => {
                       }`}
                   >
                     <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-xl font-semibold">Latest posts</h2>
-                      <span className="text-sm text-slate-500">{totalPosts} item(s)</span>
+                      <h2 className="text-xl font-semibold text-blue-600">Latest posts</h2>
+                      <span className="text-sm text-slate-800">{totalPosts} item(s)</span>
                     </div>
                     {postsLoading ? (
                       <div className="space-y-4">
@@ -605,11 +593,11 @@ const ForumDetailPage: React.FC = () => {
                                     Pinned
                                   </span>
                                 )}
-                                <span className="ml-auto text-slate-400">{post.replyCount ?? 0} replies</span>
+                                <span className="ml-auto text-sm text-blue-400  text-slate-800">{post.replyCount ?? 0} replies</span>
                               </div>
                               <div className="mt-3 flex flex-wrap gap-3 justify-between">
                                 <div className="space-y-2 flex-1 min-w-[200px]">
-                                  <h3 className="text-lg font-semibold">{post.title}</h3>
+                                  <h3 className="text-3xl font-semibold">{post.title}</h3>
                                   <div className="text-sm text-slate-600 dark:text-slate-300 line-clamp-2">
                                     <MarkdownContent content={post.content} onImageClick={handleImagePreview} />
                                   </div>
