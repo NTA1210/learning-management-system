@@ -1769,11 +1769,11 @@ export const completeCourse = async (courseId: string) => {
       enrollmentId: s._id,
       student: s.student
         ? {
-            _id: s.student._id,
-            username: s.student.username,
-            fullname: s.student.fullname,
-            avatar_url: s.student.avatar_url,
-          }
+          _id: s.student._id,
+          username: s.student.username,
+          fullname: s.student.fullname,
+          avatar_url: s.student.avatar_url,
+        }
         : null,
       progress: {
         lessons: {
@@ -1874,32 +1874,32 @@ export const completeCourse = async (courseId: string) => {
   const totalStudents = studentsOut.length;
   const averageFinalGrade = totalStudents
     ? Math.round((studentsOut.reduce((acc, x) => acc + x.finalGrade, 0) / totalStudents) * 100) /
-      100
+    100
     : 0;
   const droppedCount = studentsOut.filter((s) => s.status === EnrollmentStatus.DROPPED).length;
   const passCount = studentsOut.filter((s) => s.status !== EnrollmentStatus.DROPPED).length;
   const averageAttendance = totalStudents
     ? Math.round(
-        (studentsOut.reduce(
-          (acc, x) => acc + x.progress.attendance.present / (x.progress.attendance.total || 1),
-          0
-        ) /
-          totalStudents) *
-          100
-      )
+      (studentsOut.reduce(
+        (acc, x) => acc + x.progress.attendance.present / (x.progress.attendance.total || 1),
+        0
+      ) /
+        totalStudents) *
+      100
+    )
     : 0;
   const averageQuizScore = totalStudents
     ? Math.round(
-        (studentsOut.reduce((acc, x) => acc + (x.progress.quizzes.score || 0), 0) / totalStudents) *
-          100
-      ) / 100
+      (studentsOut.reduce((acc, x) => acc + (x.progress.quizzes.score || 0), 0) / totalStudents) *
+      100
+    ) / 100
     : 0;
   const averageAssignmentScore = totalStudents
     ? Math.round(
-        (studentsOut.reduce((acc, x) => acc + (x.progress.assignments.score || 0), 0) /
-          totalStudents) *
-          100
-      ) / 100
+      (studentsOut.reduce((acc, x) => acc + (x.progress.assignments.score || 0), 0) /
+        totalStudents) *
+      100
+    ) / 100
     : 0;
 
   const summary = {
@@ -1999,9 +1999,66 @@ export const getCourseStatistics = async (
       semester: course.semesterId,
       teachers: course.teacherIds || [],
       statistics: null,
+      students: [],
       message: 'Course statistics not available yet. Please complete the course first.',
     };
   }
+
+  // Query students details from Enrollment
+  const enrollments = await EnrollmentModel.find({
+    courseId: course._id,
+    role: Role.STUDENT,
+    status: {
+      $in: [EnrollmentStatus.APPROVED, EnrollmentStatus.DROPPED, EnrollmentStatus.COMPLETED],
+    },
+  })
+    .populate('studentId', 'username fullname avatar_url')
+    .select('studentId progress finalGrade status')
+    .lean();
+
+  // Transform enrollments to match completeCourse students format
+  const students = enrollments.map((enrollment: any) => ({
+    enrollmentId: enrollment._id,
+    student: enrollment.studentId
+      ? {
+        _id: enrollment.studentId._id,
+        username: enrollment.studentId.username,
+        fullname: enrollment.studentId.fullname,
+        avatar_url: enrollment.studentId.avatar_url,
+      }
+      : null,
+    progress: {
+      lessons: {
+        total: enrollment.progress?.totalLessons || 0,
+        completed: enrollment.progress?.completedLessons || 0,
+        percent:
+          enrollment.progress?.totalLessons > 0
+            ? Math.round(
+              (enrollment.progress.completedLessons / enrollment.progress.totalLessons) * 100
+            )
+            : 0,
+      },
+      quizzes: {
+        total: enrollment.progress?.totalQuizzes || 0,
+        completed: enrollment.progress?.completedQuizzes || 0,
+        score: enrollment.progress?.totalQuizScores || 0,
+      },
+      assignments: {
+        total: enrollment.progress?.totalAssignments || 0,
+        completed: enrollment.progress?.completedAssignments || 0,
+        score: enrollment.progress?.totalAssignmentScores || 0,
+      },
+      attendance: {
+        total: enrollment.progress?.totalAttendances || 0,
+        present: enrollment.progress?.completedAttendances || 0,
+        absent:
+          (enrollment.progress?.totalAttendances || 0) -
+          (enrollment.progress?.completedAttendances || 0),
+      },
+    },
+    finalGrade: enrollment.finalGrade || 0,
+    status: enrollment.status,
+  }));
 
   // Trả về thống kê
   return {
@@ -2010,5 +2067,6 @@ export const getCourseStatistics = async (
     semester: course.semesterId,
     teachers: course.teacherIds || [],
     statistics: course.statistics,
+    students,
   };
 };
