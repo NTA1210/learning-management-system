@@ -1,22 +1,18 @@
-
 export const prefixLessonMaterial = (
-  courseId: import("mongoose").Types.ObjectId|string,
-  lessonId: import("mongoose").Types.ObjectId|string
+  courseId: import('mongoose').Types.ObjectId | string,
+  lessonId: import('mongoose').Types.ObjectId | string
 ) => {
   return `courses/${courseId}/lessons/${lessonId}`;
 };
 
-export const prefixAssignmentFile = (
-  courseId: string,
-  assignmentId: string
-) => {
+export const prefixAssignmentFile = (courseId: string, assignmentId: string) => {
   return `courses/${courseId}/assignments/${assignmentId}/files`;
 };
 
 export const prefixSubmission = (
-  courseId: string | import("mongoose").Types.ObjectId,
-  assignmentId: string | import("mongoose").Types.ObjectId,
-  studentId: string | import("mongoose").Types.ObjectId
+  courseId: string | import('mongoose').Types.ObjectId,
+  assignmentId: string | import('mongoose').Types.ObjectId,
+  studentId: string | import('mongoose').Types.ObjectId
 ) => {
   const cId =
     courseId && (courseId as any).toHexString
@@ -34,10 +30,7 @@ export const prefixSubmission = (
   return `courses/${cId}/assignments/${aId}/submissions/${sId}`;
 };
 
-export const prefixQuizQuestionImage = (
-  subjectId: string,
-  questionId: string
-) => {
+export const prefixQuizQuestionImage = (subjectId: string, questionId: string) => {
   return `subjects/${subjectId}/questions/${questionId}/image`;
 };
 
@@ -53,26 +46,22 @@ export const prefixUserAvatar = (userId: string) => {
   return `users/${userId}/avatar`;
 };
 
-export const prefixForumFile = (
-  courseId: string,
-  forumId: string,
-) => {
-    return `courses/${courseId}/forums/${forumId}`;
+export const prefixChatRoomFile = (courseId: string, chatRoomId: string) => {
+  return `courses/${courseId}/chatrooms/${chatRoomId}/files`;
+};
+export const prefixForumFile = (courseId: string, forumId: string) => {
+  return `courses/${courseId}/forums/${forumId}`;
 };
 
-export const prefixForumPostFile = (
-  courseId: string,
-  forumId: string,
-  postId: string,
-) => {
-    return `courses/${courseId}/forums/${forumId}/posts/${postId}`;
+export const prefixForumPostFile = (courseId: string, forumId: string, postId: string) => {
+  return `courses/${courseId}/forums/${forumId}/posts/${postId}`;
 };
 
 export const prefixForumReplyFile = (
   courseId: string,
   forumId: string,
   postId: string,
-  replyId: string,
+  replyId: string
 ) => {
-    return `courses/${courseId}/forums/${forumId}/posts/${postId}/replies/${replyId}`;
+  return `courses/${courseId}/forums/${forumId}/posts/${postId}/replies/${replyId}`;
 };
