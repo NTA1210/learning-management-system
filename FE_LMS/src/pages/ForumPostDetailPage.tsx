@@ -10,7 +10,7 @@ import {
   type ForumPost,
   type ForumReply,
 } from "../services/forumService";
-import { ArrowLeft, Edit3, Loader2, MessageSquare, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle, Edit3, Loader2, MessageSquare, Trash2, X } from "lucide-react";
 import MarkdownContent from "../components/MarkdownContent";
 import AttachmentPreview from "../components/AttachmentPreview";
 import MarkdownComposer from "../components/MarkdownComposer";
@@ -48,9 +48,11 @@ const ForumPostDetailPage: React.FC = () => {
   const [editError, setEditError] = useState<string | null>(null);
   const [expandedReplies, setExpandedReplies] = useState<Record<string, boolean>>({});
   const [expandedChildGroups, setExpandedChildGroups] = useState<Record<string, boolean>>({});
-  const [repliesExpanded, setRepliesExpanded] = useState(false);
+  const [repliesExpanded, setRepliesExpanded] = useState(true);
+  const [visibleRepliesCount, setVisibleRepliesCount] = useState(3);
   const replyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [lightboxImage, setLightboxImage] = useState<{ src: string; alt?: string } | null>(null);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const fetchForum = useCallback(async () => {
     if (!forumId) return;
@@ -121,6 +123,12 @@ const ForumPostDetailPage: React.FC = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [lightboxImage]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timeout = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [toast]);
 
   const formatDate = (value?: string | number | Date) => {
     if (!value) return "—";
@@ -229,7 +237,7 @@ const ForumPostDetailPage: React.FC = () => {
     if (!forumId || !postId || !editingReply) return;
     const content = editingReply.content.trim();
     if (!content) {
-      setEditError("Reply content cannot be empty.");
+      setToast({ type: "error", message: "Reply content cannot be empty." });
       return;
     }
     try {
@@ -237,9 +245,21 @@ const ForumPostDetailPage: React.FC = () => {
       setEditError(null);
       await forumService.updateReply(forumId, postId, editingReply.replyId, { content });
       setEditingReply(null);
+      setToast({ type: "success", message: "Reply updated successfully." });
       await Promise.all([fetchPost(), fetchReplies()]);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to update reply";
+    } catch (err: any) {
+      let message = "Unable to update reply";
+
+      // Check for authorization errors (403 or specific message)
+      if (err?.response?.status === 403 || err?.message?.toLowerCase().includes("permission") || err?.message?.toLowerCase().includes("not allowed")) {
+        message = "You can only edit your own replies";
+      } else if (err?.response?.data?.message) {
+        message = err.response.data.message;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+
+      setToast({ type: "error", message });
       setEditError(message);
     } finally {
       setEditSaving(false);
@@ -256,9 +276,21 @@ const ForumPostDetailPage: React.FC = () => {
         setEditingReply(null);
         setEditError(null);
       }
+      setToast({ type: "success", message: "Reply deleted successfully." });
       await Promise.all([fetchPost(), fetchReplies()]);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to delete reply";
+    } catch (err: any) {
+      let message = "Unable to delete reply";
+
+      // Check for authorization errors (403 or specific message)
+      if (err?.response?.status === 403 || err?.message?.toLowerCase().includes("permission") || err?.message?.toLowerCase().includes("not allowed")) {
+        message = "You can only delete your own replies";
+      } else if (err?.response?.data?.message) {
+        message = err.response.data.message;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+
+      setToast({ type: "error", message });
       setReplyManagementError(message);
     } finally {
       setDeletingReplyId(null);
@@ -325,9 +357,8 @@ const ForumPostDetailPage: React.FC = () => {
         className={`space-y-3 ${depth > 0 ? "ml-10 border-l border-slate-200 dark:border-slate-700 pl-4" : ""}`}
       >
         <div
-          className={`rounded-3xl border px-4 py-4 ${
-            darkMode ? "bg-slate-900/60 border-slate-700" : "bg-white border-slate-200"
-          }`}
+          className={`rounded-3xl border px-4 py-4 ${darkMode ? "bg-slate-900/60 border-slate-700" : "bg-white border-slate-200"
+            }`}
         >
           <div className="flex gap-3">
             <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500/10 to-sky-500/10 flex items-center justify-center text-sm font-semibold text-indigo-600 overflow-hidden dark:text-indigo-200 dark:from-indigo-500/20 dark:to-sky-500/10">
@@ -341,13 +372,12 @@ const ForumPostDetailPage: React.FC = () => {
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="font-semibold text-base">{displayName}</span>
                 <span
-                  className={`text-[11px] px-2 py-0.5 rounded-full ${
-                    reply.author?.role === "admin"
-                      ? "bg-rose-100 text-rose-700"
-                      : reply.author?.role === "teacher"
+                  className={`text-[11px] px-2 py-0.5 rounded-full ${reply.author?.role === "admin"
+                    ? "bg-rose-100 text-rose-700"
+                    : reply.author?.role === "teacher"
                       ? "bg-indigo-100 text-indigo-700"
                       : "bg-emerald-100 text-emerald-700"
-                  }`}
+                    }`}
                 >
                   {formatRoleLabel(reply.author?.role)}
                 </span>
@@ -356,9 +386,8 @@ const ForumPostDetailPage: React.FC = () => {
               {isEditing ? (
                 <div className="mt-3 space-y-2">
                   <textarea
-                    className={`w-full rounded-2xl border px-4 py-3 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
-                      darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                    }`}
+                    className={`w-full rounded-2xl border px-4 py-3 text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+                      }`}
                     rows={4}
                     value={editingReply.content}
                     onChange={(event) =>
@@ -367,7 +396,6 @@ const ForumPostDetailPage: React.FC = () => {
                       )
                     }
                   ></textarea>
-                  {editError && <p className="text-xs text-rose-500">{editError}</p>}
                   <div className="flex items-center gap-3 text-xs font-semibold">
                     <button
                       type="button"
@@ -390,9 +418,8 @@ const ForumPostDetailPage: React.FC = () => {
                 </div>
               ) : (
                 <div
-                  className={`mt-3 rounded-2xl border px-4 py-3 text-sm leading-relaxed ${
-                    darkMode ? "bg-slate-800/60 border-slate-700" : "bg-slate-50 border-slate-200"
-                  }`}
+                  className={`mt-3 rounded-2xl border px-4 py-3 text-sm leading-relaxed ${darkMode ? "bg-slate-800/60 border-slate-700" : "bg-slate-50 border-slate-200"
+                    }`}
                 >
                   <div
                     className={`prose max-w-none dark:prose-invert ${shouldClamp && !isExpanded ? "line-clamp-4" : ""}`}
@@ -492,187 +519,225 @@ const ForumPostDetailPage: React.FC = () => {
   return (
     <>
       <div className="flex h-screen overflow-hidden relative" style={backgroundStyles}>
-      <Navbar />
-      <Sidebar role={sidebarRole} />
+        <Navbar />
+        <Sidebar role={sidebarRole} />
 
-      <div className="flex flex-col flex-1 w-0 overflow-hidden">
-        <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 mt-16 sm:pl-24 md:pl-28">
-          <div className="max-w-4xl mx-auto space-y-6 pb-16">
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 dark:border-slate-700"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back
-              </button>
-              <Link
-                to={`/forums/${forumId}`}
-                className="text-22xl font-semibold text-indigo-500 hover:text-indigo-400"
-              >
-                Forum overview
-              </Link>
-              {forum && <span className="text-1xl text-slate-600">View post in {forum.title}</span>}
-            </div>
-
-            {loading ? (
-              <div className="flex items-center gap-3 text-slate-400">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Loading post...
+        <div className="flex flex-col flex-1 w-0 overflow-hidden">
+          <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 mt-16 sm:pl-24 md:pl-28">
+            <div className="max-w-4xl mx-auto space-y-6 pb-16">
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 dark:border-slate-700"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </button>
+                <Link
+                  to={`/forums/${forumId}`}
+                  className="text-22xl font-semibold text-indigo-500 hover:text-indigo-400"
+                >
+                  Forum overview
+                </Link>
+                {forum && <span className="text-1xl text-slate-600">View post in {forum.title}</span>}
               </div>
-            ) : error ? (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-700">
-                <p className="font-semibold mb-2">Unable to load post</p>
-                <p className="text-sm">{error}</p>
-              </div>
-            ) : post ? (
-              <section
-                className={`rounded-2xl p-6 shadow-sm space-y-5 ${
-                  darkMode ? "bg-slate-900/70 border border-slate-700/60" : "bg-white border border-slate-100"
-                }`}
-              >
-                <div className="text-xs text-slate-400 flex items-center gap-2">
-                  {post.pinned && (
-                    <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">Pinned</span>
-                  )}
-                  <span>{formatDate(post.createdAt)}</span>
-                </div>
-                <h1 className="text-3xl font-bold">{post.title}</h1>
-                <div className="prose max-w-none dark:prose-invert">
-                  <MarkdownContent content={post.content} onImageClick={handleImagePreview} />
-                </div>
-                <AttachmentPreview
-                  files={post.key}
-                  size="md"
-                  onImageClick={handleImagePreview}
-                  caption={post.title}
-                />
-                {post.author && (
-                  <p className="text-xs text-slate-500">
-                    Posted by {post.author.fullname || post.author.username}
-                  </p>
-                )}
 
-                <div className="pt-4 border-t border-slate-100 space-y-4 dark:border-slate-800">
-                <form className="space-y-3" onSubmit={handleReplySubmit}>
-                    <div className="flex items-center justify-between">
-                      <label className="block text-sm font-semibold">Add reply</label>
-                      {replyTarget?.displayName && (
-                        <button
-                          type="button"
-                          onClick={() => beginReplyTo()}
-                          className="text-xs font-semibold text-indigo-500 hover:text-indigo-400"
-                        >
-                          Replying to @{replyTarget.displayName} • Cancel
-                        </button>
-                      )}
-                    </div>
-                    {replyTarget?.displayName && (
-                      <div
-                        className={`text-xs rounded-xl px-3 py-2 border ${
-                          darkMode
-                            ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-100"
-                            : "border-indigo-200 bg-indigo-50 text-indigo-600"
-                        }`}
-                      >
-                        You are replying to <span className="font-semibold">@{replyTarget.displayName}</span>
-                      </div>
+              {loading ? (
+                <div className="flex items-center gap-3 text-slate-400">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Loading post...
+                </div>
+              ) : error ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-700">
+                  <p className="font-semibold mb-2">Unable to load post</p>
+                  <p className="text-sm">{error}</p>
+                </div>
+              ) : post ? (
+                <section
+                  className={`rounded-2xl p-6 shadow-sm space-y-5 ${darkMode ? "bg-slate-900/70 border border-slate-700/60" : "bg-white border border-slate-100"
+                    }`}
+                >
+                  <div className="text-xs text-slate-400 flex items-center gap-2">
+                    {post.pinned && (
+                      <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">Pinned</span>
                     )}
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Content editor</label>
-                      <MarkdownComposer
-                        value={replyContent}
-                        onChange={(next) => {
-                          setReplyContent(next);
-                          setReplyError(null);
-                        }}
-                        placeholder="Share your thoughts, code snippets, or resources using Markdown shortcuts."
-                        darkMode={darkMode}
-                        attachment={replyFile}
-                        onAttachmentChange={(file) => setReplyFile(file)}
-                        attachmentAccept={attachmentAcceptTypes}
-                      />
-                    </div>
-                    {replyError && <p className="text-sm text-rose-500">{replyError}</p>}
-                    <div className="flex items-center justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={() => navigate(-1)}
-                        className="rounded-xl border px-5 py-2 text-sm font-semibold border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
-                        disabled={replySubmitting}
-                      >
-                        {replySubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                        Send
-                      </button>
-                    </div>
-                  </form>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-lg font-semibold">Replies</h4>
-                      <p className="text-xs text-slate-500">{replyCount} replies</p>
-                    </div>
-                    <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      {replyCount}
-                    </span>
+                    <span>{formatDate(post.createdAt)}</span>
                   </div>
+                  <h1 className="text-3xl font-bold">{post.title}</h1>
+                  <div className="prose max-w-none dark:prose-invert">
+                    <MarkdownContent content={post.content} onImageClick={handleImagePreview} />
+                  </div>
+                  <AttachmentPreview
+                    files={post.key}
+                    size="md"
+                    onImageClick={handleImagePreview}
+                    caption={post.title}
+                  />
+                  {post.author && (
+                    <p className="text-xs text-slate-500">
+                      Posted by {post.author.fullname || post.author.username}
+                    </p>
+                  )}
 
-                  {repliesLoading ? (
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Loading replies...
-                    </div>
-                  ) : repliesError ? (
-                    <p className="text-sm text-rose-500">{repliesError}</p>
-                  ) : nestedReplies.length > 0 ? (
-                    <div className="space-y-4">
-                      {!repliesExpanded ? (
-                        <div className="flex justify-center">
+                  <div className="pt-4 border-t border-slate-100 space-y-4 dark:border-slate-800">
+                    <form className="space-y-3" onSubmit={handleReplySubmit}>
+                      <div className="flex items-center justify-between">
+                        <label className="block text-sm font-semibold">Add reply</label>
+                        {replyTarget?.displayName && (
                           <button
                             type="button"
-                            onClick={() => setRepliesExpanded(true)}
-                            className="text-sm font-semibold text-indigo-600 hover:text-indigo-500"
+                            onClick={() => beginReplyTo()}
+                            className="text-xs font-semibold text-indigo-500 hover:text-indigo-400"
                           >
-                            View replies ({replyCount})
+                            Replying to @{replyTarget.displayName} • Cancel
                           </button>
+                        )}
+                      </div>
+                      {replyTarget?.displayName && (
+                        <div
+                          className={`text-xs rounded-xl px-3 py-2 border ${darkMode
+                            ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-100"
+                            : "border-indigo-200 bg-indigo-50 text-indigo-600"
+                            }`}
+                        >
+                          You are replying to <span className="font-semibold">@{replyTarget.displayName}</span>
                         </div>
-                      ) : (
-                        <>
-                          <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
-                            {nestedReplies.map((reply) => renderReplyItem(reply))}
-                          </div>
+                      )}
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Content editor</label>
+                        <MarkdownComposer
+                          value={replyContent}
+                          onChange={(next) => {
+                            setReplyContent(next);
+                            setReplyError(null);
+                          }}
+                          placeholder="Share your thoughts, code snippets, or resources using Markdown shortcuts."
+                          darkMode={darkMode}
+                          attachment={replyFile}
+                          onAttachmentChange={(file) => setReplyFile(file)}
+                          attachmentAccept={attachmentAcceptTypes}
+                        />
+                      </div>
+                      <div className="flex items-center justify-end gap-3">
+                        <button
+                          type="button"
+                          onClick={() => navigate(-1)}
+                          className="rounded-xl border px-5 py-2 text-sm font-semibold border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
+                          disabled={replySubmitting}
+                        >
+                          {replySubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                          Send
+                        </button>
+                      </div>
+                    </form>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-lg font-semibold">Replies</h4>
+                        <p className="text-xs text-slate-500">{replyCount} replies</p>
+                      </div>
+                      <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        {replyCount}
+                      </span>
+                    </div>
+
+                    {repliesLoading ? (
+                      <div className="flex items-center gap-2 text-slate-400">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Loading replies...
+                      </div>
+                    ) : repliesError ? (
+                      <p className="text-sm text-rose-500">{repliesError}</p>
+                    ) : nestedReplies.length > 0 ? (
+                      <div className="space-y-4">
+                        {repliesExpanded ? (
+                          <>
+                            <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
+                              {nestedReplies.slice(0, visibleRepliesCount).map((reply) => renderReplyItem(reply))}
+                            </div>
+                            {nestedReplies.length > visibleRepliesCount && (
+                              <div className="flex justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setVisibleRepliesCount(nestedReplies.length)}
+                                  className="text-sm font-semibold text-indigo-600 hover:text-indigo-500"
+                                >
+                                  Show {nestedReplies.length - visibleRepliesCount} more {nestedReplies.length - visibleRepliesCount === 1 ? 'reply' : 'replies'}
+                                </button>
+                              </div>
+                            )}
+                            {visibleRepliesCount > 3 && (
+                              <div className="flex justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => setVisibleRepliesCount(3)}
+                                  className="text-xs font-semibold text-slate-500 hover:text-indigo-500"
+                                >
+                                  Show less
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        ) : (
                           <div className="flex justify-center">
                             <button
                               type="button"
-                              onClick={() => setRepliesExpanded(false)}
-                              className="text-xs font-semibold text-slate-500 hover:text-indigo-500"
+                              onClick={() => setRepliesExpanded(true)}
+                              className="text-sm font-semibold text-indigo-600 hover:text-indigo-500"
                             >
-                              Hide replies
+                              View replies ({replyCount})
                             </button>
                           </div>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-500">No replies yet. Be the first to respond.</p>
-                  )}
-                  {replyManagementError && <p className="text-sm text-rose-500">{replyManagementError}</p>}
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500">No replies yet. Be the first to respond.</p>
+                    )}
 
-               
-                </div>
-              </section>
-            ) : null}
+
+                  </div>
+                </section>
+              ) : null}
+            </div>
+          </main>
+        </div>
+      </div>
+
+      {/* Toast Notification - Fixed Center Position */}
+      {toast && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none p-4">
+          <div
+            className={`rounded-2xl border px-6 py-4 flex items-center justify-between gap-4 shadow-2xl pointer-events-auto max-w-md w-full animate-in zoom-in-95 fade-in duration-300 ${toast.type === "success"
+              ? "bg-emerald-50 border-emerald-300 text-emerald-900 dark:bg-emerald-900/90 dark:border-emerald-600 dark:text-emerald-50"
+              : "bg-rose-50 border-rose-300 text-rose-900 dark:bg-rose-900/90 dark:border-rose-600 dark:text-rose-50"
+              }`}
+          >
+            <div className="flex items-center gap-3">
+              {toast.type === "success" ? (
+                <CheckCircle className="w-6 h-6 shrink-0" />
+              ) : (
+                <AlertCircle className="w-6 h-6 shrink-0" />
+              )}
+              <span className="font-semibold text-base">{toast.message}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              className="shrink-0 p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
+              aria-label="Close notification"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-        </main>
-      </div>
-      </div>
+        </div>
+      )}
 
       {lightboxImage && (
         <div
