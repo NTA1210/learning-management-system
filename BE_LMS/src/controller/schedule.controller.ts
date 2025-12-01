@@ -1,30 +1,30 @@
 import {catchErrors} from "../utils/asyncHandler";
-import {OK, CREATED} from "../constants/http";
+import {CREATED, OK} from "../constants/http";
 import {
-    createScheduleSchema,
-    approveScheduleSchema,
-    createScheduleExceptionSchema,
     approveExceptionSchema,
+    approveScheduleSchema,
     checkSlotAvailabilitySchema,
+    courseIdSchema, courseScheduleQuerySchema,
+    createScheduleExceptionSchema,
+    createScheduleSchema,
+    exceptionIdSchema,
     getScheduleRangeSchema,
     scheduleIdSchema,
-    exceptionIdSchema,
-    courseIdSchema,
     teacherIdSchema,
+    teacherScheduleQuerySchema,
     timeSlotFilterSchema,
-    teacherScheduleQuerySchema, courseScheduleQuerySchema,
 } from "../validators/schedule.schemas";
 import {
-    getAllTimeSlots,
-    createScheduleRequest,
-    getTeacherWeeklySchedule,
-    getCourseSchedule,
-    approveScheduleRequest,
-    getPendingScheduleRequests,
-    createScheduleException,
     approveScheduleException,
-    getScheduleWithExceptions,
+    approveScheduleRequest,
     checkSlotAvailability,
+    createScheduleException,
+    createScheduleRequest,
+    getAllTimeSlots,
+    getCourseSchedule,
+    getPendingScheduleRequests,
+    getScheduleWithExceptions,
+    getTeacherWeeklySchedule,
 } from "../services/schedule.service";
 
 /**
@@ -53,6 +53,7 @@ export const getTimeSlotsHandler = catchErrors(async (req, res) => {
  * POST /schedules
  *
  * Teacher creates request, admin approves.
+ * Supports creating multiple schedule slots (day-timeslot combinations) in a single request.
  */
 export const createScheduleRequestHandler = catchErrors(async (req, res) => {
     // Validate request body
@@ -60,29 +61,30 @@ export const createScheduleRequestHandler = catchErrors(async (req, res) => {
 
     const teacherId = req.userId!;
 
-    // Call service
-    const schedule = await createScheduleRequest({
+    // Call service - returns array of created schedules
+    const schedules = await createScheduleRequest({
         ...data,
         teacherId,
     });
 
     return res.success(CREATED, {
-        message: "Schedule request created successfully",
-        data: schedule,
+        message: `Schedule request created successfully with ${schedules.length} slot${schedules.length > 1 ? 's' : ''}`,
+        data: schedules,
     });
 });
 
 /**
  * Get teacher's weekly schedule.
  *
- * GET /schedules?teacherId=
+ * GET /schedules/per-teacher/:teacherId?date=&status=
  */
 export const getTeacherScheduleHandler = catchErrors(async (req, res) => {
     // Validate query parameters
-    const {date, teacherId} = teacherScheduleQuerySchema.parse(req.query);
+    const {date, status} = teacherScheduleQuerySchema.parse(req.query);
+    const teacherId = teacherIdSchema.parse(req.params.teacherId);
 
     // Call service
-    const schedule = await getTeacherWeeklySchedule(teacherId, date);
+    const schedule = await getTeacherWeeklySchedule(teacherId, date, status);
 
     return res.success(OK, {
         message: "Teacher schedule retrieved successfully",
@@ -93,14 +95,15 @@ export const getTeacherScheduleHandler = catchErrors(async (req, res) => {
 /**
  * Get course schedule.
  *
- * GET /schedules?courseId=
+ * GET /schedules/per-course/:courseId?status=
  */
 export const getCourseScheduleHandler = catchErrors(async (req, res) => {
     // Validate query parameters
-    const {courseId} = courseScheduleQuerySchema.parse(req.query);
+    const {status} = courseScheduleQuerySchema.parse(req.query);
+    const courseId = courseIdSchema.parse(req.params.courseId);
 
     // Call service
-    const schedule = await getCourseSchedule(courseId);
+    const schedule = await getCourseSchedule(courseId, status);
 
     return res.success(OK, {
         message: "Course schedule retrieved successfully",

@@ -1,7 +1,7 @@
 import TimeSlotModel from "../models/timeSlot.model";
 import ScheduleModel from "../models/schedule.model";
 import ScheduleExceptionModel from "../models/scheduleException.model";
-import {ScheduleStatus} from "../types/schedule.type";
+import ISchedule, {ScheduleStatus} from "../types/schedule.type";
 import {ExceptionStatus, ExceptionType} from "../types/scheduleException.type";
 import {DayOfWeek} from "../types/timeSlot.type";
 import appAssert from "../utils/appAssert";
@@ -10,11 +10,15 @@ import {CourseModel, UserModel} from "@/models";
 import {Role} from "@/types";
 import mongoose from "mongoose";
 
+export interface ScheduleSlot {
+    dayOfWeek: DayOfWeek;
+    timeSlotId: string;
+}
+
 export interface CreateScheduleInput {
     courseId: string;
     teacherId: mongoose.Types.ObjectId;
-    dayOfWeek: DayOfWeek;
-    timeSlotId: string;
+    slots: ScheduleSlot[];
     effectiveFrom: Date;
     effectiveTo?: Date;
     location?: string;
@@ -43,43 +47,91 @@ export const createScheduleRequest = async (input: CreateScheduleInput) => {
 
     // Verify teacher is assigned to this course
     const isAssigned = courseData.teacherIds.some(
-        (id: mongoose.Types.ObjectId) => id === input.teacherId
+        (id: mongoose.Types.ObjectId) => id.toString() === input.teacherId.toString()
     );
     appAssert(isAssigned, BAD_REQUEST, "Teacher is not assigned to this course");
 
-    // Check if slot is available for this teacher
-    const conflict = await ScheduleModel.findOne({
-        teacherId: input.teacherId,
-        dayOfWeek: input.dayOfWeek,
-        timeSlotId: input.timeSlotId,
-        status: {$in: [ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
+    // Check for conflicts for all requested slots
+    const conflictChecks = input.slots.map(async (slot) => {
+        const conflict = await ScheduleModel.findOne({
+            teacherId: input.teacherId,
+            dayOfWeek: slot.dayOfWeek,
+            timeSlotId: slot.timeSlotId,
+            status: {$in: [ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
+        });
+
+        if (conflict) {
+            // Get day and timeslot details for better error message
+            const timeSlot = await TimeSlotModel.findById(slot.timeSlotId);
+            return {
+                hasConflict: true,
+                dayOfWeek: slot.dayOfWeek,
+                timeSlot: timeSlot?.slotName || slot.timeSlotId,
+            };
+        }
+
+        return {hasConflict: false};
     });
+
+    const conflictResults = await Promise.all(conflictChecks);
+    const conflicts = conflictResults.filter(r => r.hasConflict);
 
     appAssert(
-        !conflict,
+        conflicts.length === 0,
         CONFLICT,
-        "Teacher already has a course scheduled in this slot"
+        conflicts.length === 1
+            ? `Teacher already has a course scheduled on ${conflicts[0].dayOfWeek} at ${conflicts[0].timeSlot}`
+            : `Teacher already has courses scheduled on: ${conflicts.map(c => `${c.dayOfWeek} at ${c.timeSlot}`).join(", ")}`
     );
 
-    const schedule = await ScheduleModel.create({
-        ...input,
-        status: ScheduleStatus.PENDING,
-        requestedBy: input.teacherId,
-        requestedAt: new Date(),
-    });
+    // Create schedule records for each slot in a transaction
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    return schedule.populate([
-        {path: "courseId", select: "title subjectId startDate endDate"},
-        {path: "teacherId", select: "fullname email"},
-        {path: "timeSlotId"},
-    ]);
+    try {
+        const schedulePromises = input.slots.map(async (slot) => {
+            return await ScheduleModel.create([{
+                courseId: input.courseId,
+                teacherId: input.teacherId,
+                dayOfWeek: slot.dayOfWeek,
+                timeSlotId: slot.timeSlotId,
+                effectiveFrom: input.effectiveFrom,
+                effectiveTo: input.effectiveTo,
+                location: input.location,
+                requestNote: input.requestNote,
+                status: ScheduleStatus.PENDING,
+                requestedBy: input.teacherId,
+                requestedAt: new Date(),
+            }], {session});
+        });
+
+        const schedules = await Promise.all(schedulePromises);
+
+        await session.commitTransaction();
+
+        // Flatten and populate the created schedules
+        const createdSchedules = schedules.flat();
+        return await ScheduleModel.find({
+            _id: {$in: createdSchedules.map(s => s._id)}
+        }).populate([
+            {path: "courseId", select: "title subjectId startDate endDate"},
+            {path: "teacherId", select: "fullname email"},
+            {path: "timeSlotId"},
+        ]);
+    } catch (error) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        session.endSession();
+    }
 };
 
 export const getTeacherWeeklySchedule = async (
     teacherId: string,
-    date?: string
+    date?: string,
+    status?: ScheduleStatus[]
 ) => {
-    const query: any = {
+    const query: mongoose.FilterQuery<ISchedule> = {
         teacherId,
         status: {$in: [ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
     };
@@ -87,11 +139,19 @@ export const getTeacherWeeklySchedule = async (
     // Filter by date range if provided
     if (date) {
         const targetDate = new Date(date);
-        query.effectiveFrom = {$lte: targetDate};
-        query.$or = [
-            {effectiveTo: {$exists: false}},
-            {effectiveTo: {$gte: targetDate}},
+        query.$and = [
+            {effectiveFrom: {$lte: targetDate}},
+            {
+                $or: [
+                    {effectiveTo: {$exists: false}},
+                    {effectiveTo: {$gte: targetDate}},
+                ],
+            },
         ];
+    }
+
+    if (status && status.length > 0) {
+        query.status = {$in: status};
     }
 
     const schedules = await ScheduleModel.find(query)
@@ -111,10 +171,10 @@ export const getTeacherWeeklySchedule = async (
     return weeklySchedule;
 };
 
-export const getCourseSchedule = async (courseId: string) => {
+export const getCourseSchedule = async (courseId: string, status?: ScheduleStatus[]) => {
     return ScheduleModel.find({
         courseId,
-        status: {$in: [ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
+        status: {$in: status},
     })
         .populate([
             {path: "teacherId", select: "fullname email"},
@@ -134,7 +194,7 @@ export const approveScheduleRequest = async (
     approvalNote?: string
 ) => {
     // Verify the admin ID is actually an admin
-    const admin = await UserModel.findById({adminId});
+    const admin = await UserModel.findById(adminId);
     appAssert(admin && admin.role === Role.ADMIN, NOT_FOUND, "Admin user not found");
 
     // FInd schedule
@@ -201,9 +261,10 @@ export const createScheduleException = async (input: CreateExceptionInput) => {
     const schedule = await ScheduleModel.findById(input.scheduleId);
     appAssert(schedule, NOT_FOUND, "Schedule not found");
 
+    console.log(input);
     // Verify requester is the teacher of this schedule
     appAssert(
-        schedule.teacherId === input.requestedBy,
+        schedule.teacherId.toString() === input.requestedBy.toString(),
         BAD_REQUEST,
         "You can only create exceptions for your own schedules"
     );
@@ -248,7 +309,7 @@ export const approveScheduleException = async (
     approvalNote?: string
 ) => {
     // Verify the admin ID is actually an admin
-    const admin = await UserModel.findById({adminId});
+    const admin = await UserModel.findById(adminId);
     appAssert(admin && admin.role === Role.ADMIN, NOT_FOUND, "Admin user not found");
 
     const exception = await ScheduleExceptionModel.findById(exceptionId);

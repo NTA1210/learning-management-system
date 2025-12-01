@@ -28,6 +28,26 @@ type SidebarRole = "admin" | "teacher" | "student";
 
 const attachmentAcceptTypes = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.7z,image/*";
 
+const imageExtensions = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg"]);
+
+const getFileExtension = (fileUrl: string): string => {
+  const sanitized = fileUrl.split(/[?#]/)[0];
+  const lastSegment = sanitized.split("/").pop() || "";
+  const hasExtension = lastSegment.includes(".");
+  return hasExtension ? lastSegment.split(".").pop()?.toLowerCase() || "" : "";
+};
+
+const getFirstImageUrl = (files?: string[]): string | null => {
+  if (!files || files.length === 0) return null;
+  for (const fileUrl of files) {
+    const extension = getFileExtension(fileUrl);
+    if (extension && imageExtensions.has(extension)) {
+      return fileUrl;
+    }
+  }
+  return null;
+};
+
 const ForumDetailPage: React.FC = () => {
   const { forumId = "" } = useParams();
   const navigate = useNavigate();
@@ -348,65 +368,172 @@ const ForumDetailPage: React.FC = () => {
                 </div>
               ) : forum ? (
                 <>
-                  {showStickyHeader && forum && (
-                    <div className="sticky top-0 z-20 mb-4">
-                      <div
-                        className={`rounded-2xl px-4 py-3 shadow-lg border flex items-center gap-3 ${darkMode ? "border-slate-700/70 bg-slate-900/80 backdrop-blur" : "border-slate-200 bg-white"
+                  {showStickyHeader && forum && (() => {
+                    const backgroundImageUrl = getFirstImageUrl(forum.key);
+                    const hasBackgroundImage = Boolean(backgroundImageUrl);
+                    
+                    return (
+                      <div className="sticky top-0 z-20 mb-4">
+                        <div
+                          className={`rounded-2xl px-4 py-3 shadow-lg border flex items-center gap-3 relative overflow-hidden ${
+                            darkMode ? "border-slate-700/70" : "border-slate-200"
                           }`}
-                        aria-live="polite"
-                      >
-                        <MessageSquare className="w-4 h-4 text-indigo-500" />
-                        <div className="flex flex-col">
-                          <span className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">
-                            Discussion topic
-                          </span>
-                          <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">{forum.title}</span>
+                          style={
+                            hasBackgroundImage
+                              ? {
+                                  backgroundImage: `url(${backgroundImageUrl})`,
+                                  backgroundSize: "cover",
+                                  backgroundPosition: "center",
+                                  backgroundRepeat: "no-repeat",
+                                  filter: darkMode ? "none" : "brightness(1.1)",
+                                }
+                              : darkMode
+                                ? { backgroundColor: "rgba(15, 23, 42, 0.8)", backdropFilter: "blur(8px)" }
+                                : { backgroundColor: "white", backdropFilter: "blur(8px)" }
+                          }
+                          aria-live="polite"
+                        >
+                          {hasBackgroundImage && (
+                            <div 
+                              className="absolute inset-0 z-0"
+                              style={{
+                                backgroundColor: darkMode ? "rgba(0, 0, 0, 0.4)" : "rgba(0, 0, 0, 0.3)",
+                              }}
+                            />
+                          )}
+                          <div className="relative z-10 flex items-center gap-3 w-full">
+                            <MessageSquare className={`w-4 h-4 ${
+                              hasBackgroundImage 
+                                ? "text-indigo-200"
+                                : "text-indigo-500"
+                            }`} />
+                            <div className="flex flex-col">
+                              <span className={`text-[11px] uppercase tracking-wide font-semibold ${
+                                hasBackgroundImage
+                                  ? "text-indigo-200 drop-shadow"
+                                  : "text-indigo-500"
+                              }`}>
+                                Discussion topic
+                              </span>
+                              <span className={`text-sm font-semibold ${
+                                hasBackgroundImage
+                                  ? "text-white drop-shadow"
+                                  : "text-slate-900 dark:text-slate-100"
+                              }`}>
+                                {forum.title}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
-                  <section
-                    ref={heroRef}
-                    className={`rounded-2xl p-6 shadow-sm ${darkMode ? "bg-slate-900/80 border border-slate-700/70" : "bg-white border border-slate-100"
-                      }`}
-                  >
-                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                      <div>
-                        <p className="text-xs uppercase tracking-wide text-indigo-500 font-semibold flex items-center gap-2">
-                          <MessageSquare className="w-4 h-4" />
-                          {forum.forumType === "announcement" ? "Announcement" : "Discussion"}
-                        </p>
-                        <h1 className="text-3xl font-bold mt-2">{forum.title}</h1>
-                        <p className="text-slate-500 dark:text-slate-300 mt-3">{forum.description}</p>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs font-semibold">
-                        <span
-                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 ${forum.isActive
-                            ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-200"
-                            : "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-200"
-                            }`}
-                        >
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                          {forum.isActive ? "Active" : "Inactive"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="mt-4 grid gap-3 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-2">
-                      {forum.createdAt && (
-                        <span className="inline-flex items-center gap-2">
-                          <Clock3 className="w-3.5 h-3.5 text-indigo-400" />
-                          Created: {formatDate(forum.createdAt)}
-                        </span>
-                      )}
-                      {forum.updatedAt && (
-                        <span className="inline-flex items-center gap-2">
-                          <RefreshCcw className="w-3.5 h-3.5 text-indigo-400" />
-                          Updated: {formatDate(forum.updatedAt)}
-                        </span>
-                      )}
-                    </div>
-                  </section>
+                  {(() => {
+                    const backgroundImageUrl = getFirstImageUrl(forum.key);
+                    const hasBackgroundImage = Boolean(backgroundImageUrl);
+                    
+                    return (
+                      <section
+                        ref={heroRef}
+                        className={`rounded-2xl p-6 shadow-sm relative overflow-hidden ${
+                          darkMode ? "border border-slate-700/70" : "border border-slate-100"
+                        }`}
+                          style={
+                            hasBackgroundImage
+                              ? {
+                                  backgroundImage: `url(${backgroundImageUrl})`,
+                                  backgroundSize: "cover",
+                                  backgroundPosition: "center",
+                                  backgroundRepeat: "no-repeat",
+                                  filter: darkMode ? "none" : "brightness(1.1)",
+                                }
+                              : darkMode
+                                ? { backgroundColor: "rgba(15, 23, 42, 0.8)" }
+                                : { backgroundColor: "white" }
+                          }
+                      >
+                        {hasBackgroundImage && (
+                          <div 
+                            className="absolute inset-0 z-0"
+                            style={{
+                              backgroundColor: darkMode ? "rgba(0, 0, 0, 0.4)" : "rgba(0, 0, 0, 0.3)",
+                            }}
+                          />
+                        )}
+                        <div className="relative z-10">
+                          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                            <div>
+                              <p className={`text-xs uppercase tracking-wide font-semibold flex items-center gap-2 ${
+                                hasBackgroundImage
+                                  ? "text-indigo-200 drop-shadow"
+                                  : "text-indigo-500"
+                              }`}>
+                                <MessageSquare className="w-4 h-4" />
+                                {forum.forumType === "announcement" ? "Announcement" : "Discussion"}
+                              </p>
+                              <h1 className={`text-3xl font-bold mt-2 ${
+                                hasBackgroundImage
+                                  ? "text-white drop-shadow-lg"
+                                  : ""
+                              }`}>
+                                {forum.title}
+                              </h1>
+                              <p className={`mt-3 ${
+                                hasBackgroundImage
+                                  ? "text-white/90 drop-shadow"
+                                  : "text-slate-500 dark:text-slate-300"
+                              }`}>
+                                {forum.description}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs font-semibold">
+                              <span
+                                className={`inline-flex items-center gap-2 rounded-full px-3 py-1 ${
+                                  hasBackgroundImage
+                                    ? forum.isActive
+                                      ? "bg-emerald-500/90 text-white backdrop-blur-sm"
+                                      : "bg-rose-500/90 text-white backdrop-blur-sm"
+                                    : forum.isActive
+                                      ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-200"
+                                      : "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-200"
+                                }`}
+                              >
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                                {forum.isActive ? "Active" : "Inactive"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className={`mt-4 grid gap-3 text-xs sm:grid-cols-2 ${
+                            hasBackgroundImage
+                              ? "text-white/80"
+                              : "text-slate-500 dark:text-slate-400"
+                          }`}>
+                            {forum.createdAt && (
+                              <span className="inline-flex items-center gap-2">
+                                <Clock3 className={`w-3.5 h-3.5 ${
+                                  hasBackgroundImage 
+                                    ? "text-indigo-200"
+                                    : "text-indigo-400"
+                                }`} />
+                                Created: {formatDate(forum.createdAt)}
+                              </span>
+                            )}
+                            {forum.updatedAt && (
+                              <span className="inline-flex items-center gap-2">
+                                <RefreshCcw className={`w-3.5 h-3.5 ${
+                                  hasBackgroundImage 
+                                    ? "text-indigo-200"
+                                    : "text-indigo-400"
+                                }`} />
+                                Updated: {formatDate(forum.updatedAt)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </section>
+                    );
+                  })()}
 
                   <section
                     className={`rounded-2xl p-6 shadow-sm ${darkMode ? "bg-slate-900/70 border border-slate-700/60" : "bg-white border border-slate-100"

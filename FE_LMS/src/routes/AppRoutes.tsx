@@ -13,6 +13,7 @@ import {
   RegisterPage,
   CourseManagementPage,
   MyCoursesPage,
+  MyCoursesV2Page,
   CourseDetailPage,
   ListAllLessonsPage,
   AboutUsPage,
@@ -54,6 +55,7 @@ function AppRoutes() {
         <Route path="/" element={<LandingPage />} />
 
         {/* Course detail */}
+
         <Route
           path="/courses/:id"
           element={
@@ -75,43 +77,26 @@ function AppRoutes() {
         <Route path="/reset-password/:code" element={<ResetPasswordPage />} />
 
         <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <DashboardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/onboarding"
-          element={
-            <ProtectedRoute requiredRole="student">
-              <OnboardingPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/courses"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <CourseManagementPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/courses"
-          element={
-            <ProtectedRoute>
-              <CourseManagementPage />
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
           path="/my-courses"
           element={
             <ProtectedRoute requiredRole="student">
               <MyCoursesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-courses-v2"
+          element={
+            <ProtectedRoute requiredRole="student">
+              <MyCoursesV2Page />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-courses-v2/:semesterId"
+          element={
+            <ProtectedRoute requiredRole="student">
+              <MyCoursesV2Page />
             </ProtectedRoute>
           }
         />

@@ -46,6 +46,7 @@ import {
   subjectRoutes,
   submissionRoutes,
   userRoutes,
+  studentStatisticsRoutes,
 } from './routes';
 import { socketAuthMiddleware } from './socket/middlewares/socketAuthMiddleware';
 import initializeSocket from './socket/initializeSocket';
@@ -129,6 +130,7 @@ export const createApp = async () => {
   //socket
   io.use(socketAuthMiddleware);
   await initializeSocket(io);
+  app.use('/', studentStatisticsRoutes); // Register at root level since route path includes /enrollments
 
   //error handler
   app.use(errorHandler);

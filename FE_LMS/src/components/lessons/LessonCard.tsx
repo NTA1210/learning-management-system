@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Trash, Pencil } from "lucide-react";
 import type { Lesson } from "../../types/lesson";
+import { httpClient } from "../../utils/http";
+import { useAuth } from "../../hooks/useAuth";
 
 interface LessonCardProps {
   lesson: Lesson;
@@ -30,6 +32,53 @@ const formatDate = (dateString: string) => {
 };
 
 const LessonCard: React.FC<LessonCardProps> = ({ lesson, darkMode, canManage, onNavigate, onEdit, onDelete }) => {
+  const { user } = useAuth();
+  const [progressPercent, setProgressPercent] = useState<number>(0);
+  const isStudent = user?.role === 'student';
+
+  useEffect(() => {
+    const fetchProgress = async () => {
+      if (!lesson.hasAccess || !isStudent) return;
+      
+      try {
+        const response = await httpClient.get(`/lesson-progress/lessons/${lesson._id}`, {
+          withCredentials: true,
+        });
+        if (response.data?.success && response.data?.data) {
+          const progressData = response.data.data;
+          // If lesson is completed, always show 100%
+          if (progressData.isCompleted) {
+            setProgressPercent(100);
+          } else if (progressData.progressPercent !== undefined) {
+            setProgressPercent(progressData.progressPercent);
+          }
+        }
+      } catch {
+        // Progress might not exist yet, set to 0
+        setProgressPercent(0);
+      }
+    };
+
+    fetchProgress();
+    
+    // Listen for progress updates from LessonMaterialDetailPage
+    const handleProgressUpdate = (event: CustomEvent) => {
+      if (event.detail.lessonId === lesson._id) {
+        if (event.detail.isCompleted) {
+          setProgressPercent(100);
+        } else if (event.detail.progressPercent !== undefined) {
+          setProgressPercent(event.detail.progressPercent);
+        }
+      }
+    };
+    
+    window.addEventListener('lessonProgressUpdated', handleProgressUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('lessonProgressUpdated', handleProgressUpdate as EventListener);
+    };
+  }, [lesson._id, lesson.hasAccess, isStudent]);
+
   const handleCardHover = (event: React.MouseEvent<HTMLDivElement>, entering: boolean) => {
     const el = event.currentTarget;
     if (entering) {
@@ -123,11 +172,37 @@ const LessonCard: React.FC<LessonCardProps> = ({ lesson, darkMode, canManage, on
       </p>
 
       <div className="space-y-2 mb-4">
-        <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          {formatDuration(lesson.durationMinutes)}
+        <div className="flex items-center justify-between text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+          <div className="flex items-center">
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {formatDuration(lesson.durationMinutes)}
+          </div>
+          {lesson.hasAccess && isStudent && (
+            <div className="flex items-center gap-2">
+              
+              <div
+                className="w-55 h-2 rounded-full overflow-hidden"
+                style={{
+                  backgroundColor: darkMode ? "rgba(55, 65, 81, 0.5)" : "rgba(229, 231, 235, 0.8)",
+                }}
+              >
+                <div
+                  className="h-full transition-all duration-300 ease-out"
+                  style={{
+                    width: `${progressPercent}%`,
+                    backgroundColor: progressPercent >= 100 
+                      ? (darkMode ? "#10b981" : "#059669")
+                      : (darkMode ? "#6366f1" : "#4f46e5"),
+                  }}
+                />
+              </div>
+              <div className="flex items-center gap-1 text-xs">
+                <span className="font-semibold">{Math.round(progressPercent)}%</span>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

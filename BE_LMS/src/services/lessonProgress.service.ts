@@ -137,7 +137,7 @@ export const addTimeForLesson = async (
   const progress = await LessonProgressModel.findOneAndUpdate(
     { lessonId: lessonObjId, courseId, studentId: studentObjId },
     {
-      $setOnInsert: { isCompleted: false},
+      $setOnInsert: { isCompleted: false },
       $inc: { timeSpentSeconds: incSeconds },
       $set: { lastAccessedAt: now },
     },

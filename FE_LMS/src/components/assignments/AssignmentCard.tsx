@@ -124,14 +124,9 @@ const AssignmentCard: React.FC<AssignmentCardProps> = ({
           </div>
           <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
             <User className="w-4 h-4 mr-2" />
-            {/* Created by info can be enabled later */}
+            Created by: {assignment.createdBy?.fullname || assignment.createdBy?.username || "Unknown"}
           </div>
-          {assignment.allowLate && (
-            <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
-              <Clock className="w-4 h-4 mr-2" />
-              Late submissions allowed
-            </div>
-          )}
+          
         </div>
 
         <div
