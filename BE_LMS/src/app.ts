@@ -46,7 +46,6 @@ import {
   subjectRoutes,
   submissionRoutes,
   userRoutes,
-  studentStatisticsRoutes,
 } from './routes';
 import { socketAuthMiddleware } from './socket/middlewares/socketAuthMiddleware';
 import initializeSocket from './socket/initializeSocket';
