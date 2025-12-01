@@ -54,6 +54,44 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
 
+        {/* Onboarding */}
+        <Route
+          path="/onboarding"
+          element={
+            <ProtectedRoute requiredRole="student">
+              <OnboardingPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* All Courses */}
+        <Route
+          path="/courses"
+          element={
+            <ProtectedRoute>
+              <CourseManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Courses */}
+        <Route
+          path="/admin/courses"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <CourseManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/courses/deleted"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <DeletedCoursesPage />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Course detail */}
 
         <Route
@@ -105,6 +143,15 @@ function AppRoutes() {
           element={
             <ProtectedRoute requiredRole="student">
               <MyEnrollmentsPage />
+            </ProtectedRoute>
+          }
+        />
+        {/* Admin Dashboard - both paths for compatibility */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <DashboardPage />
             </ProtectedRoute>
           }
         />

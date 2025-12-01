@@ -297,10 +297,10 @@ export default function CourseQuizzesPage() {
           const status = courseError?.status || courseError?.response?.status;
           const errorMessage =
             courseError?.message || courseError?.response?.data?.message || "";
-          const isNotFound = status === 404 || 
-                            errorMessage.toLowerCase().includes("not found") ||
-                            errorMessage.toLowerCase().includes("course not found");
-          
+          const isNotFound = status === 404 ||
+            errorMessage.toLowerCase().includes("not found") ||
+            errorMessage.toLowerCase().includes("course not found");
+
           if (isNotFound) {
             console.log("Course not found, treating as subjectId:", courseId);
             setIsSubjectId(true);
@@ -389,17 +389,12 @@ export default function CourseQuizzesPage() {
   };
 
   const getStudentLabel = (attempt: QuizAttempt) => {
-    const student = attempt.studentId;
+    // Backend can return either 'student' or 'studentId' field
+    const student = attempt.student || attempt.studentId;
     if (!student) return "Unknown student";
     if (typeof student === "string") return student;
-    return (
-      student.fullName ||
-      student.fullname ||
-      student.username ||
-      student.email ||
-      student._id ||
-      "Unknown student"
-    );
+    // Try fullname first (lowercase), then fullName, then others
+    return student.fullname || student.fullName || student.username || student.email || student._id || "Unknown student";
   };
 
   const handleOpenEditQuiz = (quiz: QuizResponse) => {
@@ -616,7 +611,7 @@ export default function CourseQuizzesPage() {
                   <ArrowLeft className="w-4 h-4" />
                   Back
                 </button>
-              
+
               </div>
               <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--heading-text)" }}>
                 {course ? course.title : "Loading..."}
@@ -707,87 +702,87 @@ export default function CourseQuizzesPage() {
                             </div>
 
                             {/* Status Badge and Actions */}
-                              <div className="flex items-center justify-between">
-                                <span
-                                  className="text-xs font-semibold px-3 py-1 rounded-full"
-                                  style={{ backgroundColor: `${status.color}20`, color: status.color }}
-                                >
-                                  {status.label}
-                                </span>
-                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                  {quiz.isPublished && (
-                                    <span className="text-xs flex items-center gap-1" style={{ color: "#10b981" }}>
-                                      <CheckCircle className="w-4 h-4" />
-                                      Published
-                                    </span>
-                                  )}
-                                  {isStudent ? (
+                            <div className="flex items-center justify-between">
+                              <span
+                                className="text-xs font-semibold px-3 py-1 rounded-full"
+                                style={{ backgroundColor: `${status.color}20`, color: status.color }}
+                              >
+                                {status.label}
+                              </span>
+                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                {quiz.isPublished && (
+                                  <span className="text-xs flex items-center gap-1" style={{ color: "#10b981" }}>
+                                    <CheckCircle className="w-4 h-4" />
+                                    Published
+                                  </span>
+                                )}
+                                {isStudent ? (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (canTakeQuiz(quiz)) {
+                                        navigate(`/quizz/${courseId}/quiz/${quiz._id}`, {
+                                          state: { quiz },
+                                        });
+                                      }
+                                    }}
+                                    disabled={!canTakeQuiz(quiz)}
+                                    className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+                                    style={{ backgroundColor: "#6d28d9" }}
+                                  >
+                                    {canTakeQuiz(quiz) ? "Take Quiz" : "Unavailable"}
+                                  </button>
+                                ) : (
+                                  <>
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        if (canTakeQuiz(quiz)) {
-                                          navigate(`/quizz/${courseId}/quiz/${quiz._id}`, {
-                                            state: { quiz },
-                                          });
-                                        }
+                                        handleOpenStatisticsModal(quiz);
                                       }}
-                                      disabled={!canTakeQuiz(quiz)}
-                                      className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
-                                      style={{ backgroundColor: "#6d28d9" }}
+                                      className="p-2 rounded hover:bg-green-50 transition-colors"
+                                      style={{ color: "#10b981" }}
+                                      title="View quiz statistics"
                                     >
-                                      {canTakeQuiz(quiz) ? "Take Quiz" : "Unavailable"}
+                                      <BarChart3 className="w-4 h-4" />
                                     </button>
-                                  ) : (
-                                    <>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleOpenStatisticsModal(quiz);
-                                        }}
-                                        className="p-2 rounded hover:bg-green-50 transition-colors"
-                                        style={{ color: "#10b981" }}
-                                        title="View quiz statistics"
-                                      >
-                                        <BarChart3 className="w-4 h-4" />
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleOpenAttemptModal(quiz);
-                                        }}
-                                        className="p-2 rounded hover:bg-purple-50 transition-colors"
-                                        style={{ color: "#6d28d9" }}
-                                        title="View active attempts"
-                                      >
-                                        <Users className="w-4 h-4" />
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleOpenEditQuiz(quiz);
-                                        }}
-                                        className="p-2 rounded hover:bg-blue-50 transition-colors"
-                                        style={{ color: "#3b82f6" }}
-                                        title="Edit quiz"
-                                      >
-                                        <Edit2 className="w-4 h-4" />
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteQuiz(quiz._id);
-                                        }}
-                                        disabled={deletingQuizId === quiz._id}
-                                        className="p-2 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                                        style={{ color: "#ef4444" }}
-                                        title="Delete quiz"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenAttemptModal(quiz);
+                                      }}
+                                      className="p-2 rounded hover:bg-purple-50 transition-colors"
+                                      style={{ color: "#6d28d9" }}
+                                      title="View active attempts"
+                                    >
+                                      <Users className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenEditQuiz(quiz);
+                                      }}
+                                      className="p-2 rounded hover:bg-blue-50 transition-colors"
+                                      style={{ color: "#3b82f6" }}
+                                      title="Edit quiz"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteQuiz(quiz._id);
+                                      }}
+                                      disabled={deletingQuizId === quiz._id}
+                                      className="p-2 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                                      style={{ color: "#ef4444" }}
+                                      title="Delete quiz"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                )}
                               </div>
+                            </div>
                           </div>
                         </div>
                       );

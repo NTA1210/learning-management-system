@@ -20,6 +20,7 @@ import {
   updateEnrollment,
   updateSelfEnrollment,
   kickStudentFromCourse,
+  getEnrollmentStatistics,
 } from "../services/enrollment.service";
 import { EnrollmentStatus, EnrollmentMethod } from "@/types/enrollment.type";
 
@@ -149,5 +150,20 @@ export const kickStudentHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     message: result.message,
   });
+});
+
+// GET /enrollments/:id/statistics - Get enrollment statistics
+export const getEnrollmentStatisticsHandler = catchErrors(async (req, res) => {
+  const { id } = enrollmentIdSchema.parse(req.params);
+  const userId = req.userId!;
+  const role = req.role!;
+
+  const result = await getEnrollmentStatistics({
+    enrollmentId: id,
+    userId,
+    role,
+  });
+
+  return res.success(OK, { data: result });
 });
 

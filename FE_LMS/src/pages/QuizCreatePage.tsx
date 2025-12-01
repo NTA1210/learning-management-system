@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { FileText } from "lucide-react";
+import { FileText, Search, ChevronDown, Check } from "lucide-react";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { useAuth } from "../hooks/useAuth";
@@ -72,19 +72,19 @@ const fixNestedPTags = (html: string | number | undefined | null): string => {
   if (html === null || html === undefined) return "";
   if (typeof html === 'number') return String(html);
   if (typeof html !== 'string') return String(html);
-  
+
   // Remove nested <p> tags: replace <p><p> with <p> and </p></p> with </p>
   let fixed = html;
-  
+
   // Fix multiple nested opening p tags
   fixed = fixed.replace(/<p\s*[^>]*>\s*<p\s*[^>]*>/gi, '<p>');
-  
+
   // Fix multiple nested closing p tags
   fixed = fixed.replace(/<\/p>\s*<\/p>/gi, '</p>');
-  
+
   // Also handle cases with attributes: <p class="..."><p> -> <p>
   fixed = fixed.replace(/<p[^>]*>\s*<p[^>]*>/gi, '<p>');
-  
+
   return fixed;
 };
 
@@ -156,8 +156,8 @@ const normalizeQuestionTypeValue = (type: string | number | undefined | null): s
     typeof type === "string"
       ? type
       : typeof type === "number"
-      ? String(type)
-      : "";
+        ? String(type)
+        : "";
   const cleaned = raw.trim().toLowerCase().replace(/[\s-]/g, "_");
 
   if (cleaned === "mcq" || cleaned === "multiple_choice" || cleaned === "multiplechoice") {
@@ -294,10 +294,132 @@ const normalizeSnapshotQuestion = (snapshot: SnapshotQuestion) => {
     images: Array.isArray(snapshot.images) ? snapshot.images : undefined,
     id: snapshot.id ? String(snapshot.id) : undefined,
     isExternal: Boolean(snapshot.isExternal),
-      isNewQuestion: Boolean(snapshot.isNewQuestion ?? false),
+    isNewQuestion: Boolean(snapshot.isNewQuestion ?? false),
     isDeleted: Boolean(snapshot.isDeleted ?? false),
     isDirty: Boolean(snapshot.isDirty ?? false),
   };
+};
+
+interface SearchableSelectProps {
+  options: { value: string; label: string; code?: string }[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  loading?: boolean;
+  searchPlaceholder?: string;
+}
+
+const SearchableSelect: React.FC<SearchableSelectProps> = ({
+  options,
+  value,
+  onChange,
+  placeholder = "Select...",
+  disabled = false,
+  loading = false,
+  searchPlaceholder = "Search...",
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    if (!search.trim()) return options;
+    const lowerSearch = search.toLowerCase();
+    return options.filter(
+      (opt) =>
+        opt.label.toLowerCase().includes(lowerSearch) ||
+        (opt.code && opt.code.toLowerCase().includes(lowerSearch))
+    );
+  }, [options, search]);
+
+  const selectedOption = options.find((opt) => opt.value === value);
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <div
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`w-full px-3 py-2 rounded-lg border flex items-center justify-between cursor-pointer ${disabled ? "opacity-50 cursor-not-allowed" : "hover:border-indigo-500"
+          }`}
+        style={{
+          backgroundColor: "var(--input-bg)",
+          borderColor: "var(--input-border)",
+          color: "var(--input-text)",
+        }}
+      >
+        <span className={!selectedOption ? "text-gray-400" : ""}>
+          {selectedOption
+            ? `${selectedOption.code ? selectedOption.code + " - " : ""}${selectedOption.label}`
+            : placeholder}
+        </span>
+        <ChevronDown className="w-4 h-4 opacity-50" />
+      </div>
+
+      {isOpen && (
+        <div
+          className="absolute z-50 w-full mt-1 rounded-lg border shadow-lg overflow-hidden"
+          style={{
+            backgroundColor: "var(--card-surface)",
+            borderColor: "var(--card-border)",
+          }}
+        >
+          <div className="p-2 border-b" style={{ borderColor: "var(--card-border)" }}>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 opacity-50" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full pl-8 pr-3 py-1.5 text-sm rounded-md border bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                style={{
+                  borderColor: "var(--input-border)",
+                  color: "var(--heading-text)",
+                }}
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="max-h-60 overflow-y-auto">
+            {loading ? (
+              <div className="px-3 py-2 text-sm text-gray-500">Loading...</div>
+            ) : filteredOptions.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-gray-500">No results found</div>
+            ) : (
+              filteredOptions.map((option) => (
+                <div
+                  key={option.value}
+                  onClick={() => {
+                    onChange(option.value);
+                    setIsOpen(false);
+                    setSearch("");
+                  }}
+                  className="px-3 py-2 text-sm cursor-pointer flex items-center justify-between hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                  style={{ color: "var(--heading-text)" }}
+                >
+                  <span>
+                    {option.code && <span className="font-mono opacity-70 mr-2">{option.code}</span>}
+                    {option.label}
+                  </span>
+                  {value === option.value && <Check className="w-4 h-4 text-indigo-600" />}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 const QuizCreatePage: React.FC = () => {
@@ -311,6 +433,7 @@ const QuizCreatePage: React.FC = () => {
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
 
   const [courses, setCourses] = useState<Course[]>([]);
+  const [wizardCourses, setWizardCourses] = useState<Course[]>([]); // All courses for wizard dropdown
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [quizCounts, setQuizCounts] = useState<Record<string, number>>({});
@@ -390,15 +513,12 @@ const QuizCreatePage: React.FC = () => {
 
   const [submittingQuiz, setSubmittingQuiz] = useState(false);
 
-  const quizUploadEndpoint = useMemo(
-    () => `${(import.meta.env.VITE_BASE_API || "").replace(/\/$/, "")}/quiz-questions`,
-    []
-  );
 
   useEffect(() => {
     const fetchSubjects = async () => {
       try {
         setLoadingSubjects(true);
+        // Fetch subjects with max allowed limit
         const { data } = await subjectService.getAllSubjects({ limit: 100 });
         setSubjects(data);
       } catch (err) {
@@ -418,7 +538,7 @@ const QuizCreatePage: React.FC = () => {
         setLoadingCourses(true);
         const response = await http.get("/courses/my-courses", {
           params: {
-          page: coursesPage,
+            page: coursesPage,
             limit: coursesPageSize,
           },
         });
@@ -426,15 +546,15 @@ const QuizCreatePage: React.FC = () => {
         const coursesList: Course[] = Array.isArray(response?.data)
           ? response.data
           : Array.isArray(response?.data?.data)
-          ? response.data.data
-          : Array.isArray(response)
-          ? (response as Course[])
-          : [];
+            ? response.data.data
+            : Array.isArray(response)
+              ? (response as Course[])
+              : [];
 
         setCourses(coursesList);
-        
+
         const pagination = response?.pagination || response?.meta?.pagination;
-        
+
         if (pagination && typeof pagination === 'object') {
           const paginationData = pagination as Record<string, unknown>;
           const totalItems =
@@ -484,43 +604,26 @@ const QuizCreatePage: React.FC = () => {
 
   useEffect(() => {
     const fetchQuizCounts = async () => {
-      if (courses.length === 0) return;
-      
+      if (courses.length === 0) {
+        setQuizCounts({});
+        return;
+      }
+
       const counts: Record<string, number> = {};
       await Promise.all(
         courses.map(async (course) => {
           try {
-            // Fetch first page with large limit to get most quizzes
-            // Use wrapPaginationValue to ensure quoted string format for backend
-            const result = await quizService.getQuizzesByCourseId(course._id, {
-              limit: wrapPaginationValue(100),
+            const response = await quizService.getQuizzesByCourseId(course._id, {
+              limit: wrapPaginationValue(1),
               page: wrapPaginationValue(1),
+              isDeleted: false,
             });
-            
-            // Count only non-deleted quizzes from fetched data
-            const activeQuizzes = (result.data || []).filter((quiz) => !quiz.deletedAt);
-            let totalCount = activeQuizzes.length;
-            
-            // If pagination info exists and indicates more pages, fetch remaining pages
-            const pagination = result.pagination;
-            if (pagination && pagination.hasNextPage && pagination.totalPages) {
-              // Fetch remaining pages
-              for (let page = 2; page <= pagination.totalPages && page <= 10; page++) {
-                try {
-                  const nextResult = await quizService.getQuizzesByCourseId(course._id, {
-                    limit: wrapPaginationValue(100),
-                    page: wrapPaginationValue(page),
-                  });
-                  const nextActiveQuizzes = (nextResult.data || []).filter((quiz) => !quiz.deletedAt);
-                  totalCount += nextActiveQuizzes.length;
-                } catch (pageErr) {
-                  console.error(`Failed to fetch page ${page} for course ${course._id}:`, pageErr);
-                  break;
-                }
-              }
+            const paginationTotal = Number(response.pagination?.total);
+            if (!Number.isNaN(paginationTotal)) {
+              counts[course._id] = paginationTotal;
+              return;
             }
-            
-            counts[course._id] = totalCount;
+            counts[course._id] = (response.data || []).filter((quiz) => !quiz.deletedAt).length;
           } catch (err) {
             console.error(`Failed to fetch quiz count for course ${course._id}:`, err);
             counts[course._id] = 0;
@@ -648,8 +751,8 @@ const QuizCreatePage: React.FC = () => {
       Array.isArray(question.correctOptions) && question.correctOptions.length === options.length
         ? question.correctOptions
         : options.map((_, idx) =>
-            question.correctOptions && question.correctOptions.includes(idx) ? 1 : 0
-          );
+          question.correctOptions && question.correctOptions.includes(idx) ? 1 : 0
+        );
     return {
       id: question._id ?? crypto.randomUUID(),
       text: String(fixNestedPTags(question.text || "")),
@@ -660,8 +763,8 @@ const QuizCreatePage: React.FC = () => {
       explanation: question.explanation ? String(fixNestedPTags(question.explanation)) : undefined,
       images: Array.isArray(question.images)
         ? question.images.map((img) =>
-            typeof img === "string" ? { url: img, fromDB: true } : { url: img.url, fromDB: img.fromDB ?? true }
-          )
+          typeof img === "string" ? { url: img, fromDB: true } : { url: img.url, fromDB: img.fromDB ?? true }
+        )
         : undefined,
       isExternal: !fromBank,
       isNewQuestion: !fromBank,
@@ -698,18 +801,10 @@ const QuizCreatePage: React.FC = () => {
     formData.append("options", JSON.stringify(sanitizedOptions));
     formData.append("correctOptions", JSON.stringify(normalizedCorrect));
 
-    const response = await fetch(quizUploadEndpoint, {
-      method: "POST",
-      body: formData,
-      credentials: "include",
+    const response = await http.post("/quiz-questions", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
     });
-    const result = await response.json().catch(() => null);
-    if (!response.ok || (result && result.success === false)) {
-      const message =
-        result?.message || result?.error?.message || response.statusText || "Failed to create question";
-      throw new Error(message);
-    }
-    const created = result?.data as QuizQuestion;
+    const created = response?.data as QuizQuestion;
     if (created) {
       created.text = String(created.text || "");
       if (Array.isArray(created.options)) {
@@ -831,15 +926,56 @@ const QuizCreatePage: React.FC = () => {
       setShowWizard(false);
     } catch (err) {
       console.error("Failed to create quiz", err);
-      const message =
-        typeof err === "object" && err !== null && "message" in err
-          ? String((err as { message?: string }).message)
-          : "Failed to create quiz.";
-      await showSwalError(message || "Failed to create quiz. Please try again.", darkMode);
+      let message = "Failed to create quiz.";
+
+      if (err && typeof err === "object") {
+        if ("response" in err) {
+          const axiosError = err as { response?: { data?: { message?: string; error?: { message?: string } } } };
+          message = axiosError.response?.data?.message
+            || axiosError.response?.data?.error?.message
+            || message;
+        } else if ("message" in err) {
+          message = (err as { message: string }).message;
+        }
+      }
+
+      await showSwalError(message, darkMode);
     } finally {
       setSubmittingQuiz(false);
     }
   };
+
+  // Fetch all courses for the wizard dropdown when wizard opens
+  useEffect(() => {
+    if (showWizard && wizardCourses.length === 0) {
+      const fetchAllCourses = async () => {
+        try {
+          // Use my-courses if teacher, or getAllCourses if admin
+          // But for simplicity and consistency with current logic, let's use my-courses with high limit
+          // If admin, they might want to see all courses? The current logic uses /courses/my-courses for the main list too.
+          // Let's assume /courses/my-courses is correct for the user context.
+          const response = await http.get<any>("/courses/my-courses", {
+            params: { page: 1, limit: 100 },
+          });
+
+          let list: Course[] = [];
+          if (Array.isArray(response?.data)) {
+            list = response.data;
+          } else if (Array.isArray(response?.data?.data)) {
+            list = response.data.data;
+          } else if (Array.isArray(response)) {
+            list = response as Course[];
+          }
+
+          console.log("Wizard courses fetched:", list);
+          setWizardCourses(list);
+        } catch (error) {
+          console.error("Failed to fetch courses for wizard", error);
+        }
+      };
+      fetchAllCourses();
+    }
+  }, [showWizard, wizardCourses.length]);
 
   const handleDetailsNext = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -886,17 +1022,19 @@ const QuizCreatePage: React.FC = () => {
                   Questions & Quiz Builder
                 </h1>
                 <p className="text-sm" style={{ color: "var(--muted-text)" }}>
-                 
+
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={openWizardWithoutCourse}
-                className="self-start px-4 py-2 rounded-xl font-semibold shadow-lg"
-                style={{ backgroundColor: "#6d28d9", color: "#fff" }}
-              >
-                Create quiz
-              </button>
+              {isTeacherOrAdmin && (
+                <button
+                  type="button"
+                  onClick={openWizardWithoutCourse}
+                  className="self-start px-4 py-2 rounded-xl font-semibold shadow-lg"
+                  style={{ backgroundColor: "#6d28d9", color: "#fff" }}
+                >
+                  Create quiz
+                </button>
+              )}
             </header>
 
 
@@ -1009,48 +1147,41 @@ const QuizCreatePage: React.FC = () => {
                 <form onSubmit={handleDetailsNext} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-1" style={{ color: "var(--muted-text)" }}>
-                      Subject
-                    </label>
-                    <select
-                      value={selectedSubjectId}
-                      onChange={(e) => setSelectedSubjectId(e.target.value)}
-                      disabled={loadingSubjects}
-                      className="w-full px-3 py-2 rounded-lg border"
-                      style={{
-                        backgroundColor: "var(--input-bg)",
-                        borderColor: "var(--input-border)",
-                        color: "var(--input-text)",
-                      }}
-                    >
-                      <option value="">{loadingSubjects ? "Loading subjects..." : "Select subject"}</option>
-                      {subjects.map((subject) => (
-                        <option key={subject._id} value={subject._id}>
-                          {subject.code} - {subject.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1" style={{ color: "var(--muted-text)" }}>
                       Course
                     </label>
-                    <select
+                    <SearchableSelect
+                      options={wizardCourses.map((c) => ({ value: c._id, label: c.title, code: c.code }))}
                       value={quizDetails.courseId}
-                      onChange={(e) => setQuizDetails((prev) => ({ ...prev, courseId: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-lg border"
-                      style={{
-                        backgroundColor: "var(--input-bg)",
-                        borderColor: "var(--input-border)",
-                        color: "var(--input-text)",
+                      onChange={(val) => {
+                        setQuizDetails((prev) => ({ ...prev, courseId: val }));
+                        // Auto-select subject based on course
+                        const selectedCourse = wizardCourses.find(c => c._id === val);
+                        if (selectedCourse && selectedCourse.subjectId) {
+                          const subjId = typeof selectedCourse.subjectId === 'object'
+                            ? selectedCourse.subjectId._id
+                            : selectedCourse.subjectId;
+                          if (subjId) {
+                            setSelectedSubjectId(subjId);
+                          }
+                        }
                       }}
-                    >
-                      <option value="">Select course</option>
-                      {courses.map((course) => (
-                        <option key={course._id} value={course._id}>
-                          {course.title}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="Select course..."
+                      searchPlaceholder="Search course by title or code..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ color: "var(--muted-text)" }}>
+                      Subject
+                    </label>
+                    <SearchableSelect
+                      options={subjects.map((s) => ({ value: s._id, label: s.name, code: s.code }))}
+                      value={selectedSubjectId}
+                      onChange={(val) => setSelectedSubjectId(val)}
+                      loading={loadingSubjects}
+                      placeholder="Select subject..."
+                      searchPlaceholder="Search subject by name or code..."
+                    />
                   </div>
 
                   <div>
@@ -1094,7 +1225,7 @@ const QuizCreatePage: React.FC = () => {
                       <label className="block text-sm font-medium mb-1" style={{ color: "var(--muted-text)" }}>
                         Start Time
                       </label>
-                    <input
+                      <input
                         type="datetime-local"
                         value={quizDetails.startTime}
                         onChange={(e) => setQuizDetails((prev) => ({ ...prev, startTime: e.target.value }))}
@@ -1298,7 +1429,7 @@ const QuizCreatePage: React.FC = () => {
                         </button>
                       </div>
                     </div>
-                    
+
                     {/* Pagination Navigation */}
                     {draftQuestions.length > 1 && (
                       <div className="flex items-center justify-between mb-4 pb-3 border-b" style={{ borderColor: "var(--card-row-border)" }}>

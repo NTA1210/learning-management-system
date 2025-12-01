@@ -10,6 +10,7 @@ import {
   updateEnrollmentHandler,
   updateSelfEnrollmentHandler,
   kickStudentHandler,
+  getEnrollmentStatisticsHandler,
 } from "../controller/enrollment.controller";
 import authorize from "../middleware/authorize";
 import { Role } from "../types";
@@ -43,6 +44,13 @@ enrollmentRoutes.get(
   "/:id",
   authorize(Role.ADMIN, Role.TEACHER),
   getEnrollmentHandler
+);
+
+// GET /enrollments/:id/statistics - Get enrollment statistics
+enrollmentRoutes.get(
+  "/:id/statistics",
+  authorize(Role.ADMIN, Role.TEACHER, Role.STUDENT),
+  getEnrollmentStatisticsHandler
 );
 
 // POST /enrollments - Admin tạo enrollment cho student

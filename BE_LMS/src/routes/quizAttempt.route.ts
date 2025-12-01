@@ -4,6 +4,7 @@ import {
   deleteQuizAttemptHandler,
   enrollQuizHandler,
   getQuizAttemptByIdHandler,
+  gradeQuizAttemptHandler,
   saveQuizHandler,
   submitQuizHandler,
 } from '@/controller/quizAttempt.controller';
@@ -30,4 +31,9 @@ quizAttemptRoutes.put(
 
 quizAttemptRoutes.put('/:quizAttemptId/auto-save', autoSaveQuizHandler);
 quizAttemptRoutes.get('/:quizAttemptId', getQuizAttemptByIdHandler);
+quizAttemptRoutes.put(
+  '/:quizAttemptId/re-grade',
+  authorize(Role.TEACHER, Role.ADMIN),
+  gradeQuizAttemptHandler
+);
 export default quizAttemptRoutes;

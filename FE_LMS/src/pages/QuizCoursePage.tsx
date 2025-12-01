@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type ChangeEvent } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { Search, X } from "lucide-react";
+import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { Search, X, Trash2 } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar";
@@ -15,14 +15,15 @@ import {
   subjectService,
   type QuizQuestion,
   type QuizQuestionImage,
-  type Subject,
 } from "../services";
+import type { Subject } from "../types/subject";
 import type { EditFormState } from "../types/quiz";
 
 export default function QuizCoursePage() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { darkMode } = useTheme();
   const { user } = useAuth();
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
@@ -30,7 +31,21 @@ export default function QuizCoursePage() {
   const [title, setTitle] = useState("Quiz Questions");
   const [subjectInfo, setSubjectInfo] = useState<Subject | null>(null);
   const [totalQuestions, setTotalQuestions] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
+
+  const updatePageURL = (page: number) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (page === 1) {
+      newParams.delete("page");
+    } else {
+      newParams.set("page", String(page));
+    }
+    setSearchParams(newParams);
+  };
+
+  // Get page from URL or default to 1
+  const pageParam = searchParams.get("page");
+  const currentPage = pageParam ? Math.max(1, parseInt(pageParam, 10)) : 1;
+
   const [pageSize, setPageSize] = useState(100);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
@@ -52,6 +67,7 @@ export default function QuizCoursePage() {
   // Track current image index for each question
   const [currentImageIndices, setCurrentImageIndices] = useState<Record<string, number>>({});
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
 
   const resolvedRole = (user?.role as "admin" | "teacher" | "student") || "teacher";
   const canManageQuestions = resolvedRole !== "teacher";
@@ -182,11 +198,13 @@ export default function QuizCoursePage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
-      setCurrentPage(1); // Reset to page 1 when search changes
+      if (searchQuery !== debouncedSearchQuery) {
+        updatePageURL(1); // Reset to page 1 when search changes
+      }
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, setSearchParams, debouncedSearchQuery]);
 
   useEffect(() => {
     if (!courseId) return;
@@ -200,10 +218,13 @@ export default function QuizCoursePage() {
           const totalItems = manualQuestions.length;
           const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
           const safePage = Math.min(Math.max(1, currentPage), totalPages);
+
+          // If URL page is invalid for manual data, update URL
           if (safePage !== currentPage) {
-            setCurrentPage(safePage);
+            updatePageURL(safePage);
             return;
           }
+
           const startIndex = (safePage - 1) * pageSize;
           const sliced = manualQuestions.slice(startIndex, startIndex + pageSize);
 
@@ -224,7 +245,7 @@ export default function QuizCoursePage() {
 
         const result = await quizQuestionService.getAllQuizQuestions({
           subjectId: courseId,
-          type: "mcq",
+          // type: "mcq", // Remove type filter to show all questions
           page: currentPage,
           limit: pageSize,
           option: "subjectId",
@@ -241,7 +262,7 @@ export default function QuizCoursePage() {
         };
 
         if (pagination.totalPages > 0 && currentPage > pagination.totalPages) {
-          setCurrentPage(Math.max(1, pagination.totalPages));
+          updatePageURL(Math.max(1, pagination.totalPages));
           return;
         }
 
@@ -283,7 +304,7 @@ export default function QuizCoursePage() {
     return () => {
       mounted = false;
     };
-  }, [courseId, manualQuestions, currentPage, pageSize, refreshKey, debouncedSearchQuery]);
+  }, [courseId, manualQuestions, currentPage, pageSize, refreshKey, debouncedSearchQuery, setSearchParams]);
 
   useEffect(() => {
     if (!subjectInfo) return;
@@ -306,19 +327,21 @@ export default function QuizCoursePage() {
     setManualQuestions((prev) => (prev ? prev.map(applySubject) : prev));
   }, [subjectInfo]);
 
+  // Reset page when courseId changes
   useEffect(() => {
-    setCurrentPage(1);
-  }, [courseId]);
+    updatePageURL(1);
+  }, [courseId, setSearchParams]);
 
+  // Reset page when pageSize changes
   useEffect(() => {
-    setCurrentPage(1);
-  }, [pageSize]);
+    updatePageURL(1);
+  }, [pageSize, setSearchParams]);
 
   useEffect(() => {
     if (manualQuestions) {
-      setCurrentPage(1);
+      updatePageURL(1);
     }
-  }, [manualQuestions]);
+  }, [manualQuestions, setSearchParams]);
 
   const getSwalBaseOptions = () => ({
     width: 360,
@@ -399,13 +422,41 @@ export default function QuizCoursePage() {
     }
   };
 
+  const handleDeleteAllQuestions = async () => {
+    if (!courseId || totalQuestions === 0) return;
+
+    const confirmed = await showSwalConfirm(
+      `Are you sure you want to delete ALL ${totalQuestions} question${totalQuestions !== 1 ? 's' : ''} from this subject? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingAll(true);
+      await quizQuestionService.deleteAllQuestionsBySubject(courseId);
+
+      // Reload questions
+      if (manualQuestions) {
+        setManualQuestions([]);
+      } else {
+        setRefreshKey((prev) => prev + 1);
+      }
+
+      await showSwalSuccess("All questions deleted successfully.");
+    } catch (error) {
+      console.error("Error deleting all questions:", error);
+      await showSwalError("Failed to delete all questions. Please try again.");
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   const pageSizeOptions = [20, 50, 100];
   const pageOptions = Array.from({ length: Math.max(1, paginationInfo.totalPages) }, (_, index) => index + 1);
 
   const goToPage = (page: number) => {
     const total = Math.max(1, paginationInfo.totalPages);
     const nextPage = Math.min(Math.max(1, page), total);
-    setCurrentPage(nextPage);
+    updatePageURL(nextPage);
   };
 
   const handlePageChange = (direction: "prev" | "next") => {
@@ -545,10 +596,10 @@ export default function QuizCoursePage() {
       setEditForm((prev) =>
         prev
           ? {
-              ...prev,
-              newImageFiles: [...prev.newImageFiles, ...files],
-              newImagePreviews: [...prev.newImagePreviews, ...previews.filter(Boolean)],
-            }
+            ...prev,
+            newImageFiles: [...prev.newImageFiles, ...files],
+            newImagePreviews: [...prev.newImagePreviews, ...previews.filter(Boolean)],
+          }
           : prev
       );
     });
@@ -673,11 +724,16 @@ export default function QuizCoursePage() {
         <Sidebar role={resolvedRole} />
         <div className="flex-1 w-full px-4 sm:px-6 py-6 md:ml-[50px] relative overflow-x-hidden">
           <div className="max-w-6xl mx-auto">
-            <QuizPageHeader title={title} onBack={() => navigate(-1)} darkMode={darkMode} textColor={textColor} />
+            <QuizPageHeader
+              title={title}
+              onBack={() => navigate(-1)}
+              darkMode={darkMode}
+              textColor={textColor}
+            />
             <div className="md:pl-12">
-              {/* Search Input - Always visible */}
-              <div className="mb-4">
-                <div className="relative">
+              {/* Search Input and Delete All Button */}
+              <div className="mb-4 flex gap-2">
+                <div className="relative flex-1">
                   <input
                     type="text"
                     placeholder="Search questions..."
@@ -705,6 +761,21 @@ export default function QuizCoursePage() {
                     </button>
                   )}
                 </div>
+                {user?.role === "admin" && totalQuestions > 0 && (
+                  <button
+                    onClick={handleDeleteAllQuestions}
+                    disabled={deletingAll}
+                    className="px-4 py-2 rounded-lg font-semibold transition-all hover:opacity-80 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+                    style={{
+                      backgroundColor: "#ef4444",
+                      color: "#ffffff",
+                    }}
+                    title={`Delete all ${totalQuestions} questions`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span className="hidden sm:inline">Delete All</span>
+                  </button>
+                )}
               </div>
 
               {loading ? (
@@ -763,7 +834,7 @@ export default function QuizCoursePage() {
                           onImageNext={handleImageNext}
                           onEdit={handleOpenEditQuestion}
                           onDelete={handleDeleteQuestion}
-                        canManage={canManageQuestions}
+                          canManage={canManageQuestions}
                         />
                       ))}
                     </div>
