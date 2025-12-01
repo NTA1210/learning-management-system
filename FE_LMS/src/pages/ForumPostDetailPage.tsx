@@ -13,6 +13,7 @@ import {
 import { ArrowLeft, Edit3, Loader2, MessageSquare, Trash2 } from "lucide-react";
 import MarkdownContent from "../components/MarkdownContent";
 import AttachmentPreview from "../components/AttachmentPreview";
+import MarkdownComposer from "../components/MarkdownComposer";
 
 type SidebarRole = "admin" | "teacher" | "student";
 type ReplyNode = ForumReply & { children?: ReplyNode[] };
@@ -27,14 +28,6 @@ const ForumPostDetailPage: React.FC = () => {
 
   const sidebarRole: SidebarRole =
     user && ["admin", "teacher", "student"].includes(user.role) ? (user.role as SidebarRole) : "student";
-  const formatFileSize = (size: number) => {
-    if (!size || Number.isNaN(size)) return "0 B";
-    const units = ["B", "KB", "MB", "GB"];
-    const exponent = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
-    const value = size / 1024 ** exponent;
-    const formatted = exponent === 0 || value >= 10 ? value.toFixed(0) : value.toFixed(1);
-    return `${formatted} ${units[exponent]}`;
-  };
 
   const [forum, setForum] = useState<ForumResponse | null>(null);
   const [post, setPost] = useState<ForumPost | null>(null);
@@ -578,50 +571,28 @@ const ForumPostDetailPage: React.FC = () => {
                     {replyTarget?.displayName && (
                       <div
                         className={`text-xs rounded-xl px-3 py-2 border ${
-                          darkMode ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-100" : "border-indigo-200 bg-indigo-50 text-indigo-600"
+                          darkMode
+                            ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-100"
+                            : "border-indigo-200 bg-indigo-50 text-indigo-600"
                         }`}
                       >
                         You are replying to <span className="font-semibold">@{replyTarget.displayName}</span>
                       </div>
                     )}
-                    <textarea
-                      ref={replyTextareaRef}
-                      className={`w-full h-28 rounded-xl border px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
-                        darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                      }`}
-                      placeholder="Share your thoughts, code snippets, or resources (Markdown supported)"
-                      value={replyContent}
-                      onChange={(event) => {
-                        setReplyContent(event.target.value);
-                        setReplyError(null);
-                      }}
-                    ></textarea>
                     <div>
-                      <label className="block text-sm font-medium mb-2"></label>
-                      <input
-                        type="file"
-                        accept={attachmentAcceptTypes}
-                        onChange={(event) => setReplyFile(event.target.files?.[0] || null)}
-                        className="w-full rounded-xl  text-sm file:mr-4 file:rounded-full file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500 cursor-pointer"
+                      <label className="block text-sm font-medium mb-2">Content editor</label>
+                      <MarkdownComposer
+                        value={replyContent}
+                        onChange={(next) => {
+                          setReplyContent(next);
+                          setReplyError(null);
+                        }}
+                        placeholder="Share your thoughts, code snippets, or resources using Markdown shortcuts."
+                        darkMode={darkMode}
+                        attachment={replyFile}
+                        onAttachmentChange={(file) => setReplyFile(file)}
+                        attachmentAccept={attachmentAcceptTypes}
                       />
-                      {replyFile && (
-                        <div
-                          className={`mt-2 flex items-center justify-between rounded-xl px-3 py-2 text-xs ${
-                            darkMode ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          <span className="truncate pr-2">
-                            {replyFile.name} • {formatFileSize(replyFile.size)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setReplyFile(null)}
-                            className="text-rose-500 font-semibold hover:text-rose-400"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      )}
                     </div>
                     {replyError && <p className="text-sm text-rose-500">{replyError}</p>}
                     <div className="flex items-center justify-end gap-3">
