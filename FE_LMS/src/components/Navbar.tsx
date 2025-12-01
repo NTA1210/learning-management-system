@@ -2,7 +2,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { KeyRound, LogOut, Moon, Settings2, Sun, UserRound, UsersRound, Paintbrush } from "lucide-react";
+import {
+  KeyRound,
+  LogOut,
+  Moon,
+  Settings2,
+  Sun,
+  UserRound,
+  UsersRound,
+  Paintbrush,
+} from "lucide-react";
 import NotificationDropdown from "./NotificationDropdown";
 import { authService } from "../services";
 
@@ -15,14 +24,23 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
   const { darkMode, toggleDarkMode } = useTheme();
   const { user, savedAccounts, switchToAccount, logout } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(null);
-  const [manualPasswords, setManualPasswords] = useState<Record<string, string>>({});
-  const [passwordPromptAccount, setPasswordPromptAccount] = useState<string | null>(null);
+  const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(
+    null
+  );
+  const [manualPasswords, setManualPasswords] = useState<
+    Record<string, string>
+  >({});
+  const [passwordPromptAccount, setPasswordPromptAccount] = useState<
+    string | null
+  >(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsDropdownOpen(false);
       }
     };
@@ -45,7 +63,10 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
     }
   };
 
-  const handleAccountSwitch = async (accountId: string, passwordOverride?: string) => {
+  const handleAccountSwitch = async (
+    accountId: string,
+    passwordOverride?: string
+  ) => {
     setSwitchingAccountId(accountId);
     try {
       const switchedUser = await switchToAccount(accountId, passwordOverride);
@@ -59,7 +80,9 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
       setIsDropdownOpen(false);
     } catch (error) {
       console.error("Failed to switch account", error);
-      alert("Unable to switch accounts. Please verify the password and try again.");
+      alert(
+        "Unable to switch accounts. Please verify the password and try again."
+      );
     } finally {
       setSwitchingAccountId(null);
     }
@@ -85,76 +108,136 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
 
   const recentAccounts = savedAccounts
     .filter((account) => {
-      const accountTokens = [
-        account.userId,
-        account.email,
-        account.displayName,
-      ]
+      const accountTokens = [account.userId, account.email, account.displayName]
         .filter((value): value is string => Boolean(value))
         .map((value) => value.toLowerCase());
-      return !accountTokens.some((token) => currentAccountTokens.includes(token));
+      return !accountTokens.some((token) =>
+        currentAccountTokens.includes(token)
+      );
     })
     .sort((a, b) => b.lastUsed - a.lastUsed);
 
   const dropdownPanelStyle = {
-    backgroundColor: darkMode ? "rgba(15, 23, 42, 0.98)" : "rgba(255, 255, 255, 0.98)",
-    borderColor: darkMode ? "rgba(71, 85, 105, 0.6)" : "rgba(226, 232, 240, 0.9)",
+    backgroundColor: darkMode
+      ? "rgba(15, 23, 42, 0.98)"
+      : "rgba(255, 255, 255, 0.98)",
+    borderColor: darkMode
+      ? "rgba(71, 85, 105, 0.6)"
+      : "rgba(226, 232, 240, 0.9)",
     color: darkMode ? "#e2e8f0" : "#0f172a",
+  };
+
+  const handleReturnHomePage = () => {
+    const path = "/admin/dashboard";
+    switch (user?.role) {
+      case "admin":
+        navigate(path);
+        break;
+      case "teacher":
+        navigate("/teacher-dashboard");
+        break;
+      case "student":
+        navigate("/student-dashboard");
+        break;
+      default:
+        navigate("/");
+    }
   };
 
   return (
     <nav
       className="shadow-lg py-3 px-4 sm:px-6 fixed top-0 left-0 right-0 z-[95] backdrop-blur-md transition-colors duration-300"
       style={{
-        backgroundColor: darkMode ? "rgba(26, 32, 44, 0.95)" : "rgba(255, 255, 255, 0.95)",
-        borderBottom: darkMode ? "1px solid rgba(148, 163, 184, 0.1)" : "1px solid rgba(148, 163, 184, 0.1)",
+        backgroundColor: darkMode
+          ? "rgba(26, 32, 44, 0.95)"
+          : "rgba(255, 255, 255, 0.95)",
+        borderBottom: darkMode
+          ? "1px solid rgba(148, 163, 184, 0.1)"
+          : "1px solid rgba(148, 163, 184, 0.1)",
         color: darkMode ? "#ffffff" : "#1e293b",
       }}
     >
-      <div className="max-w-7xl mx-auto flex flex-col gap-3">
+      <div className="flex flex-col gap-3 mx-auto max-w-7xl">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center">
             <button
-              className="mr-3 p-2 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/20 md:hidden"
+              className="p-2 mr-3 transition-all duration-200 rounded-lg hover:scale-105 focus:outline-none focus:ring-2 focus:ring-white/20 md:hidden"
               style={{
-                backgroundColor: darkMode ? "rgba(99, 102, 241, 0.15)" : "rgba(99, 102, 241, 0.1)",
+                backgroundColor: darkMode
+                  ? "rgba(99, 102, 241, 0.15)"
+                  : "rgba(99, 102, 241, 0.1)",
                 color: darkMode ? "#a5b4fc" : "#4f46e5",
               }}
               onClick={onToggleSidebar}
               aria-label="Toggle sidebar"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-6 h-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 6h16M4 12h16M4 18h16"
+                ></path>
               </svg>
             </button>
-            <a className="flex items-center space-x-3" href="/admin/dashboard">
+            <span
+              className="flex items-center space-x-3 cursor-pointer"
+              onClick={handleReturnHomePage}
+            >
               <div
-                className="h-10 w-10 rounded-xl flex items-center justify-center shadow-lg"
+                className="flex items-center justify-center w-10 h-10 shadow-lg rounded-xl"
                 style={{ backgroundColor: "#6366f1" }}
               >
-                <span className="text-white font-bold text-lg">F</span>
+                <span className="text-lg font-bold text-white">F</span>
               </div>
-              <span className="text-xl font-bold" style={{ color: darkMode ? "#ffffff" : "#1e293b" }}>
+              <span
+                className="text-xl font-bold"
+                style={{ color: darkMode ? "#ffffff" : "#1e293b" }}
+              >
                 FStudyMate
               </span>
-            </a>
+            </span>
           </div>
-          <div className="hidden md:flex md:flex-1 mx-4">
+          <div className="hidden mx-4 md:flex md:flex-1">
             <div className="relative w-full max-w-xl mx-auto">
               <input
                 type="text"
                 placeholder="Search..."
-                className="w-full pl-10 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all duration-200"
+                className="w-full py-3 pl-10 pr-4 transition-all duration-200 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 style={{
-                  borderColor: darkMode ? "rgba(148, 163, 184, 0.2)" : "rgba(148, 163, 184, 0.3)",
-                  backgroundColor: darkMode ? "rgba(15, 23, 42, 0.5)" : "rgba(255, 255, 255, 0.85)",
+                  borderColor: darkMode
+                    ? "rgba(148, 163, 184, 0.2)"
+                    : "rgba(148, 163, 184, 0.3)",
+                  backgroundColor: darkMode
+                    ? "rgba(15, 23, 42, 0.5)"
+                    : "rgba(255, 255, 255, 0.85)",
                   color: darkMode ? "#ffffff" : "#1e293b",
                   backdropFilter: "blur(10px)",
                 }}
               />
-              <div className="absolute right-3 top-2.5" style={{ color: darkMode ? "#9ca3af" : "#9ca3af" }}>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              <div
+                className="absolute right-3 top-2.5"
+                style={{ color: darkMode ? "#9ca3af" : "#9ca3af" }}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="w-5 h-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  ></path>
                 </svg>
               </div>
             </div>
@@ -172,24 +255,43 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                 >
                   <img
                     src={
-                      (user as { profileImageUrl?: string; avatar_url?: string }).profileImageUrl ||
-                      (user as { profileImageUrl?: string; avatar_url?: string }).avatar_url ||
+                      (
+                        user as {
+                          profileImageUrl?: string;
+                          avatar_url?: string;
+                        }
+                      ).profileImageUrl ||
+                      (
+                        user as {
+                          profileImageUrl?: string;
+                          avatar_url?: string;
+                        }
+                      ).avatar_url ||
                       "https://media.tenor.com/AN83u7YyqwUAAAAM/maxwell-the-cat.gif"
                     }
                     alt={
-                      (user as { fullName?: string; fullname?: string }).fullName ||
-                      (user as { fullName?: string; fullname?: string }).fullname ||
+                      (user as { fullName?: string; fullname?: string })
+                        .fullName ||
+                      (user as { fullName?: string; fullname?: string })
+                        .fullname ||
                       "profile"
                     }
-                    className="h-8 w-8 md:h-9 md:w-9 rounded-full object-cover border border-white/70"
+                    className="object-cover w-8 h-8 border rounded-full md:h-9 md:w-9 border-white/70"
                   />
                   <svg
-                    className={`h-4 w-4 transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
+                    className={`h-4 w-4 transition-transform ${
+                      isDropdownOpen ? "rotate-180" : ""
+                    }`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M19 9l-7 7-7-7"
+                    />
                   </svg>
                 </button>
                 {isDropdownOpen && (
@@ -198,28 +300,32 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                     style={dropdownPanelStyle}
                   >
                     <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
-                      <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">
+                      <div className="flex items-center gap-2 mb-1 text-xs tracking-wide uppercase text-slate-500 dark:text-slate-400">
                         <UserRound className="h-3.5 w-3.5" />
                         Current account
                       </div>
                       <button
-                        className="flex items-center gap-3 w-full text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-xl px-2 py-2"
+                        className="flex items-center w-full gap-3 px-2 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 rounded-xl"
                         onClick={async () => {
                           try {
                             // Call /users/me API to get current user info
-                            const currentUser = await authService.getCurrentUser();
-                            
+                            const currentUser =
+                              await authService.getCurrentUser();
+
                             if (currentUser?._id) {
                               // Navigate to user profile page with user data passed via state
                               navigate(`/user/${currentUser._id}`, {
-                                state: { userData: currentUser }
+                                state: { userData: currentUser },
                               });
                             } else {
                               // Fallback to profile if no ID found
                               navigate("/profile");
                             }
                           } catch (error) {
-                            console.error("Failed to fetch current user:", error);
+                            console.error(
+                              "Failed to fetch current user:",
+                              error
+                            );
                             // Fallback to profile on error
                             navigate("/profile");
                           }
@@ -228,69 +334,111 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                       >
                         <img
                           src={
-                            (user as { profileImageUrl?: string; avatar_url?: string }).profileImageUrl ||
-                            (user as { profileImageUrl?: string; avatar_url?: string }).avatar_url ||
+                            (
+                              user as {
+                                profileImageUrl?: string;
+                                avatar_url?: string;
+                              }
+                            ).profileImageUrl ||
+                            (
+                              user as {
+                                profileImageUrl?: string;
+                                avatar_url?: string;
+                              }
+                            ).avatar_url ||
                             "https://media.tenor.com/AN83u7YyqwUAAAAM/maxwell-the-cat.gif"
                           }
                           alt="current profile"
-                          className="h-10 w-10 rounded-full object-cover border border-white/70"
+                          className="object-cover w-10 h-10 border rounded-full border-white/70"
                         />
                         <div>
                           <p
-                            className="font-semibold text-sm text-slate-800 dark:text-white"
+                            className="text-sm font-semibold text-slate-800 dark:text-white"
                             style={{ color: darkMode ? "#f9fafb" : "#0f172a" }}
                           >
-                            {(user as { fullName?: string; fullname?: string; username?: string }).fullName ||
-                              (user as { fullName?: string; fullname?: string; username?: string }).fullname ||
-                              (user as { fullName?: string; fullname?: string; username?: string }).username}
+                            {(
+                              user as {
+                                fullName?: string;
+                                fullname?: string;
+                                username?: string;
+                              }
+                            ).fullName ||
+                              (
+                                user as {
+                                  fullName?: string;
+                                  fullname?: string;
+                                  username?: string;
+                                }
+                              ).fullname ||
+                              (
+                                user as {
+                                  fullName?: string;
+                                  fullname?: string;
+                                  username?: string;
+                                }
+                              ).username}
                           </p>
                           <p className="text-xs text-slate-500">
-                            {(user as { email?: string }).email || "View profile"}
+                            {(user as { email?: string }).email ||
+                              "View profile"}
                           </p>
                         </div>
                       </button>
                     </div>
                     <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
-                      <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
+                      <div className="flex items-center gap-2 mb-2 text-xs tracking-wide uppercase text-slate-500 dark:text-slate-400">
                         <UsersRound className="h-3.5 w-3.5" />
                         Other recent accounts
                       </div>
                       {recentAccounts.length === 0 && (
-                        <p className="text-sm text-slate-600 dark:text-slate-400">No other recent accounts yet</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                          No other recent accounts yet
+                        </p>
                       )}
                       {recentAccounts.map((account) => {
-                        const manualPassword = manualPasswords[account.userId] || "";
-                        const isSwitching = switchingAccountId === account.userId;
-                        const isPromptOpen = passwordPromptAccount === account.userId;
+                        const manualPassword =
+                          manualPasswords[account.userId] || "";
+                        const isSwitching =
+                          switchingAccountId === account.userId;
+                        const isPromptOpen =
+                          passwordPromptAccount === account.userId;
                         return (
                           <div
                             key={account.userId}
-                            className="rounded-xl px-3 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors mb-2 last:mb-0"
+                            className="px-3 py-3 mb-2 transition-colors rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/40 last:mb-0"
                           >
                             <div className="flex items-center justify-between gap-3">
                               <div>
                                 <p
                                   className="text-sm font-medium text-slate-800 dark:text-white"
-                                  style={{ color: darkMode ? "#f9fafb" : "#0f172a" }}
+                                  style={{
+                                    color: darkMode ? "#f9fafb" : "#0f172a",
+                                  }}
                                 >
                                   {account.displayName}
                                 </p>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">{account.email}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  {account.email}
+                                </p>
                               </div>
                               {account.hasPassword ? (
                                 <button
                                   className="text-xs font-semibold text-indigo-500 hover:text-indigo-600"
-                                  onClick={() => handleAccountSwitch(account.userId)}
+                                  onClick={() =>
+                                    handleAccountSwitch(account.userId)
+                                  }
                                   disabled={isSwitching}
                                 >
                                   {isSwitching ? "Switching..." : "Switch"}
                                 </button>
                               ) : (
                                 <button
-                                  className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-indigo-500 inline-flex items-center gap-1"
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-indigo-500"
                                   onClick={() =>
                                     setPasswordPromptAccount((prev) =>
-                                      prev === account.userId ? null : account.userId,
+                                      prev === account.userId
+                                        ? null
+                                        : account.userId
                                     )
                                   }
                                 >
@@ -309,14 +457,22 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                                   type="password"
                                   value={manualPassword}
                                   onChange={(event) =>
-                                    handleManualPasswordChange(account.userId, event.target.value)
+                                    handleManualPasswordChange(
+                                      account.userId,
+                                      event.target.value
+                                    )
                                   }
                                   placeholder="Password"
-                                  className="w-full rounded-lg border border-slate-200 dark:border-slate-600 px-3 py-2 text-sm text-slate-700 dark:text-white bg-white dark:bg-slate-800"
+                                  className="w-full px-3 py-2 text-sm bg-white border rounded-lg border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white dark:bg-slate-800"
                                 />
                                 <button
-                                  className="w-full rounded-lg bg-indigo-500 text-white text-sm py-2 font-medium disabled:opacity-50"
-                                  onClick={() => handleAccountSwitch(account.userId, manualPassword)}
+                                  className="w-full py-2 text-sm font-medium text-white bg-indigo-500 rounded-lg disabled:opacity-50"
+                                  onClick={() =>
+                                    handleAccountSwitch(
+                                      account.userId,
+                                      manualPassword
+                                    )
+                                  }
                                   disabled={!manualPassword || isSwitching}
                                 >
                                   {isSwitching ? "Switching..." : "Switch"}
@@ -329,11 +485,11 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                     </div>
                     <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700">
                       <button
-                        className="w-full text-left text-sm text-slate-500 dark:text-slate-300 px-2 py-2 rounded-lg border border-dashed border-slate-200 dark:border-slate-600 cursor-not-allowed"
+                        className="w-full px-2 py-2 text-sm text-left border border-dashed rounded-lg cursor-not-allowed text-slate-500 dark:text-slate-300 border-slate-200 dark:border-slate-600"
                         type="button"
                       >
                         <span className="inline-flex items-center gap-2">
-                          <Settings2 className="h-4 w-4" />
+                          <Settings2 className="w-4 h-4" />
                           Account settings (coming soon)
                         </span>
                       </button>
@@ -384,13 +540,13 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                     <div className="px-4 py-3">
                       <button
                         type="button"
-                        className="w-full text-left text-sm font-semibold text-rose-500 hover:text-rose-600 flex items-center gap-2"
+                        className="flex items-center w-full gap-2 text-sm font-semibold text-left text-rose-500 hover:text-rose-600"
                         onClick={() => {
                           setIsDropdownOpen(false);
                           logout();
                         }}
                       >
-                        <LogOut className="h-4 w-4" />
+                        <LogOut className="w-4 h-4" />
                         Logout
                       </button>
                     </div>
@@ -407,14 +563,32 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
               placeholder="Search..."
               className="w-full pl-10 pr-4 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all duration-200"
               style={{
-                borderColor: darkMode ? "rgba(148, 163, 184, 0.3)" : "rgba(148, 163, 184, 0.35)",
-                backgroundColor: darkMode ? "rgba(15, 23, 42, 0.6)" : "rgba(255, 255, 255, 0.95)",
+                borderColor: darkMode
+                  ? "rgba(148, 163, 184, 0.3)"
+                  : "rgba(148, 163, 184, 0.35)",
+                backgroundColor: darkMode
+                  ? "rgba(15, 23, 42, 0.6)"
+                  : "rgba(255, 255, 255, 0.95)",
                 color: darkMode ? "#ffffff" : "#1e293b",
               }}
             />
-            <div className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: darkMode ? "#9ca3af" : "#94a3b8" }}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            <div
+              className="absolute -translate-y-1/2 left-3 top-1/2"
+              style={{ color: darkMode ? "#9ca3af" : "#94a3b8" }}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="w-5 h-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                ></path>
               </svg>
             </div>
           </div>

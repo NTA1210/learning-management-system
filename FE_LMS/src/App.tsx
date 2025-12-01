@@ -9,31 +9,32 @@ function App() {
     <AuthProvider>
       <ThemeProvider>
         <AppRoutes />
-        <ThemeToggle />
+
+        {/* <ThemeToggle /> */}
         <Toaster
           position="top-right"
           containerStyle={{
-            top: '80px', // Add padding from top to avoid navbar
+            top: "80px", // Add padding from top to avoid navbar
           }}
           toastOptions={{
             duration: 15000,
             style: {
-              background: '#363636',
-              color: '#fff',
-              marginTop: '16px', // Additional top margin
+              background: "#363636",
+              color: "#fff",
+              marginTop: "16px", // Additional top margin
             },
             success: {
               duration: 3000,
               iconTheme: {
-                primary: '#4ade80',
-                secondary: '#fff',
+                primary: "#4ade80",
+                secondary: "#fff",
               },
             },
             error: {
               duration: 4000,
               iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
+                primary: "#ef4444",
+                secondary: "#fff",
               },
             },
           }}

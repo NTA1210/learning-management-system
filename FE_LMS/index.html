@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -7,28 +7,33 @@
     <script>
       (() => {
         try {
-          const stored = localStorage.getItem('appDarkMode');
+          const stored = localStorage.getItem("appDarkMode");
           const prefersDark =
-            window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-          const isDark = stored !== null ? stored === 'true' : prefersDark;
+            window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches;
+          const isDark = stored !== null ? stored === "true" : prefersDark;
           const root = document.documentElement;
           if (isDark) {
-            root.classList.add('dark');
+            root.classList.add("dark");
           } else {
-            root.classList.remove('dark');
+            root.classList.remove("dark");
           }
-          root.setAttribute('data-theme', isDark ? 'dark' : 'light');
+          root.setAttribute("data-theme", isDark ? "dark" : "light");
         } catch (error) {
-          console.warn('Theme bootstrap failed', error);
+          console.warn("Theme bootstrap failed", error);
         }
       })();
     </script>
     <title>FStudyMate LMS</title>
     <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
   </head>
   <body>
     <div id="root"></div>
+    <div id="portal"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

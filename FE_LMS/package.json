@@ -13,6 +13,7 @@
     "@react-three/drei": "^10.7.6",
     "@react-three/fiber": "^9.4.0",
     "@tailwindcss/vite": "^4.1.14",
+    "@tanstack/react-query": "^5.90.11",
     "axios": "^1.12.2",
     "bootstrap-icons": "^1.13.1",
     "date-fns": "^4.1.0",
@@ -31,10 +32,13 @@
     "remark-emoji": "^5.0.2",
     "remark-gfm": "^4.0.1",
     "remark-supersub": "^1.0.0",
+    "socket.io-client": "^4.8.1",
+    "sonner": "^2.0.7",
     "sweetalert2": "^11.26.3",
     "tailwindcss": "^4.1.14",
     "three": "^0.180.0",
-    "unist-util-visit": "^5.0.0"
+    "unist-util-visit": "^5.0.0",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",

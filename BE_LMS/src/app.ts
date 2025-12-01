@@ -3,7 +3,8 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { Role } from './types';
 import { uploadFile } from './utils/uploadFile';
-import './models/semester.model'; // ✅ Register Semester model
+import { Server } from 'socket.io';
+import http from 'http';
 
 //config
 import upload from './config/multer';
@@ -46,8 +47,12 @@ import {
   submissionRoutes,
   userRoutes,
 } from './routes';
+import { socketAuthMiddleware } from './socket/middlewares/socketAuthMiddleware';
+import initializeSocket from './socket/initializeSocket';
+import messageRoutes from './routes/message.route';
+import chatRoomRoutes from './routes/chatRoom.route';
 
-export const createApp = () => {
+export const createApp = async () => {
   const app = express();
 
   app.use(customResponse);
@@ -60,6 +65,18 @@ export const createApp = () => {
     })
   );
   app.use(cookieParser());
+
+  const httpServer = http.createServer(app);
+
+  const io = new Server(httpServer, {
+    cors: {
+      origin: APP_ORIGIN,
+      credentials: true,
+      methods: ['GET', 'POST'],
+    },
+    pingInterval: 25000,
+    pingTimeout: 60000,
+  });
 
   //example API----------------------------------
   app.get('/', (req, res) => {
@@ -106,9 +123,16 @@ export const createApp = () => {
   app.use('/quiz-attempts', authenticate, quizAttemptRoutes);
   app.use('/attendances', authenticate, attendanceRoutes);
   app.use('/semesters', semesterRoutes);
+  app.use('/chat-rooms', authenticate, messageRoutes);
+  app.use('/chat-rooms', authenticate, chatRoomRoutes);
+
+  //socket
+  io.use(socketAuthMiddleware);
+  await initializeSocket(io);
+  app.use('/', studentStatisticsRoutes); // Register at root level since route path includes /enrollments
 
   //error handler
   app.use(errorHandler);
 
-  return app;
+  return httpServer;
 };
