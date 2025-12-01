@@ -84,7 +84,7 @@ courseRoutes.get('/:courseId/quizzes', authenticate, getQuizzesHandler);
 courseRoutes.get(
   '/:courseId/statistics',
   authenticate,
-  authorize(Role.ADMIN),
+  authorize(Role.ADMIN, Role.TEACHER),
   getCourseStatisticsHandler
 );
 

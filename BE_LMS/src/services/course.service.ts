@@ -1778,7 +1778,11 @@ export const completeCourse = async (courseId: string) => {
  * @param courseId - ID của khóa học
  * @returns Thống kê khóa học
  */
-export const getCourseStatistics = async (courseId: string) => {
+export const getCourseStatistics = async (
+  courseId: string,
+  userId?: Types.ObjectId,
+  userRole?: Role
+) => {
   // Validate courseId format
   appAssert(
     courseId && courseId.match(/^[0-9a-fA-F]{24}$/),
@@ -1797,6 +1801,18 @@ export const getCourseStatistics = async (courseId: string) => {
     .lean();
 
   appAssert(course, NOT_FOUND, 'Course not found');
+
+  // Check permission: Teacher can only view statistics of their own course
+  if (userRole === Role.TEACHER) {
+    const isTeacherOfCourse = course.teacherIds.some((teacher: any) =>
+      teacher._id.equals(userId)
+    );
+    appAssert(
+      isTeacherOfCourse,
+      FORBIDDEN,
+      "You don't have permission to view statistics for this course"
+    );
+  }
 
   // Kiểm tra xem khóa học đã có thống kê chưa
   if (!course.statistics || Object.keys(course.statistics).length === 0) {
