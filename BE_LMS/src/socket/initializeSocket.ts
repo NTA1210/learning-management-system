@@ -6,6 +6,7 @@ import {
   chatRoomSendMessage,
   conversationMarkAsRead,
   conversationTyping,
+  joinNewChatroom,
   leaveChatRoom,
 } from './socketConversation';
 import { getChatRoom } from './helpers';
@@ -45,6 +46,10 @@ const initializeSocket = async (io: Server) => {
 
       socket.on('chatroom:leave-chatroom', (data) => {
         leaveChatRoom(io, socket, data);
+      });
+
+      socket.on('chatroom:join', (data) => {
+        joinNewChatroom(io, socket, data);
       });
     } catch (error) {
       console.error('Error in initializeSocket:', error);

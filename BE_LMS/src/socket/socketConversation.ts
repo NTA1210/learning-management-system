@@ -46,8 +46,6 @@ export const chatRoomSendMessage = async (io: Server, socket: Socket, data: any)
       createdAt: message.createdAt,
     };
 
-    console.log(chatRoom.unreadCounts.entries());
-
     for (const [userId, count] of chatRoom.unreadCounts.entries()) {
       if (userId !== senderId.toString()) {
         chatRoom.unreadCounts.set(userId, count + 1);
@@ -92,8 +90,6 @@ export const chatRoomSendMessage = async (io: Server, socket: Socket, data: any)
       },
       unreadCounts: chatRoom.unreadCounts,
     });
-
-    console.log('UPDATE MESSAGE');
   } catch (error) {
     console.error('Error in chatRoomSendMessage:', error);
     socket.emit('chatroom:send-message:error', 'Internal server error');
@@ -105,8 +101,13 @@ export const conversationTyping = async (io: Server, socket: Socket, data: any) 
     const { chatRoomId, isTyping } = data;
     const userId = socket.userId;
 
+    if (!userId) return;
+
+    const chat = await ChatRoomModel.findById(chatRoomId);
+
     io.to(chatRoomId).emit('conversation:update-typing', {
-      userId,
+      chatRoomId: chatRoomId.toString(),
+      userId: userId.toString(),
       isTyping,
     });
   } catch (error) {
@@ -248,7 +249,7 @@ export const chatRoomInviteUser = async (io: Server, socket: Socket, data: any) 
 
     if (!userId || !user) return;
 
-    const chatRoom = await ChatRoomModel.findById(chatRoomId).session(session);
+    const chatRoom = await ChatRoomModel.findById(chatRoomId).populate('courseId').session(session);
 
     if (!chatRoom) throw new Error('Chat room not found');
 
@@ -359,10 +360,13 @@ export const chatRoomInviteUser = async (io: Server, socket: Socket, data: any) 
       unreadCounts: chatRoom.unreadCounts,
     });
 
-    io.to(exist._id.toString()).emit('chatroom:update-chatroom', {
-      chatRoomId,
-      lastMessage: chatRoom.lastMessage,
+    io.to(exist._id.toString()).emit('chatroom:added', {
+      chatRoomId: chatRoom.id.toString(),
+      name: chatRoom.name,
+      course: chatRoom.courseId,
+      participants: chatRoom.participants,
       unreadCounts: chatRoom.unreadCounts,
+      lastMessage: chatRoom.lastMessage,
     });
   } catch (error: any) {
     // ❗ROLLBACK — tất cả thay đổi bị hủy
@@ -449,30 +453,27 @@ export const leaveChatRoom = async (io: Server, socket: Socket, data: any) => {
 
     const room = chatRoom.id.toString();
 
-    io.to(room).emit('chatroom:notification-new-message', {
+    socket.to(room).emit('chatroom:notification-new-message', {
       chatRoomName: chatRoom.name,
       chatRoomId,
       message: messageData,
     });
 
-    io.to(room).emit('chatroom:new-message', {
+    socket.to(room).emit('chatroom:new-message', {
       chatRoomId,
       message: messageData,
     });
 
-    io.to(room).emit('chatroom:update-chatroom', {
+    socket.to(room).emit('chatroom:update-chatroom', {
       chatRoomId,
       lastMessage: chatRoom.lastMessage,
       unreadCounts: chatRoom.unreadCounts,
     });
 
-    socket.to(userId.toString()).emit('chatroom:leave-chatroom:success', {
+    socket.emit('chatroom:leave-chatroom:success', {
       chatRoomId,
-      name: chatRoom.name,
       course: chatRoom.courseId,
-      participants: chatRoom.participants,
       lastMessage: chatRoom.lastMessage,
-      unreadCounts: chatRoom.unreadCounts,
     });
 
     socket.leave(chatRoomId);
@@ -481,5 +482,17 @@ export const leaveChatRoom = async (io: Server, socket: Socket, data: any) => {
     session.endSession();
     console.error('Error in leaveChatRoom:', error);
     socket.emit('chatroom:leave-chatroom:error', 'Internal server error');
+  }
+};
+
+export const joinNewChatroom = async (io: Server, socket: Socket, data: any) => {
+  try {
+    const { chatRoomId } = data;
+
+    socket.join(chatRoomId);
+    return;
+  } catch (error) {
+    console.error('Error in joinNewChatroom:', error);
+    socket.emit('chatroom:join-new-chatroom:error', 'Internal server error');
   }
 };
