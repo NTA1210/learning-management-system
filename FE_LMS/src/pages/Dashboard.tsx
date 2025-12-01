@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTheme } from "../hooks/useTheme";
 import { distributionSummary } from "../services/mock.ts";
 import StudentsByBatchChart from "../components/StudentsByBatchChart.tsx";
@@ -10,35 +11,149 @@ import Sidebar from "../components/Sidebar.tsx";
 import { Skeleton } from "../components/common/Skeleton.tsx";
 import { userService } from "../services/userService";
 import { sessionService } from "../services/sessionService";
+import { courseService } from "../services/courseService";
+import { semesterService } from "../services/semesterService";
+import { enrollmentService } from "../services/enrollmentService";
+import { announcementService } from "../services/announcementService";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { darkMode, toggleDarkMode } = useTheme();
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('Overview');
+
+  // Hover preview states with delay
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [isHoverVisible, setIsHoverVisible] = useState(false);
+  const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const HOVER_DELAY = 1000; // 1 second delay
+
+  // Handle hover with delay
+  const handleMouseEnter = useCallback((cardId: string) => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+    }
+    hoverTimerRef.current = setTimeout(() => {
+      setHoveredCard(cardId);
+      setIsHoverVisible(true);
+    }, HOVER_DELAY);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setIsHoverVisible(false);
+    setTimeout(() => setHoveredCard(null), 150); // Allow fade-out animation
+  }, []);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+      }
+    };
+  }, []);
 
   // Stats
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
-    avgSessionMin: 25, // Mock
-    expiredSessions: 12 // Mock
+    avgSessionMin: 25,
+    expiredSessions: 12,
+    totalCourses: 0,
+    totalEnrollments: 0,
+    pendingEnrollments: 0,
+    currentSemester: ''
   });
+
+  // Data for hover previews
+  const [recentUsers, setRecentUsers] = useState<any[]>([]);
+  const [recentCourses, setRecentCourses] = useState<any[]>([]);
+  const [recentEnrollments, setRecentEnrollments] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [pendingEnrollmentsList, setPendingEnrollmentsList] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
 
-        // 1. Fetch Users
-        const users = await userService.getUsers({ limit: 1000 }); // Fetch all or large limit for count
+        // 1. Fetch Users - use limit:1 for count, limit:5 for preview data
+        let totalUsers = 0;
+        try {
+          const usersCountResponse = await userService.getUsers({ page: 1, limit: 1 });
+          totalUsers = usersCountResponse.pagination?.total || 0;
+          
+          // Fetch a few users for hover preview
+          const usersPreviewResponse = await userService.getUsers({ page: 1, limit: 5 });
+          setRecentUsers(usersPreviewResponse.users || []);
+        } catch (err) {
+          console.log('Could not fetch users:', err);
+        }
 
         // 2. Fetch Sessions
         const sessions = await sessionService.getAllSessions();
 
+        // 3. Fetch Courses - use limit:1 for count, limit:5 for preview
+        let totalCourses = 0;
+        try {
+          const coursesResponse = await courseService.getCourses({ page: 1, limit: 5 });
+          totalCourses = coursesResponse.pagination?.total || coursesResponse.data.length;
+          setRecentCourses(coursesResponse.data.slice(0, 5));
+        } catch (err) {
+          console.log('Could not fetch courses:', err);
+        }
+
+        // 4. Fetch Current Semester
+        let currentSemesterName = '';
+        try {
+          const currentSemester = await semesterService.getCurrentSemester();
+          currentSemesterName = currentSemester?.name || '';
+        } catch (err) {
+          console.log('Could not fetch current semester:', err);
+        }
+
+        // 5. Fetch Enrollments - use limit:1 for total count
+        let totalEnrollments = 0;
+        let pendingEnrollments = 0;
+        try {
+          // Fetch recent enrollments for hover preview (limit:5)
+          const enrollmentsResponse = await enrollmentService.listAll({ page: 1, limit: 5 });
+          totalEnrollments = enrollmentsResponse.pagination?.total || 0;
+          setRecentEnrollments(enrollmentsResponse.items || []);
+
+          // Fetch pending enrollments with limit:5 for preview
+          const pendingResponse = await enrollmentService.listAll({ page: 1, limit: 5, status: 'pending' });
+          pendingEnrollments = pendingResponse.pagination?.total || pendingResponse.items.length;
+          setPendingEnrollmentsList(pendingResponse.items);
+        } catch (err) {
+          console.log('Could not fetch enrollments:', err);
+        }
+
+        // 6. Fetch Announcements
+        try {
+          const announcementsResponse = await announcementService.getSystemAnnouncements({
+            page: 1,
+            limit: 5,
+            isActive: true
+          });
+          setAnnouncements(announcementsResponse.data || []);
+        } catch (err) {
+          console.log('Could not fetch announcements:', err);
+        }
+
         setStats({
-          totalUsers: users.length,
+          totalUsers,
           activeUsers: sessions.length,
           avgSessionMin: 25 + Math.floor(Math.random() * 10),
-          expiredSessions: Math.floor(sessions.length * 0.2) + 5
+          expiredSessions: Math.floor(sessions.length * 0.2) + 5,
+          totalCourses,
+          totalEnrollments,
+          pendingEnrollments,
+          currentSemester: currentSemesterName
         });
 
         setLoading(false);
@@ -50,6 +165,74 @@ export default function Dashboard() {
 
     fetchData();
   }, []);
+
+  // Hover preview component with animation
+  const HoverPreview = ({ items, type, visible }: { items: any[]; type: string; visible: boolean }) => {
+    if (items.length === 0) return null;
+    
+    return (
+      <div
+        className={`absolute top-full left-0 mt-2 w-72 rounded-lg shadow-xl z-[200] p-3 transition-all duration-200 ease-out ${
+          visible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'
+        }`}
+        style={{
+          backgroundColor: darkMode ? '#2d3748' : '#ffffff',
+          border: darkMode ? '1px solid #4a5568' : '1px solid #e2e8f0',
+          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
+        }}
+      >
+        <p className="text-xs font-medium mb-2" style={{ color: darkMode ? '#a0aec0' : '#718096' }}>
+          Quick Preview
+        </p>
+        {items.slice(0, 3).map((item, index) => (
+          <div
+            key={item._id || index}
+            className="py-2 border-b last:border-b-0"
+            style={{ borderColor: darkMode ? '#4a5568' : '#e2e8f0' }}
+          >
+            {type === 'users' && (
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs">
+                  {(item.fullname || item.username || '?').charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-medium" style={{ color: darkMode ? '#fff' : '#1a202c' }}>
+                    {item.fullname || item.username}
+                  </p>
+                  <p className="text-xs" style={{ color: darkMode ? '#a0aec0' : '#718096' }}>
+                    {item.role} • {item.email}
+                  </p>
+                </div>
+              </div>
+            )}
+            {type === 'courses' && (
+              <div>
+                <p className="text-sm font-medium" style={{ color: darkMode ? '#fff' : '#1a202c' }}>
+                  {item.title}
+                </p>
+                <p className="text-xs" style={{ color: darkMode ? '#a0aec0' : '#718096' }}>
+                  {item.code || item.subjectId?.code || 'No code'}
+                </p>
+              </div>
+            )}
+            {type === 'enrollments' && (
+              <div>
+                <p className="text-sm font-medium" style={{ color: darkMode ? '#fff' : '#1a202c' }}>
+                  {item.studentId?.fullname || item.studentId?.username || 'Unknown'}
+                </p>
+                <p className="text-xs" style={{ color: darkMode ? '#a0aec0' : '#718096' }}>
+                  → {item.courseId?.title || 'Unknown Course'}
+                </p>
+              </div>
+            )}
+          </div>
+        ))}
+        <p className="text-xs text-center mt-2" style={{ color: darkMode ? '#a78bfa' : '#6366f1' }}>
+          Click to view all
+        </p>
+      </div>
+    );
+  };
 
   return (
     <div
@@ -110,19 +293,31 @@ export default function Dashboard() {
                 style={{ borderColor: darkMode ? '#374151' : '#e5e7eb' }}
               >
                 <nav className="-mb-px flex space-x-8 overflow-x-auto">
-                  {['Overview', 'Users', 'Sessions', 'Alerts', 'System', 'Actions'].map((tab) => (
+                  {['Overview', 'Users', 'Courses', 'Enrollments', 'Announcements'].map((tab) => (
                     <button
                       key={tab}
-                      className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${tab === 'Overview'
+                      onClick={() => setActiveTab(tab)}
+                      className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${tab === activeTab
                         ? ''
                         : 'border-transparent'
                         }`}
                       style={{
-                        borderColor: tab === 'Overview' ? (darkMode ? '#8b5cf6' : '#4f46e5') : 'transparent',
-                        color: tab === 'Overview' ? (darkMode ? '#a78bfa' : '#4f46e5') : (darkMode ? '#9ca3af' : '#6b7280')
+                        borderColor: tab === activeTab ? (darkMode ? '#8b5cf6' : '#4f46e5') : 'transparent',
+                        color: tab === activeTab ? (darkMode ? '#a78bfa' : '#4f46e5') : (darkMode ? '#9ca3af' : '#6b7280')
                       }}
                     >
                       <span>{tab}</span>
+                      {tab === 'Enrollments' && stats.pendingEnrollments > 0 && (
+                        <span
+                          className="ml-1 px-2 py-0.5 text-xs rounded-full"
+                          style={{
+                            backgroundColor: darkMode ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.1)',
+                            color: darkMode ? '#fcd34d' : '#d97706'
+                          }}
+                        >
+                          {stats.pendingEnrollments}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </nav>
@@ -152,13 +347,17 @@ export default function Dashboard() {
                 ))
               ) : (
                 <>
+                  {/* Total Users - Clickable */}
                   <div
-                    className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                    className="relative p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
                     style={{
                       backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
                       border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                       backdropFilter: 'blur(10px)'
                     }}
+                    onClick={() => navigate('/user')}
+                    onMouseEnter={() => handleMouseEnter('users')}
+                    onMouseLeave={handleMouseLeave}
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div
@@ -176,7 +375,7 @@ export default function Dashboard() {
                           color: darkMode ? '#10b981' : '#059669'
                         }}
                       >
-                        +1 today
+                        Click to manage
                       </div>
                     </div>
                     <p
@@ -191,6 +390,9 @@ export default function Dashboard() {
                     >
                       {stats.totalUsers}
                     </p>
+                    {hoveredCard === 'users' && recentUsers.length > 0 && (
+                      <HoverPreview items={recentUsers} type="users" visible={isHoverVisible} />
+                    )}
                   </div>
                   <div
                     className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
@@ -301,6 +503,180 @@ export default function Dashboard() {
                       style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
                     >
                       {stats.expiredSessions}
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Second Row Stats - Courses, Enrollments, Pending, Semester */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {loading ? (
+                [1, 2, 3, 4].map((i) => (
+                  <div
+                    key={`row2-${i}`}
+                    className="p-6 rounded-2xl shadow-lg"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                      border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                    }}
+                  >
+                    <Skeleton className="h-12 w-12 rounded-xl mb-4" />
+                    <Skeleton className="h-4 w-24 mb-2" />
+                    <Skeleton className="h-8 w-16" />
+                  </div>
+                ))
+              ) : (
+                <>
+                  {/* Total Courses - Clickable */}
+                  <div
+                    className="relative p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                      border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                      backdropFilter: 'blur(10px)'
+                    }}
+                    onClick={() => navigate('/courses')}
+                    onMouseEnter={() => handleMouseEnter('courses')}
+                    onMouseLeave={handleMouseLeave}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div
+                        className="p-3 rounded-xl"
+                        style={{ backgroundColor: darkMode ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.1)' }}
+                      >
+                        <svg className="w-6 h-6" style={{ color: darkMode ? '#c4b5fd' : '#8b5cf6' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                        </svg>
+                      </div>
+                      <div
+                        className="text-xs px-2 py-1 rounded-full"
+                        style={{
+                          backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                          color: darkMode ? '#10b981' : '#059669'
+                        }}
+                      >
+                        Click to manage
+                      </div>
+                    </div>
+                    <p className="text-sm font-medium mb-1" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                      Total Courses
+                    </p>
+                    <p className="text-3xl font-bold" style={{ color: darkMode ? '#ffffff' : '#1e293b' }}>
+                      {stats.totalCourses}
+                    </p>
+                    {hoveredCard === 'courses' && recentCourses.length > 0 && (
+                      <HoverPreview items={recentCourses} type="courses" visible={isHoverVisible} />
+                    )}
+                  </div>
+
+                  {/* Total Enrollments - Clickable */}
+                  <div
+                    className="relative p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                      border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                      backdropFilter: 'blur(10px)'
+                    }}
+                    onClick={() => setActiveTab('Enrollments')}
+                    onMouseEnter={() => handleMouseEnter('enrollments')}
+                    onMouseLeave={handleMouseLeave}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div
+                        className="p-3 rounded-xl"
+                        style={{ backgroundColor: darkMode ? 'rgba(6, 182, 212, 0.1)' : 'rgba(6, 182, 212, 0.1)' }}
+                      >
+                        <svg className="w-6 h-6" style={{ color: darkMode ? '#67e8f9' : '#0891b2' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                      </div>
+                      <div
+                        className="text-xs px-2 py-1 rounded-full"
+                        style={{
+                          backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                          color: darkMode ? '#10b981' : '#059669'
+                        }}
+                      >
+                        Click to manage
+                      </div>
+                    </div>
+                    <p className="text-sm font-medium mb-1" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                      Total Enrollments
+                    </p>
+                    <p className="text-3xl font-bold" style={{ color: darkMode ? '#ffffff' : '#1e293b' }}>
+                      {stats.totalEnrollments}
+                    </p>
+                    {hoveredCard === 'enrollments' && recentEnrollments.length > 0 && (
+                      <HoverPreview items={recentEnrollments} type="enrollments" visible={isHoverVisible} />
+                    )}
+                  </div>
+
+                  {/* Pending Enrollments - Clickable */}
+                  <div
+                    className="relative p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                      border: stats.pendingEnrollments > 0 
+                        ? (darkMode ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)')
+                        : (darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)'),
+                      backdropFilter: 'blur(10px)'
+                    }}
+                    onClick={() => setActiveTab('Enrollments')}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div
+                        className="p-3 rounded-xl"
+                        style={{ backgroundColor: darkMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.1)' }}
+                      >
+                        <svg className="w-6 h-6" style={{ color: darkMode ? '#fcd34d' : '#d97706' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                      </div>
+                      {stats.pendingEnrollments > 0 && (
+                        <span
+                          className="text-xs px-2 py-1 rounded-full animate-pulse"
+                          style={{
+                            backgroundColor: darkMode ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.1)',
+                            color: darkMode ? '#fcd34d' : '#d97706'
+                          }}
+                        >
+                          Action needed
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm font-medium mb-1" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                      Pending Enrollments
+                    </p>
+                    <p className="text-3xl font-bold" style={{ color: stats.pendingEnrollments > 0 ? (darkMode ? '#fcd34d' : '#d97706') : (darkMode ? '#ffffff' : '#1e293b') }}>
+                      {stats.pendingEnrollments}
+                    </p>
+                  </div>
+
+                  {/* Current Semester */}
+                  <div
+                    className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                      border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                      backdropFilter: 'blur(10px)'
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div
+                        className="p-3 rounded-xl"
+                        style={{ backgroundColor: darkMode ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.1)' }}
+                      >
+                        <svg className="w-6 h-6" style={{ color: darkMode ? '#86efac' : '#16a34a' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <p className="text-sm font-medium mb-1" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                      Current Semester
+                    </p>
+                    <p className="text-xl font-bold truncate" style={{ color: darkMode ? '#ffffff' : '#1e293b' }}>
+                      {stats.currentSemester || 'Not Set'}
                     </p>
                   </div>
                 </>

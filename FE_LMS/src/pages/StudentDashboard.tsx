@@ -1,15 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { Skeleton } from "../components/common/Skeleton.tsx";
 import StudentScheduleCalendar from "../components/StudentScheduleCalendar";
-import http from "../utils/http";
+import { courseService } from "../services/courseService";
 import { attendanceService } from "../services/attendanceService";
 import { quizService } from "../services/quizService";
 import { assignmentService } from "../services/assignmentService";
 import { submissionService } from "../services/submissionService";
+import { announcementService } from "../services/announcementService";
+import { subjectService } from "../services/subjectService";
+import http from "../utils/http";
 
 // Types
 interface Course {
@@ -62,7 +66,20 @@ interface AttendanceSummary {
   };
 }
 
+interface Announcement {
+  _id: string;
+  title: string;
+  content: string;
+  type: 'system' | 'course';
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  courseId?: string | { _id: string; title: string };
+  createdAt: string;
+  isPinned?: boolean;
+  isActive?: boolean;
+}
+
 export default function StudentDashboard() {
+  const navigate = useNavigate();
   const { darkMode, toggleDarkMode } = useTheme();
   const { user } = useAuth();
 
@@ -72,7 +89,8 @@ export default function StudentDashboard() {
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [quizzesLoading, setQuizzesLoading] = useState(false);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
-  const [gradesLoading, setGradesLoading] = useState(false);
+  const [_gradesLoading, setGradesLoading] = useState(false);
+  const [announcementsLoading, setAnnouncementsLoading] = useState(false);
 
   // Data states
   const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
@@ -80,6 +98,22 @@ export default function StudentDashboard() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [attendanceData, setAttendanceData] = useState<AttendanceSummary[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+
+  // Carousel state for My Courses
+  const [courseCarouselIndex, setCourseCarouselIndex] = useState(0);
+  const [coursePage, setCoursePage] = useState(1);
+  const [hasMoreCourses, setHasMoreCourses] = useState(false);
+  const [totalCourses, setTotalCourses] = useState(0);
+  const COURSES_PER_PAGE = 5;
+  const VISIBLE_COURSES = 3; // Number of courses visible at once in carousel
+
+  // Carousel state for Available Courses
+  const [availableCarouselIndex, setAvailableCarouselIndex] = useState(0);
+  const [availablePage, setAvailablePage] = useState(1);
+  const [hasMoreAvailable, setHasMoreAvailable] = useState(false);
+  const [totalAvailable, setTotalAvailable] = useState(0);
+  const [availableLoading, setAvailableLoading] = useState(false);
 
   // Stats
   const [stats, setStats] = useState({
@@ -89,36 +123,221 @@ export default function StudentDashboard() {
     averageGrade: 0
   });
 
-  // Fetch all data
-  useEffect(() => {
-    if (!user || !user.id) {
-      setLoading(false);
-      return;
+  // Fetch more courses for carousel
+  const fetchMoreCourses = useCallback(async (page: number) => {
+    if (coursesLoading) return;
+    
+    try {
+      setCoursesLoading(true);
+      const response = await courseService.getMyCourses({
+        page,
+        limit: COURSES_PER_PAGE,
+        sortOrder: 'desc'
+      });
+
+      const newCourses = response.data || [];
+      const pagination = response.pagination;
+      
+      if (page === 1) {
+        setEnrolledCourses(newCourses as unknown as Course[]);
+      } else {
+        setEnrolledCourses(prev => [...prev, ...(newCourses as unknown as Course[])]);
+      }
+
+      setHasMoreCourses(pagination?.hasNextPage || false);
+      setTotalCourses(pagination?.total || newCourses.length);
+      setCoursePage(page);
+
+      return newCourses.length;
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+      return 0;
+    } finally {
+      setCoursesLoading(false);
+    }
+  }, [coursesLoading]);
+
+  // Handle carousel navigation
+  const handleNextCourse = useCallback(async () => {
+    const nextIndex = courseCarouselIndex + 1;
+    const maxIndex = Math.max(0, enrolledCourses.length - VISIBLE_COURSES);
+    
+    // If approaching end of loaded courses and there are more, fetch next page
+    if (nextIndex >= enrolledCourses.length - VISIBLE_COURSES - 1 && hasMoreCourses) {
+      await fetchMoreCourses(coursePage + 1);
+    }
+    
+    if (nextIndex <= maxIndex || hasMoreCourses) {
+      setCourseCarouselIndex(Math.min(nextIndex, maxIndex));
+    }
+  }, [courseCarouselIndex, enrolledCourses.length, hasMoreCourses, coursePage, fetchMoreCourses]);
+
+  const handlePrevCourse = useCallback(() => {
+    setCourseCarouselIndex(prev => Math.max(0, prev - 1));
+  }, []);
+
+  // Fetch available courses based on student's specialist IDs
+  const fetchAvailableCourses = useCallback(async (page: number, enrolledIds: Set<string>) => {
+    if (availableLoading) return;
+
+    try {
+      setAvailableLoading(true);
+
+      // Get student's specialist IDs from localStorage
+      const specialistIdsJson = localStorage.getItem('lms:studentSpecialistIds');
+      const specialistIds: string[] = specialistIdsJson ? JSON.parse(specialistIdsJson) : [];
+
+      let subjectIds: string[] = [];
+
+      // If student has specialist IDs, get subjects for those specialists
+      if (specialistIds.length > 0) {
+        // Fetch subjects for each specialist and combine results
+        const subjectPromises = specialistIds.map(specialistId =>
+          subjectService.getAllSubjects({
+            specialistId,
+            isActive: true,
+            limit: 100
+          }).catch(() => ({ data: [] }))
+        );
+
+        const subjectResults = await Promise.all(subjectPromises);
+        const allSubjects = subjectResults.flatMap(result => result.data || []);
+        subjectIds = [...new Set(allSubjects.map(s => s._id))]; // Unique subject IDs
+      }
+
+      // Fetch courses - if we have subject IDs, fetch for each; otherwise fetch all
+      let allCourses: Course[] = [];
+      let pagination: any = null;
+
+      if (subjectIds.length > 0) {
+        // Fetch courses for each subject
+        const coursePromises = subjectIds.slice(0, 5).map(subjectId =>
+          courseService.getAllCourses({
+            subjectId,
+            isPublished: true,
+            page,
+            limit: COURSES_PER_PAGE
+          }).catch(() => ({ courses: [], pagination: null }))
+        );
+
+        const courseResults = await Promise.all(coursePromises);
+        allCourses = courseResults.flatMap(result => result.courses || []);
+
+        // Remove duplicates and filter out enrolled courses
+        const uniqueCourses = allCourses.filter((course, index, self) =>
+          index === self.findIndex(c => c._id === course._id) &&
+          !enrolledIds.has(course._id)
+        );
+
+        // Since we're fetching from multiple subjects, estimate pagination
+        const hasMore = courseResults.some(r => r.pagination?.hasNextPage);
+        pagination = {
+          total: uniqueCourses.length + (hasMore ? COURSES_PER_PAGE : 0),
+          hasNextPage: hasMore
+        };
+
+        allCourses = uniqueCourses;
+      } else {
+        // No specialist IDs - fetch all available courses
+        const response = await courseService.getAllCourses({
+          isPublished: true,
+          page,
+          limit: COURSES_PER_PAGE * 2 // Fetch more to account for filtering
+        });
+
+        allCourses = (response.courses || []).filter(course => !enrolledIds.has(course._id));
+        pagination = response.pagination;
+      }
+
+      if (page === 1) {
+        setAvailableCourses(allCourses.slice(0, COURSES_PER_PAGE));
+      } else {
+        setAvailableCourses(prev => {
+          const existingIds = new Set(prev.map(c => c._id));
+          const newCourses = allCourses.filter(c => !existingIds.has(c._id));
+          return [...prev, ...newCourses.slice(0, COURSES_PER_PAGE)];
+        });
+      }
+
+      setHasMoreAvailable(pagination?.hasNextPage || false);
+      setTotalAvailable(pagination?.total || allCourses.length);
+      setAvailablePage(page);
+
+      return allCourses.length;
+    } catch (error) {
+      console.error('Error fetching available courses:', error);
+      return 0;
+    } finally {
+      setAvailableLoading(false);
+    }
+  }, [availableLoading]);
+
+  // Handle available courses carousel navigation
+  const handleNextAvailable = useCallback(async () => {
+    const nextIndex = availableCarouselIndex + 1;
+    const maxIndex = Math.max(0, availableCourses.length - VISIBLE_COURSES);
+
+    // If approaching end of loaded courses and there are more, fetch next page
+    if (nextIndex >= availableCourses.length - VISIBLE_COURSES - 1 && hasMoreAvailable) {
+      const enrolledIds = new Set(enrolledCourses.map(c => c._id));
+      await fetchAvailableCourses(availablePage + 1, enrolledIds);
     }
 
+    if (nextIndex <= maxIndex || hasMoreAvailable) {
+      setAvailableCarouselIndex(Math.min(nextIndex, maxIndex));
+    }
+  }, [availableCarouselIndex, availableCourses.length, hasMoreAvailable, availablePage, fetchAvailableCourses, enrolledCourses]);
+
+  const handlePrevAvailable = useCallback(() => {
+    setAvailableCarouselIndex(prev => Math.max(0, prev - 1));
+  }, []);
+
+  // Fetch all data - runs once on mount like admin dashboard
+  useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
 
-        // Fetch my courses with specific params as requested
-        const myCoursesResponse = await http.get('/courses/my-courses', {
-          params: { page: 1, limit: 25, sortOrder: 'desc' }
-        });
+        // Fetch my courses using courseService (limit 5 for carousel)
+        let coursesList: any[] = [];
+        let paginationData: any = undefined;
+        try {
+          const myCoursesResponse = await courseService.getMyCourses({
+            page: 1,
+            limit: COURSES_PER_PAGE,
+            sortOrder: 'desc'
+          });
+          coursesList = myCoursesResponse.data || [];
+          paginationData = myCoursesResponse.pagination;
+          const totalCoursesCount = paginationData?.total || coursesList.length;
 
-        const myCoursesData = myCoursesResponse as any;
-        const coursesList = Array.isArray(myCoursesData.data)
-          ? myCoursesData.data
-          : [];
+          setEnrolledCourses(coursesList as unknown as Course[]);
+          setTotalCourses(totalCoursesCount);
+          setHasMoreCourses(paginationData?.hasNextPage || false);
 
-        const totalCourses = myCoursesData.pagination?.total || coursesList.length;
+          // Update stats using metadata from response
+          setStats(prev => ({
+            ...prev,
+            enrolledCourses: totalCoursesCount
+          }));
+        } catch (err) {
+          console.log('Could not fetch courses:', err);
+        }
 
-        setEnrolledCourses(coursesList);
-
-        // Update stats using metadata from response
-        setStats(prev => ({
-          ...prev,
-          enrolledCourses: totalCourses
-        }));
+        // Fetch announcements for student (get all active announcements)
+        try {
+          setAnnouncementsLoading(true);
+          const announcementsResponse = await announcementService.getAllAnnouncements({
+            page: 1,
+            limit: 5,
+            isActive: true
+          });
+          setAnnouncements((announcementsResponse.data || []) as unknown as Announcement[]);
+        } catch (err) {
+          console.log('Could not fetch announcements:', err);
+        } finally {
+          setAnnouncementsLoading(false);
+        }
 
         setLoading(false);
       } catch (error) {
@@ -128,12 +347,10 @@ export default function StudentDashboard() {
     };
 
     fetchData();
-  }, [user]);
+  }, []); // Run once on mount like admin dashboard
 
   // Fetch assignments
   useEffect(() => {
-    if (!user) return;
-
     const fetchAssignments = async () => {
       try {
         setAssignmentsLoading(true);
@@ -165,7 +382,7 @@ export default function StudentDashboard() {
     };
 
     fetchAssignments();
-  }, [user]);
+  }, []);
 
   // Fetch quizzes
   useEffect(() => {
@@ -206,12 +423,10 @@ export default function StudentDashboard() {
     };
 
     fetchQuizzes();
-  }, [user, enrolledCourses]);
+  }, [enrolledCourses]);
 
   // Fetch attendance data using /self endpoint
   useEffect(() => {
-    if (!user) return;
-
     const fetchAttendance = async () => {
       try {
         setAttendanceLoading(true);
@@ -238,8 +453,9 @@ export default function StudentDashboard() {
           }
 
           attendanceByCourse[courseId].totalSessions++;
-          if (record.status === 'present' || record.status === 'absent' || record.status === 'notyet') {
-            attendanceByCourse[courseId].counts[record.status]++;
+          const status = record.status as 'present' | 'absent' | 'notyet';
+          if (status === 'present' || status === 'absent' || status === 'notyet') {
+            attendanceByCourse[courseId].counts[status]++;
           }
         });
 
@@ -261,12 +477,10 @@ export default function StudentDashboard() {
     };
 
     fetchAttendance();
-  }, [user]);
+  }, []);
 
   // Fetch grades for average calculation
   useEffect(() => {
-    if (!user) return;
-
     const fetchGrades = async () => {
       try {
         setGradesLoading(true);
@@ -306,40 +520,14 @@ export default function StudentDashboard() {
     };
 
     fetchGrades();
-  }, [user]);
+  }, []);
 
-  // Fetch available courses (not enrolled)
+  // Fetch available courses (filtered by student's specialist IDs)
   useEffect(() => {
-    const fetchAvailableCourses = async () => {
-      try {
-        setCoursesLoading(true);
+    if (enrolledCourses.length === 0) return;
 
-        const response = await http.get('/courses', {
-          params: { page: 1, limit: 20 }
-        });
-
-        const allCourses = Array.isArray(response.data)
-          ? response.data
-          : response.data?.data || [];
-
-        // Filter out enrolled courses
-        const enrolledIds = new Set(enrolledCourses.map(c => c._id));
-        const available = allCourses.filter((course: Course) =>
-          !enrolledIds.has(course._id)
-        );
-
-        setAvailableCourses(available.slice(0, 6));
-
-      } catch (error) {
-        console.error('Error fetching available courses:', error);
-      } finally {
-        setCoursesLoading(false);
-      }
-    };
-
-    if (enrolledCourses.length > 0) {
-      fetchAvailableCourses();
-    }
+    const enrolledIds = new Set(enrolledCourses.map(c => c._id));
+    fetchAvailableCourses(1, enrolledIds);
   }, [enrolledCourses]);
 
   const handleEnroll = async (courseId: string) => {
@@ -347,10 +535,12 @@ export default function StudentDashboard() {
     console.log('Enroll in course:', courseId);
   };
 
-  const handleUnenroll = async (courseId: string) => {
+  // Unused for now, but available for future implementation
+  const _handleUnenroll = async (courseId: string) => {
     // TODO: Implement unenrollment logic
     console.log('Unenroll from course:', courseId);
   };
+  void _handleUnenroll; // silence unused warning
 
   return (
     <div
@@ -559,7 +749,7 @@ export default function StudentDashboard() {
               <StudentScheduleCalendar darkMode={darkMode} />
             </div>
 
-            {/* My Courses Grid */}
+            {/* My Courses Carousel */}
             <div className="mb-8">
               <div className="flex justify-between items-center mb-4">
                 <h2
@@ -567,6 +757,12 @@ export default function StudentDashboard() {
                   style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
                 >
                   My Courses
+                  <span
+                    className="ml-2 text-sm font-normal"
+                    style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                  >
+                    ({totalCourses} total)
+                  </span>
                 </h2>
                 <a
                   href="/my-courses"
@@ -576,99 +772,174 @@ export default function StudentDashboard() {
                   View All →
                 </a>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {loading ? (
-                  [1, 2, 3].map((i) => (
-                    <div
-                      key={i}
-                      className="rounded-2xl shadow-lg overflow-hidden"
-                      style={{
-                        backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
-                        border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
-                      }}
-                    >
-                      <Skeleton className="h-32 w-full" />
-                      <div className="p-6">
-                        <Skeleton className="h-6 w-3/4 mb-2" />
-                        <Skeleton className="h-4 w-1/2 mb-4" />
-                        <Skeleton className="h-10 w-full rounded-lg" />
-                      </div>
-                    </div>
-                  ))
-                ) : enrolledCourses.length === 0 ? (
-                  <div className="col-span-3 text-center py-12">
-                    <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                      No enrolled courses yet. Explore available courses below!
-                    </p>
-                  </div>
-                ) : (
-                  enrolledCourses.slice(0, 6).map((course) => (
-                    <div
-                      key={course._id}
-                      className="rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden"
-                      style={{
-                        backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
-                        border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
-                        backdropFilter: 'blur(10px)'
-                      }}
-                    >
-                      {course.logo ? (
-                        <img
-                          className="h-32 w-full object-cover"
-                          src={course.logo}
-                          alt={course.title}
-                        />
-                      ) : (
+              
+              {/* Carousel Container */}
+              <div className="relative">
+                {/* Previous Button */}
+                {courseCarouselIndex > 0 && (
+                  <button
+                    onClick={handlePrevCourse}
+                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110"
+                    style={{
+                      backgroundColor: darkMode ? '#4f46e5' : '#6366f1',
+                      color: '#ffffff'
+                    }}
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                )}
+
+                {/* Next Button */}
+                {(courseCarouselIndex < enrolledCourses.length - VISIBLE_COURSES || hasMoreCourses) && (
+                  <button
+                    onClick={handleNextCourse}
+                    disabled={coursesLoading}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110 disabled:opacity-50"
+                    style={{
+                      backgroundColor: darkMode ? '#4f46e5' : '#6366f1',
+                      color: '#ffffff'
+                    }}
+                  >
+                    {coursesLoading ? (
+                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    )}
+                  </button>
+                )}
+
+                {/* Courses Grid/Carousel */}
+                <div className="overflow-hidden px-2">
+                  <div 
+                    className="flex transition-all duration-500 ease-out gap-6"
+                    style={{ transform: `translateX(-${courseCarouselIndex * (100 / VISIBLE_COURSES + 2)}%)` }}
+                  >
+                    {loading ? (
+                      [1, 2, 3].map((i) => (
                         <div
-                          className="h-32 flex items-center justify-center text-4xl font-bold text-white"
-                          style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
+                          key={i}
+                          className="flex-shrink-0 rounded-2xl shadow-lg overflow-hidden"
+                          style={{
+                            width: `calc(${100 / VISIBLE_COURSES}% - 16px)`,
+                            backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                            border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                          }}
                         >
-                          {course.title.charAt(0).toUpperCase()}
+                          <Skeleton className="h-32 w-full" />
+                          <div className="p-6">
+                            <Skeleton className="h-6 w-3/4 mb-2" />
+                            <Skeleton className="h-4 w-1/2 mb-4" />
+                            <Skeleton className="h-10 w-full rounded-lg" />
+                          </div>
                         </div>
-                      )}
-                      <div className="p-6">
-                        <h3
-                          className="text-lg font-semibold mb-2"
-                          style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
-                        >
-                          {course.title}
-                        </h3>
-                        {course.code && (
-                          <p
-                            className="text-sm mb-2"
-                            style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
-                          >
-                            {course.code}
-                          </p>
-                        )}
-                        {course.teacherId && (
-                          <p
-                            className="text-sm mb-4"
-                            style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
-                          >
-                            Instructor: {typeof course.teacherId === 'object'
-                              ? (course.teacherId.fullname || course.teacherId.username)
-                              : 'Unknown'}
-                          </p>
-                        )}
-                        <button
-                          className="w-full px-3 py-2 rounded-lg text-white text-sm font-medium"
-                          style={{ backgroundColor: darkMode ? '#4f46e5' : '#6366f1' }}
-                          onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#4338ca' : '#4f46e5'}
-                          onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#4f46e5' : '#6366f1'}
-                          onClick={() => window.location.href = `/courses/${course._id}`}
-                        >
-                          View Course
-                        </button>
+                      ))
+                    ) : enrolledCourses.length === 0 ? (
+                      <div className="w-full text-center py-12">
+                        <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                          No enrolled courses yet. Explore available courses below!
+                        </p>
                       </div>
-                    </div>
-                  ))
+                    ) : (
+                      enrolledCourses.map((course) => (
+                        <div
+                          key={course._id}
+                          className="flex-shrink-0 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden cursor-pointer"
+                          style={{
+                            width: `calc(${100 / VISIBLE_COURSES}% - 16px)`,
+                            backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                            border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                            backdropFilter: 'blur(10px)'
+                          }}
+                          onClick={() => navigate(`/courses/${course._id}`)}
+                        >
+                          {course.logo ? (
+                            <img
+                              className="h-32 w-full object-cover"
+                              src={course.logo}
+                              alt={course.title}
+                            />
+                          ) : (
+                            <div
+                              className="h-32 flex items-center justify-center text-4xl font-bold text-white"
+                              style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
+                            >
+                              {course.title.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="p-4">
+                            <h3
+                              className="text-base font-semibold mb-1 line-clamp-2"
+                              style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
+                              title={course.title}
+                            >
+                              {course.title}
+                            </h3>
+                            {course.code && (
+                              <p
+                                className="text-xs mb-2"
+                                style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                              >
+                                {course.code}
+                              </p>
+                            )}
+                            {course.teacherId && (
+                              <p
+                                className="text-xs mb-3 truncate"
+                                style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                              >
+                                Instructor: {typeof course.teacherId === 'object'
+                                  ? (course.teacherId.fullname || course.teacherId.username)
+                                  : 'Unknown'}
+                              </p>
+                            )}
+                            <button
+                              className="w-full px-3 py-2 rounded-lg text-white text-sm font-medium"
+                              style={{ backgroundColor: darkMode ? '#4f46e5' : '#6366f1' }}
+                              onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#4338ca' : '#4f46e5'}
+                              onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#4f46e5' : '#6366f1'}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/courses/${course._id}`);
+                              }}
+                            >
+                              View Course
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Carousel Indicators */}
+                {enrolledCourses.length > VISIBLE_COURSES && (
+                  <div className="flex justify-center gap-2 mt-4">
+                    {Array.from({ length: Math.ceil((totalCourses) / VISIBLE_COURSES) }).map((_, idx) => (
+                      <button
+                        key={idx}
+                        className="w-2 h-2 rounded-full transition-all"
+                        style={{
+                          backgroundColor: Math.floor(courseCarouselIndex / VISIBLE_COURSES) === idx
+                            ? (darkMode ? '#6366f1' : '#4f46e5')
+                            : (darkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.5)')
+                        }}
+                        onClick={() => setCourseCarouselIndex(idx * VISIBLE_COURSES)}
+                      />
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
 
-            {/* Available Courses for Enrollment */}
-            {availableCourses.length > 0 && (
+            {/* Available Courses Carousel */}
+            {(availableCourses.length > 0 || availableLoading) && (
               <div className="mb-8">
                 <div className="flex justify-between items-center mb-4">
                   <h2
@@ -676,52 +947,181 @@ export default function StudentDashboard() {
                     style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
                   >
                     Available Courses
+                    <span
+                      className="ml-2 text-sm font-normal"
+                      style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                    >
+                      ({totalAvailable} total)
+                    </span>
                   </h2>
+                  <a
+                    href="/courses"
+                    className="text-sm font-medium hover:underline"
+                    style={{ color: darkMode ? '#a5b4fc' : '#6366f1' }}
+                  >
+                    Browse All →
+                  </a>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {coursesLoading ? (
-                    [1, 2, 3].map((i) => (
-                      <div key={i} className="rounded-2xl shadow-lg p-6">
-                        <Skeleton className="h-6 w-3/4 mb-2" />
-                        <Skeleton className="h-4 w-full mb-4" />
-                        <Skeleton className="h-10 w-full rounded-lg" />
-                      </div>
-                    ))
-                  ) : (
-                    availableCourses.map((course) => (
-                      <div
-                        key={course._id}
-                        className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
-                        style={{
-                          backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
-                          border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
-                        }}
-                      >
-                        <h3
-                          className="text-lg font-semibold mb-2"
-                          style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
-                        >
-                          {course.title}
-                        </h3>
-                        {course.description && (
-                          <p
-                            className="text-sm mb-4 line-clamp-2"
-                            style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+
+                {/* Carousel Container */}
+                <div className="relative">
+                  {/* Previous Button */}
+                  {availableCarouselIndex > 0 && (
+                    <button
+                      onClick={handlePrevAvailable}
+                      className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110"
+                      style={{
+                        backgroundColor: darkMode ? '#16a34a' : '#22c55e',
+                        color: '#ffffff'
+                      }}
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                  )}
+
+                  {/* Next Button */}
+                  {(availableCarouselIndex < availableCourses.length - VISIBLE_COURSES || hasMoreAvailable) && (
+                    <button
+                      onClick={handleNextAvailable}
+                      disabled={availableLoading}
+                      className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110 disabled:opacity-50"
+                      style={{
+                        backgroundColor: darkMode ? '#16a34a' : '#22c55e',
+                        color: '#ffffff'
+                      }}
+                    >
+                      {availableLoading ? (
+                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
+
+                  {/* Courses Carousel */}
+                  <div className="overflow-hidden px-2">
+                    <div
+                      className="flex transition-all duration-500 ease-out gap-6"
+                      style={{ transform: `translateX(-${availableCarouselIndex * (100 / VISIBLE_COURSES + 2)}%)` }}
+                    >
+                      {availableLoading && availableCourses.length === 0 ? (
+                        [1, 2, 3].map((i) => (
+                          <div
+                            key={i}
+                            className="flex-shrink-0 rounded-2xl shadow-lg overflow-hidden"
+                            style={{
+                              width: `calc(${100 / VISIBLE_COURSES}% - 16px)`,
+                              backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                              border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                            }}
                           >
-                            {course.description}
+                            <Skeleton className="h-32 w-full" />
+                            <div className="p-6">
+                              <Skeleton className="h-6 w-3/4 mb-2" />
+                              <Skeleton className="h-4 w-full mb-4" />
+                              <Skeleton className="h-10 w-full rounded-lg" />
+                            </div>
+                          </div>
+                        ))
+                      ) : availableCourses.length === 0 ? (
+                        <div className="w-full text-center py-12">
+                          <p style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                            No available courses for your specialization at the moment.
                           </p>
-                        )}
+                        </div>
+                      ) : (
+                        availableCourses.map((course) => (
+                          <div
+                            key={course._id}
+                            className="flex-shrink-0 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden cursor-pointer"
+                            style={{
+                              width: `calc(${100 / VISIBLE_COURSES}% - 16px)`,
+                              backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                              border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                              backdropFilter: 'blur(10px)'
+                            }}
+                            onClick={() => navigate(`/courses/${course._id}`)}
+                          >
+                            {course.logo ? (
+                              <img
+                                className="h-32 w-full object-cover"
+                                src={course.logo}
+                                alt={course.title}
+                              />
+                            ) : (
+                              <div
+                                className="h-32 flex items-center justify-center text-4xl font-bold text-white"
+                                style={{ backgroundColor: darkMode ? '#065f46' : '#16a34a' }}
+                              >
+                                {course.title.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                            <div className="p-4">
+                              <h3
+                                className="text-base font-semibold mb-1 line-clamp-2"
+                                style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
+                                title={course.title}
+                              >
+                                {course.title}
+                              </h3>
+                              {course.code && (
+                                <p
+                                  className="text-xs mb-2"
+                                  style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                                >
+                                  {course.code}
+                                </p>
+                              )}
+                              {course.description && (
+                                <p
+                                  className="text-xs mb-3 line-clamp-2"
+                                  style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                                >
+                                  {course.description}
+                                </p>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEnroll(course._id);
+                                }}
+                                className="w-full px-3 py-2 rounded-lg text-white text-sm font-medium"
+                                style={{ backgroundColor: darkMode ? '#16a34a' : '#22c55e' }}
+                                onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#15803d' : '#16a34a'}
+                                onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#16a34a' : '#22c55e'}
+                              >
+                                Enroll Now
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Carousel Indicators */}
+                  {availableCourses.length > VISIBLE_COURSES && (
+                    <div className="flex justify-center gap-2 mt-4">
+                      {Array.from({ length: Math.ceil(totalAvailable / VISIBLE_COURSES) }).map((_, idx) => (
                         <button
-                          onClick={() => handleEnroll(course._id)}
-                          className="w-full px-3 py-2 rounded-lg text-white text-sm font-medium"
-                          style={{ backgroundColor: darkMode ? '#16a34a' : '#22c55e' }}
-                          onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#15803d' : '#16a34a'}
-                          onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#16a34a' : '#22c55e'}
-                        >
-                          Enroll Now
-                        </button>
-                      </div>
-                    ))
+                          key={idx}
+                          className="w-2 h-2 rounded-full transition-all"
+                          style={{
+                            backgroundColor: Math.floor(availableCarouselIndex / VISIBLE_COURSES) === idx
+                              ? (darkMode ? '#22c55e' : '#16a34a')
+                              : (darkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.5)')
+                          }}
+                          onClick={() => setAvailableCarouselIndex(idx * VISIBLE_COURSES)}
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
@@ -886,6 +1286,82 @@ export default function StudentDashboard() {
                 </div>
               </div>
             </div>
+
+            {/* Announcements Section */}
+            {announcements.length > 0 && (
+              <div className="mb-8">
+                <div className="flex justify-between items-center mb-4">
+                  <h2
+                    className="text-xl font-semibold"
+                    style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
+                  >
+                    Recent Announcements
+                  </h2>
+                </div>
+                <div
+                  className="rounded-2xl shadow-lg"
+                  style={{
+                    backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                    border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                  }}
+                >
+                  <div className="p-6 divide-y" style={{ borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(229, 231, 235, 0.5)' }}>
+                    {announcementsLoading ? (
+                      [1, 2, 3].map((i) => (
+                        <div key={i} className="py-4 first:pt-0 last:pb-0">
+                          <Skeleton className="h-5 w-3/4 mb-2" />
+                          <Skeleton className="h-4 w-full mb-2" />
+                          <Skeleton className="h-3 w-1/4" />
+                        </div>
+                      ))
+                    ) : (
+                      announcements.map((announcement) => (
+                        <div
+                          key={announcement._id}
+                          className="py-4 first:pt-0 last:pb-0"
+                          style={{ borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(229, 231, 235, 0.5)' }}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <h3
+                              className="font-semibold"
+                              style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
+                            >
+                              {announcement.title}
+                            </h3>
+                            {announcement.isPinned && (
+                              <span
+                                className="px-2 py-1 text-xs rounded-full"
+                                style={{
+                                  backgroundColor: darkMode ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.1)',
+                                  color: darkMode ? '#fcd34d' : '#d97706'
+                                }}
+                              >
+                                Pinned
+                              </span>
+                            )}
+                          </div>
+                          <p
+                            className="text-sm mb-2 line-clamp-2"
+                            style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                          >
+                            {announcement.content}
+                          </p>
+                          <div className="flex items-center gap-4 text-xs" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                            <span>
+                              {typeof announcement.courseId === 'object'
+                                ? announcement.courseId.title
+                                : 'Course Announcement'}
+                            </span>
+                            <span>•</span>
+                            <span>{new Date(announcement.createdAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Attendance Summary */}
             {attendanceData.length > 0 && (
