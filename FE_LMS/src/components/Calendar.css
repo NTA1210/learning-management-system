@@ -891,4 +891,284 @@
   }
 }
 
+/* ===== Enhanced Schedule Item Styles ===== */
+
+/* Schedule item hover effects */
+.schedule-item:hover,
+.week-schedule-item-compact:hover,
+.day-schedule-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+}
+
+.calendar-page:not(.dark) .schedule-item:hover,
+.calendar-page:not(.dark) .week-schedule-item-compact:hover,
+.calendar-page:not(.dark) .day-schedule-item:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Transition for smooth hover effects */
+.schedule-item,
+.week-schedule-item-compact,
+.day-schedule-item {
+  transition: all 0.2s ease;
+}
+
+/* No class indicator styling */
+.no-class-indicator {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+/* Week view items layout improvements */
+.week-day-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+/* Enhanced week schedule item */
+.week-schedule-item-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  padding: 10px 12px;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #0b1220 0%, #111827 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.calendar-page:not(.dark) .week-schedule-item-compact {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-color: #e2e8f0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+/* Room info visibility in week view */
+.week-schedule-item-compact .room-info {
+  display: block !important;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+/* Day view schedule item enhancements */
+.day-schedule-item {
+  display: grid;
+  grid-template-columns: 70px 1fr;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #0b1220 0%, #111827 100%);
+  margin-bottom: 12px;
+  border-left: 4px solid #3b82f6;
+}
+
+.calendar-page:not(.dark) .day-schedule-item {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-color: #e2e8f0;
+}
+
+/* Schedule content in day view */
+.schedule-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Loading state animation */
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.loading::after {
+  content: '';
+  width: 20px;
+  height: 20px;
+  margin-left: 10px;
+  border: 2px solid #3b82f6;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Status badge styles */
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.approved,
+.status-badge.active {
+  background: #10b981;
+  color: white;
+}
+
+.status-badge.pending {
+  background: #f59e0b;
+  color: white;
+}
+
+.status-badge.rejected {
+  background: #ef4444;
+  color: white;
+}
+
+/* Sidebar time slots styling */
+.sidebar-section .time-slot-item {
+  padding: 10px 0;
+  border-bottom: 1px solid #334155;
+}
+
+.calendar-page:not(.dark) .sidebar-section .time-slot-item {
+  border-bottom-color: #e2e8f0;
+}
+
+/* Today highlight in sidebar */
+.sidebar-section .event-item {
+  transition: all 0.2s ease;
+}
+
+.sidebar-section .event-item:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-left-color: #3b82f6;
+}
+
+/* Calendar day cell with schedules */
+.calendar-day:has(.schedule-item) {
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.calendar-page:not(.dark) .calendar-day:has(.schedule-item) {
+  background: rgba(59, 130, 246, 0.03);
+}
+
+/* Navigation button styles */
+.calendar-navigation button {
+  transition: all 0.2s ease;
+}
+
+.calendar-navigation button:hover {
+  transform: scale(1.05);
+}
+
+.calendar-navigation button:active {
+  transform: scale(0.98);
+}
+
+/* Responsive adjustments for schedule items */
+@media (max-width: 768px) {
+  .week-schedule-item-compact {
+    padding: 8px 10px;
+  }
+  
+  .day-schedule-item {
+    grid-template-columns: 60px 1fr;
+    padding: 12px;
+    gap: 12px;
+  }
+  
+  .schedule-time {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .week-schedule-item-compact .subject-code {
+    font-size: 11px;
+  }
+  
+  .week-schedule-item-compact .time-range {
+    font-size: 10px;
+  }
+  
+  .day-schedule-item {
+    grid-template-columns: 50px 1fr;
+    padding: 10px;
+  }
+}
+
+/* Admin Clickable Schedule Items */
+.schedule-item.clickable,
+.week-schedule-item-compact.clickable,
+.day-schedule-item.clickable {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.schedule-item.clickable:hover {
+  transform: translateX(2px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.week-schedule-item-compact.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.day-schedule-item.clickable:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+/* Admin Actions Section */
+.admin-actions {
+  flex-wrap: wrap;
+}
+
+.admin-actions button {
+  transition: all 0.2s ease;
+}
+
+.admin-actions button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.admin-actions button:active {
+  transform: translateY(0);
+}
+
+/* Pending List Styles */
+.pending-list .pending-item {
+  transition: all 0.2s ease;
+}
+
+.pending-list .pending-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+}
+
+/* Dark mode adjustments for admin elements */
+.calendar-page.dark .pending-list .pending-item:hover {
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.calendar-page.dark .schedule-item.clickable:hover,
+.calendar-page.dark .week-schedule-item-compact.clickable:hover,
+.calendar-page.dark .day-schedule-item.clickable:hover {
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+
 

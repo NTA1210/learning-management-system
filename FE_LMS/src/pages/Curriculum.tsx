@@ -15,6 +15,10 @@ import MajorModal from "../components/curriculum/MajorModal";
 import SubjectModal from "../components/curriculum/SubjectModal";
 import CourseModal from "../components/curriculum/CourseModal";
 import PendingChangesDialog from "../components/curriculum/PendingChangesDialog";
+import TabNavigation from "../components/curriculum/TabNavigation";
+import MajorsTable from "../components/curriculum/MajorsTable";
+import SpecialistsTable from "../components/curriculum/SpecialistsTable";
+import SubjectsTable from "../components/curriculum/SubjectsTable";
 
 const Curriculum: React.FC = () => {
   const { darkMode } = useTheme();
@@ -32,7 +36,11 @@ const Curriculum: React.FC = () => {
   const [totalMajors, setTotalMajors] = useState(0);
   const [sortOption, setSortOption] = useState<'name_asc' | 'name_desc' | 'date_asc' | 'date_desc'>('date_desc');
   const majorsRef = useRef<MajorNode[]>([]);
-  
+
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'tree' | 'majors' | 'specialists' | 'subjects'>('tree');
+  const [tableRefreshTrigger, setTableRefreshTrigger] = useState(0);
+
   useEffect(() => {
     majorsRef.current = majors;
   }, [majors]);
@@ -65,7 +73,7 @@ const Curriculum: React.FC = () => {
   const [pendingMoves, setPendingMoves] = useState<PendingMove[]>([]);
   const [moveHistory, setMoveHistory] = useState<PendingMove[]>([]); // For undo/redo
   const [historyIndex, setHistoryIndex] = useState(-1);
-  
+
   // Major CRUD state
   const [showMajorModal, setShowMajorModal] = useState(false);
   const [editingMajorId, setEditingMajorId] = useState<string | null>(null);
@@ -183,10 +191,10 @@ const Curriculum: React.FC = () => {
       prev.map((major) =>
         major._id === majorId
           ? {
-              ...major,
-              specialistsLoading: true,
-              specialistsError: "",
-            }
+            ...major,
+            specialistsLoading: true,
+            specialistsError: "",
+          }
           : major
       )
     );
@@ -236,10 +244,10 @@ const Curriculum: React.FC = () => {
         prev.map((major) =>
           major._id === majorId
             ? {
-                ...major,
-                specialistsLoading: false,
-                specialistsError: message,
-              }
+              ...major,
+              specialistsLoading: false,
+              specialistsError: message,
+            }
             : major
         )
       );
@@ -378,12 +386,12 @@ const Curriculum: React.FC = () => {
                 subjects: (spec.subjects || []).map((subj) =>
                   subj._id === subjectId
                     ? {
-                        ...subj,
-                        courses,
-                        coursesLoaded: true,
-                        coursesLoading: false,
-                        coursesError: "",
-                      }
+                      ...subj,
+                      courses,
+                      coursesLoaded: true,
+                      coursesLoading: false,
+                      coursesError: "",
+                    }
                     : subj
                 ),
               };
@@ -405,10 +413,10 @@ const Curriculum: React.FC = () => {
                 subjects: (spec.subjects || []).map((subj) =>
                   subj._id === subjectId
                     ? {
-                        ...subj,
-                        coursesLoading: false,
-                        coursesError: message,
-                      }
+                      ...subj,
+                      coursesLoading: false,
+                      coursesError: message,
+                    }
                     : subj
                 ),
               };
@@ -427,11 +435,11 @@ const Curriculum: React.FC = () => {
       const order = (sortOption.endsWith('asc') ? 'asc' : 'desc') as 'asc' | 'desc';
 
       const majorsResult = await majorService.getAllMajors({
-          ...(searchTerm && { search: searchTerm }),
-          page: currentPage,
-          limit: pageLimit,
-          ...(isName ? { sortBy: 'title' } : {}),
-          ...(order ? { sortOrder: order } : {}),
+        ...(searchTerm && { search: searchTerm }),
+        page: currentPage,
+        limit: pageLimit,
+        ...(isName ? { sortBy: 'title' } : {}),
+        ...(order ? { sortOrder: order } : {}),
       });
 
       setMajors((prev) => {
@@ -449,7 +457,7 @@ const Curriculum: React.FC = () => {
         });
       });
       setError("");
-      
+
       if (majorsResult.pagination && typeof majorsResult.pagination === 'object') {
         if ('total' in majorsResult.pagination)
           setTotalMajors(majorsResult.pagination.total as number);
@@ -542,6 +550,7 @@ const Curriculum: React.FC = () => {
       setShowCreateModal(false);
       setFormData({ name: "", description: "", majorId: "" });
       await fetchData();
+      setTableRefreshTrigger(prev => prev + 1);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create specialist");
     }
@@ -560,6 +569,7 @@ const Curriculum: React.FC = () => {
       setEditingSpecialist(null);
       setFormData({ name: "", description: "", majorId: "" });
       await fetchData();
+      setTableRefreshTrigger(prev => prev + 1);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to update specialist");
     }
@@ -570,6 +580,7 @@ const Curriculum: React.FC = () => {
     try {
       await specialistService.deleteSpecialist(id);
       await fetchData();
+      setTableRefreshTrigger(prev => prev + 1);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to delete specialist");
     }
@@ -581,16 +592,16 @@ const Curriculum: React.FC = () => {
     );
     const specialist = majorNode?.specialists?.find((spec) => spec._id === specialistId);
     if (specialist) {
-    setEditingSpecialist(specialist);
-    setFormData({
-      name: specialist.name,
-      description: specialist.description,
-      majorId: specialist.majorId?._id || "",
-    });
-    setShowEditModal(true);
-        setOpenActionMenu(null);
-      }
-    };
+      setEditingSpecialist(specialist);
+      setFormData({
+        name: specialist.name,
+        description: specialist.description,
+        majorId: specialist.majorId?._id || "",
+      });
+      setShowEditModal(true);
+      setOpenActionMenu(null);
+    }
+  };
 
   const openCreateMajorModal = () => {
     setEditingMajorId(null);
@@ -627,6 +638,7 @@ const Curriculum: React.FC = () => {
       setEditingMajorId(null);
       setMajorFormData({ name: "", description: "" });
       await fetchData();
+      setTableRefreshTrigger(prev => prev + 1); // Refresh table views
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to save major");
     }
@@ -638,6 +650,7 @@ const Curriculum: React.FC = () => {
       await majorService.deleteMajor(majorId);
       setOpenActionMenu(null);
       await fetchData();
+      setTableRefreshTrigger(prev => prev + 1);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to delete major");
     }
@@ -773,7 +786,7 @@ const Curriculum: React.FC = () => {
       subjectId: subject._id,
       subjectName: subject.name,
     });
-    
+
     // Format dates to YYYY-MM-DD
     const formatDate = (dateStr: string | undefined) => {
       if (!dateStr) return "";
@@ -782,11 +795,11 @@ const Curriculum: React.FC = () => {
     };
 
     // Extract teacher IDs
-    const teacherIds = course.teacherIds 
+    const teacherIds = course.teacherIds
       ? course.teacherIds.map((t: any) => typeof t === 'string' ? t : t._id)
       : course.teachers
-      ? course.teachers.map((t: any) => t._id)
-      : [];
+        ? course.teachers.map((t: any) => t._id)
+        : [];
 
     setCourseFormData({
       title: course.title || "",
@@ -809,7 +822,7 @@ const Curriculum: React.FC = () => {
     e.preventDefault();
     if (!courseContext) return;
     const context = courseContext;
-    
+
     try {
       setLoading(true);
       if (editingCourseId) {
@@ -846,7 +859,7 @@ const Curriculum: React.FC = () => {
         };
         await courseService.createCourse(createPayload);
       }
-      
+
       setShowCourseModal(false);
       setEditingCourseId(null);
       setCourseContext(null);
@@ -863,7 +876,7 @@ const Curriculum: React.FC = () => {
         semesterId: undefined,
         logo: null,
       });
-      
+
       // Reload courses for the subject
       await loadCoursesForSubject(context.majorId, context.specialistId, context.subjectId, true);
     } catch (err: unknown) {
@@ -904,7 +917,7 @@ const Curriculum: React.FC = () => {
     if (!draggedItem) return;
 
     // Validate drop target
-    const isValidDrop = 
+    const isValidDrop =
       (draggedItem.type === 'specialist' && targetType === 'major') ||
       (draggedItem.type === 'subject' && targetType === 'specialist');
 
@@ -924,15 +937,15 @@ const Curriculum: React.FC = () => {
     // Handle specialist move to major
     if (draggedItem.type === 'specialist' && targetType === 'major') {
       const specialist = draggedItem.data;
-      const currentMajorId = typeof specialist.majorId === 'object' 
-        ? specialist.majorId?._id 
+      const currentMajorId = typeof specialist.majorId === 'object'
+        ? specialist.majorId?._id
         : specialist.majorId;
-      
+
       if (currentMajorId && currentMajorId !== targetId) {
         // Find source and target major names
         const sourceMajor = majors.find(m => m._id === currentMajorId);
         const targetMajor = majors.find(m => m._id === targetId);
-        
+
         if (sourceMajor && targetMajor) {
           const newMove: PendingMove = {
             id: specialist._id,
@@ -946,25 +959,28 @@ const Curriculum: React.FC = () => {
           };
 
           // Remove any existing move for this item
-          setPendingMoves(prev => prev.filter(m => m.id !== specialist._id && m.type !== 'specialist'));
+          setPendingMoves(prev => prev.filter(m => m.id !== specialist._id || m.type !== 'specialist'));
           setPendingMoves(prev => [...prev, newMove]);
-          
+
           // Optimistic update: move specialist in UI immediately
           applyOptimisticMove(newMove);
         }
       }
     }
-    
+
     // Handle subject move to specialist
     else if (draggedItem.type === 'subject' && targetType === 'specialist') {
       const subject = draggedItem.data;
-      const currentSpecialistIds = subject.specialistIds || [];
-      
+      // Extract specialist IDs, handling both string and object formats
+      const currentSpecialistIds = (subject.specialistIds || []).map((id: any) =>
+        typeof id === 'object' ? id._id : id
+      );
+
       if (!currentSpecialistIds.includes(targetId)) {
         // Find source specialist and target specialist
         let sourceSpecialist: any = null;
         let sourceMajor: any = null;
-        
+
         for (const major of majors) {
           for (const specialist of major.specialists || []) {
             if (currentSpecialistIds.includes(specialist._id)) {
@@ -1002,9 +1018,9 @@ const Curriculum: React.FC = () => {
           };
 
           // Remove any existing move for this item
-          setPendingMoves(prev => prev.filter(m => m.id !== subject._id && m.type !== 'subject'));
+          setPendingMoves(prev => prev.filter(m => m.id !== subject._id || m.type !== 'subject'));
           setPendingMoves(prev => [...prev, newMove]);
-          
+
           // Optimistic update: move subject in UI immediately
           applyOptimisticMove(newMove);
         }
@@ -1032,11 +1048,11 @@ const Curriculum: React.FC = () => {
             const specialist = prev
               .flatMap(m => m.specialists || [])
               .find(s => s._id === move.id);
-            
+
             if (specialist) {
               const updatedSpecialist = {
                 ...specialist,
-                majorId: typeof specialist.majorId === 'object' 
+                majorId: typeof specialist.majorId === 'object'
                   ? { ...specialist.majorId, _id: move.toId }
                   : move.toId,
               } as SpecialistNode;
@@ -1068,7 +1084,7 @@ const Curriculum: React.FC = () => {
                 .flatMap(m => m.specialists || [])
                 .flatMap(s => s.subjects || [])
                 .find(sub => sub._id === move.id);
-              
+
               if (subject) {
                 const updatedSubject = {
                   ...subject,
@@ -1109,7 +1125,7 @@ const Curriculum: React.FC = () => {
 
     // Revert optimistic update for this specific move
     revertOptimisticMove(move);
-    
+
     // Remove from pending moves
     setPendingMoves(prev => prev.filter(m => !(m.id === moveId && m.type === moveType)));
   };
@@ -1131,11 +1147,11 @@ const Curriculum: React.FC = () => {
             const specialist = prev
               .flatMap(m => m.specialists || [])
               .find(s => s._id === move.id);
-            
+
             if (specialist) {
               const revertedSpecialist = {
                 ...specialist,
-                majorId: typeof specialist.majorId === 'object' 
+                majorId: typeof specialist.majorId === 'object'
                   ? { ...specialist.majorId, _id: move.fromId }
                   : move.fromId,
               } as SpecialistNode;
@@ -1167,7 +1183,7 @@ const Curriculum: React.FC = () => {
                 .flatMap(m => m.specialists || [])
                 .flatMap(s => s.subjects || [])
                 .find(sub => sub._id === move.id);
-              
+
               if (subject) {
                 const revertedSubject = {
                   ...subject,
@@ -1193,27 +1209,27 @@ const Curriculum: React.FC = () => {
 
   const undoLastMove = () => {
     if (pendingMoves.length === 0) return;
-    
+
     const lastMove = pendingMoves[pendingMoves.length - 1];
     revertOptimisticMove(lastMove);
-    
+
     // Add to history for redo
     setMoveHistory(prev => [...prev, lastMove]);
     setHistoryIndex(prev => prev + 1);
-    
+
     // Remove from pending
     setPendingMoves(prev => prev.slice(0, -1));
   };
 
   const redoLastMove = () => {
     if (historyIndex < 0 || historyIndex >= moveHistory.length) return;
-    
+
     const moveToRedo = moveHistory[historyIndex];
     applyOptimisticMove(moveToRedo);
-    
+
     // Add back to pending
     setPendingMoves(prev => [...prev, moveToRedo]);
-    
+
     // Remove from history
     setMoveHistory(prev => prev.slice(0, -1));
     setHistoryIndex(prev => prev - 1);
@@ -1252,18 +1268,18 @@ const Curriculum: React.FC = () => {
       // Store which majors were expanded before refresh
       const previouslyExpandedMajors = new Set(expandedMajors);
       const previouslyExpandedSpecialists = new Set(expandedSpecialists);
-      
+
       // Clear pending moves
       setPendingMoves([]);
       setMoveHistory([]);
       setHistoryIndex(-1);
-      
+
       // Refresh the entire tree
       await fetchData();
-      
+
       // Use a small delay to ensure state is updated, then refresh expanded nodes
       await new Promise(resolve => setTimeout(resolve, 50));
-      
+
       // Reload specialists and subjects for affected majors that were expanded
       for (const majorId of affectedMajorIds) {
         if (previouslyExpandedMajors.has(majorId)) {
@@ -1271,13 +1287,13 @@ const Curriculum: React.FC = () => {
           if (!expandedMajors.has(majorId)) {
             setExpandedMajors(prev => new Set([...prev, majorId]));
           }
-          
+
           // Force reload specialists
           await loadSpecialistsForMajor(majorId, true);
-          
+
           // Get the updated major with fresh specialists
           const updatedMajor = majorsRef.current.find(m => m._id === majorId);
-          
+
           // Reload subjects for expanded specialists
           if (updatedMajor?.specialists) {
             for (const specialist of updatedMajor.specialists) {
@@ -1398,214 +1414,312 @@ const Curriculum: React.FC = () => {
               </div>
 
 
-              {/* Search and Filter Controls */}
-              <SearchFilters
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                onSearch={handleSearch}
-                sortOption={sortOption}
-                onSortChange={setSortOption}
-                pageLimit={pageLimit}
-                onPageLimitChange={changePageLimit}
-                currentPage={currentPage}
-                totalMajors={totalMajors}
-                onPageChange={goToPage}
-              />
+              {/* Tab Navigation */}
+              <TabNavigation activeTab={activeTab} onTabChange={setActiveTab} />
 
-              {/* Loading State */}
-              {loading && (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: darkMode ? '#6366f1' : '#4f46e5' }}></div>
-                </div>
-              )}
+              {/* TreeView Content */}
+              {activeTab === 'tree' && (
+                <>
+                  {/* Search and Filter Controls */}
+                  <SearchFilters
+                    searchTerm={searchTerm}
+                    onSearchChange={setSearchTerm}
+                    onSearch={handleSearch}
+                    sortOption={sortOption}
+                    onSortChange={setSortOption}
+                    pageLimit={pageLimit}
+                    onPageLimitChange={changePageLimit}
+                    currentPage={currentPage}
+                    totalMajors={totalMajors}
+                    onPageChange={goToPage}
+                  />
 
-              {/* Error State */}
-              {error && (
-                <div
-                  className="p-4 rounded-lg mb-6 flex items-center"
-                  style={{
-                    backgroundColor: darkMode ? 'rgba(239, 68, 68, 0.1)' : '#fee2e2',
-                    color: darkMode ? '#fca5a5' : '#dc2626'
-                  }}
-                >
-                  <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  {error}
-                </div>
-              )}
+                  {/* Loading State */}
+                  {loading && (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: darkMode ? '#6366f1' : '#4f46e5' }}></div>
+                    </div>
+                  )}
 
-              {/* Table View */}
-              {!loading && !error && (
-                <div 
-                  className="rounded-lg overflow-hidden border"
-                  style={{
-                    backgroundColor: darkMode ? '#1f2937' : '#ffffff',
-                    borderColor: darkMode ? '#374151' : '#e5e7eb',
-                  }}
-                >
-                  <div className="overflow-x-auto">
-                    <table className="w-full" style={{ borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr style={{
-                          backgroundColor: darkMode ? '#111827' : '#f9fafb',
-                          borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
-                        }}>
-                          <th style={{ 
-                            padding: '12px 16px', 
-                            textAlign: 'left', 
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            color: darkMode ? '#d1d5db' : '#374151',
-                            width: '40px'
-                          }}>
+                  {/* Error State */}
+                  {error && (
+                    <div
+                      className="p-4 rounded-lg mb-6 flex items-center"
+                      style={{
+                        backgroundColor: darkMode ? 'rgba(239, 68, 68, 0.1)' : '#fee2e2',
+                        color: darkMode ? '#fca5a5' : '#dc2626'
+                      }}
+                    >
+                      <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                      {error}
+                    </div>
+                  )}
 
-                          </th>
-                          <th style={{ 
-                            padding: '12px 16px', 
-                            textAlign: 'left', 
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            color: darkMode ? '#d1d5db' : '#374151',
-                          }}>
-                            Curriculum Tree
-                          </th>
-                          <th style={{ 
-                            padding: '12px 16px', 
-                            textAlign: 'left', 
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            color: darkMode ? '#d1d5db' : '#374151',
-                            width: '120px'
-                          }}>
-                            Date Updated
-                          </th>
-                          <th style={{ 
-                            padding: '12px 16px', 
-                            textAlign: 'left', 
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            color: darkMode ? '#d1d5db' : '#374151',
-                            width: '120px'
-                          }}>
-                            Date Created
-                          </th>
-                          <th style={{ 
-                            padding: '12px 16px', 
-                            textAlign: 'center', 
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            color: darkMode ? '#d1d5db' : '#374151',
-                            width: '80px'
-                          }}>
-                            Credits
-                          </th>
-                          <th style={{ 
-                            padding: '12px 16px', 
-                            textAlign: 'left', 
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            color: darkMode ? '#d1d5db' : '#374151',
-                            width: '150px'
-                          }}>
-                            Prerequisites
-                          </th>
-                          <th style={{ 
-                            padding: '12px 16px', 
-                            textAlign: 'center', 
-                            fontWeight: 600,
-                            fontSize: '14px',
-                            color: darkMode ? '#d1d5db' : '#374151',
-                            width: '80px'
-                          }}>
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {majors.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} style={{ padding: "24px", textAlign: "center", color: darkMode ? "#9ca3af" : "#6b7280" }}>
-                              No majors found.
+                  {/* Table View */}
+                  {!loading && !error && (
+                    <div
+                      className="rounded-lg overflow-hidden border"
+                      style={{
+                        backgroundColor: darkMode ? '#1f2937' : '#ffffff',
+                        borderColor: darkMode ? '#374151' : '#e5e7eb',
+                      }}
+                    >
+                      <div className="overflow-x-auto">
+                        <table className="w-full" style={{ borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{
+                              backgroundColor: darkMode ? '#111827' : '#f9fafb',
+                              borderBottom: `1px solid ${darkMode ? '#374151' : '#e5e7eb'}`,
+                            }}>
+                              <th style={{
+                                padding: '12px 16px',
+                                textAlign: 'left',
+                                fontWeight: 600,
+                                fontSize: '14px',
+                                color: darkMode ? '#d1d5db' : '#374151',
+                                width: '40px'
+                              }}>
+
+                              </th>
+                              <th style={{
+                                padding: '12px 16px',
+                                textAlign: 'left',
+                                fontWeight: 600,
+                                fontSize: '14px',
+                                color: darkMode ? '#d1d5db' : '#374151',
+                              }}>
+                                Curriculum Tree
+                              </th>
+                              <th style={{
+                                padding: '12px 16px',
+                                textAlign: 'left',
+                                fontWeight: 600,
+                                fontSize: '14px',
+                                color: darkMode ? '#d1d5db' : '#374151',
+                                width: '120px'
+                              }}>
+                                Date Updated
+                              </th>
+                              <th style={{
+                                padding: '12px 16px',
+                                textAlign: 'left',
+                                fontWeight: 600,
+                                fontSize: '14px',
+                                color: darkMode ? '#d1d5db' : '#374151',
+                                width: '120px'
+                              }}>
+                                Date Created
+                              </th>
+                              <th style={{
+                                padding: '12px 16px',
+                                textAlign: 'center',
+                                fontWeight: 600,
+                                fontSize: '14px',
+                                color: darkMode ? '#d1d5db' : '#374151',
+                                width: '80px'
+                              }}>
+                                Credits
+                              </th>
+                              <th style={{
+                                padding: '12px 16px',
+                                textAlign: 'left',
+                                fontWeight: 600,
+                                fontSize: '14px',
+                                color: darkMode ? '#d1d5db' : '#374151',
+                                width: '150px'
+                              }}>
+                                Prerequisites
+                              </th>
+                              <th style={{
+                                padding: '12px 16px',
+                                textAlign: 'center',
+                                fontWeight: 600,
+                                fontSize: '14px',
+                                color: darkMode ? '#d1d5db' : '#374151',
+                                width: '80px'
+                              }}>
+                                Actions
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {majors.length === 0 ? (
+                              <tr>
+                                <td colSpan={7} style={{ padding: "24px", textAlign: "center", color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                                  No majors found.
                                 </td>
                               </tr>
-                        ) : (
-                          majors.map((major) => {
-                            const isExpanded = expandedMajors.has(major._id);
+                            ) : (
+                              majors.map((major) => {
+                                const isExpanded = expandedMajors.has(major._id);
 
-                            return (
-                              <MajorRow
-                                key={major._id}
-                                major={major}
-                                isExpanded={isExpanded}
-                                onToggle={() => toggleMajor(major._id)}
-                                onLoadSpecialists={() => loadSpecialistsForMajor(major._id, true)}
-                                openActionMenu={openActionMenu}
-                                onActionMenuToggle={(id) => setOpenActionMenu(openActionMenu === id ? null : id)}
-                                onActionMenuClose={() => setOpenActionMenu(null)}
-                                onAddSpecialist={() => {
-                                  setFormData({ name: "", description: "", majorId: major._id });
-                                  setShowCreateModal(true);
-                                }}
-                                onEditMajor={() => openEditMajorModal(major)}
-                                onDeleteMajor={() => handleDeleteMajor(major._id)}
-                                expandedSpecialists={expandedSpecialists}
-                                expandedSubjects={expandedSubjects}
-                                onToggleSpecialist={(specialistId) => toggleSpecialist(major._id, specialistId)}
-                                onToggleSubject={(specialistId, subjectId) => toggleSubject(major._id, specialistId, subjectId)}
-                                onLoadSubjects={(specialistId) => loadSubjectsForSpecialist(major._id, specialistId)}
-                                onLoadCourses={(specialistId, subjectId) => loadCoursesForSubject(major._id, specialistId, subjectId)}
-                                onAddSubject={(specialist) => openCreateSubjectModal(major, specialist)}
-                                onEditSubject={(specialist, subject) => openEditSubjectModal(major, specialist, subject)}
-                                onDeleteSubject={(specialist, subject) =>
-                                  handleDeleteSubject(major._id, specialist._id, subject._id)
-                                }
-                                onEditSpecialist={openEditModal}
-                                onDeleteSpecialist={handleDeleteSpecialist}
-                                onAddCourse={(subject, major, specialist) => openCreateCourseModal(subject, major, specialist)}
-                                onEditCourse={(course, subject, major, specialist) => openEditCourseModal(course, subject, major, specialist)}
-                                onDeleteCourse={(course, subject, major, specialist) => handleDeleteCourse(course, subject, major, specialist)}
-                                onShowInfo={handleShowInfo}
-                                openInfoId={openInfoId}
-                                onCloseInfo={handleCloseInfo}
-                                // Drag and Drop props
-                                onDragStart={handleDragStart}
-                                onDragEnd={handleDragEnd}
-                                onDragOver={handleDragOver}
-                                onDragLeave={handleDragLeave}
-                                onDrop={handleDrop}
-                                draggedItem={draggedItem}
-                                dropTarget={dropTarget}
-                                isDragging={isDragging}
-                                pendingMoves={pendingMoves}
-                              />
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                                return (
+                                  <MajorRow
+                                    key={major._id}
+                                    major={major}
+                                    isExpanded={isExpanded}
+                                    onToggle={() => toggleMajor(major._id)}
+                                    onLoadSpecialists={() => loadSpecialistsForMajor(major._id, true)}
+                                    openActionMenu={openActionMenu}
+                                    onActionMenuToggle={(id) => setOpenActionMenu(openActionMenu === id ? null : id)}
+                                    onActionMenuClose={() => setOpenActionMenu(null)}
+                                    onAddSpecialist={() => {
+                                      setFormData({ name: "", description: "", majorId: major._id });
+                                      setShowCreateModal(true);
+                                    }}
+                                    onEditMajor={() => openEditMajorModal(major)}
+                                    onDeleteMajor={() => handleDeleteMajor(major._id)}
+                                    expandedSpecialists={expandedSpecialists}
+                                    expandedSubjects={expandedSubjects}
+                                    onToggleSpecialist={(specialistId) => toggleSpecialist(major._id, specialistId)}
+                                    onToggleSubject={(specialistId, subjectId) => toggleSubject(major._id, specialistId, subjectId)}
+                                    onLoadSubjects={(specialistId) => loadSubjectsForSpecialist(major._id, specialistId)}
+                                    onLoadCourses={(specialistId, subjectId) => loadCoursesForSubject(major._id, specialistId, subjectId)}
+                                    onAddSubject={(specialist) => openCreateSubjectModal(major, specialist)}
+                                    onEditSubject={(specialist, subject) => openEditSubjectModal(major, specialist, subject)}
+                                    onDeleteSubject={(specialist, subject) =>
+                                      handleDeleteSubject(major._id, specialist._id, subject._id)
+                                    }
+                                    onEditSpecialist={openEditModal}
+                                    onDeleteSpecialist={handleDeleteSpecialist}
+                                    onAddCourse={(subject, major, specialist) => openCreateCourseModal(subject, major, specialist)}
+                                    onEditCourse={(course, subject, major, specialist) => openEditCourseModal(course, subject, major, specialist)}
+                                    onDeleteCourse={(course, subject, major, specialist) => handleDeleteCourse(course, subject, major, specialist)}
+                                    onShowInfo={handleShowInfo}
+                                    openInfoId={openInfoId}
+                                    onCloseInfo={handleCloseInfo}
+                                    // Drag and Drop props
+                                    onDragStart={handleDragStart}
+                                    onDragEnd={handleDragEnd}
+                                    onDragOver={handleDragOver}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={handleDrop}
+                                    draggedItem={draggedItem}
+                                    dropTarget={dropTarget}
+                                    isDragging={isDragging}
+                                    pendingMoves={pendingMoves}
+                                  />
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty State */}
+                  {!loading && !error && majors.length === 0 && (
+                    <div className="text-center py-12">
+                      <svg className="w-24 h-24 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: darkMode ? '#6b7280' : '#9ca3af' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                      <h3
+                        className="text-xl font-semibold mb-2"
+                        style={{ color: darkMode ? '#ffffff' : '#1f2937' }}
+                      >
+                        No curriculum found
+                      </h3>
+                      <p
+                        style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                      >
+                        No majors or specialists match your search criteria
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
-              {/* Empty State */}
-              {!loading && !error && majors.length === 0 && (
-                <div className="text-center py-12">
-                  <svg className="w-24 h-24 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: darkMode ? '#6b7280' : '#9ca3af' }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                  <h3
-                    className="text-xl font-semibold mb-2"
-                    style={{ color: darkMode ? '#ffffff' : '#1f2937' }}
-                  >
-                    No curriculum found
-                  </h3>
-                  <p
-                    style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
-                  >
-                    No majors or specialists match your search criteria
-                  </p>
-                </div>
+              {/* Majors Table View */}
+              {activeTab === 'majors' && (
+                <MajorsTable
+                  onOpenMajorModal={(major) => {
+                    if (major) {
+                      openEditMajorModal(major);
+                    } else {
+                      openCreateMajorModal();
+                    }
+                  }}
+                  onDeleteMajor={handleDeleteMajor}
+                  refreshTrigger={tableRefreshTrigger}
+                />
+              )}
+
+              {/* Specialists Table View */}
+              {activeTab === 'specialists' && (
+                <SpecialistsTable
+                  onOpenSpecialistModal={(specialist) => {
+                    if (specialist) {
+                      openEditModal(specialist._id);
+                    } else {
+                      setFormData({ name: "", description: "", majorId: "" });
+                      setShowCreateModal(true);
+                    }
+                  }}
+                  onDeleteSpecialist={handleDeleteSpecialist}
+                  refreshTrigger={tableRefreshTrigger}
+                />
+              )}
+
+              {/* Subjects Table View */}
+              {activeTab === 'subjects' && (
+                <SubjectsTable
+                  onOpenSubjectModal={(subject, context) => {
+                    if (subject) {
+                      // Find the major and specialist for this subject
+                      let foundMajor: MajorNode | null = null;
+                      let foundSpecialist: SpecialistNode | null = null;
+
+                      for (const major of majors) {
+                        for (const specialist of major.specialists || []) {
+                          const hasSubject = specialist.subjects?.some(s => s._id === subject._id);
+                          if (hasSubject) {
+                            foundMajor = major;
+                            foundSpecialist = specialist;
+                            break;
+                          }
+                        }
+                        if (foundMajor) break;
+                      }
+
+                      if (foundMajor && foundSpecialist) {
+                        openEditSubjectModal(foundMajor, foundSpecialist, subject);
+                      }
+                    } else if (context) {
+                      // Find the major and specialist for the context
+                      let foundMajor: MajorNode | null = null;
+                      let foundSpecialist: SpecialistNode | null = null;
+
+                      for (const major of majors) {
+                        const specialist = major.specialists?.find(s => s._id === context.specialistId);
+                        if (specialist) {
+                          foundMajor = major;
+                          foundSpecialist = specialist;
+                          break;
+                        }
+                      }
+
+                      if (foundMajor && foundSpecialist) {
+                        openCreateSubjectModal(foundMajor, foundSpecialist);
+                      }
+                    }
+                  }}
+                  onDeleteSubject={(subjectId) => {
+                    // Find the major and specialist for this subject
+                    for (const major of majors) {
+                      for (const specialist of major.specialists || []) {
+                        const hasSubject = specialist.subjects?.some(s => s._id === subjectId);
+                        if (hasSubject) {
+                          handleDeleteSubject(major._id, specialist._id, subjectId);
+                          return;
+                        }
+                      }
+                    }
+                  }}
+                  refreshTrigger={tableRefreshTrigger}
+                />
               )}
             </div>
           </main>
@@ -1615,8 +1729,8 @@ const Curriculum: React.FC = () => {
         <SpecialistModal
           isOpen={showCreateModal}
           onClose={() => {
-                setShowCreateModal(false);
-                setFormData({ name: "", description: "", majorId: "" });
+            setShowCreateModal(false);
+            setFormData({ name: "", description: "", majorId: "" });
           }}
           onSubmit={handleCreateSpecialist}
           title="Create New Specialist"
@@ -1630,9 +1744,9 @@ const Curriculum: React.FC = () => {
         <SpecialistModal
           isOpen={showEditModal && !!editingSpecialist}
           onClose={() => {
-                setShowEditModal(false);
-                setEditingSpecialist(null);
-                setFormData({ name: "", description: "", majorId: "" });
+            setShowEditModal(false);
+            setEditingSpecialist(null);
+            setFormData({ name: "", description: "", majorId: "" });
           }}
           onSubmit={handleEditSpecialist}
           title="Edit Specialist"

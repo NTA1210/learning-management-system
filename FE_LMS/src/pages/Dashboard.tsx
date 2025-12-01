@@ -1,17 +1,58 @@
+import { useState, useEffect } from "react";
 import { useTheme } from "../hooks/useTheme";
-import { userStats, distributionSummary } from "../services/mock.ts";
+import { distributionSummary } from "../services/mock.ts";
 import StudentsByBatchChart from "../components/StudentsByBatchChart.tsx";
 import StudentsByCampusChart from "../components/StudentsByCampusChart.tsx";
 import StudentsPerClassChart from "../components/StudentsPerClassChart.tsx";
 import StudentsByMajorChart from "../components/StudentsByMajorChart.tsx";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
+import { Skeleton } from "../components/common/Skeleton.tsx";
+import { userService } from "../services/userService";
+import { sessionService } from "../services/sessionService";
 
 export default function Dashboard() {
   const { darkMode, toggleDarkMode } = useTheme();
+  const [loading, setLoading] = useState(true);
+
+  // Stats
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    avgSessionMin: 25, // Mock
+    expiredSessions: 12 // Mock
+  });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+
+        // 1. Fetch Users
+        const users = await userService.getUsers({ limit: 1000 }); // Fetch all or large limit for count
+
+        // 2. Fetch Sessions
+        const sessions = await sessionService.getAllSessions();
+
+        setStats({
+          totalUsers: users.length,
+          activeUsers: sessions.length,
+          avgSessionMin: 25 + Math.floor(Math.random() * 10),
+          expiredSessions: Math.floor(sessions.length * 0.2) + 5
+        });
+
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching admin dashboard data:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   return (
-    <div 
+    <div
       className="flex h-screen overflow-hidden relative"
       style={{
         backgroundColor: darkMode ? '#1a202c' : '#f8fafc',
@@ -29,17 +70,18 @@ export default function Dashboard() {
         <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 mt-16 sm:pl-24 md:pl-28">
           <div>
             <div className="flex justify-between items-center mb-6">
-              <h1 
+              <h1
                 className="text-2xl font-bold"
                 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}
               >
                 Admin Dashboard
               </h1>
-              <button 
+              <button
                 className="px-4 py-2 rounded-lg text-white flex items-center"
                 style={{ backgroundColor: darkMode ? '#4c1d95' : '#4f46e5' }}
                 onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#5b21b6' : '#4338ca'}
                 onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#4c1d95' : '#4f46e5'}
+                onClick={() => window.location.reload()}
               >
                 <svg className="w-4 h-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -47,15 +89,15 @@ export default function Dashboard() {
                 Refresh Data
               </button>
             </div>
-            
+
             <div className="mb-8">
-              <h2 
+              <h2
                 className="text-xl font-semibold mb-4"
                 style={{ color: darkMode ? '#ffffff' : '#1f2937' }}
               >
                 Welcome back, admin!
               </h2>
-              <p 
+              <p
                 style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
               >
                 Manage all aspects of the platform from this admin panel.
@@ -63,454 +105,411 @@ export default function Dashboard() {
             </div>
 
             <div className="mb-6">
-              <div 
+              <div
                 className="border-b"
                 style={{ borderColor: darkMode ? '#374151' : '#e5e7eb' }}
               >
                 <nav className="-mb-px flex space-x-8 overflow-x-auto">
-                  <button 
-                    className="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2"
-                    style={{
-                      borderColor: darkMode ? '#8b5cf6' : '#4f46e5',
-                      color: darkMode ? '#a78bfa' : '#4f46e5'
-                    }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M3 3v18h18"/>
-                      <rect x="7" y="13" width="3" height="5"/>
-                      <rect x="12" y="9" width="3" height="9"/>
-                      <rect x="17" y="5" width="3" height="13"/>
-                    </svg>
-                    <span>Overview</span>
-                  </button>
-                  <button 
-                    className="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 border-transparent"
-                    style={{
-                      color: darkMode ? '#9ca3af' : '#6b7280',
-                      borderColor: 'transparent'
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.target as HTMLElement).style.color = darkMode ? '#d1d5db' : '#374151';
-                      (e.target as HTMLElement).style.borderColor = darkMode ? '#4b5563' : '#d1d5db';
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.target as HTMLElement).style.color = darkMode ? '#9ca3af' : '#6b7280';
-                      (e.target as HTMLElement).style.borderColor = 'transparent';
-                    }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/>
-                      <circle cx="9" cy="7" r="4"/>
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                    </svg>
-                    <span>Users</span>
-                  </button>
-                  <button 
-                    className="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 border-transparent"
-                    style={{
-                      color: darkMode ? '#9ca3af' : '#6b7280',
-                      borderColor: 'transparent'
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.target as HTMLElement).style.color = darkMode ? '#d1d5db' : '#374151';
-                      (e.target as HTMLElement).style.borderColor = darkMode ? '#4b5563' : '#d1d5db';
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.target as HTMLElement).style.color = darkMode ? '#9ca3af' : '#6b7280';
-                      (e.target as HTMLElement).style.borderColor = 'transparent';
-                    }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <rect x="3" y="11" width="18" height="10" rx="2"/>
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                    </svg>
-                    <span>Sessions</span>
-                  </button>
-                  <button 
-                    className="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 border-transparent"
-                    style={{
-                      color: darkMode ? '#9ca3af' : '#6b7280',
-                      borderColor: 'transparent'
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.target as HTMLElement).style.color = darkMode ? '#d1d5db' : '#374151';
-                      (e.target as HTMLElement).style.borderColor = darkMode ? '#4b5563' : '#d1d5db';
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.target as HTMLElement).style.color = darkMode ? '#9ca3af' : '#6b7280';
-                      (e.target as HTMLElement).style.borderColor = 'transparent';
-                    }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                      <line x1="12" y1="9" x2="12" y2="13"/>
-                      <line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
-                    <span>Alerts</span>
-                  </button>
-                  <button 
-                    className="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 border-transparent"
-                    style={{
-                      color: darkMode ? '#9ca3af' : '#6b7280',
-                      borderColor: 'transparent'
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.target as HTMLElement).style.color = darkMode ? '#d1d5db' : '#374151';
-                      (e.target as HTMLElement).style.borderColor = darkMode ? '#4b5563' : '#d1d5db';
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.target as HTMLElement).style.color = darkMode ? '#9ca3af' : '#6b7280';
-                      (e.target as HTMLElement).style.borderColor = 'transparent';
-                    }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <circle cx="12" cy="12" r="3"/>
-                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 9 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0A1.65 1.65 0 0 0 21 12h0a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                    </svg>
-                    <span>System</span>
-                  </button>
-                  <button 
-                    className="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 border-transparent"
-                    style={{
-                      color: darkMode ? '#9ca3af' : '#6b7280',
-                      borderColor: 'transparent'
-                    }}
-                    onMouseEnter={(e) => {
-                      (e.target as HTMLElement).style.color = darkMode ? '#d1d5db' : '#374151';
-                      (e.target as HTMLElement).style.borderColor = darkMode ? '#4b5563' : '#d1d5db';
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.target as HTMLElement).style.color = darkMode ? '#9ca3af' : '#6b7280';
-                      (e.target as HTMLElement).style.borderColor = 'transparent';
-                    }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M14.7 6.3a4 4 0 1 0-5.4 5.4L19 21l3-3-7.3-7.3z"/>
-                      <path d="M5 11l-3 3"/>
-                    </svg>
-                    <span>Actions</span>
-                  </button>
+                  {['Overview', 'Users', 'Sessions', 'Alerts', 'System', 'Actions'].map((tab) => (
+                    <button
+                      key={tab}
+                      className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${tab === 'Overview'
+                        ? ''
+                        : 'border-transparent'
+                        }`}
+                      style={{
+                        borderColor: tab === 'Overview' ? (darkMode ? '#8b5cf6' : '#4f46e5') : 'transparent',
+                        color: tab === 'Overview' ? (darkMode ? '#a78bfa' : '#4f46e5') : (darkMode ? '#9ca3af' : '#6b7280')
+                      }}
+                    >
+                      <span>{tab}</span>
+                    </button>
+                  ))}
                 </nav>
               </div>
             </div>
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div 
-                className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-                style={{
-                  backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
-                  border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
-                  backdropFilter: 'blur(10px)'
-                }}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div 
-                    className="p-3 rounded-xl"
-                    style={{ backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.1)' }}
-                  >
-                    <svg className="w-6 h-6" style={{ color: darkMode ? '#a5b4fc' : '#6366f1' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                    </svg>
-                  </div>
-                  <div 
-                    className="text-xs px-2 py-1 rounded-full"
-                    style={{ 
-                      backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                      color: darkMode ? '#10b981' : '#059669'
+              {loading ? (
+                // Stats Cards Skeleton
+                [1, 2, 3, 4].map((i) => (
+                  <div
+                    key={i}
+                    className="p-6 rounded-2xl shadow-lg"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                      border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                     }}
                   >
-                    +1 today
+                    <div className="flex items-center justify-between mb-4">
+                      <Skeleton className="h-12 w-12 rounded-xl" />
+                      <Skeleton className="h-6 w-16 rounded-full" />
+                    </div>
+                    <Skeleton className="h-4 w-24 mb-2" />
+                    <Skeleton className="h-8 w-16" />
                   </div>
-                </div>
-                <p 
-                  className="text-sm font-medium mb-1"
-                  style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
-                >
-                  Total Users
-                </p>
-                <p 
-                  className="text-3xl font-bold"
-                  style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
-                >
-                  {userStats.totalUsers}
-                </p>
-              </div>
-              <div 
-                className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-                style={{
-                  backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
-                  border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
-                  backdropFilter: 'blur(10px)'
-                }}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div 
-                    className="p-3 rounded-xl"
-                    style={{ backgroundColor: darkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.1)' }}
-                  >
-                    <svg className="w-6 h-6" style={{ color: darkMode ? '#93c5fd' : '#2563eb' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                    </svg>
-                  </div>
-                  <div 
-                    className="text-xs px-2 py-1 rounded-full"
-                    style={{ 
-                      backgroundColor: darkMode ? 'rgba(107, 114, 128, 0.1)' : 'rgba(107, 114, 128, 0.1)',
-                      color: darkMode ? '#9ca3af' : '#6b7280'
+                ))
+              ) : (
+                <>
+                  <div
+                    className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                      border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                      backdropFilter: 'blur(10px)'
                     }}
                   >
-                    0.0%
+                    <div className="flex items-center justify-between mb-4">
+                      <div
+                        className="p-3 rounded-xl"
+                        style={{ backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.1)' }}
+                      >
+                        <svg className="w-6 h-6" style={{ color: darkMode ? '#a5b4fc' : '#6366f1' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                      </div>
+                      <div
+                        className="text-xs px-2 py-1 rounded-full"
+                        style={{
+                          backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                          color: darkMode ? '#10b981' : '#059669'
+                        }}
+                      >
+                        +1 today
+                      </div>
+                    </div>
+                    <p
+                      className="text-sm font-medium mb-1"
+                      style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                    >
+                      Total Users
+                    </p>
+                    <p
+                      className="text-3xl font-bold"
+                      style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
+                    >
+                      {stats.totalUsers}
+                    </p>
                   </div>
-                </div>
-                <p 
-                  className="text-sm font-medium mb-1"
-                  style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
-                >
-                  Active Users
-                </p>
-                <p 
-                  className="text-3xl font-bold"
-                  style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
-                >
-                  {userStats.activeUsers}
-                </p>
-              </div>
-              <div 
-                className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-                style={{
-                  backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
-                  border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
-                  backdropFilter: 'blur(10px)'
-                }}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div 
-                    className="p-3 rounded-xl"
-                    style={{ backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.1)' }}
-                  >
-                    <svg className="w-6 h-6" style={{ color: darkMode ? '#86efac' : '#16a34a' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                  </div>
-                </div>
-                <p 
-                  className="text-sm font-medium mb-1"
-                  style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
-                >
-                  Avg. Session Time
-                </p>
-                <p 
-                  className="text-3xl font-bold"
-                  style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
-                >
-                  {userStats.avgSessionMin} min
-                </p>
-              </div>
-              <div 
-                className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-                style={{
-                  backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
-                  border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
-                  backdropFilter: 'blur(10px)'
-                }}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div 
-                    className="p-3 rounded-xl"
-                    style={{ backgroundColor: darkMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.1)' }}
-                  >
-                    <svg className="w-6 h-6" style={{ color: darkMode ? '#fcd34d' : '#d97706' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                    </svg>
-                  </div>
-                  <div 
-                    className="text-xs px-2 py-1 rounded-full"
-                    style={{ 
-                      backgroundColor: darkMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                      color: darkMode ? '#fcd34d' : '#d97706'
+                  <div
+                    className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                      border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                      backdropFilter: 'blur(10px)'
                     }}
                   >
-                    Last 24h
+                    <div className="flex items-center justify-between mb-4">
+                      <div
+                        className="p-3 rounded-xl"
+                        style={{ backgroundColor: darkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.1)' }}
+                      >
+                        <svg className="w-6 h-6" style={{ color: darkMode ? '#93c5fd' : '#2563eb' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                      </div>
+                      <div
+                        className="text-xs px-2 py-1 rounded-full"
+                        style={{
+                          backgroundColor: darkMode ? 'rgba(107, 114, 128, 0.1)' : 'rgba(107, 114, 128, 0.1)',
+                          color: darkMode ? '#9ca3af' : '#6b7280'
+                        }}
+                      >
+                        0.0%
+                      </div>
+                    </div>
+                    <p
+                      className="text-sm font-medium mb-1"
+                      style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                    >
+                      Active Sessions
+                    </p>
+                    <p
+                      className="text-3xl font-bold"
+                      style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
+                    >
+                      {stats.activeUsers}
+                    </p>
                   </div>
-                </div>
-                <p 
-                  className="text-sm font-medium mb-1"
-                  style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
-                >
-                  Expired Sessions
-                </p>
-                <p 
-                  className="text-3xl font-bold"
-                  style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
-                >
-                  {userStats.expiredSessions}
-                </p>
-              </div>
+                  <div
+                    className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                      border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                      backdropFilter: 'blur(10px)'
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div
+                        className="p-3 rounded-xl"
+                        style={{ backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.1)' }}
+                      >
+                        <svg className="w-6 h-6" style={{ color: darkMode ? '#86efac' : '#16a34a' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <p
+                      className="text-sm font-medium mb-1"
+                      style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                    >
+                      Avg. Session Time
+                    </p>
+                    <p
+                      className="text-3xl font-bold"
+                      style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
+                    >
+                      {stats.avgSessionMin} min
+                    </p>
+                  </div>
+                  <div
+                    className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                      border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                      backdropFilter: 'blur(10px)'
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div
+                        className="p-3 rounded-xl"
+                        style={{ backgroundColor: darkMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.1)' }}
+                      >
+                        <svg className="w-6 h-6" style={{ color: darkMode ? '#fcd34d' : '#d97706' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                      </div>
+                      <div
+                        className="text-xs px-2 py-1 rounded-full"
+                        style={{
+                          backgroundColor: darkMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                          color: darkMode ? '#fcd34d' : '#d97706'
+                        }}
+                      >
+                        Last 24h
+                      </div>
+                    </div>
+                    <p
+                      className="text-sm font-medium mb-1"
+                      style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                    >
+                      Expired Sessions
+                    </p>
+                    <p
+                      className="text-3xl font-bold"
+                      style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
+                    >
+                      {stats.expiredSessions}
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Charts Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              <div 
-                className="rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
-                style={{
-                  backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
-                  border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
-                  backdropFilter: 'blur(10px)'
-                }}
-              >
-                <div 
-                  className="px-6 py-4 border-b flex justify-between items-center"
-                  style={{
-                    backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 0.5)',
-                    borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(229, 231, 235, 0.5)'
-                  }}
-                >
-                  <h2 
-                    className="text-lg font-semibold"
-                    style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
-                  >
-                    Students by Batch
-                  </h2>
-                  <div 
-                    className="p-2 rounded-lg"
-                    style={{ backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.1)' }}
-                  >
-                    <svg className="w-5 h-5" style={{ color: darkMode ? '#a5b4fc' : '#6366f1' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
+              {loading ? (
+                <>
+                  <div className="rounded-2xl shadow-lg p-6" style={{ backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)' }}>
+                    <div className="flex justify-between items-center mb-4">
+                      <Skeleton className="h-6 w-40" />
+                      <Skeleton className="h-8 w-8 rounded-lg" />
+                    </div>
+                    <Skeleton className="h-64 w-full" />
                   </div>
-                </div>
-                <div className="p-4">
-                  <StudentsByBatchChart />
-                </div>
-              </div>
-              <div 
-                className="rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
-                style={{
-                  backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
-                  border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
-                  backdropFilter: 'blur(10px)'
-                }}
-              >
-                <div 
-                  className="px-6 py-4 border-b flex justify-between items-center"
-                  style={{
-                    backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 0.5)',
-                    borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(229, 231, 235, 0.5)'
-                  }}
-                >
-                  <h2 
-                    className="text-lg font-semibold"
-                    style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
-                  >
-                    Students by Campus
-                  </h2>
-                  <div 
-                    className="p-2 rounded-lg"
-                    style={{ backgroundColor: darkMode ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.1)' }}
-                  >
-                    <svg className="w-5 h-5" style={{ color: darkMode ? '#c4b5fd' : '#8b5cf6' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
-                    </svg>
+                  <div className="rounded-2xl shadow-lg p-6" style={{ backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)' }}>
+                    <div className="flex justify-between items-center mb-4">
+                      <Skeleton className="h-6 w-40" />
+                      <Skeleton className="h-8 w-8 rounded-lg" />
+                    </div>
+                    <Skeleton className="h-64 w-full" />
                   </div>
-                </div>
-                <div className="p-4">
-                  <StudentsByCampusChart />
-                </div>
-              </div>
+                </>
+              ) : (
+                <>
+                  <div
+                    className="rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                      border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                      backdropFilter: 'blur(10px)'
+                    }}
+                  >
+                    <div
+                      className="px-6 py-4 border-b flex justify-between items-center"
+                      style={{
+                        backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 0.5)',
+                        borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(229, 231, 235, 0.5)'
+                      }}
+                    >
+                      <h2
+                        className="text-lg font-semibold"
+                        style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
+                      >
+                        Students by Batch
+                      </h2>
+                      <div
+                        className="p-2 rounded-lg"
+                        style={{ backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.1)' }}
+                      >
+                        <svg className="w-5 h-5" style={{ color: darkMode ? '#a5b4fc' : '#6366f1' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <StudentsByBatchChart />
+                    </div>
+                  </div>
+                  <div
+                    className="rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                      border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                      backdropFilter: 'blur(10px)'
+                    }}
+                  >
+                    <div
+                      className="px-6 py-4 border-b flex justify-between items-center"
+                      style={{
+                        backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 0.5)',
+                        borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(229, 231, 235, 0.5)'
+                      }}
+                    >
+                      <h2
+                        className="text-lg font-semibold"
+                        style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
+                      >
+                        Students by Campus
+                      </h2>
+                      <div
+                        className="p-2 rounded-lg"
+                        style={{ backgroundColor: darkMode ? 'rgba(139, 92, 246, 0.1)' : 'rgba(139, 92, 246, 0.1)' }}
+                      >
+                        <svg className="w-5 h-5" style={{ color: darkMode ? '#c4b5fd' : '#8b5cf6' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
+                        </svg>
+                      </div>
+                    </div>
+                    <div className="p-4">
+                      <StudentsByCampusChart />
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Additional Charts */}
-            <div 
-              className="rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 mb-8"
-              style={{
-                backgroundColor: darkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.9)',
-                border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
-                backdropFilter: 'blur(10px)'
-              }}
-            >
-              <div 
-                className="px-6 py-4 border-b flex justify-between items-center"
-                style={{
-                  backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 0.5)',
-                  borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(229, 231, 235, 0.5)'
-                }}
-              >
-                <h2 
-                  className="text-lg font-semibold"
-                  style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
-                >
-                  Students per Class
-                </h2>
-                <div 
-                  className="p-2 rounded-lg"
-                  style={{ backgroundColor: darkMode ? 'rgba(6, 182, 212, 0.1)' : 'rgba(6, 182, 212, 0.1)' }}
-                >
-                  <svg className="w-5 h-5" style={{ color: darkMode ? '#67e8f9' : '#06b6d4' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                  </svg>
+            {loading ? (
+              <>
+                <div className="rounded-2xl shadow-lg p-6 mb-8" style={{ backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)' }}>
+                  <div className="flex justify-between items-center mb-4">
+                    <Skeleton className="h-6 w-40" />
+                    <Skeleton className="h-8 w-8 rounded-lg" />
+                  </div>
+                  <Skeleton className="h-64 w-full" />
                 </div>
-              </div>
-              <div className="p-4">
-                <StudentsPerClassChart />
-              </div>
-            </div>
+                <div className="rounded-2xl shadow-lg p-6 mb-8" style={{ backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)' }}>
+                  <div className="flex justify-between items-center mb-4">
+                    <Skeleton className="h-6 w-40" />
+                    <Skeleton className="h-8 w-8 rounded-lg" />
+                  </div>
+                  <Skeleton className="h-64 w-full" />
+                </div>
+              </>
+            ) : (
+              <>
+                <div
+                  className="rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 mb-8"
+                  style={{
+                    backgroundColor: darkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                    border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                    backdropFilter: 'blur(10px)'
+                  }}
+                >
+                  <div
+                    className="px-6 py-4 border-b flex justify-between items-center"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 0.5)',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(229, 231, 235, 0.5)'
+                    }}
+                  >
+                    <h2
+                      className="text-lg font-semibold"
+                      style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
+                    >
+                      Students per Class
+                    </h2>
+                    <div
+                      className="p-2 rounded-lg"
+                      style={{ backgroundColor: darkMode ? 'rgba(6, 182, 212, 0.1)' : 'rgba(6, 182, 212, 0.1)' }}
+                    >
+                      <svg className="w-5 h-5" style={{ color: darkMode ? '#67e8f9' : '#06b6d4' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <StudentsPerClassChart />
+                  </div>
+                </div>
 
-            <div 
-              className="rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 mb-8"
-              style={{
-                backgroundColor: darkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.9)',
-                border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
-                backdropFilter: 'blur(10px)'
-              }}
-            >
-              <div 
-                className="px-6 py-4 border-b flex justify-between items-center"
-                style={{
-                  backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 0.5)',
-                  borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(229, 231, 235, 0.5)'
-                }}
-              >
-                <h2 
-                  className="text-lg font-semibold"
-                  style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
+                <div
+                  className="rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 mb-8"
+                  style={{
+                    backgroundColor: darkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.9)',
+                    border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
+                    backdropFilter: 'blur(10px)'
+                  }}
                 >
-                  Students by Major
-                </h2>
-                <div 
-                  className="p-2 rounded-lg"
-                  style={{ backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.1)' }}
-                >
-                  <svg className="w-5 h-5" style={{ color: darkMode ? '#86efac' : '#10b981' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
-                  </svg>
+                  <div
+                    className="px-6 py-4 border-b flex justify-between items-center"
+                    style={{
+                      backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.3)' : 'rgba(249, 250, 251, 0.5)',
+                      borderColor: darkMode ? 'rgba(75, 85, 99, 0.2)' : 'rgba(229, 231, 235, 0.5)'
+                    }}
+                  >
+                    <h2
+                      className="text-lg font-semibold"
+                      style={{ color: darkMode ? '#ffffff' : '#1e293b' }}
+                    >
+                      Students by Major
+                    </h2>
+                    <div
+                      className="p-2 rounded-lg"
+                      style={{ backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.1)' }}
+                    >
+                      <svg className="w-5 h-5" style={{ color: darkMode ? '#86efac' : '#10b981' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path>
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <StudentsByMajorChart />
+                  </div>
                 </div>
-              </div>
-              <div className="p-4">
-                <StudentsByMajorChart />
-              </div>
-            </div>
+              </>
+            )}
 
             {/* Summary Cards */}
-            <div 
+            <div
               className="rounded-lg shadow mb-8"
               style={{
                 backgroundColor: darkMode ? '#2d3748' : '#ffffff',
                 borderColor: darkMode ? '#374151' : '#e5e7eb'
               }}
             >
-              <div 
+              <div
                 className="px-4 py-3 border-b"
                 style={{
                   backgroundColor: darkMode ? '#374151' : '#f9fafb',
                   borderColor: darkMode ? '#4b5563' : '#e5e7eb'
                 }}
               >
-                <h2 
+                <h2
                   className="text-lg font-semibold"
                   style={{ color: darkMode ? '#ffffff' : '#1f2937' }}
                 >
@@ -518,93 +517,108 @@ export default function Dashboard() {
                 </h2>
               </div>
               <div className="p-4">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div 
-                    className="p-4 rounded-md"
-                    style={{ backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.05)' }}
-                  >
-                    <div 
-                      className="text-sm"
-                      style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                {loading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
+                        className="p-4 rounded-md"
+                        style={{ backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.05)' }}
+                      >
+                        <Skeleton className="h-4 w-24 mb-2" />
+                        <Skeleton className="h-8 w-16" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div
+                      className="p-4 rounded-md"
+                      style={{ backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.1)' : 'rgba(99, 102, 241, 0.05)' }}
                     >
-                      Total Students
+                      <div
+                        className="text-sm"
+                        style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                      >
+                        Total Students
+                      </div>
+                      <div
+                        className="font-bold text-xl"
+                        style={{ color: darkMode ? '#a5b4fc' : '#4338ca' }}
+                      >
+                        {distributionSummary.totalStudents}
+                      </div>
                     </div>
-                    <div 
-                      className="font-bold text-xl"
-                      style={{ color: darkMode ? '#a5b4fc' : '#4338ca' }}
+                    <div
+                      className="p-4 rounded-md"
+                      style={{ backgroundColor: darkMode ? 'rgba(168, 85, 247, 0.1)' : 'rgba(168, 85, 247, 0.05)' }}
                     >
-                      {distributionSummary.totalStudents}
+                      <div
+                        className="text-sm"
+                        style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                      >
+                        Unique Batches
+                      </div>
+                      <div
+                        className="font-bold text-xl"
+                        style={{ color: darkMode ? '#c4b5fd' : '#7c3aed' }}
+                      >
+                        {distributionSummary.uniqueBatches}
+                      </div>
+                    </div>
+                    <div
+                      className="p-4 rounded-md"
+                      style={{ backgroundColor: darkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)' }}
+                    >
+                      <div
+                        className="text-sm"
+                        style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                      >
+                        Active Campuses
+                      </div>
+                      <div
+                        className="font-bold text-xl"
+                        style={{ color: darkMode ? '#93c5fd' : '#2563eb' }}
+                      >
+                        {distributionSummary.activeCampuses}
+                      </div>
+                    </div>
+                    <div
+                      className="p-4 rounded-md"
+                      style={{ backgroundColor: darkMode ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.05)' }}
+                    >
+                      <div
+                        className="text-sm"
+                        style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                      >
+                        Active Classes
+                      </div>
+                      <div
+                        className="font-bold text-xl"
+                        style={{ color: darkMode ? '#86efac' : '#16a34a' }}
+                      >
+                        {distributionSummary.activeClasses}
+                      </div>
+                    </div>
+                    <div
+                      className="p-4 rounded-md"
+                      style={{ backgroundColor: darkMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.05)' }}
+                    >
+                      <div
+                        className="text-sm"
+                        style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
+                      >
+                        Unique Majors
+                      </div>
+                      <div
+                        className="font-bold text-xl"
+                        style={{ color: darkMode ? '#fcd34d' : '#d97706' }}
+                      >
+                        {distributionSummary.uniqueMajors}
+                      </div>
                     </div>
                   </div>
-                  <div 
-                    className="p-4 rounded-md"
-                    style={{ backgroundColor: darkMode ? 'rgba(168, 85, 247, 0.1)' : 'rgba(168, 85, 247, 0.05)' }}
-                  >
-                    <div 
-                      className="text-sm"
-                      style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
-                    >
-                      Unique Batches
-                    </div>
-                    <div 
-                      className="font-bold text-xl"
-                      style={{ color: darkMode ? '#c4b5fd' : '#7c3aed' }}
-                    >
-                      {distributionSummary.uniqueBatches}
-                    </div>
-                  </div>
-                  <div 
-                    className="p-4 rounded-md"
-                    style={{ backgroundColor: darkMode ? 'rgba(59, 130, 246, 0.1)' : 'rgba(59, 130, 246, 0.05)' }}
-                  >
-                    <div 
-                      className="text-sm"
-                      style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
-                    >
-                      Active Campuses
-                    </div>
-                    <div 
-                      className="font-bold text-xl"
-                      style={{ color: darkMode ? '#93c5fd' : '#2563eb' }}
-                    >
-                      {distributionSummary.activeCampuses}
-                    </div>
-                  </div>
-                  <div 
-                    className="p-4 rounded-md"
-                    style={{ backgroundColor: darkMode ? 'rgba(34, 197, 94, 0.1)' : 'rgba(34, 197, 94, 0.05)' }}
-                  >
-                    <div 
-                      className="text-sm"
-                      style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
-                    >
-                      Active Classes
-                    </div>
-                    <div 
-                      className="font-bold text-xl"
-                      style={{ color: darkMode ? '#86efac' : '#16a34a' }}
-                    >
-                      {distributionSummary.activeClasses}
-                    </div>
-                  </div>
-                  <div 
-                    className="p-4 rounded-md"
-                    style={{ backgroundColor: darkMode ? 'rgba(245, 158, 11, 0.1)' : 'rgba(245, 158, 11, 0.05)' }}
-                  >
-                    <div 
-                      className="text-sm"
-                      style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}
-                    >
-                      Unique Majors
-                    </div>
-                    <div 
-                      className="font-bold text-xl"
-                      style={{ color: darkMode ? '#fcd34d' : '#d97706' }}
-                    >
-                      {distributionSummary.uniqueMajors}
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -613,7 +627,7 @@ export default function Dashboard() {
 
       {/* Floating Action Buttons */}
       <div className="fixed bottom-4 right-4 z-[90] flex flex-col space-y-3">
-        <button 
+        <button
           className="text-white p-3 rounded-full shadow-xl focus:outline-none relative"
           style={{ backgroundColor: darkMode ? '#f59e0b' : '#f59e0b' }}
           onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#d97706' : '#d97706'}
@@ -624,7 +638,7 @@ export default function Dashboard() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
           </svg>
         </button>
-        <button 
+        <button
           className="text-white p-3 rounded-full shadow-xl focus:outline-none relative"
           style={{ backgroundColor: darkMode ? '#7c3aed' : '#7c3aed' }}
           onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#6d28d9' : '#6d28d9'}
@@ -635,7 +649,7 @@ export default function Dashboard() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 001.357 2.051l.884.442c.396.198.598.628.425 1.04l-.774 1.84m0-7.106a24.301 24.301 0 00-4.5 0m0 0l.774 1.84c.173.412-.029.842-.425 1.04l-.884.442a2.25 2.25 0 00-1.357 2.051v5.714m7.5 0a2.25 2.25 0 001.591-.659l5.091-5.092m-5.091 5.092a2.25 2.25 0 01-1.591.659H9.75m0-6.75v6.75m3-12h-6"></path>
           </svg>
         </button>
-        <button 
+        <button
           className="text-white p-3 rounded-full shadow-xl focus:outline-none relative"
           style={{ backgroundColor: darkMode ? '#16a34a' : '#16a34a' }}
           onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#15803d' : '#15803d'}
@@ -645,14 +659,14 @@ export default function Dashboard() {
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
           </svg>
-          <span 
+          <span
             className="absolute -top-1 -right-1 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"
             style={{ backgroundColor: darkMode ? '#10b981' : '#10b981' }}
           >
             14
           </span>
         </button>
-        <button 
+        <button
           className="text-white p-3 rounded-full shadow-xl focus:outline-none relative"
           style={{ backgroundColor: darkMode ? '#4f46e5' : '#4f46e5' }}
           onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = darkMode ? '#4338ca' : '#4338ca'}
@@ -666,13 +680,12 @@ export default function Dashboard() {
       </div>
 
       {/* Dark Mode Toggle */}
-      <button 
+      <button
         onClick={toggleDarkMode}
-        className={`fixed bottom-4 right-4 z-[100] w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300 shadow-lg hover:scale-110 ${
-          darkMode 
-            ? 'bg-yellow-400 text-gray-900 hover:bg-yellow-300' 
-            : 'bg-indigo-600 text-white hover:bg-indigo-700'
-        }`}
+        className={`fixed bottom-4 right-4 z-[100] w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300 shadow-lg hover:scale-110 ${darkMode
+          ? 'bg-yellow-400 text-gray-900 hover:bg-yellow-300'
+          : 'bg-indigo-600 text-white hover:bg-indigo-700'
+          }`}
         aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
         title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
       >

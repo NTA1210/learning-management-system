@@ -51,6 +51,7 @@ interface SpecialistRowProps {
     timestamp: number;
   }>;
   major: MajorNode;
+  isLast?: boolean; // Whether this is the last specialist in the list
 }
 
 const SpecialistRow: React.FC<SpecialistRowProps> = ({
@@ -86,9 +87,17 @@ const SpecialistRow: React.FC<SpecialistRowProps> = ({
   isDragging,
   pendingMoves,
   major,
+  isLast = false,
 }) => {
   const { darkMode } = useTheme();
   const subjects = specialist.subjects || [];
+
+  // Helper to truncate long text
+  const truncateText = (text: string | undefined, maxLength: number = 100) => {
+    if (!text) return "-";
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + "...";
+  };
 
   const isDropTarget = dropTarget?.type === 'specialist' && dropTarget.id === specialist._id;
   const canAcceptDrop = draggedItem?.type === 'subject';
@@ -100,14 +109,14 @@ const SpecialistRow: React.FC<SpecialistRowProps> = ({
     <>
       <tr
         style={{
-          backgroundColor: isDropTarget && canAcceptDrop 
-            ? (darkMode ? "#065f46" : "#d1fae5") 
-            : isDraggedItem 
-            ? (darkMode ? "#1e1b4b" : "#e0e7ff")
-            : (darkMode ? "#1f2937" : "#ffffff"),
+          backgroundColor: isDropTarget && canAcceptDrop
+            ? (darkMode ? "#065f46" : "#d1fae5")
+            : isDraggedItem
+              ? (darkMode ? "#1e1b4b" : "#e0e7ff")
+              : (darkMode ? "#1f2937" : "#ffffff"),
           borderBottom: `1px solid ${darkMode ? "#374151" : "#e5e7eb"}`,
-          border: isDropTarget && canAcceptDrop 
-            ? `2px dashed ${darkMode ? "#10b981" : "#059669"}` 
+          border: isDropTarget && canAcceptDrop
+            ? `2px dashed ${darkMode ? "#10b981" : "#059669"}`
             : undefined,
           opacity: isDraggedItem ? 0.5 : 1,
           display: openInfoId === `specialist-${specialist._id}` ? "none" : "table-row",
@@ -140,7 +149,7 @@ const SpecialistRow: React.FC<SpecialistRowProps> = ({
                 position: "absolute",
                 left: "13px",
                 top: "-12px",
-                bottom: "50%",
+                bottom: isLast ? "50%" : "-12px",
                 width: "3px",
                 backgroundColor: darkMode ? "#4c1d95" : "#4f46e5",
               }}
@@ -161,6 +170,7 @@ const SpecialistRow: React.FC<SpecialistRowProps> = ({
               style={{
                 width: "28px",
                 height: "28px",
+                flexShrink: 0,
                 backgroundColor: darkMode ? "#0f172a" : "#e0e7ff",
                 color: darkMode ? "#f8fafc" : "#1d4ed8",
                 border: "none",
@@ -183,18 +193,18 @@ const SpecialistRow: React.FC<SpecialistRowProps> = ({
                   title={specialist.isActive ? "Active" : "Inactive"}
                 />
                 {isPendingMove && (
-                  <span 
+                  <span
                     className="px-2 py-1 rounded text-xs font-medium"
-                    style={{ 
-                      backgroundColor: darkMode ? "#78350f" : "#fffbeb", 
-                      color: darkMode ? "#fed7aa" : "#92400e" 
+                    style={{
+                      backgroundColor: darkMode ? "#78350f" : "#fffbeb",
+                      color: darkMode ? "#fed7aa" : "#92400e"
                     }}
                   >
                     Pending move to {pendingMove?.toName || major.name}
                   </span>
                 )}
               </div>
-              <p style={{ color: darkMode ? "#9ca3af" : "#6b7280", fontSize: "12px", margin: "2px 0 0 0" }}>{specialist.description || "-"}</p>
+              <p style={{ color: darkMode ? "#9ca3af" : "#6b7280", fontSize: "12px", margin: "2px 0 0 0" }}>{truncateText(specialist.description)}</p>
             </div>
           </div>
         </td>
@@ -245,7 +255,7 @@ const SpecialistRow: React.FC<SpecialistRowProps> = ({
         <InfoCard
           type="specialist"
           data={specialist}
-          onClose={onCloseInfo || (() => {})}
+          onClose={onCloseInfo || (() => { })}
           paddingLeft={100}
           openActionMenu={openActionMenu}
           onActionMenuToggle={onActionMenuToggle}
@@ -300,13 +310,15 @@ const SpecialistRow: React.FC<SpecialistRowProps> = ({
                   </td>
                 </tr>
               ) : (
-                subjects.map((subject) => {
+                subjects.map((subject, index) => {
                   const subjectExpanded = expandedSubjects.has(subject._id);
+                  const isLastSubject = index === subjects.length - 1;
                   return (
                     <SubjectRow
                       key={subject._id}
                       subject={subject}
                       isExpanded={subjectExpanded}
+                      isLast={isLastSubject}
                       onToggle={() => onToggleSubject(specialist._id, subject._id)}
                       onLoadCourses={() => onLoadCourses(subject._id)}
                       onEdit={() => onEditSubject(subject)}
