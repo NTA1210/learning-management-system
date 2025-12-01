@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, type ChangeEvent } from "react";
 import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
-import { Search, X } from "lucide-react";
+import { Search, X, Trash2 } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar";
@@ -67,6 +67,7 @@ export default function QuizCoursePage() {
   // Track current image index for each question
   const [currentImageIndices, setCurrentImageIndices] = useState<Record<string, number>>({});
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
 
   const resolvedRole = (user?.role as "admin" | "teacher" | "student") || "teacher";
   const canManageQuestions = resolvedRole !== "teacher";
@@ -421,6 +422,34 @@ export default function QuizCoursePage() {
     }
   };
 
+  const handleDeleteAllQuestions = async () => {
+    if (!courseId || totalQuestions === 0) return;
+
+    const confirmed = await showSwalConfirm(
+      `Are you sure you want to delete ALL ${totalQuestions} question${totalQuestions !== 1 ? 's' : ''} from this subject? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingAll(true);
+      await quizQuestionService.deleteAllQuestionsBySubject(courseId);
+
+      // Reload questions
+      if (manualQuestions) {
+        setManualQuestions([]);
+      } else {
+        setRefreshKey((prev) => prev + 1);
+      }
+
+      await showSwalSuccess("All questions deleted successfully.");
+    } catch (error) {
+      console.error("Error deleting all questions:", error);
+      await showSwalError("Failed to delete all questions. Please try again.");
+    } finally {
+      setDeletingAll(false);
+    }
+  };
+
   const pageSizeOptions = [20, 50, 100];
   const pageOptions = Array.from({ length: Math.max(1, paginationInfo.totalPages) }, (_, index) => index + 1);
 
@@ -702,9 +731,9 @@ export default function QuizCoursePage() {
               textColor={textColor}
             />
             <div className="md:pl-12">
-              {/* Search Input - Always visible */}
-              <div className="mb-4">
-                <div className="relative">
+              {/* Search Input and Delete All Button */}
+              <div className="mb-4 flex gap-2">
+                <div className="relative flex-1">
                   <input
                     type="text"
                     placeholder="Search questions..."
@@ -732,6 +761,21 @@ export default function QuizCoursePage() {
                     </button>
                   )}
                 </div>
+                {user?.role === "admin" && totalQuestions > 0 && (
+                  <button
+                    onClick={handleDeleteAllQuestions}
+                    disabled={deletingAll}
+                    className="px-4 py-2 rounded-lg font-semibold transition-all hover:opacity-80 disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+                    style={{
+                      backgroundColor: "#ef4444",
+                      color: "#ffffff",
+                    }}
+                    title={`Delete all ${totalQuestions} questions`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span className="hidden sm:inline">Delete All</span>
+                  </button>
+                )}
               </div>
 
               {loading ? (

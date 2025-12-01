@@ -1,10 +1,10 @@
-﻿import { useEffect, useState, useRef } from "react";
+﻿import { useEffect, useState, useRef, useMemo } from "react";
 import type { FormEvent } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
-import { PlusCircle, X, ImagePlus, CheckCircle, AlertCircle, Info, Upload, Download, FileText } from "lucide-react";
+import { PlusCircle, X, ImagePlus, CheckCircle, AlertCircle, Info, Upload, Download, FileText, Search } from "lucide-react";
 import { subjectService, quizQuestionService } from "../services";
 import type { Subject } from "../types/subject";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -27,6 +27,8 @@ export default function QuizManagementPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [subjectSearch, setSubjectSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   // Get page from URL or default to 1
   const pageParam = searchParams.get("page");
@@ -145,6 +147,47 @@ export default function QuizManagementPage() {
       }
     })();
   }, [subjectsPage, subjectsPageSize]);
+
+  // Fetch all subjects for create question modal (ensure searchability)
+  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await subjectService.getAllSubjects({ limit: 1000 });
+        setAllSubjects(result.data || []);
+      } catch (error) {
+        console.error("Error fetching all subjects:", error);
+      }
+    })();
+  }, []);
+
+  // Debounce subject search (500ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(subjectSearch);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [subjectSearch]);
+
+  // Filter subjects based on search
+  const filteredSubjects = allSubjects.filter(subject => {
+    if (!subjectSearch.trim()) return true;
+    const searchLower = subjectSearch.toLowerCase();
+    return (
+      subject.name.toLowerCase().includes(searchLower) ||
+      subject.code.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Filter main page subjects by debounced search
+  const displayedSubjects = useMemo(() => {
+    if (!debouncedSearch.trim()) return subjects;
+    const searchLower = debouncedSearch.toLowerCase();
+    return subjects.filter(subject =>
+      subject.name.toLowerCase().includes(searchLower) ||
+      subject.code.toLowerCase().includes(searchLower)
+    );
+  }, [subjects, debouncedSearch]);
 
   // Fetch question counts for each subject
   useEffect(() => {
@@ -560,8 +603,16 @@ export default function QuizManagementPage() {
     } catch (error) {
       console.error("Import quiz failed:", error);
       let message = "Failed to import quiz questions";
-      if (error && typeof error === "object" && "message" in error) {
-        message = (error as { message?: string }).message || message;
+
+      if (error && typeof error === "object") {
+        if ("response" in error) {
+          const axiosError = error as { response?: { data?: { message?: string; error?: { message?: string } } } };
+          message = axiosError.response?.data?.message
+            || axiosError.response?.data?.error?.message
+            || message;
+        } else if ("message" in error) {
+          message = (error as { message: string }).message;
+        }
       }
       showNotification(message, "error");
     } finally {
@@ -636,35 +687,37 @@ export default function QuizManagementPage() {
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold">Quiz Management</h1>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={() => setShowImportModal(true)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
-                  style={{
-                    backgroundColor: darkMode ? "rgba(16,185,129,0.2)" : "rgba(16,185,129,0.15)",
-                    color: darkMode ? "#5eead4" : "#047857",
-                  }}
-                >
-                  <Upload className="w-5 h-5" />
-                  Import Question
-                </button>
-                <button
-                  onClick={() => setShowExportModal(true)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
-                  style={{ backgroundColor: darkMode ? "rgba(59,130,246,0.25)" : "#1d4ed8", color: "#e0f2fe" }}
-                >
-                  <Download className="w-5 h-5" />
-                  Export Question
-                </button>
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
-                  style={{ backgroundColor: "#4f46e5", color: "#ffffff" }}
-                >
-                  <PlusCircle className="w-5 h-5" />
-                  Create Question
-                </button>
-              </div>
+              {user?.role === "admin" && (
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => setShowImportModal(true)}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
+                    style={{
+                      backgroundColor: darkMode ? "rgba(16,185,129,0.2)" : "rgba(16,185,129,0.15)",
+                      color: darkMode ? "#5eead4" : "#047857",
+                    }}
+                  >
+                    <Upload className="w-5 h-5" />
+                    Import Question
+                  </button>
+                  <button
+                    onClick={() => setShowExportModal(true)}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
+                    style={{ backgroundColor: darkMode ? "rgba(59,130,246,0.25)" : "#1d4ed8", color: "#e0f2fe" }}
+                  >
+                    <Download className="w-5 h-5" />
+                    Export Question
+                  </button>
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
+                    style={{ backgroundColor: "#4f46e5", color: "#ffffff" }}
+                  >
+                    <PlusCircle className="w-5 h-5" />
+                    Create Question
+                  </button>
+                </div>
+              )}
             </header>
 
             {/* Subjects list */}
@@ -673,14 +726,31 @@ export default function QuizManagementPage() {
                 className="rounded-2xl shadow-md p-6 space-y-4"
                 style={{ backgroundColor: cardBg, border: cardBorder }}
               >
-                <h2 className="text-xl font-semibold">Subjects</h2>
-                {subjects.length === 0 ? (
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold">Subjects</h2>
+                  <div className="relative w-64">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 opacity-50" />
+                    <input
+                      type="text"
+                      placeholder="Search subjects..."
+                      value={subjectSearch}
+                      onChange={(e) => setSubjectSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 rounded-lg border"
+                      style={{
+                        backgroundColor: inputBg,
+                        borderColor: inputBorder,
+                        color: textColor,
+                      }}
+                    />
+                  </div>
+                </div>
+                {displayedSubjects.length === 0 ? (
                   <p className="text-sm" style={{ color: labelColor }}>
-                    Không có môn học nào hoặc chưa tải được.
+                    {debouncedSearch.trim() ? "No subjects found matching your search." : "Không có môn học nào hoặc chưa tải được."}
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 gap-4">
-                    {subjects.map((subject) => {
+                    {displayedSubjects.map((subject) => {
                       const questionCount = questionCounts[subject._id] ?? null;
                       return (
                         <div
@@ -807,47 +877,62 @@ export default function QuizManagementPage() {
                           <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
                             Subject <span className="text-red-500">*</span>
                           </label>
+                          {/* Search input */}
+                          <input
+                            type="text"
+                            placeholder="Search subjects..."
+                            value={subjectSearch}
+                            onChange={(e) => setSubjectSearch(e.target.value)}
+                            className="w-full px-4 py-2 rounded-lg mb-3"
+                            style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
+                          />
                           <div className="grid grid-cols-1 gap-3 max-h-48 overflow-y-auto">
-                            {subjects.map((subject) => {
-                              const isSelected = selectedSubject?._id === subject._id;
-                              const questionCount = questionCounts[subject._id] ?? null;
-                              return (
-                                <div
-                                  key={subject._id}
-                                  onClick={() => handleSelectSubject(subject)}
-                                  className="cursor-pointer rounded-lg px-4 py-3 transition-all"
-                                  style={{
-                                    backgroundColor: isSelected
-                                      ? darkMode
-                                        ? "rgba(99,102,241,0.2)"
-                                        : "rgba(99,102,241,0.1)"
-                                      : darkMode
-                                        ? "rgba(15,23,42,0.6)"
-                                        : "#f8fafc",
-                                    border: isSelected
-                                      ? `2px solid #6366f1`
-                                      : `1px solid ${inputBorder}`,
-                                  }}
-                                >
-                                  <div className="font-semibold">{subject.code} - {subject.name}</div>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <FileText className="w-3 h-3" style={{ color: darkMode ? "#a5b4fc" : "#6366f1" }} />
-                                    <span className="text-xs" style={{ color: labelColor }}>
-                                      {questionCount === null
-                                        ? "Loading..."
-                                        : questionCount === 1
-                                          ? "1 question"
-                                          : `${questionCount} questions`}
-                                    </span>
-                                  </div>
-                                  {subject.description && (
-                                    <div className="text-xs mt-1" style={{ color: labelColor }}>
-                                      {subject.description}
+                            {filteredSubjects.length === 0 ? (
+                              <p className="text-sm text-center py-4" style={{ color: labelColor }}>
+                                No subjects found
+                              </p>
+                            ) : (
+                              filteredSubjects.map((subject) => {
+                                const isSelected = selectedSubject?._id === subject._id;
+                                const questionCount = questionCounts[subject._id] ?? null;
+                                return (
+                                  <div
+                                    key={subject._id}
+                                    onClick={() => handleSelectSubject(subject)}
+                                    className="cursor-pointer rounded-lg px-4 py-3 transition-all"
+                                    style={{
+                                      backgroundColor: isSelected
+                                        ? darkMode
+                                          ? "rgba(99,102,241,0.2)"
+                                          : "rgba(99,102,241,0.1)"
+                                        : darkMode
+                                          ? "rgba(15,23,42,0.6)"
+                                          : "#f8fafc",
+                                      border: isSelected
+                                        ? `2px solid #6366f1`
+                                        : `1px solid ${inputBorder}`,
+                                    }}
+                                  >
+                                    <div className="font-semibold">{subject.code} - {subject.name}</div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <FileText className="w-3 h-3" style={{ color: darkMode ? "#a5b4fc" : "#6366f1" }} />
+                                      <span className="text-xs" style={{ color: labelColor }}>
+                                        {questionCount === null
+                                          ? "Loading..."
+                                          : questionCount === 1
+                                            ? "1 question"
+                                            : `${questionCount} questions`}
+                                      </span>
                                     </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                                    {subject.description && (
+                                      <div className="text-xs mt-1" style={{ color: labelColor }}>
+                                        {subject.description}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            )}
                           </div>
                         </div>
 

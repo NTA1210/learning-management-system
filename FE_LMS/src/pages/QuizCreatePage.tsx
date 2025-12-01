@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { FileText } from "lucide-react";
+import { FileText, Search, ChevronDown, Check } from "lucide-react";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { useAuth } from "../hooks/useAuth";
@@ -300,6 +300,128 @@ const normalizeSnapshotQuestion = (snapshot: SnapshotQuestion) => {
   };
 };
 
+interface SearchableSelectProps {
+  options: { value: string; label: string; code?: string }[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  loading?: boolean;
+  searchPlaceholder?: string;
+}
+
+const SearchableSelect: React.FC<SearchableSelectProps> = ({
+  options,
+  value,
+  onChange,
+  placeholder = "Select...",
+  disabled = false,
+  loading = false,
+  searchPlaceholder = "Search...",
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredOptions = useMemo(() => {
+    if (!search.trim()) return options;
+    const lowerSearch = search.toLowerCase();
+    return options.filter(
+      (opt) =>
+        opt.label.toLowerCase().includes(lowerSearch) ||
+        (opt.code && opt.code.toLowerCase().includes(lowerSearch))
+    );
+  }, [options, search]);
+
+  const selectedOption = options.find((opt) => opt.value === value);
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <div
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={`w-full px-3 py-2 rounded-lg border flex items-center justify-between cursor-pointer ${disabled ? "opacity-50 cursor-not-allowed" : "hover:border-indigo-500"
+          }`}
+        style={{
+          backgroundColor: "var(--input-bg)",
+          borderColor: "var(--input-border)",
+          color: "var(--input-text)",
+        }}
+      >
+        <span className={!selectedOption ? "text-gray-400" : ""}>
+          {selectedOption
+            ? `${selectedOption.code ? selectedOption.code + " - " : ""}${selectedOption.label}`
+            : placeholder}
+        </span>
+        <ChevronDown className="w-4 h-4 opacity-50" />
+      </div>
+
+      {isOpen && (
+        <div
+          className="absolute z-50 w-full mt-1 rounded-lg border shadow-lg overflow-hidden"
+          style={{
+            backgroundColor: "var(--card-surface)",
+            borderColor: "var(--card-border)",
+          }}
+        >
+          <div className="p-2 border-b" style={{ borderColor: "var(--card-border)" }}>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 opacity-50" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full pl-8 pr-3 py-1.5 text-sm rounded-md border bg-transparent focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                style={{
+                  borderColor: "var(--input-border)",
+                  color: "var(--heading-text)",
+                }}
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="max-h-60 overflow-y-auto">
+            {loading ? (
+              <div className="px-3 py-2 text-sm text-gray-500">Loading...</div>
+            ) : filteredOptions.length === 0 ? (
+              <div className="px-3 py-2 text-sm text-gray-500">No results found</div>
+            ) : (
+              filteredOptions.map((option) => (
+                <div
+                  key={option.value}
+                  onClick={() => {
+                    onChange(option.value);
+                    setIsOpen(false);
+                    setSearch("");
+                  }}
+                  className="px-3 py-2 text-sm cursor-pointer flex items-center justify-between hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                  style={{ color: "var(--heading-text)" }}
+                >
+                  <span>
+                    {option.code && <span className="font-mono opacity-70 mr-2">{option.code}</span>}
+                    {option.label}
+                  </span>
+                  {value === option.value && <Check className="w-4 h-4 text-indigo-600" />}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const QuizCreatePage: React.FC = () => {
   const { user } = useAuth();
   const resolvedRole = (user?.role as "admin" | "teacher" | "student") || "teacher";
@@ -311,6 +433,7 @@ const QuizCreatePage: React.FC = () => {
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
 
   const [courses, setCourses] = useState<Course[]>([]);
+  const [wizardCourses, setWizardCourses] = useState<Course[]>([]); // All courses for wizard dropdown
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
   const [quizCounts, setQuizCounts] = useState<Record<string, number>>({});
@@ -395,6 +518,7 @@ const QuizCreatePage: React.FC = () => {
     const fetchSubjects = async () => {
       try {
         setLoadingSubjects(true);
+        // Fetch subjects with max allowed limit
         const { data } = await subjectService.getAllSubjects({ limit: 100 });
         setSubjects(data);
       } catch (err) {
@@ -802,15 +926,56 @@ const QuizCreatePage: React.FC = () => {
       setShowWizard(false);
     } catch (err) {
       console.error("Failed to create quiz", err);
-      const message =
-        typeof err === "object" && err !== null && "message" in err
-          ? String((err as { message?: string }).message)
-          : "Failed to create quiz.";
-      await showSwalError(message || "Failed to create quiz. Please try again.", darkMode);
+      let message = "Failed to create quiz.";
+
+      if (err && typeof err === "object") {
+        if ("response" in err) {
+          const axiosError = err as { response?: { data?: { message?: string; error?: { message?: string } } } };
+          message = axiosError.response?.data?.message
+            || axiosError.response?.data?.error?.message
+            || message;
+        } else if ("message" in err) {
+          message = (err as { message: string }).message;
+        }
+      }
+
+      await showSwalError(message, darkMode);
     } finally {
       setSubmittingQuiz(false);
     }
   };
+
+  // Fetch all courses for the wizard dropdown when wizard opens
+  useEffect(() => {
+    if (showWizard && wizardCourses.length === 0) {
+      const fetchAllCourses = async () => {
+        try {
+          // Use my-courses if teacher, or getAllCourses if admin
+          // But for simplicity and consistency with current logic, let's use my-courses with high limit
+          // If admin, they might want to see all courses? The current logic uses /courses/my-courses for the main list too.
+          // Let's assume /courses/my-courses is correct for the user context.
+          const response = await http.get<any>("/courses/my-courses", {
+            params: { page: 1, limit: 100 },
+          });
+
+          let list: Course[] = [];
+          if (Array.isArray(response?.data)) {
+            list = response.data;
+          } else if (Array.isArray(response?.data?.data)) {
+            list = response.data.data;
+          } else if (Array.isArray(response)) {
+            list = response as Course[];
+          }
+
+          console.log("Wizard courses fetched:", list);
+          setWizardCourses(list);
+        } catch (error) {
+          console.error("Failed to fetch courses for wizard", error);
+        }
+      };
+      fetchAllCourses();
+    }
+  }, [showWizard, wizardCourses.length]);
 
   const handleDetailsNext = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -860,14 +1025,16 @@ const QuizCreatePage: React.FC = () => {
 
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={openWizardWithoutCourse}
-                className="self-start px-4 py-2 rounded-xl font-semibold shadow-lg"
-                style={{ backgroundColor: "#6d28d9", color: "#fff" }}
-              >
-                Create quiz
-              </button>
+              {isTeacherOrAdmin && (
+                <button
+                  type="button"
+                  onClick={openWizardWithoutCourse}
+                  className="self-start px-4 py-2 rounded-xl font-semibold shadow-lg"
+                  style={{ backgroundColor: "#6d28d9", color: "#fff" }}
+                >
+                  Create quiz
+                </button>
+              )}
             </header>
 
 
@@ -980,48 +1147,41 @@ const QuizCreatePage: React.FC = () => {
                 <form onSubmit={handleDetailsNext} className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-1" style={{ color: "var(--muted-text)" }}>
-                      Subject
-                    </label>
-                    <select
-                      value={selectedSubjectId}
-                      onChange={(e) => setSelectedSubjectId(e.target.value)}
-                      disabled={loadingSubjects}
-                      className="w-full px-3 py-2 rounded-lg border"
-                      style={{
-                        backgroundColor: "var(--input-bg)",
-                        borderColor: "var(--input-border)",
-                        color: "var(--input-text)",
-                      }}
-                    >
-                      <option value="">{loadingSubjects ? "Loading subjects..." : "Select subject"}</option>
-                      {subjects.map((subject) => (
-                        <option key={subject._id} value={subject._id}>
-                          {subject.code} - {subject.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1" style={{ color: "var(--muted-text)" }}>
                       Course
                     </label>
-                    <select
+                    <SearchableSelect
+                      options={wizardCourses.map((c) => ({ value: c._id, label: c.title, code: c.code }))}
                       value={quizDetails.courseId}
-                      onChange={(e) => setQuizDetails((prev) => ({ ...prev, courseId: e.target.value }))}
-                      className="w-full px-3 py-2 rounded-lg border"
-                      style={{
-                        backgroundColor: "var(--input-bg)",
-                        borderColor: "var(--input-border)",
-                        color: "var(--input-text)",
+                      onChange={(val) => {
+                        setQuizDetails((prev) => ({ ...prev, courseId: val }));
+                        // Auto-select subject based on course
+                        const selectedCourse = wizardCourses.find(c => c._id === val);
+                        if (selectedCourse && selectedCourse.subjectId) {
+                          const subjId = typeof selectedCourse.subjectId === 'object'
+                            ? selectedCourse.subjectId._id
+                            : selectedCourse.subjectId;
+                          if (subjId) {
+                            setSelectedSubjectId(subjId);
+                          }
+                        }
                       }}
-                    >
-                      <option value="">Select course</option>
-                      {courses.map((course) => (
-                        <option key={course._id} value={course._id}>
-                          {course.title}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="Select course..."
+                      searchPlaceholder="Search course by title or code..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1" style={{ color: "var(--muted-text)" }}>
+                      Subject
+                    </label>
+                    <SearchableSelect
+                      options={subjects.map((s) => ({ value: s._id, label: s.name, code: s.code }))}
+                      value={selectedSubjectId}
+                      onChange={(val) => setSelectedSubjectId(val)}
+                      loading={loadingSubjects}
+                      placeholder="Select subject..."
+                      searchPlaceholder="Search subject by name or code..."
+                    />
                   </div>
 
                   <div>
