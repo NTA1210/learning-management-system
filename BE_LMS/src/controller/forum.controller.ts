@@ -346,8 +346,9 @@ export const deleteForumReplyByIdHandler = catchErrors(async (req, res) => {
 
     // Get user ID from authenticated user
     const userId = req.userId;
+    const role = req.role;
 
-    const result = await deleteForumReplyById(postId, replyId, userId.toString());
+    const result = await deleteForumReplyById(postId, replyId, userId.toString(), role);
 
     return res.success(OK, {
         message: "Reply deleted successfully",
