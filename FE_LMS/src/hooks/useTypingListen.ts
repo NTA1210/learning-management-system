@@ -1,5 +1,6 @@
 import { useEffect, useState, type RefObject } from "react";
 import { useSocketContext } from "../context/SocketContext";
+import { useChatRoomStore } from "../stores/chatRoomStore";
 
 const isNearBottom = (containerRef: RefObject<HTMLDivElement | null>) => {
   if (!containerRef.current) return false;
@@ -13,12 +14,18 @@ export function useTypingListen(
 ) {
   const { socket } = useSocketContext();
   const [isTyping, setIsTyping] = useState(false);
+  const { selectedChatRoom } = useChatRoomStore();
 
   useEffect(() => {
     if (!socket || !userId || !containerRef) return;
 
-    const handleTyping = (payload: { userId: string; isTyping: boolean }) => {
+    const handleTyping = (payload: {
+      userId: string;
+      isTyping: boolean;
+      chatRoomId: string;
+    }) => {
       if (payload.userId === userId) return;
+      if (payload.chatRoomId !== selectedChatRoom?.chatRoomId) return;
 
       setIsTyping(payload.isTyping);
       const wasNearBottom = isNearBottom(containerRef);
@@ -39,7 +46,7 @@ export function useTypingListen(
     return () => {
       socket.off("conversation:update-typing", handleTyping);
     };
-  }, [socket, userId, containerRef]);
+  }, [socket, userId, containerRef, selectedChatRoom]);
 
   return {
     isTyping,

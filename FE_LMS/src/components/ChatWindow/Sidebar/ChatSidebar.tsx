@@ -1,5 +1,8 @@
 import type { JSX } from "react";
-import { useChatRoomsContext } from "../../../context/ChatRoomContext";
+import {
+  useChatRoomsContext,
+  type ChatRoom,
+} from "../../../context/ChatRoomContext";
 import ChatRoomItem from "./ChatRoomItem";
 import Header from "./Header";
 
@@ -21,13 +24,19 @@ const ChatSidebar = (): JSX.Element => {
   return (
     <div>
       <Header />
-      {chatRooms.map((chatRoom, index) => {
-        return (
-          <div key={chatRoom.chatRoomId || index} className="text-black">
-            <ChatRoomItem {...chatRoom} />
-          </div>
-        );
-      })}
+      {chatRooms
+        .sort(
+          (a: ChatRoom, b: ChatRoom) =>
+            new Date(b?.lastMessage?.timestamp).getTime() -
+            new Date(a?.lastMessage?.timestamp).getTime()
+        )
+        .map((chatRoom, index) => {
+          return (
+            <div key={chatRoom.chatRoomId || index} className="text-black">
+              <ChatRoomItem {...chatRoom} />
+            </div>
+          );
+        })}
     </div>
   );
 };

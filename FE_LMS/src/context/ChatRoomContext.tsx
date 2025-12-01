@@ -83,46 +83,28 @@ export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
 
   const handleChatRoomUpdate = ({
     chatRoomId,
-    name,
-    course,
-    participants,
     lastMessage,
     unreadCounts,
   }: {
     chatRoomId: string;
-    name: string;
-    course: any;
-    participants: any;
     lastMessage: any;
     unreadCounts: any;
   }) => {
-    if (chatRooms.length === 0) {
-      return setChatRooms((prev: ChatRoom[] = []) => {
-        return [
-          {
-            chatRoomId,
-            name,
-            course,
-            participants,
-            lastMessage,
-            unreadCounts: unreadCounts,
-          },
-        ];
-      });
-    } else {
-      setChatRooms((prev: ChatRoom[]) => {
-        return prev.map((chatRoom) => {
-          if (chatRoom.chatRoomId === chatRoomId) {
-            return {
-              ...chatRoom,
-              lastMessage,
-              unreadCounts: unreadCounts,
-            };
-          }
-          return chatRoom;
-        });
-      });
-    }
+    setChatRooms((prev) => {
+      // Tìm xem chatRoom có tồn tại không
+      const exists = prev.some((c) => c.chatRoomId === chatRoomId);
+      if (!exists) {
+        // Không add mới — chờ API load
+        return prev;
+      }
+
+      // Nếu tồn tại → update
+      return prev.map((chatRoom) =>
+        chatRoom.chatRoomId === chatRoomId
+          ? { ...chatRoom, lastMessage, unreadCounts }
+          : chatRoom
+      );
+    });
   };
 
   const handleChatRoomUpdateUnreadCounts = ({
@@ -158,10 +140,22 @@ export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
   }: {
     chatRoomId: string;
   }) => {
+    toast.success("Leave chatroom successfully");
     setChatRooms((prev: ChatRoom[] = []) => {
       if (prev && prev.length === 0) return prev;
       return prev.filter((chatRoom) => chatRoom.chatRoomId !== chatRoomId);
     });
+  };
+
+  const handleChatRoomAdded = (chatRoom: ChatRoom) => {
+    setChatRooms((prev) => [...prev, chatRoom]);
+
+    if (!socket) return;
+
+    socket.emit("chatroom:join", { chatRoomId: chatRoom.chatRoomId });
+  };
+  const handleChatRoomAddedError = () => {
+    toast.error("Failed to add new user");
   };
 
   useEffect(() => {
@@ -179,6 +173,8 @@ export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
       handleChatRoomInviteError(errorMessage)
     );
     socket?.on("chatroom:leave-chatroom:success", handleLeaveChatroomSuccess);
+    socket?.on("chatroom:added", handleChatRoomAdded);
+    socket?.on("chatroom:join-new-chatroom:error", handleChatRoomAddedError);
 
     return () => {
       socket?.off(
@@ -200,6 +196,8 @@ export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
         "chatroom:leave-chatroom:success",
         handleLeaveChatroomSuccess
       );
+      socket?.off("chatroom:added", handleChatRoomAdded);
+      socket?.off("chatroom:join-new-chatroom:error", handleChatRoomAddedError);
     };
   }, [socket]);
 

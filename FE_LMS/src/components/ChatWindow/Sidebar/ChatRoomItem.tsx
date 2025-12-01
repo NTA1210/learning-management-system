@@ -74,7 +74,7 @@ const ChatRoomItem = ({
     >
       <div className="relative">
         <img
-          src={course.logo || "https://shorturl.at/ARotg"}
+          src={course?.logo || "https://shorturl.at/ARotg"}
           alt="User"
           className="object-cover rounded-full size-10"
         />
