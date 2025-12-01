@@ -43,6 +43,7 @@ const CourseSchema = new mongoose.Schema<ICourse>(
       averageQuizScore: { type: Number, default: 0 },
       totalAssignments: { type: Number, default: 0 },
       completedAssignments: { type: Number, default: 0 },
+      averageAssignmentScore: { type: Number, default: 0 },
       averageFinalGrade: { type: Number, default: 0 },
       totalAttendances: { type: Number, default: 0 },
       averageAttendance: { type: Number, default: 0 },
