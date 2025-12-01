@@ -32,3 +32,4 @@ export * from './schedule.type';
 export { default as IScheduleException } from './scheduleException.type';
 export * from './scheduleException.type';
 export { default as ISemester } from './semester.type';
+export * from './semester.type';
