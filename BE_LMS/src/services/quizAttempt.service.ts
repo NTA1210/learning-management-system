@@ -465,6 +465,21 @@ export const getQuizAttemptById = async (
   return quizAttempt;
 };
 
+/**
+ * Grade a quiz attempt.
+ * Only students of a course can grade their quiz attempts.
+ * User must not be banned from taking the quiz.
+ * User must submit the same number of answers as the number of questions in the quiz.
+ * @param  quizAttemptId - ID of the quiz attempt to grade.
+ * @param  userId - ID of the user who is grading the quiz attempt.
+ * @param  role - Role of the user who is grading the quiz attempt.
+ * @returns  The graded quiz attempt with score and other information.
+ * @throws  If the quiz attempt is not found.
+ * @throws  If the user is not the creator of the quiz and is a student.
+ * @throws  If the user is not a teacher of the course and is a teacher.
+ * @throws  If the user was banned from taking the quiz.
+ * @throws  If the user did not submit the same number of answers as the number of questions in the quiz.
+ */
 export const gradeQuizAttempt = async (
   quizAttemptId: string,
   userId: mongoose.Types.ObjectId,
