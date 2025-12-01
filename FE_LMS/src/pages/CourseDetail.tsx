@@ -59,6 +59,25 @@ export default function CourseDetail() {
   const [error, setError] = useState("");
   const [enrolling, setEnrolling] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>("lessons");
+  const handleTabChange = async (tab: TabType) => {
+    if (tab === "static" && course?.status !== "completed") {
+      const Swal = (await import("sweetalert2")).default;
+      const res = await Swal.fire({
+        title: "Static statistics require course completion",
+        html: "<div style='font-size:14px;opacity:0.8'>You need to complete the course to view aggregated statistics.</div>",
+        icon: "info",
+        showCancelButton: true,
+        showConfirmButton: false,
+        cancelButtonText: "Confirm",
+      });
+      if (res.isConfirmed) {
+        await handleCompleteCourse();
+        setActiveTab("static");
+      }
+      return;
+    }
+    setActiveTab(tab);
+  };
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmails, setInviteEmails] = useState<string[]>([]);
   const [inviteInput, setInviteInput] = useState("");
@@ -67,6 +86,9 @@ export default function CourseDetail() {
   const [inviteError, setInviteError] = useState("");
   const [users, setUsers] = useState<Array<{ _id: string; fullname?: string; username: string; email: string }>>([]);
   const [userId, setUserId] = useState("");
+  const [completing, setCompleting] = useState(false);
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [statsData, setStatsData] = useState<any>(null);
 
   const showToastSuccess = async (message: string) => {
     try {
@@ -200,6 +222,44 @@ export default function CourseDetail() {
     } finally {
       setInviting(false);
     }
+  };
+
+  const handleCompleteCourse = async () => {
+    if (!course?._id) return;
+    setCompleting(true);
+    try {
+      const resp = await httpClient.post(`/courses/${id}/statistics`, {}, { withCredentials: true });
+      const body: any = resp?.data;
+      const stats = body?.data ?? body;
+      setStatsData(stats);
+      await showToastSuccess(body?.message || "Course completed successfully");
+      const updated = await courseService.getCourseById(id);
+      setCourse(updated as unknown as ApiCourse);
+      setShowStatsModal(true);
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || "Failed to complete course";
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({ toast: true, position: "top-end", icon: "error", title: msg, showConfirmButton: false, timer: 2000 });
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  const handleCompleteButtonClick = async () => {
+    if (course?.status === "completed") {
+      const Swal = (await import("sweetalert2")).default;
+      const res = await Swal.fire({
+        title: "Course is completed",
+        html: "<div style='font-size:14px;opacity:0.8'>You can view aggregated statistics in the Static tab.</div>",
+        icon: "success",
+        confirmButtonText: "Open Static Tab",
+        showCancelButton: true,
+        cancelButtonText: "Close",
+      });
+      if (res.isConfirmed) setActiveTab("static");
+      return;
+    }
+    await handleCompleteCourse();
   };
   useEffect(() => {
     let mounted = true;
@@ -594,7 +654,7 @@ export default function CourseDetail() {
             >
               <CourseTabsNavigation
                 activeTab={activeTab}
-                onTabChange={setActiveTab}
+                onTabChange={handleTabChange}
                 darkMode={isDarkMode}
               />
               <div className="p-6">
@@ -626,9 +686,15 @@ export default function CourseDetail() {
               borderColor: isDarkMode ? "rgba(255,255,255,0.08)" : "#e5e7eb",
             }}
           >
-            <div className="truncate">
-              <span className="text-sm opacity-70">{course?.title}</span>
-            </div>
+            {user?.role === 'student' ? null : (
+              <button
+                onClick={handleCompleteButtonClick}
+                disabled={completing || !course?._id}
+                className="bg-[#65e69b] text-white font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
+              >
+                {course?.status === "completed" ? "Completed" : (completing ? "Completing..." : "Complete Course")}
+              </button>
+            )}
           
               <div className="flex gap-2">
                 {user?.role === 'student' ? null : (<button
@@ -710,6 +776,68 @@ export default function CourseDetail() {
             <div className="flex justify-end gap-2 pt-3">
               <button onClick={() => setShowInviteModal(false)} disabled={inviting} className="px-4 py-2 rounded-lg" style={{ backgroundColor: isDarkMode ? "#111827" : "#ffffff", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>Cancel</button>
               <button onClick={submitInvite} disabled={inviting || inviteEmails.length === 0} className="px-4 py-2 rounded-lg bg-[#525fe1] text-white disabled:opacity-50">{inviting ? "Sending..." : "Send Invites"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showStatsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowStatsModal(false)} />
+          <div className="relative w-full max-w-2xl rounded-xl shadow-lg p-6" style={{ backgroundColor: isDarkMode ? "#0b132b" : "#ffffff", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>
+            <div className="text-2xl font-semibold mb-4" style={{ color: isDarkMode ? "#ffffff" : "#111827" }}>Course Statistics</div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-lg p-4" style={{ backgroundColor: isDarkMode ? "rgba(31,41,55,0.8)" : "#f9fafb", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>
+                <div className="text-sm opacity-70">Total Students</div>
+                <div className="text-xl font-bold">{statsData?.course?.totalStudents ?? 0}</div>
+              </div>
+              <div className="rounded-lg p-4" style={{ backgroundColor: isDarkMode ? "rgba(31,41,55,0.8)" : "#f9fafb", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>
+                <div className="text-sm opacity-70">Total Lessons</div>
+                <div className="text-xl font-bold">{statsData?.course?.totalLessons ?? 0}</div>
+              </div>
+              <div className="rounded-lg p-4" style={{ backgroundColor: isDarkMode ? "rgba(31,41,55,0.8)" : "#f9fafb", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>
+                <div className="text-sm opacity-70">Total Quizzes</div>
+                <div className="text-xl font-bold">{statsData?.course?.totalQuizzes ?? 0}</div>
+              </div>
+              <div className="rounded-lg p-4" style={{ backgroundColor: isDarkMode ? "rgba(31,41,55,0.8)" : "#f9fafb", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>
+                <div className="text-sm opacity-70">Total Assignments</div>
+                <div className="text-xl font-bold">{statsData?.course?.totalAssignments ?? 0}</div>
+              </div>
+              <div className="rounded-lg p-4" style={{ backgroundColor: isDarkMode ? "rgba(31,41,55,0.8)" : "#f9fafb", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>
+                <div className="text-sm opacity-70">Total Attendances</div>
+                <div className="text-xl font-bold">{statsData?.course?.totalAttendances ?? 0}</div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-4">
+              <div className="rounded-lg p-4" style={{ backgroundColor: isDarkMode ? "rgba(31,41,55,0.8)" : "#f9fafb", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>
+                <div className="text-sm opacity-70">Average Final Grade</div>
+                <div className="text-xl font-bold">{statsData?.summary?.averageFinalGrade ?? 0}</div>
+              </div>
+              <div className="rounded-lg p-4" style={{ backgroundColor: isDarkMode ? "rgba(31,41,55,0.8)" : "#f9fafb", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>
+                <div className="text-sm opacity-70">Pass Rate</div>
+                <div className="text-xl font-bold">{statsData?.summary?.passRate ?? 0}%</div>
+              </div>
+              <div className="rounded-lg p-4" style={{ backgroundColor: isDarkMode ? "rgba(31,41,55,0.8)" : "#f9fafb", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>
+                <div className="text-sm opacity-70">Dropped Rate</div>
+                <div className="text-xl font-bold">{statsData?.summary?.droppedRate ?? 0}%</div>
+              </div>
+              <div className="rounded-lg p-4" style={{ backgroundColor: isDarkMode ? "rgba(31,41,55,0.8)" : "#f9fafb", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>
+                <div className="text-sm opacity-70">Average Attendance</div>
+                <div className="text-xl font-bold">{statsData?.summary?.averageAttendance ?? 0}%</div>
+              </div>
+              <div className="rounded-lg p-4" style={{ backgroundColor: isDarkMode ? "rgba(31,41,55,0.8)" : "#f9fafb", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>
+                <div className="text-sm opacity-70">Average Quiz Score</div>
+                <div className="text-xl font-bold">{statsData?.summary?.averageQuizScore ?? 0}</div>
+              </div>
+              <div className="rounded-lg p-4" style={{ backgroundColor: isDarkMode ? "rgba(31,41,55,0.8)" : "#f9fafb", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>
+                <div className="text-sm opacity-70">Average Assignment Score</div>
+                <div className="text-xl font-bold">{statsData?.summary?.averageAssignmentScore ?? 0}</div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={() => setShowStatsModal(false)} className="px-4 py-2 rounded-lg" style={{ backgroundColor: isDarkMode ? "#111827" : "#ffffff", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>Close</button>
             </div>
           </div>
         </div>
