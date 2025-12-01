@@ -82,11 +82,6 @@ export type TimeSlotFilterQuery = z.infer<typeof timeSlotFilterSchema>;
 
 export const teacherScheduleQuerySchema = z.object({
     date: z.string().optional(),
-    teacherId: z.string().min(1, "Teacher ID is required"),
-});
-
-export const courseScheduleQuerySchema = z.object({
-    courseId: z.string().min(1, "Course ID is required"),
 });
 
 export type TeacherScheduleQuery = z.infer<typeof teacherScheduleQuerySchema>;

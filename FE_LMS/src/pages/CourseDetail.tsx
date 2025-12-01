@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { Info } from "lucide-react";
 
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
+import CourseTabsNavigation from "../components/courses/CourseTabsNavigation";
+import type { TabType } from "../components/courses/CourseTabsNavigation";
+import LessonsTab from "../components/courses/LessonsTab";
+import AssignmentsTab from "../components/courses/AssignmentsTab";
+import AttendanceTab from "../components/courses/AttendanceTab";
+import StaticCourseTab from "../components/courses/StaticCourseTab";
 import { courseService } from "../services";
 import type { Course } from "../types/course";
 import { httpClient } from "../utils/http";
@@ -50,6 +57,7 @@ export default function CourseDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [enrolling, setEnrolling] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>("lessons");
 
   const showToastSuccess = async (message: string) => {
     try {
@@ -62,7 +70,9 @@ export default function CourseDetail() {
         showConfirmButton: false,
         timer: 2000,
       });
-    } catch {}
+      } catch {
+        // Ignore error
+      }
   };
 
   const showToastInfo = async (message: string) => {
@@ -76,17 +86,20 @@ export default function CourseDetail() {
         showConfirmButton: false,
         timer: 2000,
       });
-    } catch { }
+    } catch {
+      // Ignore error
+    }
   };
   const handleEnroll = async () => {
     try {
       setEnrolling(true);
       await httpClient.post("/enrollments/enroll", { courseId: id, role: "student" }, { withCredentials: true });
       await showToastSuccess("Enroll thành công");
-    } catch (e: any) {
-      const status = e?.response?.status;
+    } catch (e: unknown) {
+      const error = e as { response?: { status?: number; data?: { message?: string } } };
+      const status = error?.response?.status;
       if (status === 409) {
-        const message = e?.response?.data?.message || "You are already enrolled in this course.";
+        const message = error?.response?.data?.message || "You are already enrolled in this course.";
         await showToastInfo(message);
       } else {
         console.error(e);
@@ -105,6 +118,21 @@ export default function CourseDetail() {
       },
     });
   };
+
+  // const handleViewForumList = () => {
+  //   if (!course?._id) return;
+  //   const courseTitle = course.title ?? course.code ?? "Course";
+  //   const params = new URLSearchParams({ courseId: course._id });
+  //   if (courseTitle) {
+  //     params.set("courseTitle", courseTitle);
+  //   }
+  //   navigate(`/forum-list?${params.toString()}`, {
+  //     state: {
+  //       preselectedCourseId: course._id,
+  //       preselectedCourseTitle: courseTitle,
+  //     },
+  //   });
+  // };
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -224,7 +252,7 @@ export default function CourseDetail() {
           <>
             {/* Hero */}
             <div
-              className="relative rounded-2xl overflow-hidden mb-8 shadow-xl"
+              className="relative rounded-2xl overflow-visible mb-8 shadow-xl"
               style={{
                 background:
                   "linear-gradient(135deg, rgba(82,95,225,0.15), rgba(255,207,89,0.15))",
@@ -251,12 +279,161 @@ export default function CourseDetail() {
                   )}
                 </div>
                 <div className="lg:col-span-2 p-8">
-                  <h1
-                    className="text-4xl font-bold mb-3"
-                    style={{ color: isDarkMode ? "#ffffff" : "#111827" }}
-                  >
-                    {course.title}
-                  </h1>
+                  <div className="flex items-center gap-2 mb-3">
+                    <h1
+                      className="text-4xl font-bold"
+                      style={{ color: isDarkMode ? "#ffffff" : "#111827" }}
+                    >
+                      {course.title}
+                    </h1>
+                    <div className="relative group">
+                      <Info 
+                        className="w-5 h-5 cursor-pointer" 
+                        style={{ color: isDarkMode ? "#9ca3af" : "#6b7280" }}
+                      />
+                      <div
+                        className="fixed left-1/2 top-1/2 w-[500px] max-h-[600px] overflow-y-auto p-6 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none"
+                        style={{
+                          backgroundColor: isDarkMode ? "#0b132b" : "#ffffff",
+                          border: `1px solid ${isDarkMode ? "rgba(255,255,255,0.08)" : "#e5e7eb"}`,
+                          transform: "translate(-50%, -50%)",
+                        }}
+                      >
+                        <div className="grid grid-cols-3 gap-6 text-sm">
+                          {/* Instructors */}
+                          <div>
+                            <h2
+                              className="text-xl font-semibold mb-3"
+                              style={{ color: isDarkMode ? "#ffffff" : "#111827" }}
+                            >
+                              Instructors
+                            </h2>
+                            {teachers.length === 0 ? (
+                              <p style={{ color: isDarkMode ? "#9ca3af" : "#6b7280" }}>
+                                Chưa có thông tin giảng viên
+                              </p>
+                            ) : (
+                              <ul className="space-y-2">
+                                {teachers.map((t) => (
+                                  <li key={t._id} className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-700 dark:text-indigo-100 text-xs">
+                                      {(t.fullname || t.username || "T")
+                                        .slice(0, 1)
+                                        .toUpperCase()}
+                                    </div>
+                                    <div>
+                                      <div className="font-semibold text-xs">
+                                        {t.fullname || t.username}
+                                      </div>
+                                      <div
+                                        className="text-xs"
+                                        style={{
+                                          color: isDarkMode ? "#9ca3af" : "#6b7280",
+                                        }}
+                                      >
+                                        {t.email}
+                                      </div>
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+
+                          {/* Subject Detail */}
+                          <div>
+                            <h2
+                              className="text-xl font-semibold mb-3"
+                              style={{ color: isDarkMode ? "#ffffff" : "#111827" }}
+                            >
+                              Subject Detail
+                            </h2>
+                            {subject ? (
+                              <div className="space-y-1.5">
+                                <div className="flex gap-2 text-xs">
+                                  <span className="opacity-70">Name:</span>
+                                  <span>{subject.name}</span>
+                                </div>
+                                {subject.description && (
+                                  <p
+                                    className="text-xs line-clamp-2"
+                                    style={{
+                                      color: isDarkMode ? "#cbd5e1" : "#4b5563",
+                                    }}
+                                  >
+                                    {subject.description}
+                                  </p>
+                                )}
+                                {subject.code && (
+                                  <div className="flex gap-2 text-xs">
+                                    <span className="opacity-70">Code:</span>
+                                    <span>{subject.code}</span>
+                                  </div>
+                                )}
+                                {subject.slug && (
+                                  <div className="flex gap-2 text-xs">
+                                    <span className="opacity-70">Slug:</span>
+                                    <span className="truncate">{subject.slug}</span>
+                                  </div>
+                                )}
+                                {typeof subject.credits === "number" && (
+                                  <div className="flex gap-2 text-xs">
+                                    <span className="opacity-70">Credits:</span>
+                                    <span>{subject.credits}</span>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <p className="text-xs" style={{ color: isDarkMode ? "#9ca3af" : "#6b7280" }}>
+                                Chưa có thông tin môn học
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Info */}
+                          <div>
+                            <h2
+                              className="text-xl font-semibold mb-3"
+                              style={{ color: isDarkMode ? "#ffffff" : "#111827" }}
+                            >
+                              Info
+                            </h2>
+                            <div className="space-y-1.5 text-xs">
+                              {course.createdBy && (
+                                <div className="flex flex-col gap-1">
+                                  <span className="opacity-70">Created By:</span>
+                                  <span>{course.createdBy.username}</span>
+                                  <span className="opacity-70">{course.createdBy.email}</span>
+                                </div>
+                              )}
+                              {course.createdAt && (
+                                <div className="flex gap-2">
+                                  <span className="opacity-70">Created:</span>
+                                  <span>
+                                    {new Date(course.createdAt).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              )}
+                              {course.updatedAt && (
+                                <div className="flex gap-2">
+                                  <span className="opacity-70">Updated:</span>
+                                  <span>
+                                    {new Date(course.updatedAt).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              )}
+                              {course.key && (
+                                <div className="flex flex-col gap-1">
+                                  <span className="opacity-70">Storage Key:</span>
+                                  <span className="truncate text-xs">{course.key}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   <div className="flex flex-wrap items-center gap-3 mb-5">
                     {course.status && (
                       <span className="px-3 py-1 text-sm rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
@@ -341,158 +518,35 @@ export default function CourseDetail() {
               </div>
             </div>
 
-            {/* Info grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Teachers */}
-              <div
-                className="p-6 rounded-xl shadow-lg"
-                style={{
-                  backgroundColor: isDarkMode ? "#0b132b" : "#ffffff",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                }}
-              >
-                <h2
-                  className="text-2xl font-semibold mb-4"
-                  style={{ color: isDarkMode ? "#ffffff" : "#111827" }}
-                >
-                  Instructors
-                </h2>
-                {teachers.length === 0 ? (
-                  <p style={{ color: isDarkMode ? "#9ca3af" : "#6b7280" }}>
-                    Chưa có thông tin giảng viên
-                  </p>
-                ) : (
-                  <ul className="space-y-3">
-                    {teachers.map((t) => (
-                      <li key={t._id} className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-700 dark:text-indigo-100">
-                          {(t.fullname || t.username || "T")
-                            .slice(0, 1)
-                            .toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="font-semibold">
-                            {t.fullname || t.username}
-                          </div>
-                          <div
-                            className="text-sm"
-                            style={{
-                              color: isDarkMode ? "#9ca3af" : "#6b7280",
-                            }}
-                          >
-                            {t.email}
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+            {/* Tabs Navigation */}
+            <div
+              className="rounded-xl shadow-lg mb-8 overflow-hidden"
+              style={{
+                backgroundColor: isDarkMode ? "#0b132b" : "#ffffff",
+                border: "1px solid rgba(255,255,255,0.08)",
+              }}
+            >
+              <CourseTabsNavigation
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                darkMode={isDarkMode}
+              />
+              <div className="p-6">
+                {activeTab === "lessons" && course?._id && (
+                  <LessonsTab courseId={course._id} darkMode={isDarkMode} />
                 )}
-              </div>
-
-              {/* Subject detail */}
-              <div
-                className="p-6 rounded-xl shadow-lg"
-                style={{
-                  backgroundColor: isDarkMode ? "#0b132b" : "#ffffff",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                }}
-              >
-                <h2
-                  className="text-2xl font-semibold mb-4"
-                  style={{ color: isDarkMode ? "#ffffff" : "#111827" }}
-                >
-                  Subject Detail
-                </h2>
-                {subject ? (
-                  <div className="space-y-2">
-                    <div className="flex gap-2 text-sm">
-                      <span className="opacity-70">Name:</span>
-                      <span>{subject.name}</span>
-                    </div>
-                    {subject.description && (
-                      <p
-                        className="text-sm"
-                        style={{
-                          color: isDarkMode ? "#cbd5e1" : "#4b5563",
-                        }}
-                      >
-                        {subject.description}
-                      </p>
-                    )}
-                    <div className="flex gap-2 text-sm">
-                      {subject.slug && (
-                        <>
-                          <span className="opacity-70">Slug:</span>
-                          <span>{subject.slug}</span>
-                        </>
-                      )}
-                    </div>
-                    <div className="flex gap-2 text-sm">
-                      {typeof subject.credits === "number" && (
-                        <>
-                          <span className="opacity-70">Credits:</span>
-                          <span>{subject.credits}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <p style={{ color: isDarkMode ? "#9ca3af" : "#6b7280" }}>
-                    Chưa có thông tin môn học
-                  </p>
+                {activeTab === "assignments" && course?._id && (
+                  <AssignmentsTab courseId={course._id} darkMode={isDarkMode} />
                 )}
-              </div>
-
-              {/* Meta & Created By */}
-              <div
-                className="p-6 rounded-xl shadow-lg"
-                style={{
-                  backgroundColor: isDarkMode ? "#0b132b" : "#ffffff",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                }}
-              >
-                <h2
-                  className="text-2xl font-semibold mb-4"
-                  style={{ color: isDarkMode ? "#ffffff" : "#111827" }}
-                >
-                  Info
-                </h2>
-                <div className="space-y-2 text-sm">
-                  {course.createdBy && (
-                    <div className="flex gap-2">
-                      <span className="opacity-70">Created By:</span>
-                      <span>
-                        {course.createdBy.username} ({course.createdBy.email})
-                      </span>
-                    </div>
-                  )}
-                  {course.createdAt && (
-                    <div className="flex gap-2">
-                      <span className="opacity-70">Created:</span>
-                      <span>
-                        {new Date(course.createdAt).toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-                  {course.updatedAt && (
-                    <div className="flex gap-2">
-                      <span className="opacity-70">Updated:</span>
-                      <span>
-                        {new Date(course.updatedAt).toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-                  {course.key && (
-                    <div className="flex gap-2">
-                      <span className="opacity-70">Storage Key:</span>
-                      <span className="truncate">{course.key}</span>
-                    </div>
-                  )}
-                </div>
-
-
+                {activeTab === "attendance" && course?._id && (
+                  <AttendanceTab courseId={course._id} darkMode={isDarkMode} />
+                )}
+                {activeTab === "static" && course?._id && (
+                  <StaticCourseTab courseId={course._id} darkMode={isDarkMode} />
+                )}
               </div>
             </div>
+            
           </>
         )}
       </div>

@@ -3,7 +3,7 @@ import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
-import Skeleton from "../components/common/Skeleton.tsx";
+import { Skeleton } from "../components/common/Skeleton.tsx";
 import http, { httpClient } from "../utils/http";
 import { quizService } from "../services/quizService";
 
@@ -722,8 +722,8 @@ export default function TeacherDashboard() {
       <button
         onClick={toggleDarkMode}
         className={`fixed bottom-4 right-4 z-[100] w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300 shadow-lg hover:scale-110 ${darkMode
-            ? 'bg-yellow-400 text-gray-900 hover:bg-yellow-300'
-            : 'bg-indigo-600 text-white hover:bg-indigo-700'
+          ? 'bg-yellow-400 text-gray-900 hover:bg-yellow-300'
+          : 'bg-indigo-600 text-white hover:bg-indigo-700'
           }`}
         aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
         title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}

@@ -41,24 +41,6 @@ const getMenuItems = (role: 'admin' | 'teacher' | 'student'): MenuItem[] => {
       ),
       label: "All Courses"
     },
-    {
-      href: "/assignments",
-      icon: (
-        <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-        </svg>
-      ),
-      label: "Assignments"
-    },
-    {
-      href: "/materials",
-      icon: (
-        <svg className="w-5 h-5 min-w-[1.25rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-        </svg>
-      ),
-      label: "Lession Materials"
-    },
   ];
 
   baseItems.push(
@@ -240,6 +222,8 @@ export default function Sidebar({
   const settingsRef = useRef<HTMLDivElement | null>(null);
   const [helpHeight, setHelpHeight] = useState(0);
   const [settingsHeight, setSettingsHeight] = useState(0);
+  const [coursesHeight, setCoursesHeight] = useState(0);
+  const coursesRef = useRef<HTMLDivElement | null>(null);
 
   const [storedUser, setStoredUser] = useState<null | {
     _id?: string;
@@ -264,6 +248,7 @@ export default function Sidebar({
     const updateHeights = () => {
       if (helpRef.current) setHelpHeight(helpRef.current.scrollHeight);
       if (settingsRef.current) setSettingsHeight(settingsRef.current.scrollHeight);
+      if (coursesRef.current) setCoursesHeight(coursesRef.current.scrollHeight);
     };
     updateHeights();
     window.addEventListener('resize', updateHeights);
@@ -476,6 +461,65 @@ export default function Sidebar({
 
           <nav className="space-y-2">
             {menuItems.map((item, index) => {
+              // Special handling for "All Courses" - make it a dropdown
+              if (item.label === "All Courses") {
+                return (
+                  <div key={index} className="relative">
+                    <div className="flex items-center w-full">
+                      <Link
+                        to={item.href}
+                        className="flex items-center flex-1 px-3 py-2 text-sm rounded-md hover:bg-gray-600/20"
+                        style={{ color: darkMode ? '#9ca3af' : '#374151' }}
+                      >
+                        <div style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                          {item.icon}
+                        </div>
+                        {isExpanded && (
+                          <span className="ml-2 whitespace-nowrap">{item.label}</span>
+                        )}
+                      </Link>
+                      {isExpanded && (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            toggleSubmenu('courses');
+                          }}
+                          className="px-2 py-2 text-sm rounded-md hover:bg-gray-600/20"
+                          style={{ color: darkMode ? '#9ca3af' : '#374151' }}
+                        >
+                          <svg className={`h-4 w-4 transition-transform ${openSubmenu === 'courses' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    {isExpanded && (
+                      <div
+                        ref={coursesRef}
+                        className="pl-7 mt-1 space-y-1 overflow-hidden"
+                        style={{
+                          maxHeight: (openSubmenu === 'courses' || (closingSubmenu === 'courses' && animatingOut)) ? coursesHeight : 0,
+                          transition: 'max-height 300ms ease'
+                        }}
+                      >
+                        <Link to="/materials" className="flex items-center w-full px-3 py-2 text-sm hover:bg-gray-100/20 rounded-md" style={{ color: darkMode ? '#9ca3af' : '#374151' }}>
+                          <svg className="w-4 h-4 mr-2 min-w-[1rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                          </svg>
+                          <span className="whitespace-nowrap">Lesson Materials</span>
+                        </Link>
+                        <Link to="/assignments" className="flex items-center w-full px-3 py-2 text-sm hover:bg-gray-100/20 rounded-md" style={{ color: darkMode ? '#9ca3af' : '#374151' }}>
+                          <svg className="w-4 h-4 mr-2 min-w-[1rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                          </svg>
+                          <span className="whitespace-nowrap">Assignments</span>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              
               return (
                 <Link
                   key={index}

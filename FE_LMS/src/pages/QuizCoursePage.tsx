@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type ChangeEvent } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { Search, X } from "lucide-react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar";
@@ -31,6 +32,8 @@ export default function QuizCoursePage() {
   const [totalQuestions, setTotalQuestions] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(100);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [paginationInfo, setPaginationInfo] = useState({
     totalItems: 0,
     currentPage: 1,
@@ -175,6 +178,16 @@ export default function QuizCoursePage() {
     setTitle(`${subjectLabel}${countLabel}`);
   }, [subjectInfo, totalQuestions]);
 
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      setCurrentPage(1); // Reset to page 1 when search changes
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   useEffect(() => {
     if (!courseId) return;
     let mounted = true;
@@ -215,6 +228,7 @@ export default function QuizCoursePage() {
           page: currentPage,
           limit: pageSize,
           option: "subjectId",
+          search: debouncedSearchQuery.trim() || undefined,
         });
 
         const pagination = result.pagination || {
@@ -269,7 +283,7 @@ export default function QuizCoursePage() {
     return () => {
       mounted = false;
     };
-  }, [courseId, manualQuestions, currentPage, pageSize, refreshKey]);
+  }, [courseId, manualQuestions, currentPage, pageSize, refreshKey, debouncedSearchQuery]);
 
   useEffect(() => {
     if (!subjectInfo) return;
@@ -661,19 +675,52 @@ export default function QuizCoursePage() {
           <div className="max-w-6xl mx-auto">
             <QuizPageHeader title={title} onBack={() => navigate(-1)} darkMode={darkMode} textColor={textColor} />
             <div className="md:pl-12">
+              {/* Search Input - Always visible */}
+              <div className="mb-4">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search questions..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full px-4 py-2 pl-10 pr-10 rounded-lg border transition-colors"
+                    style={{
+                      backgroundColor: darkMode ? "rgba(15,23,42,0.6)" : "#ffffff",
+                      borderColor: borderColor,
+                      color: textColor,
+                    }}
+                  />
+                  <Search
+                    className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5"
+                    style={{ color: "var(--muted-text)" }}
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded hover:bg-gray-100 transition-colors"
+                      style={{ color: "var(--muted-text)" }}
+                      title="Clear search"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {loading ? (
                 <div className="text-center py-12">
                   <p style={{ color: textColor }}>Loading...</p>
                 </div>
               ) : quizQuestions.length === 0 ? (
                 <div className="text-center py-12">
-                  <p style={{ color: textColor }}>No questions.</p>
+                  <p style={{ color: textColor }}>
+                    {searchQuery || debouncedSearchQuery
+                      ? "No questions found matching your search."
+                      : "No questions."}
+                  </p>
                 </div>
               ) : (
                 <>
-                  
-                  
-                  
                   <QuizHeaderControls
                     startItem={startItem}
                     endItem={endItem}

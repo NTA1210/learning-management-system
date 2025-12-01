@@ -1,30 +1,30 @@
 import {catchErrors} from "../utils/asyncHandler";
-import {OK, CREATED} from "../constants/http";
+import {CREATED, OK} from "../constants/http";
 import {
-    createScheduleSchema,
-    approveScheduleSchema,
-    createScheduleExceptionSchema,
     approveExceptionSchema,
+    approveScheduleSchema,
     checkSlotAvailabilitySchema,
+    courseIdSchema,
+    createScheduleExceptionSchema,
+    createScheduleSchema,
+    exceptionIdSchema,
     getScheduleRangeSchema,
     scheduleIdSchema,
-    exceptionIdSchema,
-    courseIdSchema,
     teacherIdSchema,
+    teacherScheduleQuerySchema,
     timeSlotFilterSchema,
-    teacherScheduleQuerySchema, courseScheduleQuerySchema,
 } from "../validators/schedule.schemas";
 import {
-    getAllTimeSlots,
-    createScheduleRequest,
-    getTeacherWeeklySchedule,
-    getCourseSchedule,
-    approveScheduleRequest,
-    getPendingScheduleRequests,
-    createScheduleException,
     approveScheduleException,
-    getScheduleWithExceptions,
+    approveScheduleRequest,
     checkSlotAvailability,
+    createScheduleException,
+    createScheduleRequest,
+    getAllTimeSlots,
+    getCourseSchedule,
+    getPendingScheduleRequests,
+    getScheduleWithExceptions,
+    getTeacherWeeklySchedule,
 } from "../services/schedule.service";
 
 /**
@@ -59,6 +59,7 @@ export const createScheduleRequestHandler = catchErrors(async (req, res) => {
     const data = createScheduleSchema.parse(req.body);
 
     const teacherId = req.userId!;
+    console.log("TEACHER ID: ", teacherId);
 
     // Call service
     const schedule = await createScheduleRequest({
@@ -75,11 +76,12 @@ export const createScheduleRequestHandler = catchErrors(async (req, res) => {
 /**
  * Get teacher's weekly schedule.
  *
- * GET /schedules?teacherId=
+ * GET /schedules/per-teacher/:teacherId?date=
  */
 export const getTeacherScheduleHandler = catchErrors(async (req, res) => {
     // Validate query parameters
-    const {date, teacherId} = teacherScheduleQuerySchema.parse(req.query);
+    const {date} = teacherScheduleQuerySchema.parse(req.query);
+    const teacherId = teacherIdSchema.parse(req.params.teacherId);
 
     // Call service
     const schedule = await getTeacherWeeklySchedule(teacherId, date);
@@ -93,11 +95,11 @@ export const getTeacherScheduleHandler = catchErrors(async (req, res) => {
 /**
  * Get course schedule.
  *
- * GET /schedules?courseId=
+ * GET /schedules/per-course/:courseId
  */
 export const getCourseScheduleHandler = catchErrors(async (req, res) => {
     // Validate query parameters
-    const {courseId} = courseScheduleQuerySchema.parse(req.query);
+    const courseId = courseIdSchema.parse(req.params.courseId);
 
     // Call service
     const schedule = await getCourseSchedule(courseId);

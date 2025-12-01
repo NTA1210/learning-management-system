@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { FileText } from "lucide-react";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { useAuth } from "../hooks/useAuth";
@@ -312,7 +313,45 @@ const QuizCreatePage: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [loadingSubjects, setLoadingSubjects] = useState(false);
-  const [coursesPage, setCoursesPage] = useState(1);
+  const [quizCounts, setQuizCounts] = useState<Record<string, number>>({});
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const parsePageParam = useCallback((value: string | null) => {
+    const pageNumber = Number(value);
+    if (!Number.isFinite(pageNumber) || pageNumber <= 0) {
+      return 1;
+    }
+    return Math.floor(pageNumber);
+  }, []);
+
+  const [coursesPage, setCoursesPageState] = useState(() => parsePageParam(searchParams.get("page")));
+
+  const setCoursesPage = useCallback(
+    (value: number | ((prev: number) => number)) => {
+      setCoursesPageState((prev) => {
+        const nextValue = typeof value === "function" ? (value as (p: number) => number)(prev) : value;
+        const normalized = Math.max(1, Math.floor(nextValue) || 1);
+        setSearchParams((prevParams) => {
+          const params = new URLSearchParams(prevParams);
+          if (normalized === 1) {
+            params.delete("page");
+          } else {
+            params.set("page", String(normalized));
+          }
+          return params;
+        });
+        return normalized;
+      });
+    },
+    [setSearchParams]
+  );
+
+  useEffect(() => {
+    const pageFromUrl = parsePageParam(searchParams.get("page"));
+    if (pageFromUrl !== coursesPage) {
+      setCoursesPageState(pageFromUrl);
+    }
+  }, [searchParams, parsePageParam, coursesPage]);
   const [coursesPageSize] = useState(10);
   const [coursesPagination, setCoursesPagination] = useState<{
     totalItems: number;
@@ -322,6 +361,10 @@ const QuizCreatePage: React.FC = () => {
     hasNext: boolean;
     hasPrev: boolean;
   } | null>(null);
+
+  // Helper to wrap pagination values with quotes for /courses/:courseId/quizzes endpoint
+  // Backend expects quoted strings like "100" instead of plain numbers
+  const wrapPaginationValue = (value: number) => `"${value}"`;
 
   const [showWizard, setShowWizard] = useState(false);
   const [wizardStep, setWizardStep] = useState<"details" | "select">("details");
@@ -438,6 +481,58 @@ const QuizCreatePage: React.FC = () => {
     fetchCourses();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coursesPage, coursesPageSize]);
+
+  useEffect(() => {
+    const fetchQuizCounts = async () => {
+      if (courses.length === 0) return;
+      
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        courses.map(async (course) => {
+          try {
+            // Fetch first page with large limit to get most quizzes
+            // Use wrapPaginationValue to ensure quoted string format for backend
+            const result = await quizService.getQuizzesByCourseId(course._id, {
+              limit: wrapPaginationValue(100),
+              page: wrapPaginationValue(1),
+            });
+            
+            // Count only non-deleted quizzes from fetched data
+            const activeQuizzes = (result.data || []).filter((quiz) => !quiz.deletedAt);
+            let totalCount = activeQuizzes.length;
+            
+            // If pagination info exists and indicates more pages, fetch remaining pages
+            const pagination = result.pagination;
+            if (pagination && pagination.hasNextPage && pagination.totalPages) {
+              // Fetch remaining pages
+              for (let page = 2; page <= pagination.totalPages && page <= 10; page++) {
+                try {
+                  const nextResult = await quizService.getQuizzesByCourseId(course._id, {
+                    limit: wrapPaginationValue(100),
+                    page: wrapPaginationValue(page),
+                  });
+                  const nextActiveQuizzes = (nextResult.data || []).filter((quiz) => !quiz.deletedAt);
+                  totalCount += nextActiveQuizzes.length;
+                } catch (pageErr) {
+                  console.error(`Failed to fetch page ${page} for course ${course._id}:`, pageErr);
+                  break;
+                }
+              }
+            }
+            
+            counts[course._id] = totalCount;
+          } catch (err) {
+            console.error(`Failed to fetch quiz count for course ${course._id}:`, err);
+            counts[course._id] = 0;
+          }
+        })
+      );
+      setQuizCounts(counts);
+    };
+
+    fetchQuizCounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courses]);
 
   const openWizardWithoutCourse = () => {
     setQuizDetails({
@@ -829,7 +924,7 @@ const QuizCreatePage: React.FC = () => {
                       onClick={() => navigate(`/quizz/${course._id}`)}
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <div>
+                        <div className="flex-1">
                           <div className="text-base font-semibold" style={{ color: "var(--heading-text)" }}>
                             {course.title}
                           </div>
@@ -838,6 +933,12 @@ const QuizCreatePage: React.FC = () => {
                               {course.code}
                             </div>
                           )}
+                          <div className="flex items-center gap-2 mt-2">
+                            <FileText className="w-4 h-4" style={{ color: "var(--muted-text)" }} />
+                            <span className="text-xs" style={{ color: "var(--muted-text)" }}>
+                              {quizCounts[course._id] !== undefined ? `${quizCounts[course._id]} quiz${quizCounts[course._id] !== 1 ? 'zes' : ''}` : 'Loading...'}
+                            </span>
+                          </div>
                         </div>
                         <span
                           className="text-xs font-semibold px-4 py-1.5 rounded-full shadow"

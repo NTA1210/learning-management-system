@@ -15,7 +15,7 @@ import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import UserBio from "../components/UserBio.tsx";
 import MarkdownImage from "../components/MarkdownImage.tsx";
-import Skeleton from "../components/common/Skeleton.tsx";
+import { Skeleton } from "../components/common/Skeleton.tsx";
 import ReactMarkdown from "react-markdown";
 import {
   BookOpen,

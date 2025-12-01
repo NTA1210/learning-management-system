@@ -3,7 +3,7 @@ import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
-import Skeleton from "../components/common/Skeleton.tsx";
+import { Skeleton } from "../components/common/Skeleton.tsx";
 import http, { httpClient } from "../utils/http";
 import { attendanceService } from "../services/attendanceService";
 import { quizService } from "../services/quizService";

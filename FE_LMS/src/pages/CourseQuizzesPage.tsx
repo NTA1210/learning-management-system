@@ -17,6 +17,7 @@ import {
   Users,
   ShieldOff,
   Loader2,
+  BarChart3,
 } from "lucide-react";
 import QuizCoursePage from "./QuizCoursePage";
 import { useTheme } from "../hooks/useTheme";
@@ -59,6 +60,33 @@ export default function CourseQuizzesPage() {
     loading: boolean;
     error: string | null;
   }>({ quiz: null, attempts: [], loading: false, error: null });
+  const [statisticsModal, setStatisticsModal] = useState<{
+    quiz: QuizResponse | null;
+    statistics: {
+      totalStudents: number;
+      submittedCount: number;
+      averageScore: number;
+      medianScore: number;
+      minMax: { min: number; max: number };
+      standardDeviationScore: number;
+      scoreDistribution: Array<{
+        min: number;
+        max: number;
+        range: string;
+        count: number;
+        percentage: string;
+      }>;
+      students: Array<{
+        fullname: string;
+        email: string;
+        score: number;
+        durationSeconds: number;
+        rank: number;
+      }>;
+    } | null;
+    loading: boolean;
+    error: string | null;
+  }>({ quiz: null, statistics: null, loading: false, error: null });
   const [banProcessingId, setBanProcessingId] = useState<string | null>(null);
   const [quizzesPage, setQuizzesPage] = useState(1);
   const [quizzesPaginationInfo, setQuizzesPaginationInfo] = useState({
@@ -426,6 +454,42 @@ export default function CourseQuizzesPage() {
     });
   };
 
+  const handleOpenStatisticsModal = async (quiz: QuizResponse) => {
+    setStatisticsModal({
+      quiz,
+      statistics: null,
+      loading: true,
+      error: null,
+    });
+    try {
+      const data = await quizService.getQuizStatistics(quiz._id);
+      setStatisticsModal((prev) => ({
+        ...prev,
+        statistics: data,
+        loading: false,
+      }));
+    } catch (err) {
+      const message =
+        typeof err === "object" && err !== null && "message" in err
+          ? String((err as { message?: string }).message)
+          : "Failed to load statistics";
+      setStatisticsModal((prev) => ({
+        ...prev,
+        loading: false,
+        error: message,
+      }));
+    }
+  };
+
+  const handleCloseStatisticsModal = () => {
+    setStatisticsModal({
+      quiz: null,
+      statistics: null,
+      loading: false,
+      error: null,
+    });
+  };
+
   const handleBanAttempt = async (attempt: QuizAttempt) => {
     const studentLabel = getStudentLabel(attempt);
     const Swal = (await import("sweetalert2")).default;
@@ -521,7 +585,7 @@ export default function CourseQuizzesPage() {
     }
   };
 
-  const handlePaginationSelect = (page?: number, _queryValue?: string) => {
+  const handlePaginationSelect = (page?: number) => {
     if (!page || page === quizzesPage) {
       return;
     }
@@ -539,18 +603,21 @@ export default function CourseQuizzesPage() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
-        <main className="flex-1 overflow-y-auto p-6" style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}>
+        <main className="flex-1 overflow-y-auto p-6 pt-12" style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}>
           <div className="max-w-6xl mx-auto">
             {/* Header */}
             <div className="mb-6">
-              <button
-                onClick={() => navigate("/quizz")}
-                className="flex items-center gap-2 text-sm mb-4 hover:underline"
-                style={{ color: "var(--muted-text)" }}
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Courses
-              </button>
+              <div className="flex flex-wrap items-center  p-6 pt-12">
+                <button
+                  onClick={() => navigate(-1)}
+                  className="flex items-center gap-2 text-sm hover:underline"
+                  style={{ color: "var(--muted-text)" }}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </button>
+              
+              </div>
               <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--heading-text)" }}>
                 {course ? course.title : "Loading..."}
               </h1>
@@ -672,6 +739,17 @@ export default function CourseQuizzesPage() {
                                     </button>
                                   ) : (
                                     <>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenStatisticsModal(quiz);
+                                        }}
+                                        className="p-2 rounded hover:bg-green-50 transition-colors"
+                                        style={{ color: "#10b981" }}
+                                        title="View quiz statistics"
+                                      >
+                                        <BarChart3 className="w-4 h-4" />
+                                      </button>
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -933,7 +1011,7 @@ export default function CourseQuizzesPage() {
               <>
                 {attemptModal.attempts.filter((a) => a.status === "in_progress").length === 0 ? (
                   <div
-                    className="rounded-lg border p-6 text-center"
+                    className="rounded-lg border  p-6 pt-12 text-center"
                     style={{ borderColor: "var(--card-border)" }}
                   >
                     <p style={{ color: "var(--muted-text)" }}>
@@ -982,6 +1060,238 @@ export default function CourseQuizzesPage() {
                 )}
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Statistics Modal */}
+      {!isStudent && statisticsModal.quiz && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleCloseStatisticsModal} />
+          <div
+            className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
+            style={{
+              backgroundColor: "var(--card-surface)",
+              color: "var(--heading-text)",
+              border: "1px solid var(--card-border)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm" style={{ color: "var(--muted-text)" }}>
+                  Quiz Statistics
+                </p>
+                <h2 className="text-2xl font-semibold">
+                  {statisticsModal.quiz?.title || "Quiz"}
+                </h2>
+              </div>
+              <button
+                onClick={handleCloseStatisticsModal}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                style={{ color: "var(--heading-text)" }}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {statisticsModal.loading ? (
+              <div className="flex items-center justify-center py-10">
+                <Loader2 className="w-6 h-6 animate-spin" />
+              </div>
+            ) : statisticsModal.error ? (
+              <div
+                className="rounded-lg border p-4 text-center space-y-3"
+                style={{ borderColor: "var(--card-border)" }}
+              >
+                <p style={{ color: "#ef4444" }}>{statisticsModal.error}</p>
+                <button
+                  onClick={() => statisticsModal.quiz && handleOpenStatisticsModal(statisticsModal.quiz)}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+                  style={{ backgroundColor: "#10b981" }}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : statisticsModal.statistics ? (
+              statisticsModal.statistics.submittedCount === 0 ? (
+                <div
+                  className="rounded-lg border p-12 text-center"
+                  style={{ borderColor: "var(--card-border)" }}
+                >
+                  <BarChart3 className="w-16 h-16 mx-auto mb-4" style={{ color: "var(--muted-text)", opacity: 0.5 }} />
+                  <p className="text-lg font-semibold mb-2" style={{ color: "var(--heading-text)" }}>
+                    No submissions yet
+                  </p>
+                  <p className="text-sm" style={{ color: "var(--muted-text)" }}>
+                    Statistics will be available once students submit their quiz attempts.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Summary Statistics */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div
+                      className="rounded-lg border p-4"
+                      style={{ borderColor: "var(--card-border)" }}
+                    >
+                      <p className="text-sm" style={{ color: "var(--muted-text)" }}>
+                        Total Students
+                      </p>
+                      <p className="text-2xl font-bold mt-1">
+                        {statisticsModal.statistics.totalStudents}
+                      </p>
+                    </div>
+                    <div
+                      className="rounded-lg border p-4"
+                      style={{ borderColor: "var(--card-border)" }}
+                    >
+                      <p className="text-sm" style={{ color: "var(--muted-text)" }}>
+                        Submitted
+                      </p>
+                      <p className="text-2xl font-bold mt-1">
+                        {statisticsModal.statistics.submittedCount}
+                      </p>
+                    </div>
+                    <div
+                      className="rounded-lg border p-4"
+                      style={{ borderColor: "var(--card-border)" }}
+                    >
+                      <p className="text-sm" style={{ color: "var(--muted-text)" }}>
+                        Average Score
+                      </p>
+                      <p className="text-2xl font-bold mt-1">
+                        {isNaN(statisticsModal.statistics.averageScore) || statisticsModal.statistics.averageScore === null
+                          ? "N/A"
+                          : statisticsModal.statistics.averageScore.toFixed(1)}
+                      </p>
+                    </div>
+                    <div
+                      className="rounded-lg border p-4"
+                      style={{ borderColor: "var(--card-border)" }}
+                    >
+                      <p className="text-sm" style={{ color: "var(--muted-text)" }}>
+                        Median Score
+                      </p>
+                      <p className="text-2xl font-bold mt-1">
+                        {isNaN(statisticsModal.statistics.medianScore) || statisticsModal.statistics.medianScore === null
+                          ? "N/A"
+                          : statisticsModal.statistics.medianScore.toFixed(1)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Score Range */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div
+                      className="rounded-lg border p-4"
+                      style={{ borderColor: "var(--card-border)" }}
+                    >
+                      <p className="text-sm mb-2" style={{ color: "var(--muted-text)" }}>
+                        Score Range
+                      </p>
+                      <p className="text-lg font-semibold">
+                        {statisticsModal.statistics.minMax?.min !== undefined && statisticsModal.statistics.minMax?.max !== undefined
+                          ? `${statisticsModal.statistics.minMax.min} - ${statisticsModal.statistics.minMax.max}`
+                          : "N/A"}
+                      </p>
+                    </div>
+                    <div
+                      className="rounded-lg border p-4"
+                      style={{ borderColor: "var(--card-border)" }}
+                    >
+                      <p className="text-sm mb-2" style={{ color: "var(--muted-text)" }}>
+                        Standard Deviation
+                      </p>
+                      <p className="text-lg font-semibold">
+                        {isNaN(statisticsModal.statistics.standardDeviationScore) || statisticsModal.statistics.standardDeviationScore === null
+                          ? "N/A"
+                          : statisticsModal.statistics.standardDeviationScore.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Score Distribution */}
+                  {statisticsModal.statistics.scoreDistribution && statisticsModal.statistics.scoreDistribution.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">Score Distribution</h3>
+                      <div className="space-y-2">
+                        {statisticsModal.statistics.scoreDistribution.map((dist, index) => (
+                          <div key={index} className="flex items-center gap-4">
+                            <div className="w-24 text-sm" style={{ color: "var(--muted-text)" }}>
+                              {dist.range}
+                            </div>
+                            <div className="flex-1">
+                              <div
+                                className="h-6 rounded"
+                                style={{
+                                  backgroundColor: "var(--card-row-bg)",
+                                  width: `${dist.percentage}`,
+                                  minWidth: dist.count > 0 ? "4px" : "0",
+                                }}
+                              />
+                            </div>
+                            <div className="w-20 text-sm text-right" style={{ color: "var(--muted-text)" }}>
+                              {dist.count} ({dist.percentage})
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Students List */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">Student Results</h3>
+                    <div className="space-y-2">
+                      {statisticsModal.statistics.students.length === 0 ? (
+                        <p className="text-sm text-center py-4" style={{ color: "var(--muted-text)" }}>
+                          No students have submitted this quiz yet.
+                        </p>
+                      ) : (
+                        <div
+                          className="rounded-lg border overflow-hidden"
+                          style={{ borderColor: "var(--card-border)" }}
+                        >
+                          <table className="w-full">
+                            <thead>
+                              <tr style={{ backgroundColor: "var(--card-row-bg)" }}>
+                                <th className="px-4 py-2 text-left text-sm font-semibold">Rank</th>
+                                <th className="px-4 py-2 text-left text-sm font-semibold">Name</th>
+                                <th className="px-4 py-2 text-left text-sm font-semibold">Email</th>
+                                <th className="px-4 py-2 text-right text-sm font-semibold">Score</th>
+                                <th className="px-4 py-2 text-right text-sm font-semibold">Duration</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {statisticsModal.statistics.students.map((student, index) => (
+                                <tr
+                                  key={index}
+                                  className="border-t"
+                                  style={{ borderColor: "var(--card-border)" }}
+                                >
+                                  <td className="px-4 py-2 text-sm">#{student.rank}</td>
+                                  <td className="px-4 py-2 text-sm">{student.fullname}</td>
+                                  <td className="px-4 py-2 text-sm" style={{ color: "var(--muted-text)" }}>
+                                    {student.email}
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-right font-semibold">
+                                    {student.score.toFixed(1)}
+                                  </td>
+                                  <td className="px-4 py-2 text-sm text-right" style={{ color: "var(--muted-text)" }}>
+                                    {Math.floor(student.durationSeconds / 60)}m {Math.floor(student.durationSeconds % 60)}s
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            ) : null}
           </div>
         </div>
       )}

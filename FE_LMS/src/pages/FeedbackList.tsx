@@ -3,11 +3,11 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import AverageRating from "../components/AverageRating";
+import MarkdownContent from "../components/MarkdownContent";
 import { useAuth } from "../hooks/useAuth";
 import { useTheme } from "../hooks/useTheme";
 import { feedbackService } from "../services/feedbackService";
 import type { Feedback, FeedbackMeta, FeedbackPagination } from "../types/feedback";
-import { renderMarkdown } from "../utils/markdown";
 
 function formatDate(value: string, timezone?: string) {
   try {
@@ -58,6 +58,7 @@ export default function FeedbackList() {
   const [expandedFeedbackIds, setExpandedFeedbackIds] = useState<Record<string, boolean>>({});
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
+  const [lightboxImage, setLightboxImage] = useState<{ src: string; alt?: string } | null>(null);
 
   const fetchFeedbacks = useCallback(async (page: number, type: "system" | "teacher", from?: string, to?: string) => {
     setLoading(true);
@@ -161,6 +162,10 @@ export default function FeedbackList() {
     }
     return pages;
   }, [pagination, currentPage]);
+
+  const handleImagePreview = useCallback((payload: { src: string; alt?: string }) => {
+    setLightboxImage(payload);
+  }, []);
 
   const handlePageChange = (page: number) => {
     if (!pagination) return;
@@ -769,14 +774,16 @@ export default function FeedbackList() {
                     <div
                       className="text-sm leading-relaxed prose prose-sm max-w-none"
                       style={{ color: darkMode ? "#cbd5e1" : "#0f172a" }}
-                      dangerouslySetInnerHTML={{
-                        __html: renderMarkdown(
+                    >
+                      <MarkdownContent
+                        content={
                           expandedFeedbackIds[fb._id] || fb.description.length <= PREVIEW_CHAR_LIMIT
                             ? fb.description
-                            : `${fb.description.slice(0, PREVIEW_CHAR_LIMIT).trimEnd()}…`,
-                        ),
-                      }}
-                    />
+                            : `${fb.description.slice(0, PREVIEW_CHAR_LIMIT).trimEnd()}…`
+                        }
+                        onImageClick={handleImagePreview}
+                      />
+                    </div>
                     {fb.description.length > PREVIEW_CHAR_LIMIT && (
                       <button
                         type="button"

@@ -7,7 +7,7 @@ import StudentsPerClassChart from "../components/StudentsPerClassChart.tsx";
 import StudentsByMajorChart from "../components/StudentsByMajorChart.tsx";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
-import Skeleton from "../components/common/Skeleton.tsx";
+import { Skeleton } from "../components/common/Skeleton.tsx";
 import { userService } from "../services/userService";
 import { sessionService } from "../services/sessionService";
 
