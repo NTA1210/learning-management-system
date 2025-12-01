@@ -14,6 +14,7 @@ interface AttendanceFormProps {
   onSave: (entries: Array<{ studentId: string; status: AttendanceStatus }>) => Promise<void>;
   onStudentClick?: (studentId: string, studentName: string) => void;
   saving?: boolean;
+  attendanceDate?: string; // Optional: if provided, use this date instead of internal state
 }
 
 export default function AttendanceForm({
@@ -23,11 +24,14 @@ export default function AttendanceForm({
   onSave,
   onStudentClick,
   saving = false,
+  attendanceDate: externalDate,
 }: AttendanceFormProps) {
   const { darkMode } = useTheme();
-  const [attendanceDate, setAttendanceDate] = useState<string>(getCurrentDateUTC7());
+  // Use external date if provided, otherwise use internal state
+  const [internalDate, setInternalDate] = useState<string>(getCurrentDateUTC7());
+  const attendanceDate = externalDate || internalDate;
   const [studentAttendances, setStudentAttendances] = useState<Record<string, AttendanceStatus>>({});
-  const [loadingStatus, setLoadingStatus] = useState(false);
+  const [, setLoadingStatus] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [savedState, setSavedState] = useState<Record<string, AttendanceStatus>>({});
 
@@ -189,45 +193,46 @@ export default function AttendanceForm({
         Mark Attendance - {courseTitle}
       </h2>
 
-      {/* Date Selection */}
-      <div className="mb-4">
-        <label
-          className="block text-sm font-medium mb-2"
-          style={{ color: darkMode ? "#e2e8f0" : "#475569" }}
-        >
-          <Calendar className="inline w-4 h-4 mr-2" />
-          Attendance Date (Today Only - UTC+7)
-        </label>
-        <input
-          type="date"
-          value={attendanceDate}
-          onChange={(e) => {
-            const newDate = e.target.value;
-            if (isTodayUTC7(newDate)) {
-              setAttendanceDate(newDate);
-            }
-          }}
-          max={getCurrentDateUTC7()}
-          className="px-4 py-2 rounded-lg border"
-          style={{
-            backgroundColor: darkMode ? "rgba(30, 41, 59, 0.8)" : "#ffffff",
-            borderColor: darkMode
-              ? "rgba(148, 163, 184, 0.3)"
-              : "rgba(148, 163, 184, 0.3)",
-            color: darkMode ? "#ffffff" : "#1e293b",
-            opacity: isTodayUTC7(attendanceDate) ? 1 : 0.6,
-          }}
-          disabled={!isTodayUTC7(attendanceDate)}
-        />
-        {!isTodayUTC7(attendanceDate) && (
-          <p
-            className="text-xs mt-1"
-            style={{ color: "#ef4444" }}
+      {/* Date Selection - Only show if external date is not provided */}
+      {!externalDate && (
+        <div className="mb-4">
+          <label
+            className="block text-sm font-medium mb-2"
+            style={{ color: darkMode ? "#e2e8f0" : "#475569" }}
           >
-            Only today's date can be selected for attendance submission
-          </p>
-        )}
-      </div>
+            Attendance Date (Today Only - UTC+7)
+          </label>
+          <input
+            type="date"
+            value={internalDate}
+            onChange={(e) => {
+              const newDate = e.target.value;
+              if (newDate === getCurrentDateUTC7()) {
+                setInternalDate(newDate);
+              }
+            }}
+            max={getCurrentDateUTC7()}
+            className="px-4 py-2 rounded-lg border"
+            style={{
+              backgroundColor: darkMode ? "rgba(30, 41, 59, 0.8)" : "#ffffff",
+              borderColor: darkMode
+                ? "rgba(148, 163, 184, 0.3)"
+                : "rgba(148, 163, 184, 0.3)",
+              color: darkMode ? "#ffffff" : "#1e293b",
+              opacity: internalDate === getCurrentDateUTC7() ? 1 : 0.6,
+            }}
+            disabled={internalDate !== getCurrentDateUTC7()}
+          />
+          {internalDate !== getCurrentDateUTC7() && (
+            <p
+              className="text-xs mt-1"
+              style={{ color: "#ef4444" }}
+            >
+              Only today's date can be selected for attendance submission
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Select All Buttons */}
       <div className="mb-4 flex gap-2 justify-end">
