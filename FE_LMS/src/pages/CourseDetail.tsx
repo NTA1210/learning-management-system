@@ -15,6 +15,7 @@ import StaticCourseTab from "../components/courses/StaticCourseTab";
 import { courseService } from "../services";
 import type { Course } from "../types/course";
 import { httpClient } from "../utils/http";
+import { userService } from "../services/userService";
 
 type ApiCourse = Partial<Course> & {
   subjectId?: {
@@ -58,6 +59,14 @@ export default function CourseDetail() {
   const [error, setError] = useState("");
   const [enrolling, setEnrolling] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>("lessons");
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmails, setInviteEmails] = useState<string[]>([]);
+  const [inviteInput, setInviteInput] = useState("");
+  const [expiresInDays, setExpiresInDays] = useState(7);
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+  const [users, setUsers] = useState<Array<{ _id: string; fullname?: string; username: string; email: string }>>([]);
+  const [userId, setUserId] = useState("");
 
   const showToastSuccess = async (message: string) => {
     try {
@@ -94,12 +103,12 @@ export default function CourseDetail() {
     try {
       setEnrolling(true);
       await httpClient.post("/enrollments/enroll", { courseId: id, role: "student" }, { withCredentials: true });
-      await showToastSuccess("Enroll thành công");
-    } catch (e: unknown) {
-      const error = e as { response?: { status?: number; data?: { message?: string } } };
-      const status = error?.response?.status;
+
+      await showToastSuccess("Enroll successfully");
+    } catch (e: any) {
+      const status = e?.response?.status;
       if (status === 409) {
-        const message = error?.response?.data?.message || "You are already enrolled in this course.";
+        const message = e?.response?.data?.message || "You are already enrolled in this course.";
         await showToastInfo(message);
       } else {
         console.error(e);
@@ -119,20 +128,79 @@ export default function CourseDetail() {
     });
   };
 
-  // const handleViewForumList = () => {
-  //   if (!course?._id) return;
-  //   const courseTitle = course.title ?? course.code ?? "Course";
-  //   const params = new URLSearchParams({ courseId: course._id });
-  //   if (courseTitle) {
-  //     params.set("courseTitle", courseTitle);
-  //   }
-  //   navigate(`/forum-list?${params.toString()}`, {
-  //     state: {
-  //       preselectedCourseId: course._id,
-  //       preselectedCourseTitle: courseTitle,
-  //     },
-  //   });
-  // };
+  const handleViewForumList = () => {
+    if (!course?._id) return;
+    const courseTitle = course.title ?? course.code ?? "Course";
+    const params = new URLSearchParams({ courseId: course._id });
+    if (courseTitle) {
+      params.set("courseTitle", courseTitle);
+    }
+    navigate(`/forum-list?${params.toString()}`, {
+      state: {
+        preselectedCourseId: course._id,
+        preselectedCourseTitle: courseTitle,
+      },
+    });
+  };
+  const openInviteModal = () => {
+    setInviteError("");
+    setInviteEmails([]);
+    setInviteInput("");
+    setExpiresInDays(7);
+    setUserId("");
+    userService.getUsers({ role: "student", limit: 100 } as any).then((res) => {
+      const list = res.users || [];
+      setUsers(list.map((u: any) => ({ _id: u._id, fullname: u.fullname, username: u.username, email: u.email })));
+    }).catch(() => {});
+    setShowInviteModal(true);
+  };
+
+  const isValidEmail = (email: string) => /[^\s@]+@[^\s@]+\.[^\s@]+/.test(email);
+
+  const addInviteEmail = (email?: string) => {
+    const e = (email ?? inviteInput).trim();
+    if (!e) return;
+    if (!isValidEmail(e)) { setInviteError("Invalid email format"); return; }
+    setInviteError("");
+    setInviteEmails(prev => (prev.includes(e) ? prev : [...prev, e]));
+    if (!email) setInviteInput("");
+  };
+
+  const removeInviteEmail = (email: string) => {
+    setInviteEmails(prev => prev.filter(x => x !== email));
+  };
+
+  const handleStudentSelect = (e: any) => {
+    const id = e.target.value;
+    const selected = users.find(u => u._id === id);
+    if (selected) {
+      addInviteEmail(selected.email);
+    }
+    setUserId("");
+  };
+
+  const submitInvite = async () => {
+    if (!course?._id) return;
+    if (!inviteEmails.length) { setInviteError("Please add at least one email"); return; }
+    setInviting(true);
+    try {
+      await httpClient.post(
+        "/course-invites",
+        { courseId: id, expiresInDays, invitedEmails: inviteEmails },
+        { withCredentials: true }
+      );
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({ toast: true, position: "top-end", icon: "success", title: "Invite sent successfully", showConfirmButton: false, timer: 2000 });
+      setShowInviteModal(false);
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || "Invite failed";
+      setInviteError(msg);
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({ toast: true, position: "top-end", icon: "error", title: msg, showConfirmButton: false, timer: 2500 });
+    } finally {
+      setInviting(false);
+    }
+  };
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -158,7 +226,6 @@ export default function CourseDetail() {
   const logoUrl = useMemo(() => sanitizeLogo(course?.logo), [course?.logo]);
 
   const teachers = useMemo(() => {
-    // Hỗ trợ cả course.teachers (types/course) và course.teacherIds (backend thực tế)
     const list =
       (Array.isArray(course?.teachers) ? course?.teachers : []) as Array<{
         _id: string;
@@ -174,7 +241,6 @@ export default function CourseDetail() {
         fullname?: string;
       }>;
     const merged = [...list, ...list2];
-    // unique theo _id
     const seen = new Set<string>();
     return merged.filter(t => {
       if (!t?._id) return false;
@@ -239,13 +305,13 @@ export default function CourseDetail() {
               className="text-3xl font-bold mb-4"
               style={{ color: isDarkMode ? "#ffffff" : "#1c1c1c" }}
             >
-              Không tìm thấy khóa học
+              Course not found
             </h1>
             <button
               onClick={() => navigate("/")}
               className="bg-[#525fe1] text-white px-5 py-2 rounded-lg hover:scale-105 transition"
             >
-              Về trang chủ
+              Go to home page
             </button>
           </div>
         ) : (
@@ -551,7 +617,6 @@ export default function CourseDetail() {
         )}
       </div>
 
-      {user?.role === 'student' ? null : (
       <div className="fixed bottom-4 left-0 right-0 pointer-events-none">
         <div className="max-w-[1200px] mx-auto px-4">
           <div
@@ -566,6 +631,21 @@ export default function CourseDetail() {
             </div>
           
               <div className="flex gap-2">
+                {user?.role === 'student' ? null : (<button
+                  onClick={openInviteModal}
+                  disabled={!course?._id}
+                  className="bg-[#525fe1] text-white font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
+                >
+                  Invite Students
+                </button> )}
+            
+                <button
+                  onClick={handleViewForumList}
+                  className="bg-[#525fe1] text-white font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
+                >
+                  View Forums
+                </button>
+           
                 <button
                   onClick={handleCreateForumPost}
                   disabled={!course?._id}
@@ -573,13 +653,14 @@ export default function CourseDetail() {
                 >
                   Create Forum Post
                 </button>
-                <button
+                {user?.role === 'student' ? null : (<button
                   onClick={handleEnroll}
                   disabled={enrolling}
                   className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
                 >
-                 {enrolling ? "Enrolling..." : "Enroll"}
+                  {enrolling ? "Enrolling..." : "Enroll"}
                 </button>
+                )}
                 <button
                   onClick={() => navigate(-1)}
                   className="bg-[#eaedff] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition"
@@ -589,6 +670,48 @@ export default function CourseDetail() {
               </div>
           </div>
         </div>
+        </div>
+
+      {showInviteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => { if (!inviting) setShowInviteModal(false); }} />
+          <div className="relative w-full max-w-lg rounded-xl shadow-lg p-6" style={{ backgroundColor: isDarkMode ? "#0b132b" : "#ffffff", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>
+            <div className="text-2xl font-semibold mb-4" style={{ color: isDarkMode ? "#ffffff" : "#111827" }}>Invite Students</div>
+     
+            <div>
+              <label className="text-sm mb-1 block">Email Student</label>
+              <select
+                value={userId}
+                onChange={handleStudentSelect}
+                className="w-full px-3 py-2 rounded-lg"
+                style={{ backgroundColor: isDarkMode ? "#1f2937" : "#ffffff", color: isDarkMode ? "#ffffff" : "#111827", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}
+              >
+                <option value="">Select student</option>
+                {users.map(u => (
+                  <option key={u._id} value={u._id}>{u.fullname || u.username} - {u.email}</option>
+                ))}
+              </select>
+            </div>
+            {inviteEmails.length > 0 && (
+              <div className="mt-3 h-[150px] max-h-[150px] overflow-y-auto border rounded p-2" style={{ borderColor: isDarkMode ? "rgba(255,255,255,0.08)" : "#e5e7eb" }}>
+                {inviteEmails.map((email) => (
+                  <div key={email} className="flex items-center justify-between px-2 py-2 border-b border-[#e5e7eb]">
+                    <span className="text-sm" style={{ color: isDarkMode ? "#e5e7eb" : "#111827" }}>{email}</span>
+                    <button onClick={() => removeInviteEmail(email)} className="text-xs px-2 py-1 rounded" style={{ backgroundColor: isDarkMode ? "#111827" : "#f3f4f6", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>Remove</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-3">
+              <label className="text-sm mb-1 block">Expires in days</label>
+              <input type="number" min={1} value={expiresInDays} onChange={(e) => setExpiresInDays(parseInt(e.target.value) || 1)} className="w-full px-3 py-2 rounded-lg border" style={{ backgroundColor: isDarkMode ? "#1f2937" : "#ffffff", color: isDarkMode ? "#ffffff" : "#111827", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }} />
+            </div>
+            {inviteError && <div className="text-sm text-red-500 mt-2">{inviteError}</div>}
+            <div className="flex justify-end gap-2 pt-3">
+              <button onClick={() => setShowInviteModal(false)} disabled={inviting} className="px-4 py-2 rounded-lg" style={{ backgroundColor: isDarkMode ? "#111827" : "#ffffff", border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb" }}>Cancel</button>
+              <button onClick={submitInvite} disabled={inviting || inviteEmails.length === 0} className="px-4 py-2 rounded-lg bg-[#525fe1] text-white disabled:opacity-50">{inviting ? "Sending..." : "Send Invites"}</button>
+            </div>
+          </div>
         </div>
       )}
 
