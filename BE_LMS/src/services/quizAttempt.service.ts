@@ -452,8 +452,6 @@ export const getQuizAttemptById = async (
       BAD_REQUEST,
       'You are not the creator of this quiz'
     );
-
-    quizAttempt.quizId = quizAttempt.quizId.id;
   }
 
   if (role === Role.TEACHER) {
@@ -465,4 +463,46 @@ export const getQuizAttemptById = async (
   }
 
   return quizAttempt;
+};
+
+export const gradeQuizAttempt = async (
+  quizAttemptId: string,
+  userId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  const quizAttempt = await getQuizAttemptById(quizAttemptId, userId, role);
+
+  const answers: IQuestionAnswer[] = quizAttempt.answers;
+
+  appAssert(
+    quizAttempt.status !== AttemptStatus.ABANDONED,
+    BAD_REQUEST,
+    'Student was banned from taking this quiz'
+  );
+
+  //validate số lượng câu trả lời
+  appAssert(
+    answers.length === quizAttempt.quizId.snapshotQuestions.length,
+    BAD_REQUEST,
+    'Invalid number of answers submitted'
+  );
+
+  const {
+    totalQuestions,
+    totalScore,
+    totalQuizScore,
+    scorePercentage,
+    failedQuestions,
+    passedQuestions,
+    answers: answersSubmitted,
+  } = await quizAttempt.grade(answers, quizAttempt.quizId);
+  return {
+    totalQuestions,
+    totalScore,
+    totalQuizScore,
+    scorePercentage,
+    failedQuestions,
+    passedQuestions,
+    answersSubmitted,
+  };
 };

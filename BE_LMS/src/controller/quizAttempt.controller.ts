@@ -5,6 +5,7 @@ import {
   deleteQuizAttempt,
   enrollQuiz,
   getQuizAttemptById,
+  gradeQuizAttempt,
   saveQuizAttempt,
   submitQuizAttempt,
 } from '@/services/quizAttempt.service';
@@ -112,5 +113,17 @@ export const getQuizAttemptByIdHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     data,
     message: 'Get quiz attempt by id successfully',
+  });
+});
+
+// PUT /quiz-attempts/:quizAttemptId/re-grade - Regrade a quiz attempt
+export const gradeQuizAttemptHandler = catchErrors(async (req, res) => {
+  const quizAttemptId = quizAttemptIdSchema.parse(req.params.quizAttemptId);
+  const userId = req.userId;
+  const role = req.role;
+  const data = await gradeQuizAttempt(quizAttemptId, userId, role);
+  return res.success(OK, {
+    data,
+    message: 'Regrade quiz attempt successfully',
   });
 });
