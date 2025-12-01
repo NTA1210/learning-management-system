@@ -1,14 +1,16 @@
-﻿import { useEffect, useState, useRef } from "react";
+﻿import { useEffect, useState, useRef, useMemo } from "react";
 import type { FormEvent } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
-import { PlusCircle, X, ImagePlus, CheckCircle, AlertCircle, Info, Upload, Download, FileText } from "lucide-react";
-import { subjectService, quizQuestionService, type QuizQuestion } from "../services";
+import { PlusCircle, X, ImagePlus, CheckCircle, AlertCircle, Info, Upload, Download, FileText, Search } from "lucide-react";
+import { subjectService, quizQuestionService } from "../services";
 import type { Subject } from "../types/subject";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { QuizPagination } from "../components/quiz/QuizPagination";
+import http from "../utils/http";
+
 
 type Question = {
   text: string;
@@ -22,9 +24,16 @@ export default function QuizManagementPage() {
   const { darkMode } = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [subjectsPage, setSubjectsPage] = useState(1);
+  const [subjectSearch, setSubjectSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Get page from URL or default to 1
+  const pageParam = searchParams.get("page");
+  const subjectsPage = pageParam ? Math.max(1, parseInt(pageParam, 10)) : 1;
+
   const [subjectsPageSize] = useState(10);
   const [subjectsPagination, setSubjectsPagination] = useState<{
     totalItems: number;
@@ -52,7 +61,6 @@ export default function QuizManagementPage() {
     setShowExportModal(false);
     setExportSubjectId("");
   };
-  const quizUploadEndpoint = `${import.meta.env.VITE_BASE_API.replace(/\/$/, "")}/quiz-questions`;
   // Refs for file inputs for each question
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
@@ -69,7 +77,7 @@ export default function QuizManagementPage() {
     const id = Date.now().toString();
     const newNotification: Notification = { id, message, type };
     setNotifications((prev) => [...prev, newNotification]);
-    
+
     // Auto remove after 4 seconds
     setTimeout(() => {
       setNotifications((prev) => prev.filter((n) => n.id !== id));
@@ -105,13 +113,13 @@ export default function QuizManagementPage() {
     (async () => {
       try {
         console.log("Fetching subjects from API...");
-        const result = await subjectService.getAllSubjects({ 
+        const result = await subjectService.getAllSubjects({
           page: subjectsPage,
-          limit: subjectsPageSize 
+          limit: subjectsPageSize
         });
         console.log("Subjects response:", result);
         setSubjects(result.data || []);
-        
+
         // Handle pagination response
         if (result.pagination) {
           setSubjectsPagination({
@@ -140,28 +148,66 @@ export default function QuizManagementPage() {
     })();
   }, [subjectsPage, subjectsPageSize]);
 
+  // Fetch all subjects for create question modal (ensure searchability)
+  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const result = await subjectService.getAllSubjects({ limit: 1000 });
+        setAllSubjects(result.data || []);
+      } catch (error) {
+        console.error("Error fetching all subjects:", error);
+      }
+    })();
+  }, []);
+
+  // Debounce subject search (500ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(subjectSearch);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [subjectSearch]);
+
+  // Filter subjects based on search
+  const filteredSubjects = allSubjects.filter(subject => {
+    if (!subjectSearch.trim()) return true;
+    const searchLower = subjectSearch.toLowerCase();
+    return (
+      subject.name.toLowerCase().includes(searchLower) ||
+      subject.code.toLowerCase().includes(searchLower)
+    );
+  });
+
+  // Filter main page subjects by debounced search
+  const displayedSubjects = useMemo(() => {
+    if (!debouncedSearch.trim()) return subjects;
+    const searchLower = debouncedSearch.toLowerCase();
+    return subjects.filter(subject =>
+      subject.name.toLowerCase().includes(searchLower) ||
+      subject.code.toLowerCase().includes(searchLower)
+    );
+  }, [subjects, debouncedSearch]);
+
   // Fetch question counts for each subject
   useEffect(() => {
     const fetchQuestionCounts = async () => {
       if (subjects.length === 0) return;
-      
+
       const counts: Record<string, number> = {};
       await Promise.all(
         subjects.map(async (subject) => {
           try {
-            // Fetch first page with large limit to get most questions
             const result = await quizQuestionService.getAllQuizQuestions({
               subjectId: subject._id,
-              limit: 100,
+              limit: 1,
               page: 1,
             });
-            
-            // Use pagination total if available, otherwise count from data
-            const total = result.pagination?.totalItems;
-            if (total !== undefined && total !== null) {
+
+            const total = Number(result.pagination?.totalItems);
+            if (!Number.isNaN(total)) {
               counts[subject._id] = total;
             } else {
-              // Fallback: count questions from first page
               counts[subject._id] = (result.data || []).length;
             }
           } catch (err) {
@@ -237,32 +283,32 @@ export default function QuizManagementPage() {
     ]);
   };
 
-const handleAddOptionToQuestion = (questionIndex: number) => {
-  setQuestions((prev) => {
-    const updated = [...prev];
-    const question = updated[questionIndex];
-    updated[questionIndex] = {
-      ...question,
-      options: [...question.options, ""],
-      correctOptions: [...question.correctOptions, 0],
-    };
-    return updated;
-  });
-};
+  const handleAddOptionToQuestion = (questionIndex: number) => {
+    setQuestions((prev) => {
+      const updated = [...prev];
+      const question = updated[questionIndex];
+      updated[questionIndex] = {
+        ...question,
+        options: [...question.options, ""],
+        correctOptions: [...question.correctOptions, 0],
+      };
+      return updated;
+    });
+  };
 
-const handleRemoveOptionFromQuestion = (questionIndex: number, optionIndex: number) => {
-  setQuestions((prev) => {
-    const updated = [...prev];
-    const question = updated[questionIndex];
-    if (question.options.length <= 2) return prev;
+  const handleRemoveOptionFromQuestion = (questionIndex: number, optionIndex: number) => {
+    setQuestions((prev) => {
+      const updated = [...prev];
+      const question = updated[questionIndex];
+      if (question.options.length <= 2) return prev;
 
-    updated[questionIndex] = {
-      ...question,
-      options: question.options.filter((_, idx) => idx !== optionIndex),
-      correctOptions: question.correctOptions.filter((_, idx) => idx !== optionIndex),
-    };
-    return updated;
-  });
+      updated[questionIndex] = {
+        ...question,
+        options: question.options.filter((_, idx) => idx !== optionIndex),
+        correctOptions: question.correctOptions.filter((_, idx) => idx !== optionIndex),
+      };
+      return updated;
+    });
   };
 
   const handleUpdateQuestion = (index: number, field: keyof Question, value: unknown) => {
@@ -328,7 +374,7 @@ const handleRemoveOptionFromQuestion = (questionIndex: number, optionIndex: numb
         const currentQuestion = updated[questionIndex];
         updated[questionIndex] = {
           ...updated[questionIndex],
-          imageFiles: append 
+          imageFiles: append
             ? [...currentQuestion.imageFiles, ...files]
             : files,
           imagePreviews: append
@@ -408,7 +454,7 @@ const handleRemoveOptionFromQuestion = (questionIndex: number, optionIndex: numb
         // Ensure correctOptions is always an array of numbers (0 or 1)
         let normalizedCorrectOptions: number[] = [];
         if (Array.isArray(question.correctOptions)) {
-          normalizedCorrectOptions = question.correctOptions.map(val => 
+          normalizedCorrectOptions = question.correctOptions.map(val =>
             typeof val === "number" ? (val === 1 ? 1 : 0) : 0
           );
         } else if (typeof question.correctOptions === "string") {
@@ -442,7 +488,7 @@ const handleRemoveOptionFromQuestion = (questionIndex: number, optionIndex: numb
 
         if (normalizedCorrectOptions.length !== normalizedOptions.length) {
           // Pad or trim correctOptions to match options length
-          normalizedCorrectOptions = Array(normalizedOptions.length).fill(0).map((_, idx) => 
+          normalizedCorrectOptions = Array(normalizedOptions.length).fill(0).map((_, idx) =>
             question.correctOptions && Array.isArray(question.correctOptions) && question.correctOptions[idx] === 1 ? 1 : 0
           );
         }
@@ -466,24 +512,12 @@ const handleRemoveOptionFromQuestion = (questionIndex: number, optionIndex: numb
           }
         }
 
-        console.log("Uploading quiz question with image to:", quizUploadEndpoint);
-
-        const response = await fetch(quizUploadEndpoint, {
-          method: "POST",
-          body: formData,
+        const response = await http.post("/quiz-questions", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
         });
 
-        const result = await response.json().catch(() => null);
+        console.log("Question created successfully:", response.data);
 
-        if (!response.ok || (result && result.success === false)) {
-          const message =
-            (result && (result.message || result.error?.message)) ||
-            response.statusText ||
-            "Failed to create quiz question";
-          throw new Error(message);
-        }
-
-        console.log("Question created successfully:", result);
       }
       // Show success notification
       setShowSuccessNotification(true);
@@ -508,19 +542,19 @@ const handleRemoveOptionFromQuestion = (questionIndex: number, optionIndex: numb
     } catch (error: unknown) {
       console.error("Error creating quiz questions:", error);
       let errorMessage = "Failed to create quiz questions";
-      
+
       if (error && typeof error === "object" && "response" in error) {
         const axiosError = error as { response?: { data?: { message?: string; error?: { message?: string } } } };
-        errorMessage = axiosError.response?.data?.message 
-          || axiosError.response?.data?.error?.message 
+        errorMessage = axiosError.response?.data?.message
+          || axiosError.response?.data?.error?.message
           || errorMessage;
-        
+
         // Log full error for debugging
         console.error("Full error response:", axiosError.response?.data);
       } else if (error instanceof Error && error.message) {
         errorMessage = error.message;
       }
-      
+
       showNotification(errorMessage, "error");
     } finally {
       setIsSubmitting(false);
@@ -543,78 +577,47 @@ const handleRemoveOptionFromQuestion = (questionIndex: number, optionIndex: numb
     ]);
   };
 
-const handleImportQuiz = async () => {
-  if (!importSubjectId) {
-    showNotification("Subject is required", "error");
-    return;
-  }
-  if (!importFile) {
-    showNotification("Please choose an XML file", "error");
-    return;
-  }
+  const handleImportQuiz = async () => {
+    if (!importSubjectId) {
+      showNotification("Subject is required", "error");
+      return;
+    }
+    if (!importFile) {
+      showNotification("Please choose an XML file", "error");
+      return;
+    }
 
-  try {
-    setImporting(true);
-    
-    // 1. Fetch và lưu tất cả câu hỏi cũ trước khi import (vì BE sẽ xóa chúng)
-    const oldQuestionsResult = await quizQuestionService.getAllQuizQuestions({
-      subjectId: importSubjectId,
-      limit: 10000, // Lấy tất cả
-      option: "subjectId",
-    });
-    const oldQuestions = oldQuestionsResult.data || [];
-    
-    let subjectDetail: Subject | null = null;
     try {
-      subjectDetail = await subjectService.getSubjectById(importSubjectId);
+      setImporting(true);
+
+      // Import câu hỏi mới (BE sẽ xóa câu hỏi cũ và thêm câu hỏi mới)
+      await quizQuestionService.importQuizFromXml(importSubjectId, importFile);
+
+      showNotification("Quiz questions imported successfully", "success");
+      setShowImportModal(false);
+      setImportSubjectId("");
+      setImportFile(null);
+
+      // Navigate to quiz page và reload để fetch data mới
+      navigate(`/questionbank/${importSubjectId}`, { replace: true });
     } catch (error) {
-      console.error("Failed to fetch subject info for import:", error);
-      subjectDetail = null;
-    }
+      console.error("Import quiz failed:", error);
+      let message = "Failed to import quiz questions";
 
-    const enhanceWithSubject = (questions: QuizQuestion[]) => {
-      if (!subjectDetail) return questions;
-      return questions.map((q) => {
-        if (typeof q.subjectId === "string" || !q.subjectId) {
-          return {
-            ...q,
-            subjectId: {
-              _id: subjectDetail?._id,
-              code: subjectDetail?.code,
-              name: subjectDetail?.name,
-            },
-          };
+      if (error && typeof error === "object") {
+        if ("response" in error) {
+          const axiosError = error as { response?: { data?: { message?: string; error?: { message?: string } } } };
+          message = axiosError.response?.data?.message
+            || axiosError.response?.data?.error?.message
+            || message;
+        } else if ("message" in error) {
+          message = (error as { message: string }).message;
         }
-        return q;
-      });
-    };
-
-    // 2. Import câu hỏi mới (BE sẽ xóa câu hỏi cũ và insert câu hỏi mới)
-    const result = await quizQuestionService.importQuizFromXml(importSubjectId, importFile);
-    const imported = Array.isArray(result) ? result : result?.data || [];
-    
-    // 3. Merge câu hỏi cũ với câu hỏi mới để hiển thị cả hai
-    const allQuestions = enhanceWithSubject([...oldQuestions, ...imported]);
-
-    showNotification("Quiz questions imported successfully", "success");
-    setShowImportModal(false);
-    setImportSubjectId("");
-    setImportFile(null);
-
-    // Navigate to quiz page và pass cả câu hỏi cũ và mới để hiển thị
-    navigate(`/questionbank/${importSubjectId}`, {
-      state: { mergedQuestions: allQuestions, subjectInfo: subjectDetail ?? undefined },
-    });
-  } catch (error) {
-    console.error("Import quiz failed:", error);
-    let message = "Failed to import quiz questions";
-    if (error && typeof error === "object" && "message" in error) {
-      message = (error as { message?: string }).message || message;
+      }
+      showNotification(message, "error");
+    } finally {
+      setImporting(false);
     }
-    showNotification(message, "error");
-  } finally {
-    setImporting(false);
-  }
   };
 
   const handleExportQuiz = async () => {
@@ -651,6 +654,16 @@ const handleImportQuiz = async () => {
     }
   };
 
+  const handlePageChange = (newPage: number) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (newPage === 1) {
+      newParams.delete("page");
+    } else {
+      newParams.set("page", String(newPage));
+    }
+    setSearchParams(newParams);
+  };
+
   const pageBg = darkMode ? "#111827" : "#f8fafc";
   const cardBg = darkMode ? "rgba(30, 41, 59, 0.85)" : "#ffffff";
   const cardBorder = darkMode ? "1px solid rgba(148, 163, 184, 0.2)" : "1px solid rgba(148, 163, 184, 0.2)";
@@ -674,35 +687,37 @@ const handleImportQuiz = async () => {
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold">Quiz Management</h1>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={() => setShowImportModal(true)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
-                  style={{
-                    backgroundColor: darkMode ? "rgba(16,185,129,0.2)" : "rgba(16,185,129,0.15)",
-                    color: darkMode ? "#5eead4" : "#047857",
-                  }}
-                >
-                  <Upload className="w-5 h-5" />
-                  Import Question
-                </button>
-                <button
-                  onClick={() => setShowExportModal(true)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
-                  style={{ backgroundColor: darkMode ? "rgba(59,130,246,0.25)" : "#1d4ed8", color: "#e0f2fe" }}
-                >
-                  <Download className="w-5 h-5" />
-                  Export Question
-                </button>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
-                style={{ backgroundColor: "#4f46e5", color: "#ffffff" }}
-              >
-                <PlusCircle className="w-5 h-5" />
-                Create Question
-              </button>
-              </div>
+              {user?.role === "admin" && (
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => setShowImportModal(true)}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
+                    style={{
+                      backgroundColor: darkMode ? "rgba(16,185,129,0.2)" : "rgba(16,185,129,0.15)",
+                      color: darkMode ? "#5eead4" : "#047857",
+                    }}
+                  >
+                    <Upload className="w-5 h-5" />
+                    Import Question
+                  </button>
+                  <button
+                    onClick={() => setShowExportModal(true)}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
+                    style={{ backgroundColor: darkMode ? "rgba(59,130,246,0.25)" : "#1d4ed8", color: "#e0f2fe" }}
+                  >
+                    <Download className="w-5 h-5" />
+                    Export Question
+                  </button>
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold shadow-md transition-transform hover:-translate-y-0.5"
+                    style={{ backgroundColor: "#4f46e5", color: "#ffffff" }}
+                  >
+                    <PlusCircle className="w-5 h-5" />
+                    Create Question
+                  </button>
+                </div>
+              )}
             </header>
 
             {/* Subjects list */}
@@ -711,14 +726,31 @@ const handleImportQuiz = async () => {
                 className="rounded-2xl shadow-md p-6 space-y-4"
                 style={{ backgroundColor: cardBg, border: cardBorder }}
               >
-                <h2 className="text-xl font-semibold">Subjects</h2>
-                {subjects.length === 0 ? (
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold">Subjects</h2>
+                  <div className="relative w-64">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 opacity-50" />
+                    <input
+                      type="text"
+                      placeholder="Search subjects..."
+                      value={subjectSearch}
+                      onChange={(e) => setSubjectSearch(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 rounded-lg border"
+                      style={{
+                        backgroundColor: inputBg,
+                        borderColor: inputBorder,
+                        color: textColor,
+                      }}
+                    />
+                  </div>
+                </div>
+                {displayedSubjects.length === 0 ? (
                   <p className="text-sm" style={{ color: labelColor }}>
-                    Không có môn học nào hoặc chưa tải được.
+                    {debouncedSearch.trim() ? "No subjects found matching your search." : "Không có môn học nào hoặc chưa tải được."}
                   </p>
                 ) : (
                   <div className="grid grid-cols-1 gap-4">
-                    {subjects.map((subject) => {
+                    {displayedSubjects.map((subject) => {
                       const questionCount = questionCounts[subject._id] ?? null;
                       return (
                         <div
@@ -745,8 +777,8 @@ const handleImportQuiz = async () => {
                               {questionCount === null
                                 ? "Loading..."
                                 : questionCount === 1
-                                ? "1 question"
-                                : `${questionCount} questions`}
+                                  ? "1 question"
+                                  : `${questionCount} questions`}
                             </span>
                           </div>
                           <span
@@ -772,9 +804,9 @@ const handleImportQuiz = async () => {
                       const start = Math.max(1, subjectsPagination.currentPage - 2);
                       return Math.min(start + i, subjectsPagination.totalPages);
                     }).filter((v, i, arr) => arr.indexOf(v) === i)}
-                    onPrev={() => setSubjectsPage((p) => Math.max(1, p - 1))}
-                    onNext={() => setSubjectsPage((p) => Math.min(subjectsPagination!.totalPages, p + 1))}
-                    onSelectPage={(page) => setSubjectsPage(page)}
+                    onPrev={() => handlePageChange(Math.max(1, subjectsPage - 1))}
+                    onNext={() => handlePageChange(Math.min(subjectsPagination!.totalPages, subjectsPage + 1))}
+                    onSelectPage={(page) => handlePageChange(page)}
                   />
                 )}
               </div>
@@ -818,7 +850,7 @@ const handleImportQuiz = async () => {
                         1
                       </div>
                       <span className="text-sm font-medium" style={{ color: currentStep >= 1 ? textColor : labelColor }}>
-                      Question Details
+                        Question Details
                       </span>
                     </div>
                     <div className="flex-1 h-0.5" style={{ backgroundColor: currentStep >= 2 ? "#6366f1" : "#e2e8f0" }} />
@@ -839,60 +871,75 @@ const handleImportQuiz = async () => {
                     {currentStep === 1 && (
                       <div className="space-y-6">
                         <h3 className="text-lg font-semibold">Quiz Details</h3>
-                        
+
                         {/* Subject Selection */}
                         <div>
                           <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
                             Subject <span className="text-red-500">*</span>
                           </label>
+                          {/* Search input */}
+                          <input
+                            type="text"
+                            placeholder="Search subjects..."
+                            value={subjectSearch}
+                            onChange={(e) => setSubjectSearch(e.target.value)}
+                            className="w-full px-4 py-2 rounded-lg mb-3"
+                            style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
+                          />
                           <div className="grid grid-cols-1 gap-3 max-h-48 overflow-y-auto">
-                            {subjects.map((subject) => {
-                              const isSelected = selectedSubject?._id === subject._id;
-                              const questionCount = questionCounts[subject._id] ?? null;
-                              return (
-                                <div
-                                  key={subject._id}
-                                  onClick={() => handleSelectSubject(subject)}
-                                  className="cursor-pointer rounded-lg px-4 py-3 transition-all"
-                                  style={{
-                                    backgroundColor: isSelected
-                                      ? darkMode
-                                        ? "rgba(99,102,241,0.2)"
-                                        : "rgba(99,102,241,0.1)"
-                                      : darkMode
-                                        ? "rgba(15,23,42,0.6)"
-                                        : "#f8fafc",
-                                    border: isSelected
-                                      ? `2px solid #6366f1`
-                                      : `1px solid ${inputBorder}`,
-                                  }}
-                                >
-                                  <div className="font-semibold">{subject.code} - {subject.name}</div>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <FileText className="w-3 h-3" style={{ color: darkMode ? "#a5b4fc" : "#6366f1" }} />
-                                    <span className="text-xs" style={{ color: labelColor }}>
-                                      {questionCount === null
-                                        ? "Loading..."
-                                        : questionCount === 1
-                                        ? "1 question"
-                                        : `${questionCount} questions`}
-                                    </span>
-                                  </div>
-                                  {subject.description && (
-                                    <div className="text-xs mt-1" style={{ color: labelColor }}>
-                                      {subject.description}
+                            {filteredSubjects.length === 0 ? (
+                              <p className="text-sm text-center py-4" style={{ color: labelColor }}>
+                                No subjects found
+                              </p>
+                            ) : (
+                              filteredSubjects.map((subject) => {
+                                const isSelected = selectedSubject?._id === subject._id;
+                                const questionCount = questionCounts[subject._id] ?? null;
+                                return (
+                                  <div
+                                    key={subject._id}
+                                    onClick={() => handleSelectSubject(subject)}
+                                    className="cursor-pointer rounded-lg px-4 py-3 transition-all"
+                                    style={{
+                                      backgroundColor: isSelected
+                                        ? darkMode
+                                          ? "rgba(99,102,241,0.2)"
+                                          : "rgba(99,102,241,0.1)"
+                                        : darkMode
+                                          ? "rgba(15,23,42,0.6)"
+                                          : "#f8fafc",
+                                      border: isSelected
+                                        ? `2px solid #6366f1`
+                                        : `1px solid ${inputBorder}`,
+                                    }}
+                                  >
+                                    <div className="font-semibold">{subject.code} - {subject.name}</div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <FileText className="w-3 h-3" style={{ color: darkMode ? "#a5b4fc" : "#6366f1" }} />
+                                      <span className="text-xs" style={{ color: labelColor }}>
+                                        {questionCount === null
+                                          ? "Loading..."
+                                          : questionCount === 1
+                                            ? "1 question"
+                                            : `${questionCount} questions`}
+                                      </span>
                                     </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                                    {subject.description && (
+                                      <div className="text-xs mt-1" style={{ color: labelColor }}>
+                                        {subject.description}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            )}
                           </div>
                         </div>
 
                         {/* Quiz Title */}
                         <div>
                           <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                          Question Title <span className="text-red-500">*</span>
+                            Question Title <span className="text-red-500">*</span>
                           </label>
                           <input
                             type="text"
@@ -987,7 +1034,7 @@ const handleImportQuiz = async () => {
                     {currentStep === 2 && (
                       <div className="space-y-6">
                         <h3 className="text-lg font-semibold">Add Questions</h3>
-                        
+
                         {questions.map((question, qIndex) => (
                           <div
                             key={qIndex}
@@ -1043,33 +1090,33 @@ const handleImportQuiz = async () => {
                                 </button>
                               </div>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {question.options.map((option, optIndex) => (
-                                <div key={optIndex}>
-                                  <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                                    Option {String.fromCharCode(65 + optIndex)} <span className="text-red-500">*</span>
-                                  </label>
+                                {question.options.map((option, optIndex) => (
+                                  <div key={optIndex}>
+                                    <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
+                                      Option {String.fromCharCode(65 + optIndex)} <span className="text-red-500">*</span>
+                                    </label>
                                     <div className="flex gap-2 items-center">
-                                    <input
-                                      type="text"
-                                      required
-                                      value={option}
-                                      onChange={(e) => handleUpdateOption(qIndex, optIndex, e.target.value)}
-                                      className="flex-1 px-4 py-2 rounded-lg"
-                                      style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
-                                      placeholder={`Option ${String.fromCharCode(65 + optIndex)}`}
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => handleUpdateCorrectOption(qIndex, optIndex)}
-                                      className="px-3 py-2 rounded-lg font-semibold text-sm"
-                                      style={{
-                                        backgroundColor: question.correctOptions[optIndex] === 1 ? "#10b981" : inputBg,
-                                        color: question.correctOptions[optIndex] === 1 ? "#fff" : textColor,
-                                        border: `1px solid ${inputBorder}`,
-                                      }}
-                                    >
-                                      {question.correctOptions[optIndex] === 1 ? "✓" : "○"}
-                                    </button>
+                                      <input
+                                        type="text"
+                                        required
+                                        value={option}
+                                        onChange={(e) => handleUpdateOption(qIndex, optIndex, e.target.value)}
+                                        className="flex-1 px-4 py-2 rounded-lg"
+                                        style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
+                                        placeholder={`Option ${String.fromCharCode(65 + optIndex)}`}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateCorrectOption(qIndex, optIndex)}
+                                        className="px-3 py-2 rounded-lg font-semibold text-sm"
+                                        style={{
+                                          backgroundColor: question.correctOptions[optIndex] === 1 ? "#10b981" : inputBg,
+                                          color: question.correctOptions[optIndex] === 1 ? "#fff" : textColor,
+                                          border: `1px solid ${inputBorder}`,
+                                        }}
+                                      >
+                                        {question.correctOptions[optIndex] === 1 ? "✓" : "○"}
+                                      </button>
                                       {question.options.length > 2 && (
                                         <button
                                           type="button"
@@ -1079,9 +1126,9 @@ const handleImportQuiz = async () => {
                                           Remove
                                         </button>
                                       )}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                ))}
                               </div>
                             </div>
 

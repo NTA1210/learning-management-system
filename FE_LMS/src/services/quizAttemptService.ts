@@ -4,15 +4,22 @@ import type { QuizResponse } from "./quizService";
 export interface QuizAttempt {
   _id: string;
   quizId: string | QuizResponse;
-  studentId:
-    | string
-    | {
-        _id: string;
-        fullName?: string;
-        fullname?: string;
-        username?: string;
-        email?: string;
-      };
+  studentId?:
+  | string
+  | {
+    _id: string;
+    fullName?: string;
+    fullname?: string;
+    username?: string;
+    email?: string;
+  };
+  student?: {
+    _id: string;
+    fullName?: string;
+    fullname?: string;
+    username?: string;
+    email?: string;
+  };
   status: "in_progress" | "submitted" | "abandoned";
   startTime: string;
   submittedAt?: string;
@@ -144,7 +151,8 @@ export const quizAttemptService = {
    * GET /quizzes/:quizId/quiz-attempts
    */
   getAttemptsByQuiz: async (quizId: string): Promise<QuizAttempt[]> => {
-    const response = await http.get<{ data: QuizAttempt[] }>(`/quizzes/${quizId}/quiz-attempts`);
+    // Add populate parameter to get student details
+    const response = await http.get<{ data: QuizAttempt[] }>(`/quizzes/${quizId}/quiz-attempts?populate=studentId`);
     if (Array.isArray(response.data?.data)) {
       return response.data.data;
     }
