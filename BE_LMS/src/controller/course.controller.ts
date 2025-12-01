@@ -272,8 +272,10 @@ export const completeCourseHandler = catchErrors(async (req, res) => {
 // GET /:courseId/statistics - Get course statistics
 export const getCourseStatisticsHandler = catchErrors(async (req, res) => {
   const courseId = courseIdSchema.parse(req.params.courseId);
+  const userId = (req as any).userId;
+  const role = (req as any).role;
 
-  const data = await getCourseStatistics(courseId);
+  const data = await getCourseStatistics(courseId, userId, role);
 
   return res.success(OK, {
     data,
