@@ -292,37 +292,37 @@ export default function StudentDashboard() {
     setAvailableCarouselIndex(prev => Math.max(0, prev - 1));
   }, []);
 
-  // Fetch all data
+  // Fetch all data - runs once on mount like admin dashboard
   useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
     const fetchData = async () => {
       try {
         setLoading(true);
 
         // Fetch my courses using courseService (limit 5 for carousel)
-        const myCoursesResponse = await courseService.getMyCourses({
-          page: 1,
-          limit: COURSES_PER_PAGE,
-          sortOrder: 'desc'
-        });
+        let coursesList: any[] = [];
+        let paginationData: any = undefined;
+        try {
+          const myCoursesResponse = await courseService.getMyCourses({
+            page: 1,
+            limit: COURSES_PER_PAGE,
+            sortOrder: 'desc'
+          });
+          coursesList = myCoursesResponse.data || [];
+          paginationData = myCoursesResponse.pagination;
+          const totalCoursesCount = paginationData?.total || coursesList.length;
 
-        const coursesList = myCoursesResponse.data || [];
-        const paginationData = myCoursesResponse.pagination;
-        const totalCoursesCount = paginationData?.total || coursesList.length;
+          setEnrolledCourses(coursesList as unknown as Course[]);
+          setTotalCourses(totalCoursesCount);
+          setHasMoreCourses(paginationData?.hasNextPage || false);
 
-        setEnrolledCourses(coursesList as unknown as Course[]);
-        setTotalCourses(totalCoursesCount);
-        setHasMoreCourses(paginationData?.hasNextPage || false);
-
-        // Update stats using metadata from response
-        setStats(prev => ({
-          ...prev,
-          enrolledCourses: totalCoursesCount
-        }));
+          // Update stats using metadata from response
+          setStats(prev => ({
+            ...prev,
+            enrolledCourses: totalCoursesCount
+          }));
+        } catch (err) {
+          console.log('Could not fetch courses:', err);
+        }
 
         // Fetch announcements for student (get all active announcements)
         try {
@@ -347,12 +347,10 @@ export default function StudentDashboard() {
     };
 
     fetchData();
-  }, [user]);
+  }, []); // Run once on mount like admin dashboard
 
   // Fetch assignments
   useEffect(() => {
-    if (!user) return;
-
     const fetchAssignments = async () => {
       try {
         setAssignmentsLoading(true);
@@ -384,7 +382,7 @@ export default function StudentDashboard() {
     };
 
     fetchAssignments();
-  }, [user]);
+  }, []);
 
   // Fetch quizzes
   useEffect(() => {
@@ -425,12 +423,10 @@ export default function StudentDashboard() {
     };
 
     fetchQuizzes();
-  }, [user, enrolledCourses]);
+  }, [enrolledCourses]);
 
   // Fetch attendance data using /self endpoint
   useEffect(() => {
-    if (!user) return;
-
     const fetchAttendance = async () => {
       try {
         setAttendanceLoading(true);
@@ -481,12 +477,10 @@ export default function StudentDashboard() {
     };
 
     fetchAttendance();
-  }, [user]);
+  }, []);
 
   // Fetch grades for average calculation
   useEffect(() => {
-    if (!user) return;
-
     const fetchGrades = async () => {
       try {
         setGradesLoading(true);
@@ -526,15 +520,15 @@ export default function StudentDashboard() {
     };
 
     fetchGrades();
-  }, [user]);
+  }, []);
 
   // Fetch available courses (filtered by student's specialist IDs)
   useEffect(() => {
-    if (!user || enrolledCourses.length === 0) return;
+    if (enrolledCourses.length === 0) return;
 
     const enrolledIds = new Set(enrolledCourses.map(c => c._id));
     fetchAvailableCourses(1, enrolledIds);
-  }, [user, enrolledCourses]);
+  }, [enrolledCourses]);
 
   const handleEnroll = async (courseId: string) => {
     // TODO: Implement enrollment logic

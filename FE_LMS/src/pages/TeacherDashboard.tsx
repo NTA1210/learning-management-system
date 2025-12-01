@@ -186,50 +186,62 @@ export default function TeacherDashboard() {
     setCourseCarouselIndex(prev => Math.max(0, prev - 1));
   }, []);
 
+  // Main data fetch effect - runs once on mount like admin dashboard
   useEffect(() => {
-    if (!user || !user._id) return;
-
     const fetchData = async () => {
       try {
         setLoading(true);
 
         // 1. Fetch Teaching Courses using courseService (limit 5 for carousel)
-        const coursesResponse = await courseService.getMyCourses({
-          page: 1,
-          limit: COURSES_PER_PAGE,
-          sortOrder: 'desc'
-        });
-
-        const coursesData = coursesResponse.data || [];
-        const pagination = coursesResponse.pagination;
-        setCourses(coursesData as unknown as Course[]);
-        setTotalCourses(pagination?.total || coursesData.length);
-        setHasMoreCourses(pagination?.hasNextPage || false);
+        let coursesData: any[] = [];
+        let pagination: any = undefined;
+        try {
+          const coursesResponse = await courseService.getMyCourses({
+            page: 1,
+            limit: COURSES_PER_PAGE,
+            sortOrder: 'desc'
+          });
+          coursesData = coursesResponse.data || [];
+          pagination = coursesResponse.pagination;
+          setCourses(coursesData as unknown as Course[]);
+          setTotalCourses(pagination?.total || coursesData.length);
+          setHasMoreCourses(pagination?.hasNextPage || false);
+        } catch (err) {
+          console.log('Could not fetch courses:', err);
+        }
 
         // 2. Fetch Assignments using assignmentService
-        const assignmentsResponse = await assignmentService.listAssignments({
-          page: 1,
-          limit: 20,
-          sortOrder: 'desc'
-        });
-
-        const assignmentsData = assignmentsResponse.data || [];
-        setAssignments(assignmentsData as unknown as Assignment[]);
+        let assignmentsData: any[] = [];
+        try {
+          const assignmentsResponse = await assignmentService.listAssignments({
+            page: 1,
+            limit: 20,
+            sortOrder: 'desc'
+          });
+          assignmentsData = assignmentsResponse.data || [];
+          setAssignments(assignmentsData as unknown as Assignment[]);
+        } catch (err) {
+          console.log('Could not fetch assignments:', err);
+        }
 
         // 3. Fetch Quizzes for teaching courses
         let allQuizzes: Quiz[] = [];
-        if (coursesData.length > 0) {
-          const quizPromises = coursesData.slice(0, 5).map((course: any) =>
-            quizService.getQuizzesByCourseId(course._id, {
-              page: 1,
-              limit: 5
-            }).catch(() => ({ data: [] }))
-          );
+        try {
+          if (coursesData.length > 0) {
+            const quizPromises = coursesData.slice(0, 5).map((course: any) =>
+              quizService.getQuizzesByCourseId(course._id, {
+                page: 1,
+                limit: 5
+              }).catch(() => ({ data: [] }))
+            );
 
-          const quizResults = await Promise.all(quizPromises);
-          allQuizzes = quizResults.flatMap(result => result.data || []);
+            const quizResults = await Promise.all(quizPromises);
+            allQuizzes = quizResults.flatMap(result => result.data || []);
+          }
+          setQuizzes(allQuizzes);
+        } catch (err) {
+          console.log('Could not fetch quizzes:', err);
         }
-        setQuizzes(allQuizzes);
 
         // 4. Fetch announcements using announcementService
         try {
@@ -295,7 +307,7 @@ export default function TeacherDashboard() {
     };
 
     fetchData();
-  }, [user]);
+  }, []); // Run once on mount like admin dashboard
 
   // Hover preview component for teacher dashboard with animation
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
