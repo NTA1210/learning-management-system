@@ -174,7 +174,7 @@ export const getTeacherWeeklySchedule = async (
 export const getCourseSchedule = async (courseId: string, status?: ScheduleStatus[]) => {
     return ScheduleModel.find({
         courseId,
-        status: {$in: status},
+        status: {$in: status || [ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
     })
         .populate([
             {path: "teacherId", select: "fullname email"},
