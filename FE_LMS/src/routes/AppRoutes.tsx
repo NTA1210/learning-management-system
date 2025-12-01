@@ -51,14 +51,14 @@ function AppRoutes() {
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        
+
         {/* Course detail */}
         <Route path="/courses/:id" element={
           <ProtectedRoute>
             <CourseDetailPage />
           </ProtectedRoute>
         } />
-        
+
         {/* Auth routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
@@ -105,6 +105,16 @@ function AppRoutes() {
         <Route path="/my-courses" element={
           <ProtectedRoute requiredRole="student">
             <MyCoursesPage />
+          </ProtectedRoute>
+        } />
+        <Route path="/my-courses-v2" element={
+          <ProtectedRoute requiredRole="student">
+            <MyCoursesV2Page />
+          </ProtectedRoute>
+        } />
+        <Route path="/my-courses-v2/:semesterId" element={
+          <ProtectedRoute requiredRole="student">
+            <MyCoursesV2Page />
           </ProtectedRoute>
         } />
         <Route path="/my-enrollments" element={
@@ -183,7 +193,7 @@ function AppRoutes() {
           </ProtectedRoute>
         } />
         <Route path="/quiz-attempts/:attemptId" element={
-          <ProtectedRoute requiredRole={["teacher","admin"]}>
+          <ProtectedRoute requiredRole={["teacher", "admin"]}>
             <QuizAttemptDetailPage />
           </ProtectedRoute>
         } />

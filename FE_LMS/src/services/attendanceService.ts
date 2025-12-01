@@ -82,6 +82,7 @@ export interface StudentAttendanceStat {
   absentRate: number;
   longestAbsentStreak: number;
   alerts: StudentAttendanceAlerts;
+  isCurrentlyEnrolled?: boolean; // Track if student is currently enrolled or historical
 }
 
 export interface CourseAttendanceStats {
@@ -131,8 +132,16 @@ export const attendanceService = {
     return response;
   },
 
-  getCourseStats: async (courseId: string): Promise<CourseAttendanceStats> => {
-    const response = await http.get<CourseAttendanceStats>(`/attendances/courses/${courseId}/stats`);
+  getCourseStats: async (
+    courseId: string,
+    params?: { from?: string; to?: string }
+  ): Promise<CourseAttendanceStats> => {
+    const usp = new URLSearchParams();
+    if (params?.from) usp.append("from", params.from);
+    if (params?.to) usp.append("to", params.to);
+    const qs = usp.toString();
+    const url = `/attendances/courses/${courseId}/stats${qs ? `?${qs}` : ""}`;
+    const response = await http.get<CourseAttendanceStats>(url);
     return response.data;
   },
 
