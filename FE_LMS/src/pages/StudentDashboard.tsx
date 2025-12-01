@@ -4,9 +4,12 @@ import { useAuth } from "../hooks/useAuth";
 import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import { Skeleton } from "../components/common/Skeleton.tsx";
-import http, { httpClient } from "../utils/http";
+import StudentScheduleCalendar from "../components/StudentScheduleCalendar";
+import http from "../utils/http";
 import { attendanceService } from "../services/attendanceService";
 import { quizService } from "../services/quizService";
+import { assignmentService } from "../services/assignmentService";
+import { submissionService } from "../services/submissionService";
 
 // Types
 interface Course {
@@ -69,6 +72,7 @@ export default function StudentDashboard() {
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [quizzesLoading, setQuizzesLoading] = useState(false);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [gradesLoading, setGradesLoading] = useState(false);
 
   // Data states
   const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
@@ -133,22 +137,19 @@ export default function StudentDashboard() {
     const fetchAssignments = async () => {
       try {
         setAssignmentsLoading(true);
-        const response = await httpClient.get('/assignments', {
-          params: { page: 1, limit: 10, sortBy: 'dueDate', sortOrder: 'asc' },
-          withCredentials: true
+        const response = await assignmentService.listAssignments({
+          page: 1,
+          limit: 10,
+          sortBy: 'dueDate',
+          sortOrder: 'asc'
         });
 
-        const assignmentsData = Array.isArray(response.data?.data)
-          ? response.data.data
-          : Array.isArray(response.data)
-            ? response.data
-            : [];
+        const assignmentsData = response.data || [];
+        setAssignments(assignmentsData as unknown as Assignment[]);
 
-        setAssignments(assignmentsData);
-
-        // Count pending assignments (not yet submitted or due soon)
-        const pending = assignmentsData.filter((a: Assignment) =>
-          a.status !== 'submitted' && new Date(a.dueDate) > new Date()
+        // Count pending assignments (due date in the future)
+        const pending = assignmentsData.filter((a) =>
+          new Date(a.dueDate) > new Date()
         ).length;
 
         setStats(prev => ({
@@ -207,25 +208,25 @@ export default function StudentDashboard() {
     fetchQuizzes();
   }, [user, enrolledCourses]);
 
-  // Fetch attendance data
+  // Fetch attendance data using /self endpoint
   useEffect(() => {
-    if (!user || !user.id) return;
+    if (!user) return;
 
     const fetchAttendance = async () => {
       try {
         setAttendanceLoading(true);
 
-        const response = await attendanceService.getStudentAttendance(user.id, {
+        const response = await attendanceService.getSelfAttendance({
           page: 1,
-          limit: 100
+          limit: 200
         });
 
         // Group by course
-        const attendanceByCoursemap: { [key: string]: AttendanceSummary } = {};
+        const attendanceByCourse: { [key: string]: AttendanceSummary } = {};
 
         response.data.forEach((record: any) => {
-          const courseId = record.courseId._id;
-          const courseTitle = record.courseId.title;
+          const courseId = typeof record.courseId === 'object' ? record.courseId._id : record.courseId;
+          const courseTitle = typeof record.courseId === 'object' ? record.courseId.title : 'Unknown Course';
 
           if (!attendanceByCourse[courseId]) {
             attendanceByCourse[courseId] = {
@@ -237,7 +238,9 @@ export default function StudentDashboard() {
           }
 
           attendanceByCourse[courseId].totalSessions++;
-          attendanceByCourse[courseId].counts[record.status]++;
+          if (record.status === 'present' || record.status === 'absent' || record.status === 'notyet') {
+            attendanceByCourse[courseId].counts[record.status]++;
+          }
         });
 
         // Calculate attendance rates
@@ -258,6 +261,51 @@ export default function StudentDashboard() {
     };
 
     fetchAttendance();
+  }, [user]);
+
+  // Fetch grades for average calculation
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchGrades = async () => {
+      try {
+        setGradesLoading(true);
+
+        const response = await submissionService.getMyGrades();
+        const grades = response.data || [];
+
+        // Calculate average grade (only count graded submissions)
+        const gradedSubmissions = grades.filter((g) => g.grade !== undefined && g.grade !== null);
+        
+        if (gradedSubmissions.length > 0) {
+          // Calculate weighted average based on maxScore
+          let totalWeightedScore = 0;
+          let totalMaxScore = 0;
+
+          gradedSubmissions.forEach((submission) => {
+            const maxScore = submission.assignmentId?.maxScore || 100;
+            totalWeightedScore += (submission.grade || 0);
+            totalMaxScore += maxScore;
+          });
+
+          const averageGrade = totalMaxScore > 0 
+            ? Math.round((totalWeightedScore / totalMaxScore) * 100) 
+            : 0;
+
+          setStats(prev => ({
+            ...prev,
+            averageGrade
+          }));
+        }
+
+      } catch (error) {
+        console.error('Error fetching grades:', error);
+      } finally {
+        setGradesLoading(false);
+      }
+    };
+
+    fetchGrades();
   }, [user]);
 
   // Fetch available courses (not enrolled)
@@ -504,6 +552,11 @@ export default function StudentDashboard() {
                   </div>
                 </>
               )}
+            </div>
+
+            {/* My Schedule Calendar */}
+            <div className="mb-8">
+              <StudentScheduleCalendar darkMode={darkMode} />
             </div>
 
             {/* My Courses Grid */}
