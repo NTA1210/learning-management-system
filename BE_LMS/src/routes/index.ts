@@ -22,4 +22,4 @@ export { default as attendanceRoutes } from './attendance.route';
 export { default as quizAttemptRoutes } from './quizAttempt.route';
 export { default as announcementRoutes } from './announcement.route';
 export { default as semesterRoutes } from './semester.route';
-export { default as studentStatisticsRoutes } from './student-statistics.route';
+

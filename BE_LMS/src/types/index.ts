@@ -33,3 +33,7 @@ export { default as IScheduleException } from './scheduleException.type';
 export * from './scheduleException.type';
 export { default as ISemester } from './semester.type';
 export * from './semester.type';
+export { default as IChatRoom } from './chatRoom.type';
+export * from './chatRoom.type';
+export { default as IMessage } from './message.type';
+export * from './message.type';

@@ -1,0 +1,217 @@
+import React, { createContext, useContext, useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import { useSocketContext } from "./SocketContext";
+import { toast } from "react-hot-toast";
+import { useChatRooms } from "../hooks/useChatRooms";
+
+export type User = {
+  _id: string;
+  fullname: string;
+  username: string;
+  email: string;
+  avatarUrl: string;
+};
+
+export type Course = {
+  title: string;
+  subjectId: string;
+  startDate: Date;
+  endDate: Date;
+  logo?: string;
+  semesterId: string;
+};
+
+export type ChatRoom = {
+  chatRoomId: string;
+  name: string;
+  course: Course;
+  unreadCounts: any;
+  participants: User[];
+  lastMessage: {
+    senderId: any;
+    content: string;
+    timestamp: Date;
+    isNotification: boolean;
+  };
+};
+
+type ChatRoomsContextType = {
+  chatRooms: ChatRoom[];
+  searchTerm: string;
+  setSearchTerm: (searchTerm: string) => void;
+  isLoading: boolean;
+  isError: boolean;
+};
+
+const ChatRoomsContext = createContext<ChatRoomsContextType | undefined>(
+  undefined
+);
+
+export const useChatRoomsContext = () => {
+  const context = useContext(ChatRoomsContext);
+  if (!context) {
+    throw new Error(
+      "useChatRoomsContext must be used within a ChatRoomsProvider"
+    );
+  }
+  return context;
+};
+
+type ChatRoomsProviderProps = {
+  children: ReactNode;
+};
+
+export const ChatRoomsProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}: ChatRoomsProviderProps) => {
+  const { data, isLoading, isError } = useChatRooms();
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const { socket } = useSocketContext();
+
+  useEffect(() => {
+    if (data) {
+      setChatRooms(data);
+    }
+  }, [data]);
+
+  console.log(chatRooms);
+
+  const handleConversationMarkAsReadError = () => {
+    toast.error("Failed to mark conversation as read");
+  };
+
+  const handleChatRoomUpdate = ({
+    chatRoomId,
+    lastMessage,
+    unreadCounts,
+  }: {
+    chatRoomId: string;
+    lastMessage: any;
+    unreadCounts: any;
+  }) => {
+    setChatRooms((prev) => {
+      // Tìm xem chatRoom có tồn tại không
+      const exists = prev.some((c) => c.chatRoomId === chatRoomId);
+      if (!exists) {
+        // Không add mới — chờ API load
+        return prev;
+      }
+
+      // Nếu tồn tại → update
+      return prev.map((chatRoom) =>
+        chatRoom.chatRoomId === chatRoomId
+          ? { ...chatRoom, lastMessage, unreadCounts }
+          : chatRoom
+      );
+    });
+  };
+
+  const handleChatRoomUpdateUnreadCounts = ({
+    chatRoomId,
+    unreadCounts,
+  }: {
+    chatRoomId: string;
+    unreadCounts: any;
+  }) => {
+    setChatRooms((prev: ChatRoom[] = []) => {
+      return prev.map((chatRoom) => {
+        if (chatRoom.chatRoomId === chatRoomId) {
+          return {
+            ...chatRoom,
+            unreadCounts,
+          };
+        }
+        return chatRoom;
+      });
+    });
+  };
+
+  const handleChatRoomSendMessageError = () => {
+    toast.error("Failed to send message");
+  };
+
+  const handleChatRoomInviteError = (error: any) => {
+    toast.error(error || "Failed to invite user");
+  };
+
+  const handleLeaveChatroomSuccess = ({
+    chatRoomId,
+  }: {
+    chatRoomId: string;
+  }) => {
+    toast.success("Leave chatroom successfully");
+    setChatRooms((prev: ChatRoom[] = []) => {
+      if (prev && prev.length === 0) return prev;
+      return prev.filter((chatRoom) => chatRoom.chatRoomId !== chatRoomId);
+    });
+  };
+
+  const handleChatRoomAdded = (chatRoom: ChatRoom) => {
+    setChatRooms((prev) => [...prev, chatRoom]);
+
+    if (!socket) return;
+
+    socket.emit("chatroom:join", { chatRoomId: chatRoom.chatRoomId });
+  };
+  const handleChatRoomAddedError = () => {
+    toast.error("Failed to add new user");
+  };
+
+  useEffect(() => {
+    socket?.on(
+      "conversation:mark-as-read:error",
+      handleConversationMarkAsReadError
+    );
+    socket?.on("chatroom:update-chatroom", handleChatRoomUpdate);
+    socket?.on(
+      "chatroom:update-unread-counts",
+      handleChatRoomUpdateUnreadCounts
+    );
+    socket?.on("chatroom:send-message:error", handleChatRoomSendMessageError);
+    socket?.on("chatroom:invite-user:error", (errorMessage) =>
+      handleChatRoomInviteError(errorMessage)
+    );
+    socket?.on("chatroom:leave-chatroom:success", handleLeaveChatroomSuccess);
+    socket?.on("chatroom:added", handleChatRoomAdded);
+    socket?.on("chatroom:join-new-chatroom:error", handleChatRoomAddedError);
+
+    return () => {
+      socket?.off(
+        "chatroom:mark-as-read:error",
+        handleConversationMarkAsReadError
+      );
+      socket?.off("chatroom:update-chatroom", handleChatRoomUpdate);
+      socket?.off(
+        "chatroom:update-unread-counts",
+        handleChatRoomUpdateUnreadCounts
+      );
+      socket?.off(
+        "chatroom:send-message:error",
+        handleChatRoomSendMessageError
+      );
+
+      socket?.off("chatroom:invite-user:error", handleChatRoomInviteError);
+      socket?.off(
+        "chatroom:leave-chatroom:success",
+        handleLeaveChatroomSuccess
+      );
+      socket?.off("chatroom:added", handleChatRoomAdded);
+      socket?.off("chatroom:join-new-chatroom:error", handleChatRoomAddedError);
+    };
+  }, [socket]);
+
+  return (
+    <ChatRoomsContext.Provider
+      value={{
+        chatRooms,
+        searchTerm,
+        setSearchTerm,
+        isLoading,
+        isError,
+      }}
+    >
+      {children}
+    </ChatRoomsContext.Provider>
+  );
+};

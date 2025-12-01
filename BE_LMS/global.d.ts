@@ -1,6 +1,7 @@
-import mongoose from "mongoose";
-import { IApiResponse } from "@/types/dto/apiResponse.type";
-import { Role } from "@/types";
+import mongoose from 'mongoose';
+import { IApiResponse } from '@/types/dto/apiResponse.type';
+import { IUser, Role } from '@/types';
+import { DefaultEventsMap } from 'socket.io';
 
 declare global {
   namespace Express {
@@ -26,6 +27,13 @@ declare global {
         }
       ): Response<IApiResponse<null>>;
     }
+  }
+}
+
+declare module 'socket.io' {
+  interface Socket {
+    user?: Omit<IUser, 'password'>;
+    userId?: mongoose.Types.ObjectId;
   }
 }
 
