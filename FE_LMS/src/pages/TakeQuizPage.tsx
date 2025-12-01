@@ -80,6 +80,7 @@ export default function TakeQuizPage() {
     message?: string;
   }>({ status: "idle" });
   const restoredAttemptRef = useRef(false);
+  const completedAttemptFetchKeyRef = useRef<string | null>(null);
   const storageKey = quizId ? `quizAttempt:${quizId}` : null;
   const banStorageKey = quizId ? `quizBan:${quizId}` : null;
   const completedAttemptKey = quizId ? `quizCompleted:${quizId}` : null;
@@ -292,6 +293,12 @@ export default function TakeQuizPage() {
   const loadCompletedAttempt = useCallback(async () => {
     if (!quizId || !user?._id || submitted || quizAttemptId) return;
 
+    const lookupKey = `${quizId}:${user._id}`;
+    if (completedAttemptFetchKeyRef.current === lookupKey) {
+      return;
+    }
+    completedAttemptFetchKeyRef.current = lookupKey;
+
     try {
       setLoadingCompletedAttempt(true);
       
@@ -374,6 +381,7 @@ export default function TakeQuizPage() {
       }
     } catch (error) {
       console.error("Failed to load completed attempt:", error);
+      completedAttemptFetchKeyRef.current = null;
       // Silently fail - user can still enter password if needed
     } finally {
       setLoadingCompletedAttempt(false);

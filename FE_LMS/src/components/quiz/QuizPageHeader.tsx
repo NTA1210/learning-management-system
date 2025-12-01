@@ -8,19 +8,27 @@ interface QuizPageHeaderProps {
 }
 
 export function QuizPageHeader({ title, onBack, darkMode, textColor }: QuizPageHeaderProps) {
+  const handleBackClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onBack();
+  };
+
   return (
-    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between md:ml-[50px]">
-      <div className="flex items-center gap-3">
+    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between md:ml-[50px]">
+      <div className="flex flex-col gap-2">
         <button
-          onClick={onBack}
-          className="inline-flex items-center justify-center rounded-xl shadow-lg transition-colors w-10 h-10 sm:w-12 sm:h-12 -ml-1 sm:-ml-3 md:-ml-6"
+          type="button"
+          onClick={handleBackClick}
+          className="flex items-center gap-2 text-sm hover:underline w-fit"
           style={{
-            backgroundColor: darkMode ? "rgba(99,102,241,0.25)" : "#6366f1",
-            color: darkMode ? "#a5b4fc" : "#ffffff",
+            color: darkMode ? "#94a3b8" : "#64748b",
+            zIndex: 9999,
+            pointerEvents: "auto",
           }}
         >
-          <ArrowLeft className="w-5 h-5" />
-          <span className="sr-only">Back to subjects</span>
+          <ArrowLeft className="w-4 h-4" />
+          Back
         </button>
         <h1 className="text-3xl font-bold" style={{ color: textColor }}>
           {title}
