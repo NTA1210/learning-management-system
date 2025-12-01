@@ -65,47 +65,6 @@ const getMenuItems = (
       ),
       label: "All Courses",
     },
-<<<<<<< HEAD
-    {
-      href: "/assignments",
-      icon: (
-        <svg
-          className="w-5 h-5 min-w-[1.25rem]"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-          ></path>
-        </svg>
-      ),
-      label: "Assignments",
-    },
-    {
-      href: "/materials",
-      icon: (
-        <svg
-          className="w-5 h-5 min-w-[1.25rem]"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="2"
-            d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-          ></path>
-        </svg>
-      ),
-      label: "Lession Materials",
-    },
-=======
->>>>>>> 35e98c76576edf77554fe79ceb9a461a175d7412
   ];
 
   baseItems.push(
@@ -490,13 +449,8 @@ export default function Sidebar({
   useEffect(() => {
     const updateHeights = () => {
       if (helpRef.current) setHelpHeight(helpRef.current.scrollHeight);
-<<<<<<< HEAD
-      if (settingsRef.current)
-        setSettingsHeight(settingsRef.current.scrollHeight);
-=======
       if (settingsRef.current) setSettingsHeight(settingsRef.current.scrollHeight);
       if (coursesRef.current) setCoursesHeight(coursesRef.current.scrollHeight);
->>>>>>> 35e98c76576edf77554fe79ceb9a461a175d7412
     };
     updateHeights();
     window.addEventListener("resize", updateHeights);
