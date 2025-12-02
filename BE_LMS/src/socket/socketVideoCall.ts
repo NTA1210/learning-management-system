@@ -157,9 +157,12 @@ export const videoCallIceCandidate = async (io: Server, socket: Socket, data: an
 
     if (!userId) return;
 
-    console.log(`[VideoCall] Relaying ICE candidate from ${userId} to ${toUserId}`);
+    console.log(`[VideoCall] Relaying ICE candidate from ${userId} to ${toUserId}`, {
+      type: candidate?.type,
+      protocol: candidate?.protocol,
+    });
 
-    // Send ICE candidate to specific user
+    // Send ICE candidate to specific user (user joins room with their ID)
     io.to(toUserId).emit('videocall:ice-candidate', {
       callId,
       fromUserId: userId,

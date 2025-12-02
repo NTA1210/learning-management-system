@@ -22,8 +22,6 @@ const VideoCallContainer: React.FC = () => {
     setIsScreenSharing,
     setIsCallMinimized,
     addParticipant,
-    removeParticipant,
-    updateParticipantStream,
     resetCall,
   } = useVideoCallStore();
 
@@ -35,48 +33,13 @@ const VideoCallContainer: React.FC = () => {
     return stored ? JSON.parse(stored) : null;
   }, []);
 
-  // Initialize WebRTC service and set up handlers
+  // Set local stream to WebRTC service when it changes
   useEffect(() => {
-    if (!socket || !currentUser || !isInCall) return;
+    if (!isInCall || !localStream) return;
 
-    console.log("[VideoCall] Initializing WebRTC with localStream:", !!localStream);
-
-    const handlers = {
-      onRemoteStream: (userId: string, stream: MediaStream) => {
-        console.log("[VideoCall] Remote stream received for:", userId, stream.getTracks());
-        
-        // Make sure participant exists, if not create them
-        const currentParticipants = useVideoCallStore.getState().participants;
-        if (!currentParticipants.has(userId)) {
-          console.log("[VideoCall] Adding new participant with stream:", userId);
-          addParticipant(userId, {
-            oderId: userId,
-            odername: `User ${userId.substring(0, 6)}`,
-            stream: stream,
-          });
-        } else {
-          console.log("[VideoCall] Updating existing participant stream:", userId);
-          updateParticipantStream(userId, stream);
-        }
-      },
-      onPeerDisconnected: (userId: string) => {
-        console.log("[VideoCall] Peer disconnected:", userId);
-        removeParticipant(userId);
-        toast(`Participant left the call`, { icon: "👋" });
-      },
-      onConnectionStateChange: (userId: string, state: RTCPeerConnectionState) => {
-        console.log(`[VideoCall] Connection with ${userId}: ${state}`);
-      },
-    };
-
-    webRTCService.initialize(socket, currentUser._id, handlers);
-
-    // Set local stream to WebRTC service
-    if (localStream) {
-      webRTCService.setLocalStream(localStream);
-    }
-
-  }, [socket, currentUser, isInCall, localStream, addParticipant, updateParticipantStream, removeParticipant]);
+    console.log("[VideoCall] Setting local stream to WebRTC service");
+    webRTCService.setLocalStream(localStream);
+  }, [isInCall, localStream]);
 
   // Handle participant updates from socket
   useEffect(() => {

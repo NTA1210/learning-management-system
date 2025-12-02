@@ -1,15 +1,46 @@
 import { Socket } from "socket.io-client";
 
+// TURN server configuration - hardcoded for now (move to env vars for production)
+const TURN_SERVER = "global.relay.metered.ca";
+const TURN_USERNAME = "c83bd8ef115dd2a828773ff7";
+const TURN_CREDENTIAL = "0mKaV0/zYTRHcT0e";
+
 // STUN/TURN servers for NAT traversal
 const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
+    // Metered STUN server
+    { urls: "stun:stun.relay.metered.ca:80" },
+    
+    // Google STUN as fallback
     { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun2.l.google.com:19302" },
-    { urls: "stun:stun3.l.google.com:19302" },
-    { urls: "stun:stun4.l.google.com:19302" },
+    
+    // TURN servers from Metered.ca (required for NAT traversal)
+    {
+      urls: "turn:global.relay.metered.ca:80",
+      username: TURN_USERNAME,
+      credential: TURN_CREDENTIAL,
+    },
+    {
+      urls: "turn:global.relay.metered.ca:80?transport=tcp",
+      username: TURN_USERNAME,
+      credential: TURN_CREDENTIAL,
+    },
+    {
+      urls: "turn:global.relay.metered.ca:443",
+      username: TURN_USERNAME,
+      credential: TURN_CREDENTIAL,
+    },
+    {
+      urls: "turns:global.relay.metered.ca:443?transport=tcp",
+      username: TURN_USERNAME,
+      credential: TURN_CREDENTIAL,
+    },
   ],
+  iceCandidatePoolSize: 10,
+  iceTransportPolicy: "all",
 };
+
+console.log("[WebRTC] ICE servers configured:", ICE_SERVERS.iceServers?.length, "servers");
 
 export interface PeerConnection {
   oderId: string;
@@ -31,15 +62,44 @@ class WebRTCService {
   private eventHandlers: WebRTCEventHandler | null = null;
   private currentCallId: string | null = null;
   private pendingCandidates: Map<string, RTCIceCandidateInit[]> = new Map();
+  private isInitialized: boolean = false;
+  private currentUserId: string | null = null;
 
-  initialize(socket: Socket, _userId: string, handlers: WebRTCEventHandler) {
+  initialize(socket: Socket, userId: string, handlers: WebRTCEventHandler) {
+    // Prevent duplicate initialization
+    if (this.isInitialized && this.socket === socket) {
+      console.log("[WebRTC] Already initialized with same socket, updating handlers only");
+      this.eventHandlers = handlers;
+      return;
+    }
+
+    // Clean up old listeners if re-initializing with different socket
+    if (this.socket && this.socket !== socket) {
+      this.removeSocketListeners();
+    }
+
     this.socket = socket;
+    this.currentUserId = userId;
     this.eventHandlers = handlers;
     this.setupSocketListeners();
+    this.isInitialized = true;
+    console.log("[WebRTC] Initialized for user:", userId);
+  }
+
+  private removeSocketListeners() {
+    if (!this.socket) return;
+    this.socket.off("videocall:offer");
+    this.socket.off("videocall:answer");
+    this.socket.off("videocall:ice-candidate");
+    this.socket.off("videocall:peer-left");
+    console.log("[WebRTC] Removed old socket listeners");
   }
 
   private setupSocketListeners() {
     if (!this.socket) return;
+
+    // Remove any existing listeners first
+    this.removeSocketListeners();
 
     // Handle incoming WebRTC offer
     this.socket.on("videocall:offer", async (data: {
@@ -65,11 +125,9 @@ class WebRTCService {
       fromUserId: string;
       candidate: RTCIceCandidateInit;
     }) => {
-      console.log("[WebRTC] Received ICE candidate from:", data.fromUserId);
+      console.log(`[WebRTC] Received ICE candidate from ${data.fromUserId}`);
       await this.handleIceCandidate(data.fromUserId, data.candidate);
     });
-
-    // Note: videocall:peer-joined is handled in VideoCallContainer to properly add participant first
 
     // Handle peer left the call
     this.socket.on("videocall:peer-left", (data: {
@@ -79,6 +137,8 @@ class WebRTCService {
       this.closePeerConnection(data.peerId);
       this.eventHandlers?.onPeerDisconnected(data.peerId);
     });
+
+    console.log("[WebRTC] Socket listeners set up");
   }
 
   async getLocalStream(video: boolean = true, audio: boolean = true): Promise<MediaStream> {
@@ -166,13 +226,28 @@ class WebRTCService {
 
     // Handle ICE candidates
     pc.onicecandidate = (event) => {
-      if (event.candidate && this.socket) {
-        this.socket.emit("videocall:ice-candidate", {
-          callId: this.currentCallId,
-          toUserId: userId,
-          candidate: event.candidate.toJSON(),
+      if (event.candidate) {
+        console.log(`[WebRTC] ICE candidate for ${userId}:`, {
+          type: event.candidate.type,
+          protocol: event.candidate.protocol,
+          address: event.candidate.address,
+          port: event.candidate.port,
         });
+        if (this.socket) {
+          this.socket.emit("videocall:ice-candidate", {
+            callId: this.currentCallId,
+            toUserId: userId,
+            candidate: event.candidate.toJSON(),
+          });
+        }
+      } else {
+        console.log(`[WebRTC] ICE gathering complete for ${userId}`);
       }
+    };
+
+    // Handle ICE gathering state
+    pc.onicegatheringstatechange = () => {
+      console.log(`[WebRTC] ICE gathering state with ${userId}:`, pc.iceGatheringState);
     };
 
     // Handle remote stream
@@ -193,17 +268,28 @@ class WebRTCService {
 
     // Handle connection state changes
     pc.onconnectionstatechange = () => {
-      console.log(`Connection state with ${userId}:`, pc.connectionState);
+      console.log(`[WebRTC] Connection state with ${userId}:`, pc.connectionState);
       this.eventHandlers?.onConnectionStateChange(userId, pc.connectionState);
       
       if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
+        console.log(`[WebRTC] Connection ${pc.connectionState} with ${userId}, cleaning up`);
         this.closePeerConnection(userId);
         this.eventHandlers?.onPeerDisconnected(userId);
       }
     };
 
     pc.oniceconnectionstatechange = () => {
-      console.log(`ICE connection state with ${userId}:`, pc.iceConnectionState);
+      console.log(`[WebRTC] ICE connection state with ${userId}:`, pc.iceConnectionState);
+      if (pc.iceConnectionState === "failed") {
+        console.error(`[WebRTC] ICE connection failed with ${userId}. Check TURN server configuration.`);
+        // Try ICE restart
+        console.log(`[WebRTC] Attempting ICE restart for ${userId}`);
+        pc.restartIce();
+      }
+    };
+
+    pc.onsignalingstatechange = () => {
+      console.log(`[WebRTC] Signaling state with ${userId}:`, pc.signalingState);
     };
 
     this.peerConnections.set(userId, pc);
@@ -217,16 +303,23 @@ class WebRTCService {
     let pc = this.peerConnections.get(userId);
     if (pc) {
       console.log("[WebRTC] Connection already exists for", userId, "state:", pc.signalingState);
-      // If already stable with remote description, skip (connection already established)
+      
+      // If already stable with remote description, connection is established - skip
       if (pc.signalingState === "stable" && pc.remoteDescription) {
         console.log("[WebRTC] Connection already established, skipping offer");
         return;
       }
-      // If in wrong state, close and recreate
-      if (pc.signalingState !== "stable") {
-        console.log("[WebRTC] Connection in wrong state, recreating");
-        pc.close();
-        this.peerConnections.delete(userId);
+      
+      // If already have-local-offer, we already sent an offer - skip
+      if (pc.signalingState === "have-local-offer") {
+        console.log("[WebRTC] Already sent offer, waiting for answer");
+        return;
+      }
+      
+      // If in have-remote-offer, we received their offer - don't create ours
+      if (pc.signalingState === "have-remote-offer") {
+        console.log("[WebRTC] Have remote offer, should send answer not offer");
+        return;
       }
     }
     
@@ -254,11 +347,32 @@ class WebRTCService {
   private async handleOffer(fromUserId: string, offer: RTCSessionDescriptionInit, callId: string) {
     this.currentCallId = callId;
     
-    // Check if we already have a connection - if so, close it and create fresh
+    // Check if we already have a connection
     let pc = this.peerConnections.get(fromUserId);
     if (pc) {
-      console.log("[WebRTC] Already have connection for", fromUserId, "- checking state:", pc.signalingState);
-      // If connection exists but is in wrong state, recreate it
+      console.log("[WebRTC] Already have connection for", fromUserId, "- state:", pc.signalingState);
+      
+      // If connection is stable and has remote description, it's already established - skip
+      if (pc.signalingState === "stable" && pc.remoteDescription) {
+        console.log("[WebRTC] Connection already established, ignoring duplicate offer");
+        return;
+      }
+      
+      // If connection is in have-local-offer state, we have a glare situation
+      // Use polite peer logic - higher ID yields (closes and accepts incoming offer)
+      if (pc.signalingState === "have-local-offer") {
+        if (this.currentUserId && this.currentUserId > fromUserId) {
+          console.log("[WebRTC] Glare detected - we yield (higher ID), accepting their offer");
+          pc.close();
+          this.peerConnections.delete(fromUserId);
+          pc = this.createPeerConnection(fromUserId);
+        } else {
+          console.log("[WebRTC] Glare detected - they yield (higher ID), ignoring their offer");
+          return;
+        }
+      }
+      
+      // If in other wrong states, recreate
       if (pc.signalingState !== "stable") {
         console.log("[WebRTC] Connection in wrong state, closing and recreating");
         pc.close();
@@ -274,7 +388,8 @@ class WebRTCService {
       
       // Apply any pending ICE candidates
       const pending = this.pendingCandidates.get(fromUserId);
-      if (pending) {
+      if (pending && pending.length > 0) {
+        console.log(`[WebRTC] Processing ${pending.length} pending ICE candidates for ${fromUserId}`);
         for (const candidate of pending) {
           await pc.addIceCandidate(new RTCIceCandidate(candidate));
         }
@@ -284,13 +399,14 @@ class WebRTCService {
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
+      console.log("[WebRTC] Sending answer to:", fromUserId);
       this.socket?.emit("videocall:answer", {
         callId,
         toUserId: fromUserId,
         answer: pc.localDescription,
       });
     } catch (error) {
-      console.error("Error handling offer:", error);
+      console.error("[WebRTC] Error handling offer:", error);
     }
   }
 
@@ -313,7 +429,8 @@ class WebRTCService {
       
       // Apply any pending ICE candidates
       const pending = this.pendingCandidates.get(fromUserId);
-      if (pending) {
+      if (pending && pending.length > 0) {
+        console.log(`[WebRTC] Processing ${pending.length} pending ICE candidates for ${fromUserId}`);
         for (const candidate of pending) {
           await pc.addIceCandidate(new RTCIceCandidate(candidate));
         }
@@ -333,11 +450,13 @@ class WebRTCService {
         this.pendingCandidates.set(fromUserId, []);
       }
       this.pendingCandidates.get(fromUserId)!.push(candidate);
+      console.log(`[WebRTC] Queued ICE candidate from ${fromUserId} (no remote description yet)`);
       return;
     }
 
     try {
       await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      console.log(`[WebRTC] Added ICE candidate from ${fromUserId}:`, candidate.candidate?.split(" ").slice(4, 7).join(" "));
     } catch (error) {
       console.error("Error adding ICE candidate:", error);
     }
@@ -402,8 +521,11 @@ class WebRTCService {
 
   // Clean up all connections and streams
   cleanup() {
+    console.log("[WebRTC] Cleaning up...");
+    
     // Close all peer connections
-    this.peerConnections.forEach((pc) => {
+    this.peerConnections.forEach((pc, oderId) => {
+      console.log("[WebRTC] Closing connection to:", oderId);
       pc.close();
     });
     this.peerConnections.clear();
@@ -421,7 +543,13 @@ class WebRTCService {
       this.screenStream = null;
     }
 
+    // Remove socket listeners
+    this.removeSocketListeners();
+    
     this.currentCallId = null;
+    this.isInitialized = false;
+    
+    console.log("[WebRTC] Cleanup complete");
   }
 
   // Get current local stream

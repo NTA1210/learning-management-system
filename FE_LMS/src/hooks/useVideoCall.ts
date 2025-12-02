@@ -118,17 +118,27 @@ export const useVideoCall = () => {
       const stream = await webRTCService.getLocalStream(true, true);
       setLocalStream(stream);
 
-      // Initialize WebRTC service
+      // Initialize WebRTC service with handlers
       webRTCService.initialize(socket, currentUser._id, {
         onRemoteStream: (userId, remoteStream) => {
           console.log("[useVideoCall] Remote stream received for:", userId);
-          useVideoCallStore.getState().updateParticipantStream(userId, remoteStream);
+          const state = useVideoCallStore.getState();
+          if (!state.participants.has(userId)) {
+            state.addParticipant(userId, {
+              oderId: userId,
+              odername: `User ${userId.substring(0, 6)}`,
+              stream: remoteStream,
+            });
+          } else {
+            state.updateParticipantStream(userId, remoteStream);
+          }
         },
         onPeerDisconnected: (userId) => {
+          console.log("[useVideoCall] Peer disconnected:", userId);
           useVideoCallStore.getState().removeParticipant(userId);
         },
         onConnectionStateChange: (userId, state) => {
-          console.log(`Connection with ${userId}: ${state}`);
+          console.log(`[useVideoCall] Connection with ${userId}: ${state}`);
         },
       });
 
@@ -173,17 +183,27 @@ export const useVideoCall = () => {
       setIsInCall(true);
       setIncomingCall(null);
 
-      // Initialize WebRTC service
+      // Initialize WebRTC service with handlers
       webRTCService.initialize(socket, currentUser._id, {
         onRemoteStream: (userId, remoteStream) => {
           console.log("[useVideoCall] Remote stream received for:", userId);
-          useVideoCallStore.getState().updateParticipantStream(userId, remoteStream);
+          const state = useVideoCallStore.getState();
+          if (!state.participants.has(userId)) {
+            state.addParticipant(userId, {
+              oderId: userId,
+              odername: `User ${userId.substring(0, 6)}`,
+              stream: remoteStream,
+            });
+          } else {
+            state.updateParticipantStream(userId, remoteStream);
+          }
         },
         onPeerDisconnected: (userId) => {
+          console.log("[useVideoCall] Peer disconnected:", userId);
           useVideoCallStore.getState().removeParticipant(userId);
         },
         onConnectionStateChange: (userId, state) => {
-          console.log(`Connection with ${userId}: ${state}`);
+          console.log(`[useVideoCall] Connection with ${userId}: ${state}`);
         },
       });
 
