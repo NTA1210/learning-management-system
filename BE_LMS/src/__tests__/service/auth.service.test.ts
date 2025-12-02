@@ -1,4 +1,4 @@
-jest.mock("@/models", () => {
+jest.mock('@/models', () => {
   return {
     VerificationCodeModel: {
       create: jest.fn().mockResolvedValue({
@@ -29,21 +29,21 @@ jest.mock("@/models", () => {
     },
   };
 });
-jest.mock("@/utils/sendMail", () => {
+jest.mock('@/utils/sendMail', () => {
   return {
     sendMail: jest.fn().mockResolvedValue({
-      data: { id: "12345678" },
+      data: { id: '12345678' },
     }),
   };
 });
 
-jest.mock("@/utils/jwt", () => {
+jest.mock('@/utils/jwt', () => {
   return {
     refreshTokenSignOptions: {
-      secret: "refreshTokenSecret",
+      secret: 'refreshTokenSecret',
     },
     verifyToken: jest.fn().mockReturnValue({
-      payload: { sessionId: "1234" },
+      payload: { sessionId: '1234' },
     }),
     signToKen: jest.fn().mockReturnValue({}),
   };
@@ -54,9 +54,9 @@ import {
   NOT_FOUND,
   TOO_MANY_REQUESTS,
   UNAUTHORIZED,
-} from "@/constants/http";
+} from '@/constants/http';
 // --------------------------//---------------------------------
-import { SessionModel, UserModel, VerificationCodeModel } from "@/models";
+import { SessionModel, UserModel, VerificationCodeModel } from '@/models';
 import {
   createAccount,
   loginUser,
@@ -64,36 +64,36 @@ import {
   resetPassword,
   sendPasswordResetEmail,
   verifyEmail,
-} from "@/services/auth.service";
-import { Role } from "@/types";
-import AppError from "@/utils/AppError";
-import { verifyToken } from "@/utils/jwt";
-import { sendMail } from "@/utils/sendMail";
+} from '@/services/auth.service';
+import { Role } from '@/types';
+import AppError from '@/utils/AppError';
+import { verifyToken } from '@/utils/jwt';
+import { sendMail } from '@/utils/sendMail';
 // --------------------------//---------------------------------
 
-describe("Auth Service Unit Tests", () => {
+describe('Auth Service Unit Tests', () => {
   const mockUser = {
-    username: "user12345",
-    email: "user12345@gmail.com",
-    password: "12345678",
-    confirmPassword: "12345678",
+    username: 'user12345',
+    email: 'user12345@gmail.com',
+    password: '12345678',
+    confirmPassword: '12345678',
   };
 
   const mockUserDoc = {
-    email: "user12345@gmail.com",
-    username: "user12345",
+    email: 'user12345@gmail.com',
+    username: 'user12345',
     role: Role.STUDENT,
     isVerified: false,
     omitPassword: jest.fn().mockReturnValue({
-      email: "user12345@gmail.com",
-      username: "user12345",
+      email: 'user12345@gmail.com',
+      username: 'user12345',
       role: Role.STUDENT,
       isVerified: false,
     }),
   };
 
-  describe("Register", () => {
-    it("should create a new user", async () => {
+  describe('Register', () => {
+    it('should create a new user', async () => {
       (UserModel.create as jest.Mock).mockResolvedValue(mockUserDoc);
       const res = await createAccount(mockUser);
 
@@ -103,16 +103,16 @@ describe("Auth Service Unit Tests", () => {
       expect(res.user.isVerified).toBe(false);
     });
 
-    it("should call UserModel.create() with role=TEACHER if email ends with @fe.edu.vn", async () => {
+    it('should call UserModel.create() with role=TEACHER if email ends with @fe.edu.vn', async () => {
       (UserModel.exists as jest.Mock).mockResolvedValue(false);
       (UserModel.create as jest.Mock).mockResolvedValue({
         omitPassword: jest.fn().mockReturnValue({}),
       });
 
       await createAccount({
-        username: "teacherUser",
-        email: "teacher@fe.edu.vn",
-        password: "123456",
+        username: 'teacherUser',
+        email: 'teacher@fe.edu.vn',
+        password: '123456',
       });
 
       expect(UserModel.create).toHaveBeenCalledWith(
@@ -121,54 +121,48 @@ describe("Auth Service Unit Tests", () => {
         })
       );
     });
-    it("should throw error is user already exists", async () => {
+    it('should throw error is user already exists', async () => {
       (UserModel.exists as jest.Mock).mockResolvedValue(true);
-      await expect(createAccount(mockUser)).rejects.toThrow(
-        "Email already in use"
-      );
+      await expect(createAccount(mockUser)).rejects.toThrow('Email already in use');
     });
 
-    it("should throw error if username already exists", async () => {
-      (UserModel.exists as jest.Mock)
-        .mockResolvedValueOnce(false)
-        .mockResolvedValueOnce(true);
-      await expect(createAccount(mockUser)).rejects.toThrow(
-        "Username already in use"
-      );
+    it('should throw error if username already exists', async () => {
+      (UserModel.exists as jest.Mock).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+      await expect(createAccount(mockUser)).rejects.toThrow('Username already in use');
     });
 
-    it("should throw error if sendMail fails", async () => {
+    it('should throw error if sendMail fails', async () => {
       (UserModel.exists as jest.Mock).mockResolvedValue(false);
       (UserModel.create as jest.Mock).mockResolvedValue(mockUser);
       (VerificationCodeModel.create as jest.Mock).mockResolvedValueOnce({
-        _id: "code1",
+        _id: 'code1',
       });
       (sendMail as jest.Mock).mockResolvedValueOnce({
-        error: new Error("SMTP error"),
+        error: new Error('SMTP error'),
       });
 
       await expect(
         createAccount({
-          username: "anh",
-          email: "test@gmail.com",
-          password: "123",
+          username: 'anh',
+          email: 'test@gmail.com',
+          password: '123',
         })
       ).rejects.toThrow();
     });
   });
 
-  describe("Login", () => {
+  describe('Login', () => {
     const user = {
-      _id: "123",
-      username: "user12345",
-      email: "user12345@gmail.com",
-      password: "12345678",
+      _id: '123',
+      username: 'user12345',
+      email: 'user12345@gmail.com',
+      password: '12345678',
       role: Role.STUDENT,
       isVerified: true,
       comparePassword: jest.fn().mockResolvedValue(true),
       response: jest.fn().mockResolvedValue({}),
     };
-    it("should return user and token", async () => {
+    it('should return user and token', async () => {
       (UserModel.findOne as jest.Mock).mockResolvedValue(user);
 
       const res = await loginUser({
@@ -180,19 +174,17 @@ describe("Auth Service Unit Tests", () => {
       expect(res.refreshToken).toBeDefined();
     });
 
-    it("should throw error if user not found", async () => {
+    it('should throw error if user not found', async () => {
       (UserModel.findOne as jest.Mock).mockResolvedValue(null);
       await expect(
         loginUser({
           email: user.email,
           password: user.password,
         })
-      ).rejects.toThrow(
-        new AppError("Invalid email or password", UNAUTHORIZED)
-      );
+      ).rejects.toThrow(new AppError('Invalid email or password', UNAUTHORIZED));
     });
 
-    it("should throw error if email is not verified", async () => {
+    it('should throw error if email is not verified', async () => {
       (UserModel.findOne as jest.Mock).mockResolvedValue({
         ...user,
         isVerified: false,
@@ -202,10 +194,10 @@ describe("Auth Service Unit Tests", () => {
           email: user.email,
           password: user.password,
         })
-      ).rejects.toThrow(new AppError("Email not verified", UNAUTHORIZED));
+      ).rejects.toThrow(new AppError('Email not verified', UNAUTHORIZED));
     });
 
-    it("should throw error if password is invalid", async () => {
+    it('should throw error if password is invalid', async () => {
       (UserModel.findOne as jest.Mock).mockResolvedValue({
         ...user,
         comparePassword: jest.fn().mockResolvedValue(false),
@@ -215,20 +207,18 @@ describe("Auth Service Unit Tests", () => {
           email: user.email,
           password: user.password,
         })
-      ).rejects.toThrow(
-        new AppError("Invalid email or password", UNAUTHORIZED)
-      );
+      ).rejects.toThrow(new AppError('Invalid email or password', UNAUTHORIZED));
     });
   });
 
-  describe("Refresh Token", () => {
-    it("should refresh token success", async () => {
-      const res = await refreshUserAccessToken("refreshToken");
+  describe('Refresh Token', () => {
+    it('should refresh token success', async () => {
+      const res = await refreshUserAccessToken('refreshToken');
       expect(res.accessToken).toBeDefined();
       expect(res.refreshToken).toBeDefined();
     });
 
-    it("should extend session if sessionNeedRefresh is true", async () => {
+    it('should extend session if sessionNeedRefresh is true', async () => {
       const mockSave = jest.fn();
       const mockSession = {
         expiresAt: new Date(Date.now() + 23 * 60 * 60 * 1000),
@@ -237,7 +227,7 @@ describe("Auth Service Unit Tests", () => {
 
       (SessionModel.findById as jest.Mock).mockResolvedValueOnce(mockSession);
 
-      await refreshUserAccessToken("refreshToken");
+      await refreshUserAccessToken('refreshToken');
 
       expect(mockSave).toHaveBeenCalled();
       expect(mockSession.expiresAt.getTime()).toBeGreaterThan(
@@ -245,122 +235,134 @@ describe("Auth Service Unit Tests", () => {
       );
     });
 
-    it("should throw error if refresh token is invalid", async () => {
-      (verifyToken as jest.Mock).mockReturnValueOnce({ error: "jwt expired" });
+    it('should NOT create a new refreshToken when session does NOT need refresh', async () => {
+      const mockSave = jest.fn();
+      const mockSession = {
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days -> no refresh needed
+        save: mockSave,
+        _id: 'sessionid',
+        userId: 'userId',
+      };
 
-      await expect(refreshUserAccessToken("refreshToken")).rejects.toThrow(
-        new AppError("Invalid refresh token", UNAUTHORIZED)
+      (SessionModel.findById as jest.Mock).mockResolvedValueOnce(mockSession);
+      (UserModel.findById as jest.Mock).mockResolvedValueOnce({
+        ...mockUserDoc,
+      });
+
+      const res = await refreshUserAccessToken('refreshToken');
+
+      expect(res.accessToken).toBeDefined();
+      expect(res.refreshToken).toBeUndefined();
+      expect(mockSave).not.toHaveBeenCalled();
+    });
+
+    it('should throw error if refresh token is invalid', async () => {
+      (verifyToken as jest.Mock).mockReturnValueOnce({ error: 'jwt expired' });
+
+      await expect(refreshUserAccessToken('refreshToken')).rejects.toThrow(
+        new AppError('Invalid refresh token', UNAUTHORIZED)
       );
     });
 
-    it("should throw error if refresh token is expired", async () => {
+    it('should throw error if refresh token is expired', async () => {
       (SessionModel.findById as jest.Mock).mockResolvedValueOnce({
         expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
       });
-      await expect(refreshUserAccessToken("refreshToken")).rejects.toThrow(
-        new AppError("Session expired", UNAUTHORIZED)
+      await expect(refreshUserAccessToken('refreshToken')).rejects.toThrow(
+        new AppError('Session expired', UNAUTHORIZED)
       );
     });
 
-    it("should throw error if session not found", async () => {
+    it('should throw error if session not found', async () => {
       (SessionModel.findById as jest.Mock).mockResolvedValueOnce(null);
-      await expect(refreshUserAccessToken("refreshToken")).rejects.toThrow(
-        new AppError("Session expired", UNAUTHORIZED)
+      await expect(refreshUserAccessToken('refreshToken')).rejects.toThrow(
+        new AppError('Session expired', UNAUTHORIZED)
       );
     });
 
-    it("should throw error if user not found", async () => {
+    it('should throw error if user not found', async () => {
       (SessionModel.findById as jest.Mock).mockResolvedValueOnce({
-        userId: "userId",
+        userId: 'userId',
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       });
       (UserModel.findById as jest.Mock).mockResolvedValue(null);
-      await expect(refreshUserAccessToken("refreshToken")).rejects.toThrow(
-        new AppError("User not found", NOT_FOUND)
+      await expect(refreshUserAccessToken('refreshToken')).rejects.toThrow(
+        new AppError('User not found', NOT_FOUND)
       );
     });
   });
 
-  describe("Verify Email", () => {
-    it("should verify email success", async () => {
-      const res = await verifyEmail("code1");
+  describe('Verify Email', () => {
+    it('should verify email success', async () => {
+      const res = await verifyEmail('code1');
       expect(res).toBeDefined();
     });
 
-    it("should throw error if code not found", async () => {
+    it('should throw error if code not found', async () => {
       (VerificationCodeModel.findOne as jest.Mock).mockResolvedValueOnce(null);
-      await expect(verifyEmail("code1")).rejects.toThrow(
-        new AppError("Invalid or expired verification code", NOT_FOUND)
+      await expect(verifyEmail('code1')).rejects.toThrow(
+        new AppError('Invalid or expired verification code', NOT_FOUND)
       );
     });
 
-    it("should throw error if update user failed", async () => {
+    it('should throw error if update user failed', async () => {
       (UserModel.findByIdAndUpdate as jest.Mock).mockResolvedValueOnce(null);
-      await expect(verifyEmail("code1")).rejects.toThrow(
-        new AppError("Failed to verify email", INTERNAL_SERVER_ERROR)
+      await expect(verifyEmail('code1')).rejects.toThrow(
+        new AppError('Failed to verify email', INTERNAL_SERVER_ERROR)
       );
     });
   });
 
-  describe("Send Reset Password Mail", () => {
-    it("should send forgot password mail", async () => {
-      const res = await sendPasswordResetEmail("email");
+  describe('Send Reset Password Mail', () => {
+    it('should send forgot password mail', async () => {
+      const res = await sendPasswordResetEmail('email');
       expect(res).toBeDefined();
     });
 
-    it("should throw error if user email not found", async () => {
+    it('should throw error if user email not found', async () => {
       (UserModel.findOne as jest.Mock).mockResolvedValueOnce(null);
-      await expect(sendPasswordResetEmail("email")).rejects.toThrow(
-        new AppError("User with this email does not exist", NOT_FOUND)
+      await expect(sendPasswordResetEmail('email')).rejects.toThrow(
+        new AppError('User with this email does not exist', NOT_FOUND)
       );
     });
 
-    it("should throw error if user send too many requests within 5m", async () => {
-      (VerificationCodeModel.countDocuments as jest.Mock).mockResolvedValueOnce(
-        2
-      );
-      await expect(sendPasswordResetEmail("email")).rejects.toThrow(
-        new AppError(
-          "Too many requests. Please try again later.",
-          TOO_MANY_REQUESTS
-        )
+    it('should throw error if user send too many requests within 5m', async () => {
+      (VerificationCodeModel.countDocuments as jest.Mock).mockResolvedValueOnce(2);
+      await expect(sendPasswordResetEmail('email')).rejects.toThrow(
+        new AppError('Too many requests. Please try again later.', TOO_MANY_REQUESTS)
       );
     });
 
-    it("should throw error if send email failed", async () => {
-      (sendMail as jest.Mock).mockResolvedValue({ error: "error" });
-      await expect(sendPasswordResetEmail("email")).rejects.toThrow(AppError);
-      await expect(sendPasswordResetEmail("email")).rejects.toHaveProperty(
-        "statusCode",
+    it('should throw error if send email failed', async () => {
+      (sendMail as jest.Mock).mockResolvedValue({ error: 'error' });
+      await expect(sendPasswordResetEmail('email')).rejects.toThrow(AppError);
+      await expect(sendPasswordResetEmail('email')).rejects.toHaveProperty(
+        'statusCode',
         INTERNAL_SERVER_ERROR
       );
     });
   });
 
-  describe("Reset Password", () => {
-    it("should reset password success", async () => {
+  describe('Reset Password', () => {
+    it('should reset password success', async () => {
       const res = await resetPassword({
-        verificationCode: "code1",
-        password: "123",
+        verificationCode: 'code1',
+        password: '123',
       });
       expect(res).toBeDefined();
     });
 
-    it("should throw error if code not found", async () => {
+    it('should throw error if code not found', async () => {
       (VerificationCodeModel.findOne as jest.Mock).mockResolvedValueOnce(null);
-      await expect(
-        resetPassword({ verificationCode: "code1", password: "123" })
-      ).rejects.toThrow(
-        new AppError("Invalid or expired verification code", NOT_FOUND)
+      await expect(resetPassword({ verificationCode: 'code1', password: '123' })).rejects.toThrow(
+        new AppError('Invalid or expired verification code', NOT_FOUND)
       );
     });
 
-    it("should throw error if update user failed", async () => {
+    it('should throw error if update user failed', async () => {
       (UserModel.findByIdAndUpdate as jest.Mock).mockResolvedValueOnce(null);
-      await expect(
-        resetPassword({ verificationCode: "code1", password: "123" })
-      ).rejects.toThrow(
-        new AppError("Failed to reset password", INTERNAL_SERVER_ERROR)
+      await expect(resetPassword({ verificationCode: 'code1', password: '123' })).rejects.toThrow(
+        new AppError('Failed to reset password', INTERNAL_SERVER_ERROR)
       );
     });
   });
