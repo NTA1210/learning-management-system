@@ -28,6 +28,7 @@ import { snapShotQuestion } from '@/validators/quiz.schemas';
 import { AttemptStatus } from '@/types';
 import { SubmissionStatus } from '@/types/submission.type';
 import { AttendanceStatus } from '@/types/attendance.type';
+import { isTeacherOfCourse } from './helpers/quizHelpers';
 
 // ====================================
 // HELPER FUNCTIONS FOR LOGO MANAGEMENT
@@ -1337,15 +1338,21 @@ export const getQuizzes = async (
  * @returns Khoa học hoàn thành
  */
 
-export const completeCourse = async (courseId: string) => {
+export const completeCourse = async (
+  courseId: string,
+  userId: mongoose.Types.ObjectId,
+  role: Role
+) => {
   // 1. Load course (lean for plain object)
-  const course = await CourseModel.findById(courseId)
-    .populate([
-      { path: 'semesterId', select: 'name year type' },
-      { path: 'teacherIds', select: 'username fullname avatar_url' },
-    ])
-    .lean();
+  const course = await CourseModel.findById(courseId).populate([
+    { path: 'semesterId', select: 'name year type' },
+    { path: 'teacherIds', select: 'username fullname avatar_url' },
+  ]);
   appAssert(course, NOT_FOUND, 'Course not found');
+
+  if (role === Role.TEACHER) {
+    appAssert(isTeacherOfCourse(course, userId), FORBIDDEN, 'You are not a teacher of this course');
+  }
 
   // If already completed, error
   // appAssert(course.status !== CourseStatus.COMPLETED, BAD_REQUEST, 'Course is completed');
@@ -1769,11 +1776,11 @@ export const completeCourse = async (courseId: string) => {
       enrollmentId: s._id,
       student: s.student
         ? {
-          _id: s.student._id,
-          username: s.student.username,
-          fullname: s.student.fullname,
-          avatar_url: s.student.avatar_url,
-        }
+            _id: s.student._id,
+            username: s.student.username,
+            fullname: s.student.fullname,
+            avatar_url: s.student.avatar_url,
+          }
         : null,
       progress: {
         lessons: {
@@ -1874,32 +1881,32 @@ export const completeCourse = async (courseId: string) => {
   const totalStudents = studentsOut.length;
   const averageFinalGrade = totalStudents
     ? Math.round((studentsOut.reduce((acc, x) => acc + x.finalGrade, 0) / totalStudents) * 100) /
-    100
+      100
     : 0;
   const droppedCount = studentsOut.filter((s) => s.status === EnrollmentStatus.DROPPED).length;
   const passCount = studentsOut.filter((s) => s.status !== EnrollmentStatus.DROPPED).length;
   const averageAttendance = totalStudents
     ? Math.round(
-      (studentsOut.reduce(
-        (acc, x) => acc + x.progress.attendance.present / (x.progress.attendance.total || 1),
-        0
-      ) /
-        totalStudents) *
-      100
-    )
+        (studentsOut.reduce(
+          (acc, x) => acc + x.progress.attendance.present / (x.progress.attendance.total || 1),
+          0
+        ) /
+          totalStudents) *
+          100
+      )
     : 0;
   const averageQuizScore = totalStudents
     ? Math.round(
-      (studentsOut.reduce((acc, x) => acc + (x.progress.quizzes.score || 0), 0) / totalStudents) *
-      100
-    ) / 100
+        (studentsOut.reduce((acc, x) => acc + (x.progress.quizzes.score || 0), 0) / totalStudents) *
+          100
+      ) / 100
     : 0;
   const averageAssignmentScore = totalStudents
     ? Math.round(
-      (studentsOut.reduce((acc, x) => acc + (x.progress.assignments.score || 0), 0) /
-        totalStudents) *
-      100
-    ) / 100
+        (studentsOut.reduce((acc, x) => acc + (x.progress.assignments.score || 0), 0) /
+          totalStudents) *
+          100
+      ) / 100
     : 0;
 
   const summary = {
@@ -1981,9 +1988,7 @@ export const getCourseStatistics = async (
 
   // Check permission: Teacher can only view statistics of their own course
   if (userRole === Role.TEACHER) {
-    const isTeacherOfCourse = course.teacherIds.some((teacher: any) =>
-      teacher._id.equals(userId)
-    );
+    const isTeacherOfCourse = course.teacherIds.some((teacher: any) => teacher._id.equals(userId));
     appAssert(
       isTeacherOfCourse,
       FORBIDDEN,
@@ -2021,11 +2026,11 @@ export const getCourseStatistics = async (
     enrollmentId: enrollment._id,
     student: enrollment.studentId
       ? {
-        _id: enrollment.studentId._id,
-        username: enrollment.studentId.username,
-        fullname: enrollment.studentId.fullname,
-        avatar_url: enrollment.studentId.avatar_url,
-      }
+          _id: enrollment.studentId._id,
+          username: enrollment.studentId.username,
+          fullname: enrollment.studentId.fullname,
+          avatar_url: enrollment.studentId.avatar_url,
+        }
       : null,
     progress: {
       lessons: {
@@ -2034,8 +2039,8 @@ export const getCourseStatistics = async (
         percent:
           enrollment.progress?.totalLessons > 0
             ? Math.round(
-              (enrollment.progress.completedLessons / enrollment.progress.totalLessons) * 100
-            )
+                (enrollment.progress.completedLessons / enrollment.progress.totalLessons) * 100
+              )
             : 0,
       },
       quizzes: {
