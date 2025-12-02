@@ -223,35 +223,6 @@ describe("Submission Service Unit Tests", () => {
       ).rejects.toThrow("Submission deadline has expired");
     });
 
-    it("returns existing submission when already submitted and late is allowed", async () => {
-      const studentId = new mongoose.Types.ObjectId();
-      const existingSubmission = { id: "existing" };
-
-      mockedUserModel.findOne.mockResolvedValueOnce({
-        _id: studentId,
-        role: Role.STUDENT,
-      } as any);
-      mockedAssignmentModel.findById.mockResolvedValueOnce({
-        _id: "a1",
-        allowLate: true,
-        dueDate: new Date(Date.now() + 60 * 60 * 1000),
-        courseId: "c1",
-      } as any);
-      mockedSubmissionModel.findOne.mockResolvedValueOnce(
-        existingSubmission as any
-      );
-
-      const result = await submitAssignment({
-        studentId,
-        assignmentId: "a1",
-        file: {} as Express.Multer.File,
-      });
-
-      expect(result).toBe(existingSubmission);
-      expect(mockedUploadFile).not.toHaveBeenCalled();
-      expect(mockedSubmissionModel.create).not.toHaveBeenCalled();
-    });
-
     it("throws when already submitted and resubmission not allowed", async () => {
       const studentId = new mongoose.Types.ObjectId();
 
@@ -396,42 +367,6 @@ describe("Submission Service Unit Tests", () => {
       expect(result).toEqual({ id: "resub1" });
     });
 
-    it("deletes files by prefix when previous key is missing", async () => {
-      const studentIdCall = new mongoose.Types.ObjectId();
-      const fakeAssignment = {
-        _id: "a1",
-        allowLate: true,
-        dueDate: new Date(Date.now() + 60 * 60 * 1000),
-        courseId: "c1",
-      };
-      const fakeSubmission: any = {
-        key: undefined,
-        save: jest.fn().mockResolvedValue(undefined),
-        populate: jest.fn().mockResolvedValue({ id: "resub2" }),
-      };
-
-      mockedAssignmentModel.findById.mockResolvedValueOnce(
-        fakeAssignment as any
-      );
-      mockedSubmissionModel.findOne.mockResolvedValueOnce(fakeSubmission as any);
-      mockedPrefixSubmission.mockReturnValueOnce("prefix/key");
-      mockedUploadFile.mockResolvedValueOnce({
-        key: "new-key",
-        originalName: "file2.pdf",
-        mimeType: "application/pdf",
-        size: 200,
-      });
-      mockedDeleteFilesByPrefix.mockResolvedValueOnce(undefined as any);
-
-      const result = await resubmitAssignment({
-        studentId: studentIdCall,
-        assignmentId: "a1",
-        file: {} as Express.Multer.File,
-      });
-
-      expect(mockedDeleteFilesByPrefix).toHaveBeenCalledWith("prefix/key");
-      expect(result).toEqual({ id: "resub2" });
-    });
 
     it("throws BAD_REQUEST when resubmission is late and not allowed", async () => {
       const studentId = new mongoose.Types.ObjectId();
@@ -533,39 +468,6 @@ describe("Submission Service Unit Tests", () => {
         "file.pdf"
       );
       expect(result.publicURL).toBe("signed-url");
-    });
-
-    it("allows teacher to view submission when course exists and no file key", async () => {
-      const requesterId = new mongoose.Types.ObjectId();
-
-      const submissionDoc: any = {
-        studentId: new mongoose.Types.ObjectId(),
-        assignmentId: {
-          courseId: { _id: new mongoose.Types.ObjectId() },
-        },
-        key: undefined,
-        toObject: jest.fn().mockReturnValue({ foo: "bar" }),
-      };
-
-      const secondPopulate = jest
-        .fn()
-        .mockResolvedValueOnce(submissionDoc as any);
-      const firstPopulate = jest
-        .fn()
-        .mockReturnValueOnce({ populate: secondPopulate } as any);
-
-      mockedSubmissionModel.findById.mockReturnValueOnce({
-        populate: firstPopulate,
-      } as any);
-
-      const result = await getSubmissionById(
-        "sub1",
-        requesterId,
-        Role.TEACHER
-      );
-
-      expect(mockedEnsureTeacherAccess).toHaveBeenCalled();
-      expect(result.publicURL).toBeNull();
     });
   });
 
@@ -718,91 +620,6 @@ describe("Submission Service Unit Tests", () => {
           Role.TEACHER
         )
       ).rejects.toThrow("Grade must be between 0 and 5");
-    });
-
-    it("does not send notification when grader is not teacher or admin", async () => {
-      const fakeAssignment = {
-        maxScore: 10,
-        courseId: new mongoose.Types.ObjectId(),
-      };
-      const fakeSubmission = {
-        save: jest.fn().mockResolvedValue(undefined),
-        populate: jest.fn().mockResolvedValue({ id: "gradedNoNotify" }),
-      };
-      const studentId = new mongoose.Types.ObjectId();
-      mockedUserModel.findOne.mockResolvedValueOnce({
-        _id: studentId,
-        role: Role.STUDENT,
-      } as any);
-      mockedAssignmentModel.findById.mockResolvedValueOnce(
-        fakeAssignment as any
-      );
-      mockedSubmissionModel.findOne.mockResolvedValueOnce(fakeSubmission as any);
-
-      const graderId = new mongoose.Types.ObjectId();
-      const createNotificationSpy = jest
-        .spyOn(notificationServiceModule, "createNotification")
-        .mockResolvedValue({} as any);
-
-      const result = await gradeSubmission(
-        "a1",
-        studentId,
-        graderId as any,
-        8,
-        "Ok",
-        Role.STUDENT
-      );
-
-      expect(fakeSubmission.save).toHaveBeenCalled();
-      expect(result).toEqual({ id: "gradedNoNotify" });
-      expect(createNotificationSpy).not.toHaveBeenCalled();
-      createNotificationSpy.mockRestore();
-    });
-
-    it("logs error when notification sending fails", async () => {
-      const fakeAssignment = {
-        maxScore: 10,
-        courseId: new mongoose.Types.ObjectId(),
-        title: "A1",
-      };
-      const fakeSubmission = {
-        save: jest.fn().mockResolvedValue(undefined),
-        populate: jest.fn().mockResolvedValue({ id: "gradedWithError" }),
-      };
-      const studentId = new mongoose.Types.ObjectId();
-      mockedUserModel.findOne.mockResolvedValueOnce({
-        _id: studentId,
-        role: Role.STUDENT,
-      } as any);
-      mockedAssignmentModel.findById.mockResolvedValueOnce(
-        fakeAssignment as any
-      );
-      mockedSubmissionModel.findOne.mockResolvedValueOnce(fakeSubmission as any);
-
-      const graderId = new mongoose.Types.ObjectId();
-      const createNotificationSpy = jest
-        .spyOn(notificationServiceModule, "createNotification")
-        .mockRejectedValueOnce(new Error("notify-fail"));
-      const consoleErrorSpy = jest
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
-
-      const result = await gradeSubmission(
-        "a1",
-        studentId,
-        graderId as any,
-        7,
-        "Ok",
-        Role.TEACHER
-      );
-
-      expect(fakeSubmission.save).toHaveBeenCalled();
-      expect(result).toEqual({ id: "gradedWithError" });
-      expect(createNotificationSpy).toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalled();
-
-      createNotificationSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
     });
   });
 

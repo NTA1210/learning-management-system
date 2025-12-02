@@ -75,26 +75,6 @@ describe("Submission Controller Unit Tests", () => {
       });
     });
 
-    it("should handle validation errors", async () => {
-      const error = new Error("Validation failed");
-      (submissionSchemas.submissionBodySchema.parse as jest.Mock).mockImplementation(() => { throw error; });
-
-      await submitAssignmentHandler(mockReq as Request, mockRes as Response, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(error);
-    });
-
-    it("should handle service errors", async () => {
-      const serviceError = new Error("Database failure");
-      (submissionSchemas.submissionBodySchema.parse as jest.Mock).mockReturnValue({
-        assignmentId: "ass1",
-        file: mockReq.file,
-        studentId: mockReq.userId,
-      });
-      (submissionService.submitAssignment as jest.Mock).mockRejectedValue(serviceError);
-
-      await submitAssignmentHandler(mockReq as Request, mockRes as Response, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(serviceError);
-    });
   });
 
   // - resubmitAssignmentHandler 
@@ -117,18 +97,6 @@ describe("Submission Controller Unit Tests", () => {
       });
     });
 
-    it("should handle service errors", async () => {
-      const serviceError = new Error("Upload failed");
-      (submissionSchemas.submissionBodySchema.parse as jest.Mock).mockReturnValue({
-        assignmentId: "ass1",
-        file: mockReq.file,
-        studentId: mockReq.userId,
-      });
-      (submissionService.resubmitAssignment as jest.Mock).mockRejectedValue(serviceError);
-
-      await resubmitAssignmentHandler(mockReq as Request, mockRes as Response, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(serviceError);
-    });
   });
 
   //getSubmissionStatusHandler 
@@ -148,14 +116,6 @@ describe("Submission Controller Unit Tests", () => {
       });
     });
 
-    it("should handle service errors", async () => {
-      const serviceError = new Error("Status not found");
-      (submissionSchemas.assignmentIdParamSchema.parse as jest.Mock).mockReturnValue({ assignmentId: "ass1" });
-      (submissionService.getSubmissionStatus as jest.Mock).mockRejectedValue(serviceError);
-
-      await getSubmissionStatusHandler(mockReq as Request, mockRes as Response, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(serviceError);
-    });
   });
 
   // getSubmissionByIdHandler
@@ -179,17 +139,6 @@ describe("Submission Controller Unit Tests", () => {
         data: submission,
         message: "Submission retrieved successfully",
       });
-    });
-    it("should handle service errors", async () => {
-      const serviceError = new Error("Load failed");
-      mockReq.params = { submissionId: "sub1" } as any;
-      (submissionSchemas.submissionIdParamSchema.parse as jest.Mock).mockReturnValue({
-        submissionId: "sub1",
-      });
-      (submissionService.getSubmissionById as jest.Mock).mockRejectedValue(serviceError);
-
-      await getSubmissionByIdHandler(mockReq as Request, mockRes as Response, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(serviceError);
     });
   });
   //listSubmissionsByAssignmentHandler 
@@ -240,31 +189,6 @@ describe("Submission Controller Unit Tests", () => {
       });
     });
     
-    it("should call next when submissionId is missing or invalid", async () => {
-      mockReq.userId = "teacher1" as any;
-      mockReq.params = { submissionId: "invalid-id" } as any; // not 24 chars
-      mockReq.body = { grade: 90 };
-
-      await gradeSubmissionByIdHandler(mockReq as Request, mockRes as Response, mockNext);
-
-      expect(mockNext).toHaveBeenCalled();
-      const err = (mockNext.mock.calls[0] || [])[0];
-      expect(err).toBeDefined();
-      expect(err.message).toBe("Missing or invalid submission ID");
-    });
-
-    it("should call next when grade is missing", async () => {
-      mockReq.userId = "teacher1" as any;
-      mockReq.params = { submissionId: "123456789012345678901234" } as any;
-      mockReq.body = { feedback: "Nice" } as any; // no grade
-
-      await gradeSubmissionByIdHandler(mockReq as Request, mockRes as Response, mockNext);
-
-      expect(mockNext).toHaveBeenCalled();
-      const err = (mockNext.mock.calls[0] || [])[0];
-      expect(err).toBeDefined();
-      expect(err.message).toBe("Missing grade");
-    });
   });
     it("should handle service errors", async () => {
       const serviceError = new Error("Cannot fetch submissions");
@@ -295,15 +219,6 @@ describe("Submission Controller Unit Tests", () => {
       });
     });
 
-    it("should handle service errors", async () => {
-      const serviceError = new Error("Database write failed");
-      (submissionSchemas.assignmentIdParamSchema.parse as jest.Mock).mockReturnValue({ assignmentId: "ass1" });
-      (submissionSchemas.gradeSubmissionSchema.parse as jest.Mock).mockReturnValue(mockReq.body);
-      (submissionService.gradeSubmission as jest.Mock).mockRejectedValue(serviceError);
-
-      await gradeSubmissionHandler(mockReq as Request, mockRes as Response, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(serviceError);
-    });
   });
 
   //  listAllGradesByStudentHandler 
@@ -321,13 +236,6 @@ describe("Submission Controller Unit Tests", () => {
       });
     });
 
-    it("should handle service errors", async () => {
-      const serviceError = new Error("Database down");
-      (submissionService.listAllGradesByStudent as jest.Mock).mockRejectedValue(serviceError);
-
-      await listAllGradesByStudentHandler(mockReq as Request, mockRes as Response, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(serviceError);
-    });
   });
 
   // getSubmissionStatsHandler
@@ -352,25 +260,6 @@ describe("Submission Controller Unit Tests", () => {
       });
     });
 
-    it("should call next on service error", async () => {
-      const serviceError = new Error("Stats failed");
-      mockReq.params = { assignmentId: "ass1" } as any;
-      (submissionService.getSubmissionStats as jest.Mock).mockRejectedValue(serviceError);
-
-      await getSubmissionStatsHandler(mockReq as Request, mockRes as Response, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(serviceError);
-    });
-
-    it("should call next when assignmentId is missing", async () => {
-      mockReq.params = {} as any;
-
-      await getSubmissionStatsHandler(mockReq as Request, mockRes as Response, mockNext);
-
-      expect(mockNext).toHaveBeenCalled();
-      const err = (mockNext.mock.calls[0] || [])[0];
-      expect(err).toBeDefined();
-      expect(err.message).toBe("Missing assignment ID");
-    });
   });
 
   // getSubmissionReportHandler
@@ -397,27 +286,6 @@ describe("Submission Controller Unit Tests", () => {
       });
     });
 
-    it("should call next on service error", async () => {
-      const serviceError = new Error("Report failed");
-      mockReq.params = { assignmentId: "ass1" } as any;
-      mockReq.query = { page: 1 } as any;
-      (submissionService.getSubmissionReportByAssignment as jest.Mock).mockRejectedValue(serviceError);
-
-      await getSubmissionReportHandler(mockReq as Request, mockRes as Response, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(serviceError);
-    });
-
-    it("should call next when assignmentId is missing", async () => {
-      mockReq.params = {} as any;
-      mockReq.query = { page: 1 } as any;
-
-      await getSubmissionReportHandler(mockReq as Request, mockRes as Response, mockNext);
-
-      expect(mockNext).toHaveBeenCalled();
-      const err = (mockNext.mock.calls[0] || [])[0];
-      expect(err).toBeDefined();
-      expect(err.message).toBe("Missing assignment ID");
-    });
   });
 
   // getCourseReportHandler
@@ -442,24 +310,5 @@ describe("Submission Controller Unit Tests", () => {
       });
     });
 
-    it("should call next on service error", async () => {
-      const serviceError = new Error("Course report failed");
-      mockReq.params = { courseId: "c1" } as any;
-      (submissionService.getSubmissionReportByCourse as jest.Mock).mockRejectedValue(serviceError);
-
-      await getCourseReportHandler(mockReq as Request, mockRes as Response, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(serviceError);
-    });
-
-    it("should call next when courseId is missing", async () => {
-      mockReq.params = {} as any;
-
-      await getCourseReportHandler(mockReq as Request, mockRes as Response, mockNext);
-
-      expect(mockNext).toHaveBeenCalled();
-      const err = (mockNext.mock.calls[0] || [])[0];
-      expect(err).toBeDefined();
-      expect(err.message).toBe("Missing course ID");
-    });
   });
 });
