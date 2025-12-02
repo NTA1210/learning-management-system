@@ -119,7 +119,7 @@ function AppRoutes() {
         <Route
           path="/my-courses"
           element={
-            <ProtectedRoute requiredRole="student">
+            <ProtectedRoute>
               <MyCoursesPage />
             </ProtectedRoute>
           }
