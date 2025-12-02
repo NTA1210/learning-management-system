@@ -197,7 +197,7 @@ describe("📎 LessonMaterial Controller Unit Tests", () => {
     (schemas.UpdateLessonMaterialSchema.parse as jest.Mock).mockReturnValue({ title: "New" });
     (service.updateLessonMaterial as jest.Mock).mockResolvedValue({ _id: id, title: "New" });
     await updateLessonMaterialController(req as Request, res as Response, next);
-      expect(service.updateLessonMaterial).toHaveBeenCalledWith(id, { title: "New" }, req.userId, req.role);
+      expect(service.updateLessonMaterial).toHaveBeenCalledWith(id, { title: "New" }, undefined, req.userId, req.role);
       expect(res.success).toHaveBeenCalledWith(200, {
         data: { _id: id, title: "New" },
         message: "Update lesson material successfully"

@@ -114,12 +114,65 @@ describe("⏳ LessonProgress Service Unit Tests", () => {
     });
 
     it("rejects teacher updating time", async () => {
-      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.lesson, courseId: { _id: ids.course } }) }) });
-      await expect(addTimeForLesson(ids.lesson.toString(), 10, ids.teacher, Role.TEACHER)).rejects.toThrow("Teacher cannot update student's time");
+      (LessonModel.findById as any).mockReturnValue({
+        populate: jest.fn().mockReturnValue({
+          lean: jest
+            .fn()
+            .mockResolvedValue({
+              _id: ids.lesson,
+              courseId: { _id: ids.course },
+            }),
+        }),
+      });
+      await expect(
+        addTimeForLesson(ids.lesson.toString(), 10, ids.teacher, Role.TEACHER)
+      ).rejects.toThrow("Teacher cannot update student progress");
+    });
+
+    it("rejects when incSeconds exceeds real elapsed time multiplier", async () => {
+      (LessonModel.findById as any).mockReturnValue({
+        populate: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue({
+            _id: ids.lesson,
+            courseId: { _id: ids.course },
+            durationMinutes: 5,
+          }),
+        }),
+      });
+      (EnrollmentModel.exists as any).mockResolvedValue(true);
+
+      // 20 seconds since last access -> HEARTBEAT_MIN_INTERVAL satisfied,
+      // but MAX_TIME_MULTIPLIER (1.3) makes maxAllowed = floor(20 * 1.3) = 26
+      const lastAccessedAt = new Date(Date.now() - 20 * 1000);
+      (LessonProgressModel.findOne as any).mockReturnValue({
+        lean: jest.fn().mockResolvedValue({
+          lessonId: ids.lesson,
+          courseId: ids.course,
+          studentId: ids.student,
+          timeSpentSeconds: 30,
+          lastAccessedAt,
+        }),
+      });
+
+      await expect(
+        addTimeForLesson(ids.lesson.toString(), 40, ids.student, Role.STUDENT)
+      ).rejects.toThrow("Time increment exceeds real elapsed time"); 
     });
 
     it("admin can update time", async () => {
-      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue({ _id: ids.lesson, courseId: { _id: ids.course }, durationMinutes: 10 }) }) });
+      (LessonModel.findById as any).mockReturnValue({
+        populate: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue({
+            _id: ids.lesson,
+            courseId: { _id: ids.course },
+            durationMinutes: 10,
+          }),
+        }),
+      });
+      // No existing progress -> skip heartbeat / anti-cheat branch
+      (LessonProgressModel.findOne as any).mockReturnValue({
+        lean: jest.fn().mockResolvedValue(null),
+      });
       const progressDoc = {
         toObject: () => ({ lessonId: ids.lesson, courseId: ids.course, studentId: ids.admin, timeSpentSeconds: 60, isCompleted: false }),
         save: jest.fn(),
