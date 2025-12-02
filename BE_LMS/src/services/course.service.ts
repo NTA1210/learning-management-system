@@ -1294,7 +1294,7 @@ export const getMyCourses = async ({
  * @throws If courseId is not provided for students.
  */
 export const getQuizzes = async (
-  { courseId, isPublished, isCompleted, isDeleted, page = 1, limit = 10, search }: GetQuizzes,
+  { courseId, isPublished, isCompleted, page = 1, limit = 10, search }: GetQuizzes,
   role: string
 ) => {
   const filter: any = {};
@@ -1305,16 +1305,11 @@ export const getQuizzes = async (
 
   if (role === Role.STUDENT) {
     filter.isPublished = true;
-    filter.deletedAt = null;
   } else {
     if (isPublished !== undefined) filter.isPublished = isPublished;
     if (isCompleted !== undefined) {
       if (isCompleted) filter.endTime = { $gte: new Date() };
       else filter.endTime = { $lt: new Date() };
-    }
-    if (isDeleted !== undefined) {
-      if (isDeleted) filter.deletedAt = { $ne: null };
-      else filter.deletedAt = null;
     }
   }
 
