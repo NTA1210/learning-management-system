@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { useTheme } from "../hooks/useTheme";
@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   Edit3,
   Trash2,
-  Eye,
   X,
   PlusCircle,
   Pin,
@@ -50,7 +49,6 @@ const getFirstImageUrl = (files?: string[]): string | null => {
 
 const ForumDetailPage: React.FC = () => {
   const { forumId = "" } = useParams();
-  const navigate = useNavigate();
   const { darkMode } = useTheme();
   const { user } = useAuth();
 
@@ -225,10 +223,7 @@ const ForumDetailPage: React.FC = () => {
     }
   };
 
-  const openPostDetail = (postId: string) => {
-    if (!forumId) return;
-    navigate(`/forums/${forumId}/posts/${postId}`);
-  };
+
 
   const openEditPost = (post: ForumPost) => {
     if (!canManagePosts) return;
@@ -402,19 +397,19 @@ const ForumDetailPage: React.FC = () => {
                           )}
                           <div className="relative z-10 flex items-center gap-3 w-full">
                             <MessageSquare className={`w-4 h-4 ${hasBackgroundImage
-                                ? "text-indigo-200"
-                                : "text-indigo-500"
+                              ? "text-indigo-200"
+                              : "text-indigo-500"
                               }`} />
                             <div className="flex flex-col">
                               <span className={`text-[11px] uppercase tracking-wide font-semibold ${hasBackgroundImage
-                                  ? "text-indigo-200 drop-shadow"
-                                  : "text-indigo-500"
+                                ? "text-indigo-200 drop-shadow"
+                                : "text-indigo-500"
                                 }`}>
                                 Discussion topic
                               </span>
                               <span className={`text-sm font-semibold ${hasBackgroundImage
-                                  ? "text-white drop-shadow"
-                                  : "text-slate-900 dark:text-slate-100"
+                                ? "text-white drop-shadow"
+                                : "text-slate-900 dark:text-slate-100"
                                 }`}>
                                 {forum.title}
                               </span>
@@ -460,21 +455,21 @@ const ForumDetailPage: React.FC = () => {
                           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                             <div>
                               <p className={`text-xs uppercase tracking-wide font-semibold flex items-center gap-2 ${hasBackgroundImage
-                                  ? "text-indigo-200 drop-shadow"
-                                  : "text-indigo-500"
+                                ? "text-indigo-200 drop-shadow"
+                                : "text-indigo-500"
                                 }`}>
                                 <MessageSquare className="w-4 h-4" />
                                 {forum.forumType === "announcement" ? "Announcement" : "Discussion"}
                               </p>
                               <h1 className={`text-3xl font-bold mt-2 ${hasBackgroundImage
-                                  ? "text-white drop-shadow-lg"
-                                  : ""
+                                ? "text-white drop-shadow-lg"
+                                : ""
                                 }`}>
                                 {forum.title}
                               </h1>
                               <p className={`mt-3 ${hasBackgroundImage
-                                  ? "text-white/90 drop-shadow"
-                                  : "text-slate-500 dark:text-slate-300"
+                                ? "text-white/90 drop-shadow"
+                                : "text-slate-500 dark:text-slate-300"
                                 }`}>
                                 {forum.description}
                               </p>
@@ -482,12 +477,12 @@ const ForumDetailPage: React.FC = () => {
                             <div className="flex items-center gap-3 text-xs font-semibold">
                               <span
                                 className={`inline-flex items-center gap-2 rounded-full px-3 py-1 ${hasBackgroundImage
-                                    ? forum.isActive
-                                      ? "bg-emerald-500/90 text-white backdrop-blur-sm"
-                                      : "bg-rose-500/90 text-white backdrop-blur-sm"
-                                    : forum.isActive
-                                      ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-200"
-                                      : "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-200"
+                                  ? forum.isActive
+                                    ? "bg-emerald-500/90 text-white backdrop-blur-sm"
+                                    : "bg-rose-500/90 text-white backdrop-blur-sm"
+                                  : forum.isActive
+                                    ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-200"
+                                    : "bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-200"
                                   }`}
                               >
                                 <ShieldCheck className="w-3.5 h-3.5" />
@@ -496,14 +491,14 @@ const ForumDetailPage: React.FC = () => {
                             </div>
                           </div>
                           <div className={`mt-4 grid gap-3 text-xs sm:grid-cols-2 ${hasBackgroundImage
-                              ? "text-white/80"
-                              : "text-slate-500 dark:text-slate-400"
+                            ? "text-white/80"
+                            : "text-slate-500 dark:text-slate-400"
                             }`}>
                             {forum.createdAt && (
                               <span className="inline-flex items-center gap-2">
                                 <Clock3 className={`w-3.5 h-3.5 ${hasBackgroundImage
-                                    ? "text-indigo-200"
-                                    : "text-indigo-400"
+                                  ? "text-indigo-200"
+                                  : "text-indigo-400"
                                   }`} />
                                 Created: {formatDate(forum.createdAt)}
                               </span>
@@ -511,8 +506,8 @@ const ForumDetailPage: React.FC = () => {
                             {forum.updatedAt && (
                               <span className="inline-flex items-center gap-2">
                                 <RefreshCcw className={`w-3.5 h-3.5 ${hasBackgroundImage
-                                    ? "text-indigo-200"
-                                    : "text-indigo-400"
+                                  ? "text-indigo-200"
+                                  : "text-indigo-400"
                                   }`} />
                                 Updated: {formatDate(forum.updatedAt)}
                               </span>
@@ -586,104 +581,104 @@ const ForumDetailPage: React.FC = () => {
                               className={`rounded-3xl p-5 shadow-sm border ${darkMode ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-100"
                                 }`}
                             >
-                              <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                                <span className="font-semibold">{formatDate(post.createdAt)}</span>
-                                {post.pinned && (
-                                  <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold bg-amber-50 text-amber-700 text-[11px]">
-                                    Pinned
-                                  </span>
-                                )}
-                                <span className="ml-auto text-sm text-blue-400  text-slate-800">{post.replyCount ?? 0} replies</span>
-                              </div>
-                              <div className="mt-3 flex flex-wrap gap-3 justify-between">
-                                <div className="space-y-2 flex-1 min-w-[200px]">
-                                  <h3 className="text-3xl font-semibold">{post.title}</h3>
-                                  <div className="text-sm text-slate-600 dark:text-slate-300 line-clamp-2">
-                                    <MarkdownContent content={post.content} onImageClick={handleImagePreview} />
-                                  </div>
-                                  <AttachmentPreview
-                                    files={post.key}
-                                    size="sm"
-                                    onImageClick={handleImagePreview}
-                                    caption={post.title}
-                                  />
-                                  {post.author ? (
-                                    <div className="flex items-center gap-2 mt-2">
-                                      <div
-                                        className={`h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden text-[10px] ${darkMode ? "ring-1 ring-indigo-500/40 text-indigo-100" : "ring-1 ring-indigo-100"
-                                          }`}
-                                      >
-                                        {post.author.avatar_url ? (
-                                          <img
-                                            src={post.author.avatar_url}
-                                            alt={post.author.fullname || post.author.username || "User avatar"}
-                                            className="h-full w-full object-cover"
-                                          />
-                                        ) : (
-                                          (post.author.fullname || post.author.username || "U")
-                                            .split(/\s+/)
-                                            .map((segment) => segment[0]?.toUpperCase())
-                                            .slice(0, 2)
-                                            .join("") || "U"
-                                        )}
-                                      </div>
-                                      <div className="flex flex-col">
-                                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                                          {post.author.fullname || post.author.username || 'Unknown User'}
-                                        </p>
-                                        {post.author.role && (
-                                          <p className="text-[10px] text-slate-400 capitalize">
-                                            {post.author.role}
+                              <Link to={`/forums/${forumId}/posts/${post._id}`} className="block">
+                                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                                  <span className="font-semibold">{formatDate(post.createdAt)}</span>
+                                  {post.pinned && (
+                                    <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold bg-amber-50 text-amber-700 text-[11px]">
+                                      Pinned
+                                    </span>
+                                  )}
+                                  <span className="ml-auto text-sm text-blue-400  text-slate-800">{post.replyCount ?? 0} replies</span>
+                                </div>
+                                <div className="mt-3 flex flex-wrap gap-3 justify-between">
+                                  <div className="space-y-2 flex-1 min-w-[200px]">
+                                    <h3 className="text-3xl font-semibold cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">{post.title}</h3>
+                                    <div className="text-sm text-slate-600 dark:text-slate-300 line-clamp-2">
+                                      <MarkdownContent content={post.content} onImageClick={handleImagePreview} />
+                                    </div>
+                                    <AttachmentPreview
+                                      files={post.key}
+                                      size="sm"
+                                      onImageClick={handleImagePreview}
+                                      caption={post.title}
+                                    />
+                                    {post.author ? (
+                                      <div className="flex items-center gap-2 mt-2">
+                                        <div
+                                          className={`h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden text-[10px] ${darkMode ? "ring-1 ring-indigo-500/40 text-indigo-100" : "ring-1 ring-indigo-100"
+                                            }`}
+                                        >
+                                          {post.author.avatar_url ? (
+                                            <img
+                                              src={post.author.avatar_url}
+                                              alt={post.author.fullname || post.author.username || "User avatar"}
+                                              className="h-full w-full object-cover"
+                                            />
+                                          ) : (
+                                            (post.author.fullname || post.author.username || "U")
+                                              .split(/\s+/)
+                                              .map((segment) => segment[0]?.toUpperCase())
+                                              .slice(0, 2)
+                                              .join("") || "U"
+                                          )}
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                            {post.author.fullname || post.author.username || 'Unknown User'}
                                           </p>
-                                        )}
+                                          {post.author.role && (
+                                            <p className="text-[10px] text-slate-400 capitalize">
+                                              {post.author.role}
+                                            </p>
+                                          )}
+                                        </div>
                                       </div>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center gap-2 mt-2">
-                                      <div
-                                        className={`h-8 w-8 rounded-xl bg-gradient-to-br from-slate-500/15 to-slate-500/15 text-slate-600 font-semibold flex items-center justify-center uppercase tracking-wide text-[10px] ${darkMode ? "ring-1 ring-slate-500/40 text-slate-100" : "ring-1 ring-slate-100"
-                                          }`}
-                                      >
-                                        ?
+                                    ) : (
+                                      <div className="flex items-center gap-2 mt-2">
+                                        <div
+                                          className={`h-8 w-8 rounded-xl bg-gradient-to-br from-slate-500/15 to-slate-500/15 text-slate-600 font-semibold flex items-center justify-center uppercase tracking-wide text-[10px] ${darkMode ? "ring-1 ring-slate-500/40 text-slate-100" : "ring-1 ring-slate-100"
+                                            }`}
+                                        >
+                                          ?
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <p className="text-xs font-semibold text-slate-400">
+                                            Unknown User
+                                          </p>
+                                        </div>
                                       </div>
-                                      <div className="flex flex-col">
-                                        <p className="text-xs font-semibold text-slate-400">
-                                          Unknown User
-                                        </p>
-                                      </div>
-                                    </div>
-                                  )}
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => openPostDetail(post._id)}
-                                    className="h-9 w-9 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 flex items-center justify-center"
-                                    title="View post"
-                                  >
-                                    <Eye className="w-4 h-4" />
-                                  </button>
-                                  {canManagePosts && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        onClick={() => openEditPost(post)}
-                                        className="h-9 w-9 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 flex items-center justify-center"
-                                        title="Edit post"
-                                      >
-                                        <Edit3 className="w-4 h-4" />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => openDeletePostModal(post)}
-                                        className="h-9 w-9 rounded-full border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10 flex items-center justify-center"
-                                        title="Delete post"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
+                              </Link>
+                              <div className="mt-3 flex items-center gap-2 justify-end">
+                                {canManagePosts && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        openEditPost(post);
+                                      }}
+                                      className="h-9 w-9 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 flex items-center justify-center"
+                                      title="Edit post"
+                                    >
+                                      <Edit3 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        openDeletePostModal(post);
+                                      }}
+                                      className="h-9 w-9 rounded-full border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10 flex items-center justify-center"
+                                      title="Delete post"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                )}
                               </div>
                             </div>
                           );
