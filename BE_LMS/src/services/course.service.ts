@@ -283,7 +283,7 @@ export const listCourses = async ({
 
   // ✅ Add isTeacher field to each course for teacher role
   const coursesWithTeacherFlag = courses.map((course) => {
-    const isTeacher = userId
+    const isTeacherOfCourse = userId
       ? course.teacherIds.some((teacherId: any) =>
         teacherId._id?.toString() === userId.toString() ||
         teacherId.toString() === userId.toString()
@@ -292,7 +292,7 @@ export const listCourses = async ({
 
     return {
       ...course,
-      isTeacher,
+      isTeacherOfCourse,
     };
   });
 
