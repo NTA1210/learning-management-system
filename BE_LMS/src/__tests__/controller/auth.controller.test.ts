@@ -45,7 +45,7 @@ jest.mock('@/utils/jwt', () => ({
   }),
 }));
 
-import { BAD_REQUEST, NOT_FOUND, OK, UNAUTHORIZED } from '@/constants/http';
+import { CONFLICT, NOT_FOUND, OK, UNAUTHORIZED } from '@/constants/http';
 // ------------------------//----------------------------------
 import {
   loginHandler,
@@ -66,9 +66,8 @@ import {
   sendPasswordResetEmail,
   verifyEmail,
 } from '@/services/auth.service';
-import appAssert from '@/utils/appAssert';
 import AppError from '@/utils/AppError';
-import { clearAuthCookies, setAuthCookies } from '@/utils/cookies';
+import { clearAuthCookies, getRefreshTokenCookieOptions, setAuthCookies } from '@/utils/cookies';
 import { verifyToken } from '@/utils/jwt';
 import {
   emailSchema,
@@ -77,7 +76,6 @@ import {
   resetPasswordSchema,
   verificationCodeSchema,
 } from '@/validators';
-import { clear } from 'console';
 import { ZodError } from 'zod';
 
 // ------------------------//----------------------------------
@@ -100,6 +98,7 @@ describe('Auth Controller Unit Tests', () => {
     cookie: jest.fn().mockReturnThis(),
     clearCookie: jest.fn().mockReturnThis(),
   };
+  afterEach(() => jest.clearAllMocks());
 
   const mockNext = jest.fn();
 
@@ -181,24 +180,31 @@ describe('Auth Controller Unit Tests', () => {
       (registerSchema.parse as jest.Mock).mockResolvedValueOnce(mockUser);
 
       (createAccount as jest.Mock).mockRejectedValueOnce(
-        new ZodError([
-          {
-            code: 'custom',
-            message: 'User already exists',
-            path: ['email'],
-          },
-        ])
+        new AppError('Email already in use', CONFLICT)
       );
       await registerHandler(mockReq as any, mockRes as any, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(
-        new ZodError([
-          {
-            code: 'custom',
-            message: 'User already exists',
-            path: ['email'],
-          },
-        ])
+      expect(mockNext).toHaveBeenCalledWith(new AppError('Email already in use', CONFLICT));
+    });
+
+    it('should throw error if username already in use', async () => {
+      (registerSchema.parse as jest.Mock).mockResolvedValueOnce(mockUser);
+
+      (createAccount as jest.Mock).mockRejectedValueOnce(
+        new AppError('Username already in use', CONFLICT)
       );
+      await registerHandler(mockReq as any, mockRes as any, mockNext);
+      expect(mockNext).toHaveBeenCalledWith(new AppError('Username already in use', CONFLICT));
+    });
+
+    it('should pass generic error to next if createAccount fails', async () => {
+      (registerSchema.parse as jest.Mock).mockResolvedValueOnce(mockUser);
+
+      const genericError = new Error('DB connection error');
+      (createAccount as jest.Mock).mockRejectedValueOnce(genericError);
+
+      await registerHandler(mockReq as any, mockRes as any, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(genericError);
     });
   });
 
@@ -328,6 +334,28 @@ describe('Auth Controller Unit Tests', () => {
 
       expect(mockNext).toHaveBeenCalledWith(new Error('Internal server error'));
     });
+
+    it('should NOT delete session if verifyToken has no payload', async () => {
+      const mockReq = {
+        cookies: {
+          accessToken: 'token',
+          refreshToken: 'token',
+        },
+      };
+
+      // verifyToken returns no payload
+      (verifyToken as jest.Mock).mockReturnValueOnce({ payload: undefined });
+
+      (clearAuthCookies as jest.Mock).mockReturnValueOnce(mockRes);
+
+      await logoutHandler(mockReq as any, mockRes as any, mockNext);
+
+      expect(SessionModel.findByIdAndDelete).not.toHaveBeenCalled();
+      expect(clearAuthCookies).toHaveBeenCalledWith(mockRes);
+      expect(mockRes.success).toHaveBeenCalledWith(OK, {
+        message: 'Logout successfully',
+      });
+    });
   });
 
   describe('Refresh Token', () => {
@@ -363,6 +391,52 @@ describe('Auth Controller Unit Tests', () => {
       await refreshHandler(mockReqWithCookie as any, mockRes as any, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(new AppError('Missing refresh token', UNAUTHORIZED));
+    });
+
+    it('should return accessToken and refreshToken, set both cookies', async () => {
+      const mockReqWithCookie = {
+        ...mockReq,
+        cookies: { refreshToken: 'refresh-token' },
+      };
+
+      (refreshUserAccessToken as jest.Mock).mockResolvedValueOnce({
+        accessToken: 'new-access-token',
+        refreshToken: 'new-refresh-token',
+      });
+
+      (getRefreshTokenCookieOptions as jest.Mock).mockReturnValueOnce({
+        sameSite: 'strict',
+        secure: true,
+        httpOnly: true,
+        expires: '2025-11-07T03:31:13.441Z',
+        path: '/auth/refresh',
+      });
+
+      await refreshHandler(mockReqWithCookie as any, mockRes as any, mockNext);
+
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        'refreshToken',
+        'new-refresh-token',
+        expect.objectContaining({
+          httpOnly: true,
+          secure: true,
+          sameSite: 'strict',
+        })
+      );
+
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        'accessToken',
+        'new-access-token',
+        expect.objectContaining({
+          httpOnly: true,
+          secure: true,
+          sameSite: 'strict',
+        })
+      );
+
+      expect(mockRes.success).toHaveBeenCalledWith(OK, {
+        message: 'Token refreshed successfully',
+      });
     });
 
     it('should throw error if verify token fails', async () => {

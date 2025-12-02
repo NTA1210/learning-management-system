@@ -418,7 +418,7 @@ const ForumListPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleCreateForumFromList}
-                  disabled={!selectedCourseId || !canManage}
+                  disabled={!selectedCourseId}
                   className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
                 >
                   Create Forum Post

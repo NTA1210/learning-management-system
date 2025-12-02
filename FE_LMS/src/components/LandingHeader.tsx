@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useTheme } from '../hooks/useTheme';
+import { useTheme } from "../hooks/useTheme";
 
 const LandingHeader = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -11,10 +11,10 @@ const LandingHeader = () => {
   };
 
   return (
-    <header 
+    <header
       className="py-4 px-4 sticky top-0 z-50 shadow-sm transition-colors duration-300"
       style={{
-        backgroundColor: isDarkMode ? '#1f2937' : '#4f46e5'
+        backgroundColor: isDarkMode ? "#1f2937" : "#4f46e5",
       }}
     >
       <div className="max-w-[1366px] mx-auto flex items-center justify-between">
@@ -67,6 +67,12 @@ const LandingHeader = () => {
           >
             Preview
           </a>
+          <Link
+            to="/blogs"
+            className="text-[14px] font-normal leading-[21px] text-white font-poppins hover:text-gray-300 transition-colors duration-300"
+          >
+            Blogs
+          </Link>
         </nav>
 
         {/* Auth Buttons */}
@@ -109,8 +115,6 @@ const LandingHeader = () => {
 
       {/* Mobile Navigation */}
       {mobileMenuOpen && (
-
-
         <div className="md:hidden px-4 pt-2 pb-4 ">
           <a href="#home" className="block py-2 text-gray-700">
             Home
