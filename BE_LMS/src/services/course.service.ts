@@ -28,6 +28,7 @@ import { snapShotQuestion } from '@/validators/quiz.schemas';
 import { AttemptStatus } from '@/types';
 import { SubmissionStatus } from '@/types/submission.type';
 import { AttendanceStatus } from '@/types/attendance.type';
+import { isTeacherOfCourse } from './helpers/quizHelpers';
 
 // ====================================
 // HELPER FUNCTIONS FOR LOGO MANAGEMENT
@@ -89,6 +90,7 @@ export type ListCoursesParams = {
   sortBy?: string;
   sortOrder?: string;
   userRole?: Role; // ✅ FIX: Added to check permissions for viewing deleted courses
+  userId?: Types.ObjectId; // ✅ NEW: User ID for teacher check
 };
 
 /**
@@ -118,6 +120,7 @@ export const listCourses = async ({
   sortBy = 'createdAt',
   sortOrder = 'desc',
   userRole,
+  userId,
 }: ListCoursesParams) => {
   // ❌ FIX: Validate pagination parameters
   appAssert(page > 0 && page <= 10000, BAD_REQUEST, 'Page must be between 1 and 10000');
@@ -279,8 +282,24 @@ export const listCourses = async ({
   const hasNextPage = page < totalPages;
   const hasPrevPage = page > 1;
 
+  // ✅ Add isTeacher field to each course for teacher role
+  const coursesWithTeacherFlag = courses.map((course) => {
+    const isTeacherOfCourse = userId
+      ? course.teacherIds.some(
+          (teacherId: any) =>
+            teacherId._id?.toString() === userId.toString() ||
+            teacherId.toString() === userId.toString()
+        )
+      : false;
+
+    return {
+      ...course,
+      isTeacherOfCourse,
+    };
+  });
+
   return {
-    courses,
+    courses: coursesWithTeacherFlag,
     pagination: {
       total,
       page,
@@ -295,7 +314,7 @@ export const listCourses = async ({
 /**
  * Lấy thông tin chi tiết một khóa học theo ID
  */
-export const getCourseById = async (courseId: string) => {
+export const getCourseById = async (courseId: string, userId?: Types.ObjectId) => {
   // ❌ FIX: Validate courseId format
   appAssert(
     courseId && courseId.match(/^[0-9a-fA-F]{24}$/),
@@ -316,7 +335,19 @@ export const getCourseById = async (courseId: string) => {
 
   appAssert(course, NOT_FOUND, 'Course not found');
 
-  return course;
+  // ✅ Add isTeacherOfCourse field
+  const isTeacherOfCourse = userId
+    ? (course.teacherIds as any[]).some(
+        (teacherId: any) =>
+          teacherId._id?.toString() === userId.toString() ||
+          teacherId.toString() === userId.toString()
+      )
+    : false;
+
+  return {
+    ...course,
+    isTeacherOfCourse,
+  };
 };
 
 /**
@@ -1263,7 +1294,7 @@ export const getMyCourses = async ({
  * @throws If courseId is not provided for students.
  */
 export const getQuizzes = async (
-  { courseId, isPublished, isCompleted, isDeleted, page = 1, limit = 10, search }: GetQuizzes,
+  { courseId, isPublished, isCompleted, page = 1, limit = 10, search }: GetQuizzes,
   role: string
 ) => {
   const filter: any = {};
@@ -1274,16 +1305,11 @@ export const getQuizzes = async (
 
   if (role === Role.STUDENT) {
     filter.isPublished = true;
-    filter.deletedAt = null;
   } else {
     if (isPublished !== undefined) filter.isPublished = isPublished;
     if (isCompleted !== undefined) {
       if (isCompleted) filter.endTime = { $gte: new Date() };
       else filter.endTime = { $lt: new Date() };
-    }
-    if (isDeleted !== undefined) {
-      if (isDeleted) filter.deletedAt = { $ne: null };
-      else filter.deletedAt = null;
     }
   }
 
@@ -1303,6 +1329,7 @@ export const getQuizzes = async (
 
   if (role === Role.STUDENT) {
     quizzes = quizzes.map((quiz) => {
+      delete quiz.hashPassword;
       return { ...quiz, snapshotQuestions: [] };
     });
   }
@@ -1337,15 +1364,21 @@ export const getQuizzes = async (
  * @returns Khoa học hoàn thành
  */
 
-export const completeCourse = async (courseId: string) => {
+export const completeCourse = async (
+  courseId: string,
+  userId: mongoose.Types.ObjectId,
+  role: Role
+) => {
   // 1. Load course (lean for plain object)
-  const course = await CourseModel.findById(courseId)
-    .populate([
-      { path: 'semesterId', select: 'name year type' },
-      { path: 'teacherIds', select: 'username fullname avatar_url' },
-    ])
-    .lean();
+  const course = await CourseModel.findById(courseId).populate([
+    { path: 'semesterId', select: 'name year type' },
+    { path: 'teacherIds', select: 'username fullname avatar_url' },
+  ]);
   appAssert(course, NOT_FOUND, 'Course not found');
+
+  if (role === Role.TEACHER) {
+    appAssert(isTeacherOfCourse(course, userId), FORBIDDEN, 'You are not a teacher of this course');
+  }
 
   // If already completed, error
   // appAssert(course.status !== CourseStatus.COMPLETED, BAD_REQUEST, 'Course is completed');
@@ -1448,7 +1481,7 @@ export const completeCourse = async (courseId: string) => {
               },
             },
           },
-          { $match: { status: 'SUBMITTED' } },
+          { $match: { status: AttemptStatus.SUBMITTED } },
         ],
         as: 'quizAttemptsRaw',
       },
@@ -1955,7 +1988,11 @@ export const completeCourse = async (courseId: string) => {
  * @param courseId - ID của khóa học
  * @returns Thống kê khóa học
  */
-export const getCourseStatistics = async (courseId: string) => {
+export const getCourseStatistics = async (
+  courseId: string,
+  userId?: Types.ObjectId,
+  userRole?: Role
+) => {
   // Validate courseId format
   appAssert(
     courseId && courseId.match(/^[0-9a-fA-F]{24}$/),
@@ -1975,6 +2012,16 @@ export const getCourseStatistics = async (courseId: string) => {
 
   appAssert(course, NOT_FOUND, 'Course not found');
 
+  // Check permission: Teacher can only view statistics of their own course
+  if (userRole === Role.TEACHER) {
+    const isTeacherOfCourse = course.teacherIds.some((teacher: any) => teacher._id.equals(userId));
+    appAssert(
+      isTeacherOfCourse,
+      FORBIDDEN,
+      "You don't have permission to view statistics for this course"
+    );
+  }
+
   // Kiểm tra xem khóa học đã có thống kê chưa
   if (!course.statistics || Object.keys(course.statistics).length === 0) {
     return {
@@ -1983,9 +2030,66 @@ export const getCourseStatistics = async (courseId: string) => {
       semester: course.semesterId,
       teachers: course.teacherIds || [],
       statistics: null,
+      students: [],
       message: 'Course statistics not available yet. Please complete the course first.',
     };
   }
+
+  // Query students details from Enrollment
+  const enrollments = await EnrollmentModel.find({
+    courseId: course._id,
+    role: Role.STUDENT,
+    status: {
+      $in: [EnrollmentStatus.APPROVED, EnrollmentStatus.DROPPED, EnrollmentStatus.COMPLETED],
+    },
+  })
+    .populate('studentId', 'username fullname avatar_url')
+    .select('studentId progress finalGrade status')
+    .lean();
+
+  // Transform enrollments to match completeCourse students format
+  const students = enrollments.map((enrollment: any) => ({
+    enrollmentId: enrollment._id,
+    student: enrollment.studentId
+      ? {
+          _id: enrollment.studentId._id,
+          username: enrollment.studentId.username,
+          fullname: enrollment.studentId.fullname,
+          avatar_url: enrollment.studentId.avatar_url,
+        }
+      : null,
+    progress: {
+      lessons: {
+        total: enrollment.progress?.totalLessons || 0,
+        completed: enrollment.progress?.completedLessons || 0,
+        percent:
+          enrollment.progress?.totalLessons > 0
+            ? Math.round(
+                (enrollment.progress.completedLessons / enrollment.progress.totalLessons) * 100
+              )
+            : 0,
+      },
+      quizzes: {
+        total: enrollment.progress?.totalQuizzes || 0,
+        completed: enrollment.progress?.completedQuizzes || 0,
+        score: enrollment.progress?.totalQuizScores || 0,
+      },
+      assignments: {
+        total: enrollment.progress?.totalAssignments || 0,
+        completed: enrollment.progress?.completedAssignments || 0,
+        score: enrollment.progress?.totalAssignmentScores || 0,
+      },
+      attendance: {
+        total: enrollment.progress?.totalAttendances || 0,
+        present: enrollment.progress?.completedAttendances || 0,
+        absent:
+          (enrollment.progress?.totalAttendances || 0) -
+          (enrollment.progress?.completedAttendances || 0),
+      },
+    },
+    finalGrade: enrollment.finalGrade || 0,
+    status: enrollment.status,
+  }));
 
   // Trả về thống kê
   return {
@@ -1994,5 +2098,6 @@ export const getCourseStatistics = async (courseId: string) => {
     semester: course.semesterId,
     teachers: course.teacherIds || [],
     statistics: course.statistics,
+    students,
   };
 };

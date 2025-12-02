@@ -46,7 +46,7 @@ const ListAllLessonsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortOption, setSortOption] = useState<LessonSortOption>("date_desc");
+  const [sortOption, setSortOption] = useState<LessonSortOption>("date_desc"); // Default to newest first
   const [currentPage, setCurrentPage] = useState(1);
   const [pageLimit, setPageLimit] = useState(25);
   const [totalLessons, setTotalLessons] = useState(0);
@@ -176,13 +176,17 @@ const ListAllLessonsPage: React.FC = () => {
 
       const termToUse = customSearchTerm ?? searchTerm;
       if (termToUse) {
-        params.search = termToUse;
+        params.title = termToUse; // Use title parameter for regex search
       }
 
-      const isName = sortOption === "name_asc" || sortOption === "name_desc";
-      const order = sortOption.endsWith("asc") ? "asc" : "desc";
-      params.sortBy = isName ? "title" : "createdAt";
-      params.sortOrder = order;
+      // Sort by createdAt
+      if (sortOption === "date_asc") {
+        params.sortBy = "createdAt";
+        params.sortOrder = "asc";
+      } else if (sortOption === "date_desc") {
+        params.sortBy = "createdAt";
+        params.sortOrder = "desc";
+      }
 
       const response = await httpClient.get<ApiResponse>("/lessons/", {
         params,
@@ -318,7 +322,7 @@ const ListAllLessonsPage: React.FC = () => {
           <div className="max-w-7xl mx-auto px-4">
             <div className="mb-8">
               <h1 className="text-3xl font-bold mb-2" style={{ color: darkMode ? "#ffffff" : "#1f2937" }}>
-                Lesson Materials
+                Lesson
               </h1>
               <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>Browse all available lessons across courses</p>
                 </div>
@@ -340,6 +344,7 @@ const ListAllLessonsPage: React.FC = () => {
               canCreate={canCreate}
               onCreate={handleCreate}
               createLabel="+ Create Lesson"
+              showOnlyDateSort={true}
             />
 
             {error && (

@@ -127,7 +127,9 @@ export const updateQuiz = async (
     startTime,
     endTime,
     shuffleQuestions,
+    isPublished,
     snapshotQuestions,
+    isChangePassword,
   }: UpdateQuiz,
   userId: mongoose.Types.ObjectId,
   role: Role
@@ -172,8 +174,8 @@ export const updateQuiz = async (
   const deleted = snapshotQuestions.filter((q) => q.isDeleted && !q.isNewQuestion);
 
   for (const q of updated) {
-    const index = map.get(q.id) || -1;
-    if (index === -1) continue;
+    const index = map.get(q.id);
+    if (index === undefined) continue;
 
     const oldQuestion = quiz.snapshotQuestions[index];
     const oldImages = oldQuestion.images || [];
@@ -183,10 +185,11 @@ export const updateQuiz = async (
     quiz.snapshotQuestions[index] = {
       ...oldQuestion,
       ...q,
+      images: newImages, // Merge ảnh
+      isDirty: false, // reset flag
+      isNewQuestion: false, // reset flag
+      isDeleted: false,
     };
-
-    // Merge ảnh
-    quiz.snapshotQuestions[index].images = newImages;
 
     // Xóa ảnh
     deletedImages.push(
@@ -201,7 +204,12 @@ export const updateQuiz = async (
     for (const q of added) {
       const exists = quiz.snapshotQuestions.some((sq) => sq.id === q.id);
       appAssert(!exists, BAD_REQUEST, `Question "${q.text}" already exists`);
-      quiz.snapshotQuestions.push(q);
+      quiz.snapshotQuestions.push({
+        ...q,
+        isDirty: false,
+        isNewQuestion: false,
+        isDeleted: false,
+      });
     }
   }
 
@@ -241,9 +249,14 @@ export const updateQuiz = async (
     }
     quiz.endTime = endTime;
   }
+  quiz.isPublished = isPublished ?? quiz.isPublished;
   quiz.shuffleQuestions = shuffleQuestions ?? quiz.shuffleQuestions;
 
+  if (isChangePassword) {
+    quiz.hashPassword = quiz.generateHashPassword();
+  }
   await quiz.save();
+
   return quiz;
 };
 
@@ -276,9 +289,10 @@ export const deleteQuiz = async ({
   const isOnGoing = quiz.startTime.getTime() <= Date.now() && quiz.endTime.getTime() >= Date.now();
   appAssert(!isOnGoing, BAD_REQUEST, 'Cannot delete a quiz that is on going');
 
-  quiz.deletedAt = new Date();
-  quiz.deletedBy = userId;
-  const data = await quiz.save();
+  const count = await QuizAttemptModel.countDocuments({ quizId: quiz._id });
+  appAssert(count === 0, BAD_REQUEST, 'Cannot delete a quiz that has attempts');
+
+  const data = await QuizModel.findByIdAndDelete(quizId);
 
   return data;
 };

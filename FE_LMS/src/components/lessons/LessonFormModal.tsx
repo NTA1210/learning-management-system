@@ -34,7 +34,7 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
 
   useEffect(() => {
     setValues(initialValues || defaultValues);
-  }, [initialValues]);
+  }, [initialValues, isOpen]);
 
   if (!isOpen) return null;
 

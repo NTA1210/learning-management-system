@@ -103,6 +103,13 @@ const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
     return handleUploadError(res, error);
   }
 
+  if (error.code === 11000) {
+    return res.error(BAD_REQUEST, {
+      message: `Duplicate key: ${JSON.stringify(error.keyValue)}`,
+      code: AppErrorCode.ValidationError,
+    });
+  }
+
   if (error.type === 'entity.parse.failed') {
     return handleJSONParseError(res);
   }

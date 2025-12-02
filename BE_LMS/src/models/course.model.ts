@@ -43,6 +43,7 @@ const CourseSchema = new mongoose.Schema<ICourse>(
       averageQuizScore: { type: Number, default: 0 },
       totalAssignments: { type: Number, default: 0 },
       completedAssignments: { type: Number, default: 0 },
+      averageAssignmentScore: { type: Number, default: 0 },
       averageFinalGrade: { type: Number, default: 0 },
       totalAttendances: { type: Number, default: 0 },
       averageAttendance: { type: Number, default: 0 },
@@ -93,6 +94,20 @@ CourseSchema.index({ isPublished: 1, title: 'text', description: 'text' });
 // Soft delete indexes
 CourseSchema.index({ isDeleted: 1, createdAt: -1 });
 CourseSchema.index({ isDeleted: 1, isPublished: 1, createdAt: -1 });
+
+//hooks
+CourseSchema.pre('save', function (next) {
+  this.slug = this.title
+    .normalize('NFD') // tách ký tự và dấu
+    .replace(/[\u0300-\u036f]/g, '') // remove dấu
+    .replace(/đ/g, 'd') // chuyển đ
+    .replace(/Đ/g, 'd') // chuyển Đ
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '');
+  next();
+});
 
 const CourseModel = mongoose.model<ICourse>('Course', CourseSchema, 'courses');
 

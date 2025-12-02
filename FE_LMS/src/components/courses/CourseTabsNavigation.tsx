@@ -1,6 +1,6 @@
 import React from "react";
 
-export type TabType = "lessons" | "assignments" | "attendance" | "static";
+export type TabType = "lessons" | "assignments" | "attendance" | "schedule" | "static";
 
 interface CourseTabsNavigationProps {
   activeTab: TabType;
@@ -17,6 +17,7 @@ const CourseTabsNavigation: React.FC<CourseTabsNavigationProps> = ({
     { id: "lessons", label: "Lessons" },
     { id: "assignments", label: "Assignments" },
     { id: "attendance", label: "Attendance" },
+    { id: "schedule", label: "Schedule" },
     { id: "static", label: "Static course" },
   ];
 

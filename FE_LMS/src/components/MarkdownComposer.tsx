@@ -10,6 +10,7 @@ interface MarkdownComposerProps {
   attachment?: File | null;
   onAttachmentChange?: (file: File | null) => void;
   attachmentAccept?: string;
+  disabled?: boolean;
 }
 
 type ToolbarAction =
@@ -19,7 +20,6 @@ type ToolbarAction =
   | "quote"
   | "bullet"
   | "numbered"
-  | "link"
   | "codeblock"
   | "heading";
 
@@ -31,6 +31,7 @@ const MarkdownComposer: React.FC<MarkdownComposerProps> = ({
   attachment,
   onAttachmentChange,
   attachmentAccept,
+  disabled = false,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -68,6 +69,7 @@ const MarkdownComposer: React.FC<MarkdownComposerProps> = ({
   };
 
   const handleToolbarClick = (action: ToolbarAction) => {
+    if (disabled) return;
     switch (action) {
       case "bold":
         applyWrap("**");
@@ -93,23 +95,6 @@ const MarkdownComposer: React.FC<MarkdownComposerProps> = ({
       case "heading":
         applyLinePrefix("##");
         break;
-      case "link": {
-        const url = window.prompt("Enter link URL");
-        if (!url) return;
-        const textarea = textareaRef.current;
-        if (!textarea) return;
-        const { selectionStart, selectionEnd } = textarea;
-        const selected = value.slice(selectionStart, selectionEnd) || "link text";
-        const markdown = `[${selected}](${url})`;
-        const nextValue = `${value.slice(0, selectionStart)}${markdown}${value.slice(selectionEnd)}`;
-        onChange(nextValue);
-        requestAnimationFrame(() => {
-          const caretPosition = selectionStart + markdown.length;
-          textarea.setSelectionRange(caretPosition, caretPosition);
-          textarea.focus();
-        });
-        break;
-      }
       default:
         break;
     }
@@ -124,7 +109,6 @@ const MarkdownComposer: React.FC<MarkdownComposerProps> = ({
     { action: "numbered", label: "1." },
     { action: "code", label: "</>" },
     { action: "codeblock", label: "{ }" },
-    { action: "link", label: "🔗" },
   ];
 
   const formatFileSize = (size?: number) => {
@@ -160,11 +144,12 @@ const MarkdownComposer: React.FC<MarkdownComposerProps> = ({
             key={button.action}
             type="button"
             onClick={() => handleToolbarClick(button.action)}
+            disabled={disabled}
             className={`rounded-xl px-2.5 py-1 transition ${
               darkMode
                 ? "bg-slate-800 text-slate-100 hover:bg-slate-700"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-            }`}
+            } ${disabled ? "opacity-50 cursor-not-allowed hover:bg-inherit" : ""}`}
           >
             {button.label}
           </button>
@@ -175,7 +160,10 @@ const MarkdownComposer: React.FC<MarkdownComposerProps> = ({
             <button
               type="button"
               onClick={triggerAttachmentPicker}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              disabled={disabled}
+              className={`inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 ${
+                disabled ? "opacity-50 cursor-not-allowed hover:bg-inherit dark:hover:bg-inherit" : ""
+              }`}
             >
               <Paperclip className="w-3.5 h-3.5" />
               Add attachment
@@ -196,6 +184,7 @@ const MarkdownComposer: React.FC<MarkdownComposerProps> = ({
         className={editorClasses}
         placeholder={placeholder}
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
       />
 

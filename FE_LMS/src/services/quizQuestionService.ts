@@ -46,7 +46,7 @@ export const quizQuestionService = {
   // Get all quiz questions with optional filters
   getAllQuizQuestions: async (filters?: QuizQuestionFilters): Promise<QuizQuestionListResponse> => {
     const params = new URLSearchParams();
-    
+
     if (filters?.subjectId) params.append("subjectId", filters.subjectId);
     if (filters?.type) params.append("type", filters.type);
     if (filters?.search) params.append("search", filters.search);
@@ -57,22 +57,22 @@ export const quizQuestionService = {
 
     const queryString = params.toString();
     const url = `/quiz-questions${queryString ? `?${queryString}` : ""}`;
-    
+
     const baseUrl = import.meta.env.VITE_BASE_API || "";
     console.log("QuizQuestionService: Base URL from env:", baseUrl);
     console.log("QuizQuestionService: Full URL will be:", `${baseUrl}${url}`);
     console.log("QuizQuestionService: Fetching from URL:", url);
     console.log("QuizQuestionService: Filters:", filters);
-    
+
     const response = await http.get<QuizQuestion[]>(url);
     console.log("QuizQuestionService: Raw response:", response);
     console.log("QuizQuestionService: Response type:", typeof response);
     console.log("QuizQuestionService: Response.data type:", typeof response.data);
     console.log("QuizQuestionService: Response.data is array?", Array.isArray(response.data));
-    
+
     // Handle response format - có thể là response.data hoặc response trực tiếp
     let questions: QuizQuestion[] = [];
-    
+
     // Thử nhiều format response
     if (Array.isArray(response.data)) {
       questions = response.data;
@@ -83,9 +83,9 @@ export const quizQuestionService = {
     } else if (response.data && Array.isArray(response.data)) {
       questions = response.data;
     }
-    
+
     console.log("QuizQuestionService: Parsed questions:", questions);
-    
+
     const pagination = response.meta?.pagination || response.pagination || {
       totalItems: questions.length,
       currentPage: filters?.page || 1,
@@ -94,7 +94,7 @@ export const quizQuestionService = {
       hasNext: false,
       hasPrev: false,
     };
-    
+
     return { data: questions, pagination };
   },
 
@@ -140,11 +140,39 @@ export const quizQuestionService = {
       });
     }
 
-    const response = await http.put(`/quiz-questions/${questionId}`, formData, {
+    const response = await http.put<{ data: QuizQuestion }>(`/quiz-questions/${questionId}`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
     return response.data;
+  },
+
+  // Upload images to a quiz question
+  uploadQuestionImages: async (questionId: string, images: File[], quizId?: string): Promise<QuizQuestion> => {
+    const formData = new FormData();
+    images.forEach((file) => {
+      formData.append('files', file);
+    });
+
+    if (quizId) {
+      formData.append('quizId', quizId);
+    }
+
+    let url = `/quiz-questions/images?questionId=${questionId}`;
+    if (quizId) {
+      url += `&quizId=${quizId}`;
+    }
+
+    const response = await http.post<{ data: QuizQuestion }>(url, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+
+    return response.data;
+  },
+
+  // Delete a single image from quiz questions
+  deleteQuestionImage: async (imageUrl: string): Promise<void> => {
+    await http.del(`/quiz-questions/image?url=${encodeURIComponent(imageUrl)}`);
   },
 
   importQuizFromXml: async (subjectId: string, file: File) => {
@@ -164,13 +192,13 @@ export const quizQuestionService = {
   deleteQuizQuestion: async (questionId: string, question?: QuizQuestion): Promise<void> => {
     // If question is not provided, try to get it from the current questions
     let questionToDelete = question;
-    
+
     if (!questionToDelete) {
       // Fallback: get the question (but this should be avoided if possible)
       const questions = await quizQuestionService.getAllQuizQuestions({ limit: 1000 });
       questionToDelete = questions.data.find((q) => q._id === questionId);
     }
-    
+
     // Delete images that are not from DB (fromDB === false)
     if (questionToDelete?.images && Array.isArray(questionToDelete.images)) {
       for (const image of questionToDelete.images) {
@@ -213,6 +241,12 @@ export const quizQuestionService = {
       responseType: "blob",
     });
     return response.data as Blob;
+  },
+
+  // Delete all questions for a subject
+  deleteAllQuestionsBySubject: async (subjectId: string): Promise<void> => {
+    const baseUrl = import.meta.env.VITE_BASE_API || "";
+    await http.del(`${baseUrl}/subjects/${subjectId}/quiz-questions`);
   },
 };
 

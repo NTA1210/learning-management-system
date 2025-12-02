@@ -28,7 +28,7 @@
   --status-closed-text: #dc2626;
 }
 
-:root[data-theme='dark'] {
+:root[data-theme="dark"] {
   color-scheme: dark;
   --page-bg: #1a202c;
   --page-text: #ffffff;
@@ -63,7 +63,8 @@
 
 /* Add smooth transitions for dark mode */
 * {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  transition: background-color 0.3s ease, color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 html.theme-transition-disabled *,
@@ -91,7 +92,6 @@ html.theme-transition-disabled *::after {
   background: #6b7280;
 }
 
-
 /* Enhanced custom styles for beautiful auth pages */
 .auth-container {
   min-height: 100vh;
@@ -101,31 +101,50 @@ html.theme-transition-disabled *::after {
 }
 
 .auth-container::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: 
-    radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3) 0%, transparent 50%),
-    radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.2) 0%, transparent 50%);
+  background: radial-gradient(
+      circle at 20% 80%,
+      rgba(120, 119, 198, 0.3) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 80% 20%,
+      rgba(255, 119, 198, 0.3) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 40% 40%,
+      rgba(120, 219, 255, 0.2) 0%,
+      transparent 50%
+    );
   animation: backgroundShift 20s ease-in-out infinite;
 }
 
 @keyframes backgroundShift {
-  0%, 100% { transform: translateX(0) translateY(0); }
-  25% { transform: translateX(-20px) translateY(-10px); }
-  50% { transform: translateX(20px) translateY(10px); }
-  75% { transform: translateX(-10px) translateY(20px); }
+  0%,
+  100% {
+    transform: translateX(0) translateY(0);
+  }
+  25% {
+    transform: translateX(-20px) translateY(-10px);
+  }
+  50% {
+    transform: translateX(20px) translateY(10px);
+  }
+  75% {
+    transform: translateX(-10px) translateY(20px);
+  }
 }
 
 .auth-card {
   background: rgba(255, 255, 255, 0.95);
   border-radius: 2rem;
-  box-shadow: 
-    0 32px 64px -12px rgba(0, 0, 0, 0.25),
+  box-shadow: 0 32px 64px -12px rgba(0, 0, 0, 0.25),
     0 0 0 1px rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -133,8 +152,13 @@ html.theme-transition-disabled *::after {
 }
 
 @keyframes cardFloat {
-  0%, 100% { transform: translateY(0px) rotate(0deg); }
-  50% { transform: translateY(-10px) rotate(0.5deg); }
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(0.5deg);
+  }
 }
 
 .auth-input {
@@ -145,8 +169,7 @@ html.theme-transition-disabled *::after {
 
 .auth-input:focus {
   transform: translateY(-2px) scale(1.02);
-  box-shadow: 
-    0 20px 40px -10px rgba(59, 130, 246, 0.3),
+  box-shadow: 0 20px 40px -10px rgba(59, 130, 246, 0.3),
     0 0 0 3px rgba(59, 130, 246, 0.1);
   background: rgba(255, 255, 255, 0.95);
 }
@@ -159,13 +182,18 @@ html.theme-transition-disabled *::after {
 }
 
 .auth-button::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
   transition: left 0.5s;
 }
 
@@ -175,8 +203,7 @@ html.theme-transition-disabled *::after {
 
 .auth-button:hover {
   transform: translateY(-3px) scale(1.05);
-  box-shadow: 
-    0 20px 40px -10px rgba(102, 126, 234, 0.4),
+  box-shadow: 0 20px 40px -10px rgba(102, 126, 234, 0.4),
     0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
@@ -202,21 +229,33 @@ html.theme-transition-disabled *::after {
 }
 
 .gradient-bg::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: 
-    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
-    radial-gradient(circle at 70% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
+  background: radial-gradient(
+      circle at 30% 20%,
+      rgba(255, 255, 255, 0.1) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      circle at 70% 80%,
+      rgba(255, 255, 255, 0.05) 0%,
+      transparent 50%
+    );
   animation: shimmer 3s ease-in-out infinite;
 }
 
 @keyframes shimmer {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .wave-animation {
@@ -224,7 +263,8 @@ html.theme-transition-disabled *::after {
 }
 
 @keyframes wave {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0px) rotate(0deg);
   }
   25% {
@@ -243,10 +283,18 @@ html.theme-transition-disabled *::after {
   animation: slideInUp 0.6s ease-out;
 }
 
-.form-group:nth-child(1) { animation-delay: 0.1s; }
-.form-group:nth-child(2) { animation-delay: 0.2s; }
-.form-group:nth-child(3) { animation-delay: 0.3s; }
-.form-group:nth-child(4) { animation-delay: 0.4s; }
+.form-group:nth-child(1) {
+  animation-delay: 0.1s;
+}
+.form-group:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.form-group:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.form-group:nth-child(4) {
+  animation-delay: 0.4s;
+}
 
 @keyframes slideInUp {
   from {
@@ -267,7 +315,7 @@ html.theme-transition-disabled *::after {
 }
 
 .social-button::before {
-  content: '';
+  content: "";
   position: absolute;
   top: 50%;
   left: 50%;
@@ -312,7 +360,8 @@ html.theme-transition-disabled *::after {
 }
 
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0px) rotate(0deg);
   }
   33% {
@@ -339,7 +388,8 @@ html.theme-transition-disabled *::after {
   0% {
     transform: scale(0.33);
   }
-  40%, 50% {
+  40%,
+  50% {
     opacity: 1;
   }
   100% {
@@ -352,30 +402,32 @@ html.theme-transition-disabled *::after {
 .neu-surface {
   background: #e5e5e5; /* close to E5E5E5 from spec */
   border-radius: 1rem;
-  box-shadow:
-    10px 10px 24px rgba(0, 0, 0, 0.25), /* dark shadow at +30,+30, 25% */
-    -14px -14px 16px rgba(255, 255, 255, 0.9); /* light shadow at -30,-30, 70% */
+  box-shadow: 10px 10px 24px rgba(0, 0, 0, 0.25),
+    /* dark shadow at +30,+30, 25% */ -14px -14px 16px rgba(255, 255, 255, 0.9); /* light shadow at -30,-30, 70% */
 }
 
 .neu-surface-inset {
   background: #e5e5e5;
   border-radius: 1rem;
-  box-shadow:
-    inset 10px 10px 30px rgba(0, 0, 0, 0.15),
+  box-shadow: inset 10px 10px 30px rgba(0, 0, 0, 0.15),
     inset -10px -10px 20px rgba(255, 255, 255, 0.6);
 }
 
 .dark .neu-surface {
   background: #1f2937;
   /* soften whites in dark mode */
-  box-shadow:
-    24px 24px 40px rgba(0, 0, 0, 0.55),
+  box-shadow: 24px 24px 40px rgba(0, 0, 0, 0.55),
     -24px -24px 40px rgba(255, 255, 255, 0.05);
 }
 
 .dark .neu-surface-inset {
   background: #1f2937;
-  box-shadow:
-    inset 10px 10px 20px rgba(0, 0, 0, 0.5),
+  box-shadow: inset 10px 10px 20px rgba(0, 0, 0, 0.5),
     inset -10px -10px 20px rgba(255, 255, 255, 0.06);
+}
+
+@layer components {
+  .popup {
+    @apply absolute top-[30px] right-1 z-50 py-2 px-2 text-gray-900  bg-white rounded-md shadow-2xl flex flex-col;
+  }
 }

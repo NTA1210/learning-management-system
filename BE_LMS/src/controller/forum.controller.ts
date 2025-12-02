@@ -129,7 +129,10 @@ export const updateForumByIdHandler = catchErrors(async (req, res) => {
 export const deleteForumByIdHandler = catchErrors(async (req, res) => {
     const forumId = forumIdSchema.parse(req.params.id);
 
-    const result = await deleteForumById(forumId);
+    const userId = req.userId;
+    const role = req.role;
+
+    const result = await deleteForumById(forumId, userId, role);
 
     return res.success(OK, {
         message: "Forum deleted successfully",
@@ -351,8 +354,9 @@ export const deleteForumReplyByIdHandler = catchErrors(async (req, res) => {
 
     // Get user ID from authenticated user
     const userId = req.userId;
+    const role = req.role;
 
-    const result = await deleteForumReplyById(postId, replyId, userId.toString());
+    const result = await deleteForumReplyById(postId, replyId, userId.toString(), role);
 
     return res.success(OK, {
         message: "Reply deleted successfully",

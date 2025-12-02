@@ -1,44 +1,59 @@
 import { AppRoutes } from "./routes";
 import { ThemeProvider } from "./context/ThemeContextProvider";
 import { AuthProvider } from "./context/AuthContext";
+import { SidebarProvider } from "./context/SidebarContext";
 import { ThemeToggle } from "./components";
 import { Toaster } from "react-hot-toast";
 
 function App() {
   return (
     <AuthProvider>
-      <ThemeProvider>
-        <AppRoutes />
-        <ThemeToggle />
-        <Toaster
-          position="top-right"
-          containerStyle={{
-            top: '80px', // Add padding from top to avoid navbar
-          }}
-          toastOptions={{
-            duration: 15000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-              marginTop: '16px', // Additional top margin
-            },
-            success: {
-              duration: 3000,
-              iconTheme: {
-                primary: '#4ade80',
-                secondary: '#fff',
-              },
-            },
-            error: {
+      <SidebarProvider>
+        <ThemeProvider>
+          <AppRoutes />
+
+          {/* <ThemeToggle /> */}
+          <Toaster
+            position="top-right"
+            containerStyle={{
+              top: "80px",
+            }}
+            toastOptions={{
               duration: 4000,
-              iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
+              style: {
+                borderRadius: "12px",
+                padding: "16px",
+                fontSize: "14px",
+                fontWeight: "600",
               },
-            },
-          }}
-        />
-      </ThemeProvider>
+              success: {
+                duration: 4000,
+                style: {
+                  background: "#dcfce7",
+                  color: "#065f46",
+                  border: "1px solid #86efac",
+                },
+                iconTheme: {
+                  primary: "#059669",
+                  secondary: "#ffffff",
+                },
+              },
+              error: {
+                duration: 4000,
+                style: {
+                  background: "#fee2e2",
+                  color: "#991b1b",
+                  border: "1px solid #fca5a5",
+                },
+                iconTheme: {
+                  primary: "#dc2626",
+                  secondary: "#ffffff",
+                },
+              },
+            }}
+          />
+        </ThemeProvider>
+      </SidebarProvider>
     </AuthProvider>
   );
 }

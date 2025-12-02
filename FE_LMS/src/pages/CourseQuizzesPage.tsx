@@ -14,11 +14,21 @@ import {
   Trash2,
   Edit2,
   X,
-  Users,
   ShieldOff,
   Loader2,
   BarChart3,
+  ClipboardList,
+  MoreVertical,
+  Users,
 } from "lucide-react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import QuizCoursePage from "./QuizCoursePage";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
@@ -97,6 +107,7 @@ export default function CourseQuizzesPage() {
     hasNext: false,
     hasPrev: false,
   });
+  const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
 
   const getSwalBaseOptions = () => ({
     width: 360,
@@ -169,11 +180,14 @@ export default function CourseQuizzesPage() {
   const fetchBackendPage = useCallback(
     async (pageNumber: number) => {
       if (!courseId) return null;
-      const params = {
-        isPublished: isStudent ? true : undefined,
+      const params: Record<string, any> = {
         page: wrapPaginationValue(pageNumber),
         limit: QUIZZES_PER_PAGE_PARAM,
       };
+      // Students only see published quizzes
+      if (isStudent) {
+        params.isPublished = true;
+      }
       const result = await quizService.getQuizzesByCourseId(courseId, params);
       return {
         active: filterActiveQuizzes(result.data),
@@ -209,8 +223,7 @@ export default function CourseQuizzesPage() {
       setQuizzes(displayed);
 
       const hasPrev = pageNumber > 1;
-      const hasNext =
-        cache.length > startIndex + displayed.length || hasMore;
+      const hasNext = cache.length > startIndex + displayed.length || hasMore;
       const totalPages = hasMore
         ? Math.max(pageNumber + 1, Math.ceil(cache.length / QUIZZES_PER_PAGE))
         : Math.max(1, Math.ceil(cache.length / QUIZZES_PER_PAGE));
@@ -297,10 +310,11 @@ export default function CourseQuizzesPage() {
           const status = courseError?.status || courseError?.response?.status;
           const errorMessage =
             courseError?.message || courseError?.response?.data?.message || "";
-          const isNotFound = status === 404 || 
-                            errorMessage.toLowerCase().includes("not found") ||
-                            errorMessage.toLowerCase().includes("course not found");
-          
+          const isNotFound =
+            status === 404 ||
+            errorMessage.toLowerCase().includes("not found") ||
+            errorMessage.toLowerCase().includes("course not found");
+
           if (isNotFound) {
             console.log("Course not found, treating as subjectId:", courseId);
             setIsSubjectId(true);
@@ -331,12 +345,7 @@ export default function CourseQuizzesPage() {
     return () => {
       cancelled = true;
     };
-  }, [
-    courseId,
-    goToPage,
-    isQuestionBankRoute,
-    resetPaginationState,
-  ]);
+  }, [courseId, goToPage, isQuestionBankRoute, resetPaginationState]);
 
   const getQuizStatus = (quiz: QuizResponse) => {
     const now = new Date();
@@ -389,12 +398,14 @@ export default function CourseQuizzesPage() {
   };
 
   const getStudentLabel = (attempt: QuizAttempt) => {
-    const student = attempt.studentId;
+    // Backend can return either 'student' or 'studentId' field
+    const student = attempt.student || attempt.studentId;
     if (!student) return "Unknown student";
     if (typeof student === "string") return student;
+    // Try fullname first (lowercase), then fullName, then others
     return (
-      student.fullName ||
       student.fullname ||
+      student.fullName ||
       student.username ||
       student.email ||
       student._id ||
@@ -514,7 +525,9 @@ export default function CourseQuizzesPage() {
       const updated = await quizAttemptService.banQuizAttempt(attempt._id);
       setAttemptModal((prev) => ({
         ...prev,
-        attempts: prev.attempts.map((a) => (a._id === updated._id ? updated : a)),
+        attempts: prev.attempts.map((a) =>
+          a._id === updated._id ? updated : a
+        ),
       }));
       await showSwalSuccess("Attempt banned successfully");
     } catch (err) {
@@ -542,8 +555,11 @@ export default function CourseQuizzesPage() {
         isPublished: editForm.isPublished,
       });
 
+      // Force complete cache reset to ensure updated quiz appears
       resetPaginationState();
-      await goToPage(quizzesPage);
+      // Reset to page 1 to ensure fresh data
+      setQuizzesPage(1);
+      await goToPage(1);
 
       handleCloseEdit();
       await showSwalSuccess("Quiz updated successfully");
@@ -560,7 +576,9 @@ export default function CourseQuizzesPage() {
   };
 
   const handleDeleteQuiz = async (quizId: string) => {
-    const confirmed = await showSwalConfirm("Are you sure you want to delete this quiz? This action cannot be undone.");
+    const confirmed = await showSwalConfirm(
+      "Are you sure you want to delete this quiz? This action cannot be undone."
+    );
     if (!confirmed) {
       return;
     }
@@ -569,7 +587,8 @@ export default function CourseQuizzesPage() {
       setDeletingQuizId(quizId);
       await quizService.deleteQuiz(quizId);
       resetPaginationState();
-      const nextPage = quizzesPage > 1 && quizzes.length === 1 ? quizzesPage - 1 : quizzesPage;
+      const nextPage =
+        quizzesPage > 1 && quizzes.length === 1 ? quizzesPage - 1 : quizzesPage;
       setQuizzesPage(nextPage);
       await goToPage(nextPage);
       await showSwalSuccess("Quiz deleted successfully");
@@ -593,6 +612,16 @@ export default function CourseQuizzesPage() {
     goToPage(page);
   };
 
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const handleToggleSidebar = () => {
+    setMobileSidebarOpen((prev) => !prev);
+  };
+
+  const handleCloseSidebar = () => {
+    setMobileSidebarOpen(false);
+  };
+
   // If it's a subjectId, render QuizCoursePage instead
   if (isSubjectId) {
     return <QuizCoursePage />;
@@ -600,10 +629,22 @@ export default function CourseQuizzesPage() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar />
+      <Sidebar role={role} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Navbar />
-        <main className="flex-1 overflow-y-auto p-6 pt-12" style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}>
+        <Navbar onToggleSidebar={handleToggleSidebar} />
+        <Sidebar
+          variant="mobile"
+          role={role}
+          isOpen={mobileSidebarOpen}
+          onClose={handleCloseSidebar}
+        />
+        <main
+          className="flex-1 overflow-y-auto p-6 pt-12"
+          style={{
+            backgroundColor: "var(--page-bg)",
+            color: "var(--page-text)",
+          }}
+        >
           <div className="max-w-6xl mx-auto">
             {/* Header */}
             <div className="mb-6">
@@ -616,9 +657,11 @@ export default function CourseQuizzesPage() {
                   <ArrowLeft className="w-4 h-4" />
                   Back
                 </button>
-              
               </div>
-              <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--heading-text)" }}>
+              <h1
+                className="text-2xl font-bold mb-2"
+                style={{ color: "var(--heading-text)" }}
+              >
                 {course ? course.title : "Loading..."}
               </h1>
               {course?.code && (
@@ -639,7 +682,10 @@ export default function CourseQuizzesPage() {
             {error && (
               <div
                 className="rounded-lg p-4 mb-6"
-                style={{ backgroundColor: "var(--error-bg)", color: "var(--error-text)" }}
+                style={{
+                  backgroundColor: "var(--error-bg)",
+                  color: "var(--error-text)",
+                }}
               >
                 {error}
               </div>
@@ -651,9 +697,14 @@ export default function CourseQuizzesPage() {
                 {quizzes.length === 0 ? (
                   <div
                     className="rounded-lg p-8 text-center"
-                    style={{ backgroundColor: "var(--card-surface)", border: "1px solid var(--card-border)" }}
+                    style={{
+                      backgroundColor: "var(--card-surface)",
+                      border: "1px solid var(--card-border)",
+                    }}
                   >
-                    <p style={{ color: "var(--muted-text)" }}>No quizzes available for this course.</p>
+                    <p style={{ color: "var(--muted-text)" }}>
+                      No quizzes available for this course.
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -662,7 +713,7 @@ export default function CourseQuizzesPage() {
                       return (
                         <div
                           key={quiz._id}
-                          className="rounded-lg shadow-md overflow-hidden transition-all duration-200 hover:shadow-lg cursor-pointer"
+                          className="relative rounded-lg shadow-md overflow-hidden transition-all duration-200 hover:shadow-lg cursor-pointer"
                           style={{
                             backgroundColor: "var(--card-surface)",
                             border: `1px solid var(--card-border)`,
@@ -677,15 +728,124 @@ export default function CourseQuizzesPage() {
                             }
                           }}
                         >
+                          {/* Action menu - top right */}
+                          {!isStudent && (
+                            <div
+                              className="absolute top-3 right-3"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                onClick={() => {
+                                  setActionMenuOpenId((prev) =>
+                                    prev === quiz._id ? null : quiz._id
+                                  );
+                                }}
+                                className="p-2 rounded hover:bg-gray-100 transition-colors"
+                                style={{
+                                  color: darkMode ? "#4b5563" : "#4b5563",
+                                }}
+                                title="More actions"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
+                              {actionMenuOpenId === quiz._id && (
+                                <div
+                                  className="absolute right-full top-0 mr-2 w-44 rounded-lg shadow-lg border z-20"
+                                  style={{
+                                    backgroundColor: darkMode
+                                      ? "#020617"
+                                      : "#ffffff",
+                                    borderColor: darkMode
+                                      ? "rgba(148,163,184,0.3)"
+                                      : "rgba(226,232,240,0.9)",
+                                    color: darkMode ? "#e5e7eb" : "#0f172a",
+                                  }}
+                                >
+                                  <button
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-green-50"
+                                    style={{
+                                      color: "#10b981",
+                                      backgroundColor: darkMode
+                                        ? "transparent"
+                                        : undefined,
+                                    }}
+                                    onClick={() => {
+                                      handleOpenStatisticsModal(quiz);
+                                      setActionMenuOpenId(null);
+                                    }}
+                                  >
+                                    <BarChart3 className="w-4 h-4" />
+                                    <span>View statistics</span>
+                                  </button>
+                                  <button
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-purple-50"
+                                    style={{
+                                      color: "#6d28d9",
+                                      backgroundColor: darkMode
+                                        ? "transparent"
+                                        : undefined,
+                                    }}
+                                    onClick={() => {
+                                      handleOpenAttemptModal(quiz);
+                                      setActionMenuOpenId(null);
+                                    }}
+                                  >
+                                    <Users className="w-4 h-4" />
+                                    <span>View attempts</span>
+                                  </button>
+                                  <button
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-blue-50"
+                                    style={{
+                                      color: "#3b82f6",
+                                      backgroundColor: darkMode
+                                        ? "transparent"
+                                        : undefined,
+                                    }}
+                                    onClick={() => {
+                                      handleOpenEditQuiz(quiz);
+                                      setActionMenuOpenId(null);
+                                    }}
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                    <span>Edit quiz</span>
+                                  </button>
+                                  <button
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-red-50 disabled:opacity-50"
+                                    style={{
+                                      color: "#ef4444",
+                                      backgroundColor: darkMode
+                                        ? "transparent"
+                                        : undefined,
+                                    }}
+                                    disabled={deletingQuizId === quiz._id}
+                                    onClick={async () => {
+                                      setActionMenuOpenId(null);
+                                      handleDeleteQuiz(quiz._id);
+                                    }}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                    <span>Delete quiz</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                           <div className="p-6">
                             {/* Quiz Title */}
-                            <h3 className="text-xl font-semibold mb-2" style={{ color: "var(--heading-text)" }}>
+                            <h3
+                              className="text-xl font-semibold mb-2"
+                              style={{ color: "var(--heading-text)" }}
+                            >
                               {quiz.title}
                             </h3>
 
                             {/* Quiz Description */}
                             {quiz.description && (
-                              <p className="text-sm mb-4 line-clamp-2" style={{ color: "var(--muted-text)" }}>
+                              <p
+                                className="text-sm mb-4 line-clamp-2"
+                                style={{ color: "var(--muted-text)" }}
+                              >
                                 {quiz.description}
                               </p>
                             )}
@@ -693,13 +853,19 @@ export default function CourseQuizzesPage() {
                             {/* Quiz Details */}
                             <div className="space-y-2 mb-4">
                               <div className="flex items-center gap-2 text-sm">
-                                <Calendar className="w-4 h-4" style={{ color: "var(--muted-text)" }} />
+                                <Calendar
+                                  className="w-4 h-4"
+                                  style={{ color: "var(--muted-text)" }}
+                                />
                                 <span style={{ color: "var(--muted-text)" }}>
                                   Start: {formatDate(quiz.startTime)}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2 text-sm">
-                                <Clock className="w-4 h-4" style={{ color: "var(--muted-text)" }} />
+                                <Clock
+                                  className="w-4 h-4"
+                                  style={{ color: "var(--muted-text)" }}
+                                />
                                 <span style={{ color: "var(--muted-text)" }}>
                                   End: {formatDate(quiz.endTime)}
                                 </span>
@@ -707,87 +873,103 @@ export default function CourseQuizzesPage() {
                             </div>
 
                             {/* Status Badge and Actions */}
-                              <div className="flex items-center justify-between">
-                                <span
-                                  className="text-xs font-semibold px-3 py-1 rounded-full"
-                                  style={{ backgroundColor: `${status.color}20`, color: status.color }}
-                                >
-                                  {status.label}
-                                </span>
-                                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                  {quiz.isPublished && (
-                                    <span className="text-xs flex items-center gap-1" style={{ color: "#10b981" }}>
-                                      <CheckCircle className="w-4 h-4" />
-                                      Published
-                                    </span>
-                                  )}
-                                  {isStudent ? (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (canTakeQuiz(quiz)) {
-                                          navigate(`/quizz/${courseId}/quiz/${quiz._id}`, {
+                            <div className="flex items-center justify-between">
+                              <span
+                                className="text-xs font-semibold px-3 py-1 rounded-full"
+                                style={{
+                                  backgroundColor: `${status.color}20`,
+                                  color: status.color,
+                                }}
+                              >
+                                {status.label}
+                              </span>
+                              <div
+                                className="flex items-center gap-2"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {quiz.isPublished && (
+                                  <span
+                                    className="text-xs flex items-center gap-1"
+                                    style={{ color: "#10b981" }}
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                    Published
+                                  </span>
+                                )}
+                                {isStudent && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (canTakeQuiz(quiz)) {
+                                        navigate(
+                                          `/quizz/${courseId}/quiz/${quiz._id}`,
+                                          {
                                             state: { quiz },
-                                          });
-                                        }
-                                      }}
-                                      disabled={!canTakeQuiz(quiz)}
-                                      className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
-                                      style={{ backgroundColor: "#6d28d9" }}
-                                    >
-                                      {canTakeQuiz(quiz) ? "Take Quiz" : "Unavailable"}
-                                    </button>
-                                  ) : (
-                                    <>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleOpenStatisticsModal(quiz);
-                                        }}
-                                        className="p-2 rounded hover:bg-green-50 transition-colors"
-                                        style={{ color: "#10b981" }}
-                                        title="View quiz statistics"
-                                      >
-                                        <BarChart3 className="w-4 h-4" />
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleOpenAttemptModal(quiz);
-                                        }}
-                                        className="p-2 rounded hover:bg-purple-50 transition-colors"
-                                        style={{ color: "#6d28d9" }}
-                                        title="View active attempts"
-                                      >
-                                        <Users className="w-4 h-4" />
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleOpenEditQuiz(quiz);
-                                        }}
-                                        className="p-2 rounded hover:bg-blue-50 transition-colors"
-                                        style={{ color: "#3b82f6" }}
-                                        title="Edit quiz"
-                                      >
-                                        <Edit2 className="w-4 h-4" />
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleDeleteQuiz(quiz._id);
-                                        }}
-                                        disabled={deletingQuizId === quiz._id}
-                                        className="p-2 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                                        style={{ color: "#ef4444" }}
-                                        title="Delete quiz"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
+                                          }
+                                        );
+                                      }
+                                    }}
+                                    disabled={!canTakeQuiz(quiz)}
+                                    className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+                                    style={{ backgroundColor: "#6d28d9" }}
+                                  >
+                                    {canTakeQuiz(quiz)
+                                      ? "Take Quiz"
+                                      : "Unavailable"}
+                                  </button>
+                                )}{" "}
+
+                                <>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenStatisticsModal(quiz);
+                                    }}
+                                    className="p-2 rounded hover:bg-green-50 transition-colors"
+                                    style={{ color: "#10b981" }}
+                                    title="View quiz statistics"
+                                  >
+                                    <BarChart3 className="w-4 h-4" />
+                                  </button>
+
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/quizzes/${quiz._id}/attempts`);
+                                    }}
+                                    className="p-2 rounded hover:bg-orange-50 transition-colors"
+                                    style={{ color: "#f97316" }}
+                                    title="Grade / View All Attempts"
+                                  >
+                                    <ClipboardList className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenEditQuiz(quiz);
+                                    }}
+                                    className="p-2 rounded hover:bg-blue-50 transition-colors"
+                                    style={{ color: "#3b82f6" }}
+                                    title="Edit quiz"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteQuiz(quiz._id);
+                                    }}
+                                    disabled={deletingQuizId === quiz._id}
+                                    className="p-2 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                                    style={{ color: "#ef4444" }}
+                                    title="Delete quiz"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </>
+
                               </div>
+                            </div>
                           </div>
                         </div>
                       );
@@ -805,8 +987,14 @@ export default function CourseQuizzesPage() {
                     pageOptions={Array.from(
                       { length: Math.min(5, quizzesPaginationInfo.totalPages) },
                       (_, index) => {
-                        const start = Math.max(1, quizzesPaginationInfo.currentPage - 2);
-                        return Math.min(start + index, quizzesPaginationInfo.totalPages);
+                        const start = Math.max(
+                          1,
+                          quizzesPaginationInfo.currentPage - 2
+                        );
+                        return Math.min(
+                          start + index,
+                          quizzesPaginationInfo.totalPages
+                        );
                       }
                     )}
                     sendStringParams
@@ -824,7 +1012,10 @@ export default function CourseQuizzesPage() {
       {/* Edit Quiz Modal */}
       {!isStudent && editingQuiz && editForm && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleCloseEdit} />
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={handleCloseEdit}
+          />
           <div
             className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
             style={{
@@ -838,7 +1029,7 @@ export default function CourseQuizzesPage() {
               <h2 className="text-2xl font-semibold">Edit Quiz</h2>
               <button
                 onClick={handleCloseEdit}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 style={{ color: "var(--heading-text)" }}
               >
                 <X className="w-5 h-5" />
@@ -847,13 +1038,18 @@ export default function CourseQuizzesPage() {
 
             <form onSubmit={handleUpdateQuiz} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: "var(--muted-text)" }}>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  style={{ color: "var(--muted-text)" }}
+                >
                   Title
                 </label>
                 <input
                   type="text"
                   value={editForm.title}
-                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, title: e.target.value })
+                  }
                   className="w-full px-3 py-2 rounded-lg border"
                   style={{
                     backgroundColor: "var(--input-bg)",
@@ -865,12 +1061,17 @@ export default function CourseQuizzesPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: "var(--muted-text)" }}>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  style={{ color: "var(--muted-text)" }}
+                >
                   Description
                 </label>
                 <textarea
                   value={editForm.description}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, description: e.target.value })
+                  }
                   className="w-full px-3 py-2 rounded-lg border"
                   style={{
                     backgroundColor: "var(--input-bg)",
@@ -883,13 +1084,18 @@ export default function CourseQuizzesPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: "var(--muted-text)" }}>
+                  <label
+                    className="block text-sm font-medium mb-1"
+                    style={{ color: "var(--muted-text)" }}
+                  >
                     Start Time
                   </label>
                   <input
                     type="datetime-local"
                     value={editForm.startTime}
-                    onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, startTime: e.target.value })
+                    }
                     className="w-full px-3 py-2 rounded-lg border"
                     style={{
                       backgroundColor: "var(--input-bg)",
@@ -900,13 +1106,18 @@ export default function CourseQuizzesPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: "var(--muted-text)" }}>
+                  <label
+                    className="block text-sm font-medium mb-1"
+                    style={{ color: "var(--muted-text)" }}
+                  >
                     End Time
                   </label>
                   <input
                     type="datetime-local"
                     value={editForm.endTime}
-                    onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, endTime: e.target.value })
+                    }
                     className="w-full px-3 py-2 rounded-lg border"
                     style={{
                       backgroundColor: "var(--input-bg)",
@@ -923,14 +1134,24 @@ export default function CourseQuizzesPage() {
                   <input
                     type="checkbox"
                     checked={editForm.isPublished}
-                    onChange={(e) => setEditForm({ ...editForm, isPublished: e.target.checked })}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        isPublished: e.target.checked,
+                      })
+                    }
                     className="w-4 h-4 rounded border"
                     style={{
-                      backgroundColor: editForm.isPublished ? "var(--primary-color)" : "var(--input-bg)",
+                      backgroundColor: editForm.isPublished
+                        ? "var(--primary-color)"
+                        : "var(--input-bg)",
                       borderColor: "var(--input-border)",
                     }}
                   />
-                  <span className="text-sm font-medium" style={{ color: "var(--muted-text)" }}>
+                  <span
+                    className="text-sm font-medium"
+                    style={{ color: "var(--muted-text)" }}
+                  >
                     Published
                   </span>
                 </label>
@@ -941,7 +1162,10 @@ export default function CourseQuizzesPage() {
                   type="button"
                   onClick={handleCloseEdit}
                   className="px-4 py-2 rounded-lg text-sm font-medium"
-                  style={{ backgroundColor: "var(--divider-color)", color: "var(--heading-text)" }}
+                  style={{
+                    backgroundColor: "var(--divider-color)",
+                    color: "var(--heading-text)",
+                  }}
                 >
                   Cancel
                 </button>
@@ -950,7 +1174,9 @@ export default function CourseQuizzesPage() {
                   disabled={updatingQuizId === editingQuiz._id}
                   className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white disabled:opacity-50"
                 >
-                  {updatingQuizId === editingQuiz._id ? "Updating..." : "Update Quiz"}
+                  {updatingQuizId === editingQuiz._id
+                    ? "Updating..."
+                    : "Update Quiz"}
                 </button>
               </div>
             </form>
@@ -961,7 +1187,10 @@ export default function CourseQuizzesPage() {
       {/* Attempt Modal */}
       {!isStudent && attemptModal.quiz && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleCloseAttemptModal} />
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={handleCloseAttemptModal}
+          />
           <div
             className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
             style={{
@@ -1000,7 +1229,10 @@ export default function CourseQuizzesPage() {
               >
                 <p style={{ color: "#ef4444" }}>{attemptModal.error}</p>
                 <button
-                  onClick={() => attemptModal.quiz && handleOpenAttemptModal(attemptModal.quiz)}
+                  onClick={() =>
+                    attemptModal.quiz &&
+                    handleOpenAttemptModal(attemptModal.quiz)
+                  }
                   className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
                   style={{ backgroundColor: "#6d28d9" }}
                 >
@@ -1009,7 +1241,8 @@ export default function CourseQuizzesPage() {
               </div>
             ) : (
               <>
-                {attemptModal.attempts.filter((a) => a.status === "in_progress").length === 0 ? (
+                {attemptModal.attempts.filter((a) => a.status === "in_progress")
+                  .length === 0 ? (
                   <div
                     className="rounded-lg border  p-6 pt-12 text-center"
                     style={{ borderColor: "var(--card-border)" }}
@@ -1029,16 +1262,27 @@ export default function CourseQuizzesPage() {
                           style={{ borderColor: "var(--card-border)" }}
                         >
                           <div>
-                            <p className="font-semibold" style={{ color: "var(--heading-text)" }}>
+                            <p
+                              className="font-semibold"
+                              style={{ color: "var(--heading-text)" }}
+                            >
                               {getStudentLabel(attempt)}
                             </p>
-                            <p className="text-xs" style={{ color: "var(--muted-text)" }}>
-                              Started: {attempt.startedAt ? new Date(attempt.startedAt).toLocaleString() : "—"}
+                            <p
+                              className="text-xs"
+                              style={{ color: "var(--muted-text)" }}
+                            >
+                              Started:{" "}
+                              {attempt.startedAt
+                                ? new Date(attempt.startedAt).toLocaleString()
+                                : "—"}
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => navigate(`/quiz-attempts/${attempt._id}`)}
+                              onClick={() =>
+                                navigate(`/quiz-attempts/${attempt._id}`)
+                              }
                               className="px-4 py-2 rounded-lg text-sm font-semibold"
                               style={{ backgroundColor: "var(--card-row-bg)" }}
                             >
@@ -1051,7 +1295,9 @@ export default function CourseQuizzesPage() {
                               style={{ backgroundColor: "#dc2626" }}
                             >
                               <ShieldOff className="w-4 h-4" />
-                              {banProcessingId === attempt._id ? "Banning..." : "Ban"}
+                              {banProcessingId === attempt._id
+                                ? "Banning..."
+                                : "Ban"}
                             </button>
                           </div>
                         </div>
@@ -1067,13 +1313,20 @@ export default function CourseQuizzesPage() {
       {/* Statistics Modal */}
       {!isStudent && statisticsModal.quiz && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={handleCloseStatisticsModal} />
           <div
-            className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={handleCloseStatisticsModal}
+          />
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={handleCloseStatisticsModal}
+          />
+          <div
+            className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
             style={{
               backgroundColor: "var(--card-surface)",
               color: "var(--heading-text)",
-              border: "1px solid var(--card-border)",
+              border: "2px solid var(--card-border)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1088,7 +1341,7 @@ export default function CourseQuizzesPage() {
               </div>
               <button
                 onClick={handleCloseStatisticsModal}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 style={{ color: "var(--heading-text)" }}
               >
                 <X className="w-5 h-5" />
@@ -1106,7 +1359,10 @@ export default function CourseQuizzesPage() {
               >
                 <p style={{ color: "#ef4444" }}>{statisticsModal.error}</p>
                 <button
-                  onClick={() => statisticsModal.quiz && handleOpenStatisticsModal(statisticsModal.quiz)}
+                  onClick={() =>
+                    statisticsModal.quiz &&
+                    handleOpenStatisticsModal(statisticsModal.quiz)
+                  }
                   className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
                   style={{ backgroundColor: "#10b981" }}
                 >
@@ -1119,133 +1375,255 @@ export default function CourseQuizzesPage() {
                   className="rounded-lg border p-12 text-center"
                   style={{ borderColor: "var(--card-border)" }}
                 >
-                  <BarChart3 className="w-16 h-16 mx-auto mb-4" style={{ color: "var(--muted-text)", opacity: 0.5 }} />
-                  <p className="text-lg font-semibold mb-2" style={{ color: "var(--heading-text)" }}>
+                  <BarChart3
+                    className="w-16 h-16 mx-auto mb-4"
+                    style={{ color: "var(--muted-text)", opacity: 0.5 }}
+                  />
+                  <p
+                    className="text-lg font-semibold mb-2"
+                    style={{ color: "var(--heading-text)" }}
+                  >
                     No submissions yet
                   </p>
                   <p className="text-sm" style={{ color: "var(--muted-text)" }}>
-                    Statistics will be available once students submit their quiz attempts.
+                    Statistics will be available once students submit their quiz
+                    attempts.
                   </p>
                 </div>
               ) : (
                 <div className="space-y-6">
                   {/* Summary Statistics */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p className="text-sm" style={{ color: "var(--muted-text)" }}>
-                        Total Students
-                      </p>
-                      <p className="text-2xl font-bold mt-1">
-                        {statisticsModal.statistics.totalStudents}
-                      </p>
-                    </div>
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p className="text-sm" style={{ color: "var(--muted-text)" }}>
-                        Submitted
-                      </p>
-                      <p className="text-2xl font-bold mt-1">
-                        {statisticsModal.statistics.submittedCount}
-                      </p>
-                    </div>
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p className="text-sm" style={{ color: "var(--muted-text)" }}>
-                        Average Score
-                      </p>
-                      <p className="text-2xl font-bold mt-1">
-                        {isNaN(statisticsModal.statistics.averageScore) || statisticsModal.statistics.averageScore === null
-                          ? "N/A"
-                          : statisticsModal.statistics.averageScore.toFixed(1)}
-                      </p>
-                    </div>
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p className="text-sm" style={{ color: "var(--muted-text)" }}>
-                        Median Score
-                      </p>
-                      <p className="text-2xl font-bold mt-1">
-                        {isNaN(statisticsModal.statistics.medianScore) || statisticsModal.statistics.medianScore === null
-                          ? "N/A"
-                          : statisticsModal.statistics.medianScore.toFixed(1)}
-                      </p>
-                    </div>
-                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Left Column: Stats */}
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div
+                          className="rounded-lg border-2 p-3 bg-gradient-to-br from-blue-500/10 to-blue-600/10"
+                          style={{ borderColor: "#3b82f6" }}
+                        >
+                          <p
+                            className="text-xs"
+                            style={{ color: "var(--muted-text)" }}
+                          >
+                            Total Students
+                          </p>
+                          <p className="text-xl font-bold mt-1">
+                            {statisticsModal.statistics.totalStudents}
+                          </p>
+                        </div>
+                        <div
+                          className="rounded-lg border-2 p-3 bg-gradient-to-br from-green-500/10 to-green-600/10"
+                          style={{ borderColor: "#10b981" }}
+                        >
+                          <p
+                            className="text-xs"
+                            style={{ color: "var(--muted-text)" }}
+                          >
+                            Submitted
+                          </p>
+                          <p className="text-xl font-bold mt-1">
+                            {statisticsModal.statistics.submittedCount}
+                          </p>
+                        </div>
+                        <div
+                          className="rounded-lg border-2 p-3 bg-gradient-to-br from-purple-500/10 to-purple-600/10"
+                          style={{ borderColor: "#8b5cf6" }}
+                        >
+                          <p
+                            className="text-xs"
+                            style={{ color: "var(--muted-text)" }}
+                          >
+                            Avg Score
+                          </p>
+                          <p className="text-xl font-bold mt-1">
+                            {isNaN(statisticsModal.statistics.averageScore) ||
+                              statisticsModal.statistics.averageScore === null
+                              ? "N/A"
+                              : statisticsModal.statistics.averageScore.toFixed(
+                                1
+                              )}
+                          </p>
+                        </div>
+                        <div
+                          className="rounded-lg border-2 p-3 bg-gradient-to-br from-orange-500/10 to-orange-600/10"
+                          style={{ borderColor: "#f97316" }}
+                        >
+                          <p
+                            className="text-xs"
+                            style={{ color: "var(--muted-text)" }}
+                          >
+                            Median
+                          </p>
+                          <p className="text-xl font-bold mt-1">
+                            {isNaN(statisticsModal.statistics.medianScore) ||
+                              statisticsModal.statistics.medianScore === null
+                              ? "N/A"
+                              : statisticsModal.statistics.medianScore.toFixed(
+                                1
+                              )}
+                          </p>
+                        </div>
+                      </div>
 
-                  {/* Score Range */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p className="text-sm mb-2" style={{ color: "var(--muted-text)" }}>
-                        Score Range
-                      </p>
-                      <p className="text-lg font-semibold">
-                        {statisticsModal.statistics.minMax?.min !== undefined && statisticsModal.statistics.minMax?.max !== undefined
-                          ? `${statisticsModal.statistics.minMax.min} - ${statisticsModal.statistics.minMax.max}`
-                          : "N/A"}
-                      </p>
-                    </div>
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p className="text-sm mb-2" style={{ color: "var(--muted-text)" }}>
-                        Standard Deviation
-                      </p>
-                      <p className="text-lg font-semibold">
-                        {isNaN(statisticsModal.statistics.standardDeviationScore) || statisticsModal.statistics.standardDeviationScore === null
-                          ? "N/A"
-                          : statisticsModal.statistics.standardDeviationScore.toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Score Distribution */}
-                  {statisticsModal.statistics.scoreDistribution && statisticsModal.statistics.scoreDistribution.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold mb-3">Score Distribution</h3>
-                      <div className="space-y-2">
-                        {statisticsModal.statistics.scoreDistribution.map((dist, index) => (
-                          <div key={index} className="flex items-center gap-4">
-                            <div className="w-24 text-sm" style={{ color: "var(--muted-text)" }}>
-                              {dist.range}
-                            </div>
-                            <div className="flex-1">
-                              <div
-                                className="h-6 rounded"
-                                style={{
-                                  backgroundColor: "var(--card-row-bg)",
-                                  width: `${dist.percentage}`,
-                                  minWidth: dist.count > 0 ? "4px" : "0",
-                                }}
-                              />
-                            </div>
-                            <div className="w-20 text-sm text-right" style={{ color: "var(--muted-text)" }}>
-                              {dist.count} ({dist.percentage})
-                            </div>
-                          </div>
-                        ))}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div
+                          className="rounded-lg border-2 p-3"
+                          style={{
+                            borderColor: "var(--heading-text)",
+                            opacity: 0.8,
+                          }}
+                        >
+                          <p
+                            className="text-xs mb-1"
+                            style={{ color: "var(--muted-text)" }}
+                          >
+                            Score Range
+                          </p>
+                          <p className="text-base font-semibold">
+                            {statisticsModal.statistics.minMax?.min !==
+                              undefined &&
+                              statisticsModal.statistics.minMax?.max !== undefined
+                              ? `${statisticsModal.statistics.minMax.min} - ${statisticsModal.statistics.minMax.max}`
+                              : "N/A"}
+                          </p>
+                        </div>
+                        <div
+                          className="rounded-lg border-2 p-3"
+                          style={{
+                            borderColor: "var(--heading-text)",
+                            opacity: 0.8,
+                          }}
+                        >
+                          <p
+                            className="text-xs mb-1"
+                            style={{ color: "var(--muted-text)" }}
+                          >
+                            Std Deviation
+                          </p>
+                          <p className="text-base font-semibold">
+                            {isNaN(
+                              statisticsModal.statistics.standardDeviationScore
+                            ) ||
+                              statisticsModal.statistics
+                                .standardDeviationScore === null
+                              ? "N/A"
+                              : statisticsModal.statistics.standardDeviationScore.toFixed(
+                                2
+                              )}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  )}
+
+                    {/* Right Column: Chart */}
+                    {statisticsModal.statistics.scoreDistribution &&
+                      statisticsModal.statistics.scoreDistribution.length >
+                      0 && (
+                        <div
+                          className="flex flex-col items-center justify-center rounded-lg border-2 p-4 shadow-md"
+                          style={{ borderColor: "var(--card-border)", borderWidth: "3px" }}
+                        >
+                          <h3 className="text-sm font-semibold mb-2">
+                            Score Distribution
+                          </h3>
+                          <div className="w-full h-48">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={statisticsModal.statistics.scoreDistribution.map(
+                                    (d) => ({
+                                      name: d.range,
+                                      value: d.count,
+                                      percentage: d.percentage,
+                                    })
+                                  )}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={40}
+                                  outerRadius={70}
+                                  paddingAngle={2}
+                                  dataKey="value"
+                                >
+                                  {statisticsModal.statistics.scoreDistribution.map(
+                                    (_, index) => {
+                                      // Softer/Pastel Palette
+                                      // Red -> Orange -> Yellow -> Blue -> Green
+                                      const colors = [
+                                        "#F87171",
+                                        "#FB923C",
+                                        "#FACC15",
+                                        "#60A5FA",
+                                        "#4ADE80",
+                                      ];
+                                      return (
+                                        <Cell
+                                          key={`cell-${index}`}
+                                          fill={colors[index % colors.length]}
+                                        />
+                                      );
+                                    }
+                                  )}
+                                </Pie>
+                                <Tooltip
+                                  formatter={(
+                                    value: number,
+                                    _: string,
+                                    props: any
+                                  ) => {
+                                    // Parse percentage string (e.g. "25.5%") to number, round it, and add % back
+                                    const rawPercent = parseFloat(
+                                      props.payload.percentage.replace("%", "")
+                                    );
+                                    const roundedPercent =
+                                      Math.round(rawPercent);
+                                    return [
+                                      `${roundedPercent}% - ${value} students`,
+                                      null,
+                                    ];
+                                  }}
+                                  contentStyle={{
+                                    backgroundColor: "var(--card-surface)",
+                                    borderColor: "var(--card-border)",
+                                    color: "var(--heading-text)",
+                                    borderRadius: "8px",
+                                    fontSize: "12px",
+                                    boxShadow:
+                                      "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                                  }}
+                                  itemStyle={{ color: "var(--heading-text)" }}
+                                  labelStyle={{ display: "none" }}
+                                />
+                                <Legend
+                                  layout="vertical"
+                                  verticalAlign="middle"
+                                  align="right"
+                                  wrapperStyle={{ fontSize: "10px" }}
+                                  formatter={(value, entry: any) => (
+                                    <span
+                                      style={{ color: "var(--muted-text)" }}
+                                    >
+                                      {value}
+                                    </span>
+                                  )}
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      )}
+                  </div>
 
                   {/* Students List */}
                   <div>
-                    <h3 className="text-lg font-semibold mb-3">Student Results</h3>
+                    <h3 className="text-lg font-semibold mb-3">
+                      Student Results
+                    </h3>
                     <div className="space-y-2">
                       {statisticsModal.statistics.students.length === 0 ? (
-                        <p className="text-sm text-center py-4" style={{ color: "var(--muted-text)" }}>
+                        <p
+                          className="text-sm text-center py-4"
+                          style={{ color: "var(--muted-text)" }}
+                        >
                           No students have submitted this quiz yet.
                         </p>
                       ) : (
@@ -1255,34 +1633,65 @@ export default function CourseQuizzesPage() {
                         >
                           <table className="w-full">
                             <thead>
-                              <tr style={{ backgroundColor: "var(--card-row-bg)" }}>
-                                <th className="px-4 py-2 text-left text-sm font-semibold">Rank</th>
-                                <th className="px-4 py-2 text-left text-sm font-semibold">Name</th>
-                                <th className="px-4 py-2 text-left text-sm font-semibold">Email</th>
-                                <th className="px-4 py-2 text-right text-sm font-semibold">Score</th>
-                                <th className="px-4 py-2 text-right text-sm font-semibold">Duration</th>
+                              <tr
+                                style={{
+                                  backgroundColor: "var(--card-row-bg)",
+                                }}
+                              >
+                                <th className="px-4 py-2 text-left text-sm font-semibold">
+                                  Rank
+                                </th>
+                                <th className="px-4 py-2 text-left text-sm font-semibold">
+                                  Name
+                                </th>
+                                <th className="px-4 py-2 text-left text-sm font-semibold">
+                                  Email
+                                </th>
+                                <th className="px-4 py-2 text-right text-sm font-semibold">
+                                  Score
+                                </th>
+                                <th className="px-4 py-2 text-right text-sm font-semibold">
+                                  Duration
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
-                              {statisticsModal.statistics.students.map((student, index) => (
-                                <tr
-                                  key={index}
-                                  className="border-t"
-                                  style={{ borderColor: "var(--card-border)" }}
-                                >
-                                  <td className="px-4 py-2 text-sm">#{student.rank}</td>
-                                  <td className="px-4 py-2 text-sm">{student.fullname}</td>
-                                  <td className="px-4 py-2 text-sm" style={{ color: "var(--muted-text)" }}>
-                                    {student.email}
-                                  </td>
-                                  <td className="px-4 py-2 text-sm text-right font-semibold">
-                                    {student.score.toFixed(1)}
-                                  </td>
-                                  <td className="px-4 py-2 text-sm text-right" style={{ color: "var(--muted-text)" }}>
-                                    {Math.floor(student.durationSeconds / 60)}m {Math.floor(student.durationSeconds % 60)}s
-                                  </td>
-                                </tr>
-                              ))}
+                              {statisticsModal.statistics.students.map(
+                                (student, index) => (
+                                  <tr
+                                    key={index}
+                                    className="border-t"
+                                    style={{
+                                      borderColor: "var(--card-border)",
+                                    }}
+                                  >
+                                    <td className="px-4 py-2 text-sm">
+                                      #{student.rank}
+                                    </td>
+                                    <td className="px-4 py-2 text-sm">
+                                      {student.fullname}
+                                    </td>
+                                    <td
+                                      className="px-4 py-2 text-sm"
+                                      style={{ color: "var(--muted-text)" }}
+                                    >
+                                      {student.email}
+                                    </td>
+                                    <td className="px-4 py-2 text-sm text-right font-semibold">
+                                      {student.score.toFixed(1)}
+                                    </td>
+                                    <td
+                                      className="px-4 py-2 text-sm text-right"
+                                      style={{ color: "var(--muted-text)" }}
+                                    >
+                                      {Math.floor(student.durationSeconds / 60)}
+                                      m{" "}
+                                      {Math.floor(student.durationSeconds % 60)}
+                                      s
+                                    </td>
+                                  </tr>
+                                )
+                              )}
                             </tbody>
                           </table>
                         </div>
@@ -1298,4 +1707,3 @@ export default function CourseQuizzesPage() {
     </div>
   );
 }
-

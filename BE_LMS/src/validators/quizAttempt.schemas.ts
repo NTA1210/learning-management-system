@@ -60,3 +60,14 @@ export const submitAnswerSchema = z.object({
 });
 
 export type SubmitAnswerInput = z.infer<typeof submitAnswerSchema>;
+
+export const updateQuizAttemptScoreSchema = z.object({
+  quizAttemptId: quizAttemptIdSchema,
+  score: z
+    .union([z.number(), z.string()])
+    .transform((val) => Number(val))
+    .refine((val) => !isNaN(val), { message: 'Score must be a number' })
+    .refine((val) => val >= 0 && val <= 10, { message: 'Score must be between 0 and 10' }),
+});
+
+export type UpdateQuizAttemptScoreInput = z.infer<typeof updateQuizAttemptScoreSchema>;

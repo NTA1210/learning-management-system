@@ -72,22 +72,22 @@ const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
         const isImage = Boolean(extension) && imageExtensions.has(extension);
         if (isImage) {
           return (
-            <button
-              type="button"
-              key={`${fileUrl}-${index}`}
+        <button
+          type="button"
+          key={`${fileUrl}-${index}`}
               onClick={() => handleImageClick(fileUrl)}
-              className={`shrink-0 rounded-2xl border border-slate-200 bg-white/30 p-1 transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800/60 ${sizing.container}`}
-              aria-label={`View attachment ${index + 1}`}
-            >
+          className={`shrink-0 rounded-2xl border border-slate-200 bg-white/30 p-1 transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-800/60 ${sizing.container}`}
+          aria-label={`View attachment ${index + 1}`}
+        >
               <div className="h-full w-full overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-900/50">
-                <img
-                  src={fileUrl}
-                  alt={caption || `Attachment ${index + 1}`}
-                  loading="lazy"
-                  className={`w-full rounded-2xl object-cover ${sizing.image}`}
-                />
-              </div>
-            </button>
+            <img
+              src={fileUrl}
+              alt={caption || `Attachment ${index + 1}`}
+              loading="lazy"
+              className={`w-full rounded-2xl object-cover ${sizing.image}`}
+            />
+          </div>
+        </button>
           );
         }
 

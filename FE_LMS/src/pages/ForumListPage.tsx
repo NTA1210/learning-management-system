@@ -7,8 +7,10 @@ import type { Course } from "../types/course";
 import { courseService } from "../services";
 import AttachmentPreview from "../components/AttachmentPreview";
 import { forumService, type ForumResponse, type ForumType } from "../services/forumService";
-import { Book, BookOpen, Edit3, Eye, Loader2, PlusCircle, RefreshCcw, Trash2, X, User } from "lucide-react";
+import { Edit3, Eye, Loader2, RefreshCcw, Trash2, X, User } from "lucide-react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import toast from "react-hot-toast";
+import MarkdownComposer from "../components/MarkdownComposer";
 
 type SidebarRole = "admin" | "teacher" | "student";
 
@@ -41,15 +43,6 @@ const ForumListPage: React.FC = () => {
     user && ["admin", "teacher", "student"].includes(user.role) ? (user.role as SidebarRole) : "student";
   const canManage = user?.role === "admin" || user?.role === "teacher";
 
-  const formatFileSize = (size: number) => {
-    if (!size || Number.isNaN(size)) return "0 B";
-    const units = ["B", "KB", "MB", "GB"];
-    const exponent = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
-    const value = size / 1024 ** exponent;
-    const formatted = exponent === 0 || value >= 10 ? value.toFixed(0) : value.toFixed(1);
-    return `${formatted} ${units[exponent]}`;
-  };
-
   const getInitials = (input?: string) => {
     if (!input) return "U";
     const trimmed = input.trim();
@@ -65,7 +58,7 @@ const ForumListPage: React.FC = () => {
   };
 
   const imageExtensions = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg"]);
-  
+
   const getFileExtension = (fileUrl: string): string => {
     const sanitized = fileUrl.split(/[?#]/)[0];
     const lastSegment = sanitized.split("/").pop() || "";
@@ -137,27 +130,7 @@ const ForumListPage: React.FC = () => {
     error: null,
   });
 
-  const [createModal, setCreateModal] = useState<{
-    open: boolean;
-    title: string;
-    description: string;
-    forumType: ForumType;
-    isActive: boolean;
-    submitting: boolean;
-    error?: string | null;
-    file: File | null;
-  }>({
-    open: false,
-    title: "",
-    description: "",
-    forumType: "discussion",
-    isActive: true,
-    submitting: false,
-    error: null,
-    file: null,
-  });
 
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const courseDropdownRef = useRef<HTMLDivElement | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState<{ src: string; alt?: string } | null>(null);
   const handleAttachmentPreview = useCallback((payload: { src: string; alt?: string }) => {
@@ -265,12 +238,6 @@ const ForumListPage: React.FC = () => {
   }, [courses, selectedCourseId, selectedCourseSnapshot]);
 
   useEffect(() => {
-    if (!toast) return;
-    const timeout = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(timeout);
-  }, [toast]);
-
-  useEffect(() => {
     if (courseDropdownOpen) return;
     if (selectedCourse?.title) {
       setCourseSearchQuery(selectedCourse.title);
@@ -321,7 +288,7 @@ const ForumListPage: React.FC = () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to load forum detail";
       setDetailModal({ loading: false, forum: null });
-      setToast({ type: "error", message });
+      toast.error(message);
     }
   };
 
@@ -355,37 +322,6 @@ const ForumListPage: React.FC = () => {
       file: null,
     });
 
-  const openCreateModal = () => {
-    if (!canManage) return;
-    if (!selectedCourseId) {
-      setToast({ type: "error", message: "Select a course before creating a post." });
-      return;
-    }
-    setCreateModal((prev) => ({
-      ...prev,
-      open: true,
-      title: "",
-      description: "",
-      forumType: "discussion",
-      isActive: true,
-      submitting: false,
-      error: null,
-      file: null,
-    }));
-  };
-
-  const closeCreateModal = () =>
-    setCreateModal({
-      open: false,
-      title: "",
-      description: "",
-      forumType: "discussion",
-      isActive: true,
-      submitting: false,
-      error: null,
-      file: null,
-    });
-
   const handleUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editModal.forum) return;
@@ -401,7 +337,7 @@ const ForumListPage: React.FC = () => {
         },
         editModal.file || undefined
       );
-      setToast({ type: "success", message: "Forum updated successfully." });
+      toast.success("Forum updated successfully.");
       closeEditModal();
       refreshForums();
     } catch (error) {
@@ -410,35 +346,18 @@ const ForumListPage: React.FC = () => {
     }
   };
 
-  const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!selectedCourseId) {
-      setCreateModal((prev) => ({ ...prev, error: "Please choose a course first." }));
+  const handleCreateForumFromList = () => {
+    if (!selectedCourseId || !selectedCourse) {
+      toast.error("Please select a course first.");
       return;
     }
-    if (!createModal.title.trim() || !createModal.description.trim()) {
-      setCreateModal((prev) => ({ ...prev, error: "Title and content are both required." }));
-      return;
-    }
-    try {
-      setCreateModal((prev) => ({ ...prev, submitting: true, error: null }));
-      await forumService.createForum(
-        {
-          courseId: selectedCourseId,
-          title: createModal.title.trim(),
-          description: createModal.description.trim(),
-          forumType: createModal.forumType,
-          isActive: createModal.isActive,
-        },
-        createModal.file || undefined
-      );
-      setToast({ type: "success", message: "Forum post created." });
-      closeCreateModal();
-      refreshForums();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to create forum post";
-      setCreateModal((prev) => ({ ...prev, submitting: false, error: message }));
-    }
+    const courseTitle = selectedCourse.title ?? "Course";
+    navigate("/forum", {
+      state: {
+        preselectedCourseId: selectedCourseId,
+        preselectedCourseTitle: courseTitle,
+      },
+    });
   };
 
   const openDeleteModal = (forum: ForumResponse) => {
@@ -453,12 +372,22 @@ const ForumListPage: React.FC = () => {
     try {
       setDeleteModal((prev) => ({ ...prev, loading: true, error: null }));
       await forumService.deleteForum(deleteModal.forum._id);
-      setToast({ type: "success", message: "Forum deleted." });
+      toast.success("Forum deleted successfully.");
       closeDeleteModal();
       refreshForums();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to delete forum";
-      setDeleteModal((prev) => ({ ...prev, loading: false, error: message }));
+    } catch (error: any) {
+      let message = "Unable to delete forum";
+
+      // Check for specific error messages from the API
+      if (error?.response?.data?.message) {
+        message = error.response.data.message;
+      } else if (error instanceof Error) {
+        message = error.message;
+      }
+
+      // Show error in toast popup and close modal
+      toast.error(message);
+      closeDeleteModal();
     }
   };
 
@@ -486,7 +415,14 @@ const ForumListPage: React.FC = () => {
 
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
-          
+                <button
+                  type="button"
+                  onClick={handleCreateForumFromList}
+                  disabled={!selectedCourseId || !canManage}
+                  className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
+                >
+                  Create Forum Post
+                </button>
                 <button
                   type="button"
                   onClick={refreshForums}
@@ -494,22 +430,11 @@ const ForumListPage: React.FC = () => {
                   disabled={forumsLoading || !selectedCourseId}
                 >
                   <RefreshCcw className={`w-4 h-4 ${forumsLoading ? "animate-spin" : ""}`} />
-                 
+
                 </button>
               </div>
             </header>
 
-            {toast && (
-              <div
-                className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${toast.type === "success"
-                    ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                    : "bg-rose-50 border-rose-200 text-rose-700"
-                  }`}
-              >
-                <Book className="w-5 h-5" />
-                <span>{toast.message}</span>
-              </div>
-            )}
 
             <section className={`rounded-2xl p-6 shadow-sm ${panelStyles}`}>
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -638,23 +563,22 @@ const ForumListPage: React.FC = () => {
                     return (
                       <div
                         key={forum._id}
-                        className={`rounded-2xl border p-5 flex flex-col gap-4 relative overflow-hidden ${
-                          darkMode ? "border-slate-700" : "border-slate-200"
-                        }`}
+                        className={`rounded-2xl border p-5 flex flex-col gap-4 relative overflow-hidden ${darkMode ? "border-slate-700" : "border-slate-200"
+                          }`}
                         style={
                           hasBackgroundImage
                             ? {
-                                backgroundImage: `url(${backgroundImageUrl})`,
-                                backgroundSize: "cover",
-                                backgroundPosition: "center",
-                                backgroundRepeat: "no-repeat",
-                                filter: darkMode ? "none" : "brightness(1.1)",
-                              }
+                              backgroundImage: `url(${backgroundImageUrl})`,
+                              backgroundSize: "cover",
+                              backgroundPosition: "center",
+                              backgroundRepeat: "no-repeat",
+                              filter: darkMode ? "none" : "brightness(1.1)",
+                            }
                             : undefined
                         }
                       >
                         {hasBackgroundImage && (
-                          <div 
+                          <div
                             className="absolute inset-0 z-0"
                             style={{
                               backgroundColor: darkMode ? "rgba(0, 0, 0, 0.4)" : "rgba(0, 0, 0, 0.3)",
@@ -665,9 +589,8 @@ const ForumListPage: React.FC = () => {
                           <div className="flex items-start gap-4 relative">
                             <div className="relative group" style={{ zIndex: 100 }}>
                               <div
-                                className={`h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden cursor-pointer ${
-                                  darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
-                                }`}
+                                className={`h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden cursor-pointer ${darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
+                                  }`}
                               >
                                 {avatarUrl ? (
                                   <img src={avatarUrl} alt={authorName} className="h-full w-full object-cover" />
@@ -677,15 +600,13 @@ const ForumListPage: React.FC = () => {
                               </div>
                               {/* Author Hover Popup */}
                               <div className="absolute left-0 top-14 z-[9999] hidden group-hover:block w-64">
-                                <div className={`rounded-2xl shadow-2xl border p-4 ${
-                                  darkMode 
-                                    ? "bg-slate-900 border-slate-700 text-slate-100" 
-                                    : "bg-white border-slate-200 text-slate-900"
-                                }`}>
+                                <div className={`rounded-2xl shadow-2xl border p-4 ${darkMode
+                                  ? "bg-slate-900 border-slate-700 text-slate-100"
+                                  : "bg-white border-slate-200 text-slate-900"
+                                  }`}>
                                   <div className="flex items-center gap-3 mb-3">
-                                    <div className={`h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden ${
-                                      darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
-                                    }`}>
+                                    <div className={`h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden ${darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
+                                      }`}>
                                       {avatarUrl ? (
                                         <img src={avatarUrl} alt={authorName} className="h-full w-full object-cover" />
                                       ) : (
@@ -711,32 +632,28 @@ const ForumListPage: React.FC = () => {
                               </div>
                             </div>
                             <div className="flex-1 min-w-[200px]">
-                              <div className={`text-xs mb-2 ${
-                                hasBackgroundImage 
-                                  ? "text-white/90 drop-shadow"
-                                  : "text-slate-400"
-                              }`}>
+                              <div className={`text-xs mb-2 ${hasBackgroundImage
+                                ? "text-white/90 drop-shadow"
+                                : "text-slate-400"
+                                }`}>
                                 <span className="relative inline-block group/name" style={{ zIndex: 100 }}>
-                                  <span 
-                                    className={`font-semibold cursor-pointer hover:underline ${
-                                      hasBackgroundImage 
-                                        ? "text-white"
-                                        : "text-slate-600 dark:text-slate-200"
-                                    }`}
+                                  <span
+                                    className={`font-semibold cursor-pointer hover:underline ${hasBackgroundImage
+                                      ? "text-white"
+                                      : "text-slate-600 dark:text-slate-200"
+                                      }`}
                                   >
                                     {authorName}
                                   </span>
                                   {/* Author Name Hover Popup */}
                                   <div className="absolute left-0 top-6 z-[9999] hidden group-hover/name:block w-64">
-                                    <div className={`rounded-2xl shadow-2xl border p-4 ${
-                                      darkMode 
-                                        ? "bg-slate-900 border-slate-700 text-slate-100" 
-                                        : "bg-white border-slate-200 text-slate-900"
-                                    }`}>
+                                    <div className={`rounded-2xl shadow-2xl border p-4 ${darkMode
+                                      ? "bg-slate-900 border-slate-700 text-slate-100"
+                                      : "bg-white border-slate-200 text-slate-900"
+                                      }`}>
                                       <div className="flex items-center gap-3 mb-3">
-                                        <div className={`h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden ${
-                                          darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
-                                        }`}>
+                                        <div className={`h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden ${darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
+                                          }`}>
                                           {avatarUrl ? (
                                             <img src={avatarUrl} alt={authorName} className="h-full w-full object-cover" />
                                           ) : (
@@ -766,11 +683,10 @@ const ForumListPage: React.FC = () => {
                                     {authorRole}
                                   </span>
                                 )}
-                                <span className={`ml-2 ${
-                                  hasBackgroundImage 
-                                    ? "text-white/80"
-                                    : "text-slate-500"
-                                }`}>
+                                <span className={`ml-2 ${hasBackgroundImage
+                                  ? "text-white/80"
+                                  : "text-slate-500"
+                                  }`}>
                                   • Created: {forum.createdAt ? new Date(forum.createdAt).toLocaleString() : "—"}
                                   {forum.updatedAt && forum.updatedAt !== forum.createdAt && (
                                     <span className="ml-2">
@@ -778,38 +694,39 @@ const ForumListPage: React.FC = () => {
                                   )}
                                 </span>
                               </div>
-                              <h4 
-                                onClick={() => navigate(`/forums/${forum._id}`)}
-                                className={`text-2xl font-bold cursor-pointer transition-colors ${
-                                  hasBackgroundImage
+                              <Link
+                                to={`/forums/${forum._id}`}
+                                className="block"
+                              >
+                                <h4
+                                  className={`text-2xl font-bold cursor-pointer transition-colors ${hasBackgroundImage
                                     ? "text-white drop-shadow-lg hover:text-indigo-200"
                                     : "text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200"
-                                }`}
-                              >
-                                {forumTitle}
-                              </h4>
-                              <p className={`text-sm mt-2 line-clamp-3 ${
-                                hasBackgroundImage 
-                                  ? "text-white/90 drop-shadow"
-                                  : "text-slate-500"
-                              }`}>
+                                    }`}
+                                >
+                                  {forumTitle}
+                                </h4>
+                              </Link>
+                              <p className={`text-sm mt-2 line-clamp-3 ${hasBackgroundImage
+                                ? "text-white/90 drop-shadow"
+                                : "text-slate-500"
+                                }`}>
                                 {forum.description}
                               </p>
                             </div>
                             <div className="absolute top-0 right-0">
-                                <span
-                                  className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                                    hasBackgroundImage
-                                      ? forum.forumType === "announcement"
-                                        ? "bg-amber-500/90 text-white backdrop-blur-sm"
-                                        : "bg-indigo-500/90 text-white backdrop-blur-sm"
-                                      : forum.forumType === "announcement"
-                                        ? "bg-amber-100 text-amber-700"
-                                        : "bg-indigo-100 text-indigo-700"
+                              <span
+                                className={`text-xs font-semibold px-3 py-1 rounded-full ${hasBackgroundImage
+                                  ? forum.forumType === "announcement"
+                                    ? "bg-amber-500/90 text-white backdrop-blur-sm"
+                                    : "bg-indigo-500/90 text-white backdrop-blur-sm"
+                                  : forum.forumType === "announcement"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-indigo-100 text-indigo-700"
                                   }`}
-                                >
-                                  {forumTypeLabels[forum.forumType]}
-                                </span>
+                              >
+                                {forumTypeLabels[forum.forumType]}
+                              </span>
                             </div>
                           </div>
 
@@ -823,21 +740,19 @@ const ForumListPage: React.FC = () => {
                           )}
 
                           <div className="flex flex-wrap items-center justify-between gap-3 pt-12">
-                            <div className={`text-xs ${
-                              hasBackgroundImage 
-                                ? "text-white/80"
-                                : "text-slate-400"
-                            }`}>
+                            <div className={`text-xs ${hasBackgroundImage
+                              ? "text-white/80"
+                              : "text-slate-400"
+                              }`}>
                               Updated: {forum.updatedAt ? new Date(forum.updatedAt).toLocaleString() : "Awaiting update"}
                             </div>
                             <div className="flex gap-2 shrink-0">
                               <Link
                                 to={`/forums/${forum._id}`}
-                                className={`inline-flex items-center justify-center rounded-xl border active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow px-3 py-2 ${
-                                  hasBackgroundImage
-                                    ? "border-white/30 text-white bg-white/20 hover:bg-white/30 backdrop-blur-sm"
-                                    : "border-slate-300 text-slate-700 bg-white hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                                }`}
+                                className={`inline-flex items-center justify-center rounded-xl border active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow px-3 py-2 ${hasBackgroundImage
+                                  ? "border-white/30 text-white bg-white/20 hover:bg-white/30 backdrop-blur-sm"
+                                  : "border-slate-300 text-slate-700 bg-white hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                                  }`}
                                 title="View forum"
                               >
                                 <Eye className="w-4 h-4" />
@@ -847,11 +762,10 @@ const ForumListPage: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => openEditModal(forum)}
-                                    className={`inline-flex items-center justify-center rounded-xl border active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow px-3 py-2 ${
-                                      hasBackgroundImage
-                                        ? "border-white/30 text-white bg-white/20 hover:bg-white/30 backdrop-blur-sm"
-                                        : "border-slate-300 text-slate-700 bg-white hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                                    }`}
+                                    className={`inline-flex items-center justify-center rounded-xl border active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow px-3 py-2 ${hasBackgroundImage
+                                      ? "border-white/30 text-white bg-white/20 hover:bg-white/30 backdrop-blur-sm"
+                                      : "border-slate-300 text-slate-700 bg-white hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                                      }`}
                                     title="Edit forum"
                                   >
                                     <Edit3 className="w-4 h-4" />
@@ -860,11 +774,10 @@ const ForumListPage: React.FC = () => {
                                   <button
                                     type="button"
                                     onClick={() => openDeleteModal(forum)}
-                                    className={`inline-flex items-center justify-center rounded-lg px-3 py-2 border ${
-                                      hasBackgroundImage
-                                        ? "border-rose-300/50 text-rose-200 hover:bg-rose-500/30 backdrop-blur-sm"
-                                        : "border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
-                                    }`}
+                                    className={`inline-flex items-center justify-center rounded-lg px-3 py-2 border ${hasBackgroundImage
+                                      ? "border-rose-300/50 text-rose-200 hover:bg-rose-500/30 backdrop-blur-sm"
+                                      : "border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                      }`}
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
@@ -882,155 +795,6 @@ const ForumListPage: React.FC = () => {
           </div>
         </main>
       </div>
-
-      {createModal.open && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
-          <div
-            className={`max-w-4xl w-full rounded-3xl p-6 md:p-8 relative ${darkMode ? "bg-slate-950 text-slate-100" : "bg-white text-slate-900"
-              }`}
-          >
-            <button className="absolute top-5 right-5" onClick={closeCreateModal}>
-              <X className="w-5 h-5" />
-            </button>
-            <form className="grid gap-6 md:grid-cols-2" onSubmit={handleCreate}>
-              <div className="space-y-5">
-                <div >
-                  <p className="text-2xl uppercase tracking-wide text-indigo-400 font-semibold">Create post</p>
-                  <h3 className="text-2xl font-semibold mt-1">Share resources or questions</h3>
-                  {selectedCourse && (
-                    <p className="text-sm text-slate-500 mt-1">
-                      Posting to <span className="font-medium">{selectedCourse.title}</span>
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Title</label>
-                  <input
-                    type="text"
-                    className={`w-full rounded-2xl border px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                      }`}
-                    placeholder="Example: UI design materials"
-                    value={createModal.title}
-                    onChange={(event) => setCreateModal((prev) => ({ ...prev, title: event.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Content (Markdown supported)</label>
-                  <textarea
-                    className={`w-full h-36 rounded-2xl border px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                      }`}
-                    placeholder="Share context, add bullet lists...."
-                    value={createModal.description}
-                    onChange={(event) => setCreateModal((prev) => ({ ...prev, description: event.target.value }))}
-                  ></textarea>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Attachment (optional)</label>
-                  <input
-                    type="file"
-                    accept={attachmentAcceptTypes}
-                    onChange={(event) =>
-                      setCreateModal((prev) => ({
-                        ...prev,
-                        file: event.target.files?.[0] || null,
-                      }))
-                    }
-                    className="w-full rounded-2xl border px-4 py-2.5 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500 cursor-pointer"
-                  />
-                  {createModal.file && (
-                    <div
-                      className={`mt-2 flex items-center justify-between rounded-xl px-3 py-2 text-xs ${darkMode ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-600"
-                        }`}
-                    >
-                      <span className="truncate pr-2">
-                        {createModal.file.name} • {formatFileSize(createModal.file.size)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setCreateModal((prev) => ({ ...prev, file: null }))}
-                        className="text-rose-500 font-semibold hover:text-rose-400"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Topic type</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {(["discussion", "announcement"] as ForumType[]).map((type) => {
-                      const isActive = createModal.forumType === type;
-                      return (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setCreateModal((prev) => ({ ...prev, forumType: type }))}
-                          className={`text-left p-4 rounded-2xl border transition ${isActive
-                              ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-500/20"
-                              : darkMode
-                                ? "border-slate-700 hover:border-slate-500"
-                                : "border-slate-200 hover:border-slate-300"
-                            }`}
-                        >
-                          <p className="font-semibold">{forumTypeLabels[type]}</p>
-                          <p className="text-xs text-slate-500 mt-1">
-                            {type === "discussion"
-                              ? "Perfect for open questions or resource sharing."
-                              : "Use for important, single-source announcements."}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <label className="flex items-center gap-3 text-sm">
-                  <input
-                    type="checkbox"
-                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                    checked={createModal.isActive}
-                    onChange={(event) => setCreateModal((prev) => ({ ...prev, isActive: event.target.checked }))}
-                  />
-                  Allow everyone in the course to participate (active)
-                </label>
-                {createModal.error && <p className="text-sm text-rose-500">{createModal.error}</p>}
-                <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-                  <button
-                    type="submit"
-                    className="inline-flex items-center justify-center rounded-2xl bg-indigo-600 px-5 py-2.5 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
-                    disabled={createModal.submitting}
-                  >
-                    {createModal.submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                    Publish post
-                  </button>
-                  <button
-                    type="button"
-                    onClick={closeCreateModal}
-                    className="rounded-2xl border px-5 py-2.5 font-semibold border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-              <div
-                className={`rounded-2xl border px-4 py-5 h-full ${darkMode ? "bg-slate-900 border-slate-800" : "bg-slate-50 border-slate-200"
-                  }`}
-              >
-                <p className="text-2xl uppercase tracking-wide text-indigo-400 font-semibold mb-2">Live preview</p>
-                <h4 className="text-xl font-semibold mb-3">What learners will see</h4>
-                <div
-                  className={`rounded-2xl border-dashed border px-4 py-6 min-h-[220px] ${darkMode ? "border-slate-700 text-slate-200" : "border-slate-300 text-slate-500"
-                    }`}
-                >
-                  <h5 className="text-lg font-semibold mb-2">
-                    {createModal.title || "Start typing to preview your Markdown formatting."}
-                  </h5>
-
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {detailModal.forum && (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4">
@@ -1095,42 +859,24 @@ const ForumListPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Description</label>
-                <textarea
-                  className={`w-full h-28 rounded-xl border px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                    }`}
+                <label className="block text-sm font-medium mb-2">Content editor</label>
+                <MarkdownComposer
                   value={editModal.description}
-                  onChange={(event) => setEditModal((prev) => ({ ...prev, description: event.target.value }))}
-                ></textarea>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Update attachment</label>
-                <input
-                  type="file"
-                  accept={attachmentAcceptTypes}
-                  onChange={(event) =>
-                    setEditModal((prev) => ({
-                      ...prev,
-                      file: event.target.files?.[0] || null,
-                    }))
-                  }
-                  className="w-full rounded-xl border px-4 py-2.5 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500 cursor-pointer"
+                  onChange={(next) => setEditModal((prev) => ({ ...prev, description: next }))}
+                  placeholder="Share context, add bullet lists, or embed resources using Markdown shortcuts."
+                  darkMode={darkMode}
+                  attachment={editModal.file}
+                  onAttachmentChange={(file) => setEditModal((prev) => ({ ...prev, file }))}
+                  attachmentAccept={attachmentAcceptTypes}
                 />
                 {editModal.file && (
-                  <div
-                    className={`mt-2 flex items-center justify-between rounded-xl px-3 py-2 text-xs ${darkMode ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-600"
-                      }`}
-                  >
-                    <span className="truncate pr-2">
-                      {editModal.file.name} • {formatFileSize(editModal.file.size)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setEditModal((prev) => ({ ...prev, file: null }))}
-                      className="text-rose-500 font-semibold hover:text-rose-400"
-                    >
-                      Remove
-                    </button>
+                  <div className="mt-3">
+                    <AttachmentPreview
+                      files={[URL.createObjectURL(editModal.file)]}
+                      size="sm"
+                      onImageClick={handleAttachmentPreview}
+                      caption={editModal.file.name}
+                    />
                   </div>
                 )}
               </div>
@@ -1143,10 +889,10 @@ const ForumListPage: React.FC = () => {
                       key={type}
                       onClick={() => setEditModal((prev) => ({ ...prev, forumType: type }))}
                       className={`text-left p-4 rounded-xl border transition-all ${isActive
-                          ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-500/20"
-                          : darkMode
-                            ? "border-slate-700 hover:border-slate-500"
-                            : "border-slate-200 hover:border-slate-300"
+                        ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-500/20"
+                        : darkMode
+                          ? "border-slate-700 hover:border-slate-500"
+                          : "border-slate-200 hover:border-slate-300"
                         }`}
                     >
                       <p className="font-semibold">{forumTypeLabels[type]}</p>

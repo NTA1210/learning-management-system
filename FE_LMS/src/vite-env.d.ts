@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+declare module "prerender-node";
 
 interface ImportMetaEnv {
   readonly VITE_BASE_API: string;

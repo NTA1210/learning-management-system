@@ -7,24 +7,30 @@ import Sidebar from "../components/Sidebar.tsx";
 import http from "../utils/http";
 import useDebounce from "../hooks/useDebounce";
 import type { Course } from "../types/course";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { userService } from "../services/userService";
 
 const MyCoursesPage: React.FC = () => {
     const { darkMode } = useTheme();
     const { user } = useAuth();
     const navigate = useNavigate();
+      const [searchParams, setSearchParams] = useSearchParams();
     const [courses, setCourses] = useState<Course[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [searchTerm, setSearchTerm] = useState("");
-    const debouncedSearchTerm = useDebounce(searchTerm, 300);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [pageLimit, setPageLimit] = useState(25);
+    const [searchTerm, setSearchTerm] = useState(searchParams.get("search") ?? "");
+    const debouncedSearchTerm = useDebounce(searchTerm, 500);
+    const [currentPage, setCurrentPage] = useState(Number(searchParams.get("page") ?? "1"));
+    const [pageLimit, setPageLimit] = useState(Number(searchParams.get("limit") ?? "25"));
     const [totalCourses, setTotalCourses] = useState(0);
-    const [sortOption, setSortOption] = useState<'name_asc' | 'name_desc' | 'date_asc' | 'date_desc'>('date_desc');
+    const [sortOption, setSortOption] = useState<'name_asc' | 'name_desc' | 'date_asc' | 'date_desc'>((searchParams.get("sort") as 'name_asc' | 'name_desc' | 'date_asc' | 'date_desc') || 'date_desc');
     const [mySubjects, setMySubjects] = useState<Array<{ _id: string; name: string }>>([]);
-    const [selectedSubjectId, setSelectedSubjectId] = useState("");
+    const [selectedSubjectId, setSelectedSubjectId] = useState(searchParams.get("subjectId") ?? "");
+    const [semesters, setSemesters] = useState<Array<{ _id: string; name: string }>>([]);
+    const [selectedSemesterId, setSelectedSemesterId] = useState(searchParams.get("semesterId") ?? "");
+    const [teachers, setTeachers] = useState<Array<{ _id: string; fullname?: string; username?: string }>>([]);
+    const [selectedTeacherId, setSelectedTeacherId] = useState(searchParams.get("teacherId") ?? "");
 
     const fetchMyCourses = async () => {
         try {
@@ -36,6 +42,8 @@ const MyCoursesPage: React.FC = () => {
                 limit: pageLimit,
                 ...(debouncedSearchTerm ? { search: debouncedSearchTerm } : {}),
                 ...(selectedSubjectId ? { subjectId: selectedSubjectId } : {}),
+                ...(selectedSemesterId ? { semesterId: selectedSemesterId } : {}),
+                ...(selectedTeacherId ? { teacherId: selectedTeacherId } : {}),
                 ...(isName ? { sortBy: 'title' } : {}),
                 ...(order ? { sortOrder: order } : {}),
             };
@@ -62,17 +70,44 @@ const MyCoursesPage: React.FC = () => {
     useEffect(() => {
         fetchMyCourses();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentPage, pageLimit, sortOption, debouncedSearchTerm, selectedSubjectId]);
+    }, [currentPage, pageLimit, sortOption, debouncedSearchTerm, selectedSubjectId, selectedSemesterId, selectedTeacherId]);
 
     useEffect(() => {
         (async () => {
             try {
-                const res = await http.get('/subjects/my-subjects');
-                const list = Array.isArray((res as any)?.data) ? (res as any).data : [];
-                setMySubjects(list.map((s: any) => ({ _id: s._id, name: s.name })));
+                const [subjectsRes, semestersRes, teachersRes] = await Promise.allSettled([
+                    http.get('/subjects/my-subjects'),
+                    http.get('/semesters'),
+                    userService.getUsers({ role: 'teacher', limit: 100 } as any),
+                ]);
+                if (subjectsRes.status === 'fulfilled') {
+                    const list = Array.isArray((subjectsRes.value as any)?.data) ? (subjectsRes.value as any).data : [];
+                    setMySubjects(list.map((s: any) => ({ _id: s._id, name: s.name })));
+                }
+                if (semestersRes.status === 'fulfilled') {
+                    const body: any = semestersRes.value as any;
+                    const list = Array.isArray(body?.data) ? body.data : Array.isArray(body?.data?.data) ? body.data.data : Array.isArray(body) ? body : [];
+                    setSemesters(list.map((x: any) => ({ _id: x._id, name: x.name })));
+                }
+                if (teachersRes.status === 'fulfilled') {
+                    const list = teachersRes.value.users || [];
+                    setTeachers(list.map((u: any) => ({ _id: u._id, fullname: u.fullname, username: u.username })));
+                }
             } catch {}
         })();
     }, []);
+
+    useEffect(() => {
+        const params: Record<string, string> = {};
+        if (debouncedSearchTerm) params.search = debouncedSearchTerm;
+        if (sortOption) params.sort = sortOption;
+        if (selectedSubjectId) params.subjectId = selectedSubjectId;
+        if (selectedSemesterId) params.semesterId = selectedSemesterId;
+        if (selectedTeacherId) params.teacherId = selectedTeacherId;
+        params.page = String(currentPage);
+        params.limit = String(pageLimit);
+        setSearchParams(params);
+    }, [debouncedSearchTerm, sortOption, selectedSubjectId, selectedSemesterId, selectedTeacherId, currentPage, pageLimit, setSearchParams]);
 
     return (
         <div
@@ -138,6 +173,36 @@ const MyCoursesPage: React.FC = () => {
                                 <option key={s._id} value={s._id}>{s.name}</option>
                             ))}
                         </select>
+                        <select
+                            value={selectedSemesterId}
+                            onChange={(e) => { setSelectedSemesterId(e.target.value); setCurrentPage(1); }}
+                            className="px-3 py-2 rounded-lg"
+                            style={{
+                                backgroundColor: darkMode ? "#1f2937" : "#ffffff",
+                                color: darkMode ? "#ffffff" : "#111827",
+                                border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
+                            }}
+                        >
+                            <option value="">All Semesters</option>
+                            {semesters.map((s) => (
+                                <option key={s._id} value={s._id}>{s.name}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={selectedTeacherId}
+                            onChange={(e) => { setSelectedTeacherId(e.target.value); setCurrentPage(1); }}
+                            className="px-3 py-2 rounded-lg"
+                            style={{
+                                backgroundColor: darkMode ? "#1f2937" : "#ffffff",
+                                color: darkMode ? "#ffffff" : "#111827",
+                                border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
+                            }}
+                        >
+                            <option value="">All Teachers</option>
+                            {teachers.map((t) => (
+                                <option key={t._id} value={t._id}>{t.fullname || t.username}</option>
+                            ))}
+                        </select>
                     </div>
                     <select
                         value={pageLimit}
@@ -187,10 +252,11 @@ const MyCoursesPage: React.FC = () => {
                                         {courses.map((course) => (
                                             <div
                                                 key={course._id}
-                                                className="rounded-xl p-6 neu-surface transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
+                                                className="rounded-xl p-6 neu-surface transition-all duration-300 hover:scale-[1.02] hover:shadow-xl flex flex-col"
                                                 style={{
                                                     backgroundColor: darkMode ? 'rgba(31, 41, 55, 0.85)' : '#f7f7fb',
                                                     border: 'none',
+                                                    minHeight: '320px',
                                                 }}
                                             >
                                                 <div className="flex items-start justify-between mb-4">
@@ -261,9 +327,9 @@ const MyCoursesPage: React.FC = () => {
                                                     </div>
                                                 </div>
 
-                                                <div className="flex space-x-2 pt-4 border-t" style={{ borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb' }}>
+                                                <div className="mt-auto pt-4 border-t" style={{ borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb' }}>
                                                     <button
-                                                        className="flex-1 px-4 py-2 rounded-lg text-sm font-medium"
+                                                        className="w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-all hover:opacity-90"
                                                         style={{
                                                             backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff',
                                                             color: darkMode ? '#a5b4fc' : '#4f46e5'

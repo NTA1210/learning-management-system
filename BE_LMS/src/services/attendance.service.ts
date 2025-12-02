@@ -315,15 +315,12 @@ export const exportAttendanceReport = async (
     formatCsvValue(record.status),
     formatCsvValue(record.markedBy?.fullname || record.markedBy?.email),
     formatCsvValue(record.markedBy?.role),
-  ]);
+    ]
+      .map((cell) => String(cell))
+      .join(',')
+  );
 
-  const csv = [
-    header.join(','),
-    ...csvRows.map((row: (string | number | undefined)[]) =>
-      row.map((cell) => (cell === undefined ? '' : String(cell))).join(',')
-    ),
-  ].join('\n');
-
+  const csv = [header.join(','), ...csvRows].join('\n');
   return {
     format: 'csv',
     summary,
@@ -821,7 +818,7 @@ export const deleteAttendance = async (
   const deleteResult = await AttendanceModel.deleteOne({ _id: singleId });
   return {
     deleted: deleteResult.deletedCount === 1,
-    record: deletedRecordsMeta[0] || null,
+    record: deletedRecordsMeta[0],
   };
 };
 

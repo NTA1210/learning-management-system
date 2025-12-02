@@ -68,6 +68,7 @@ export const listCoursesHandler = catchErrors(async (req, res) => {
 
   // ✅ FIX: Get user role from request (undefined if not authenticated)
   const userRole = (req as any).role;
+  const userId = (req as any).userId; // ✅ NEW: Get userId to check if user is teacher of course
 
   // Call service
   const result = await listCourses({
@@ -87,6 +88,7 @@ export const listCoursesHandler = catchErrors(async (req, res) => {
     sortBy: query.sortBy,
     sortOrder: query.sortOrder,
     userRole, // ✅ FIX: Pass userRole to service for permission check
+    userId, // ✅ NEW: Pass userId to add isTeacher field to each course
   });
 
   return res.success(OK, {
@@ -103,8 +105,11 @@ export const getCourseByIdHandler = catchErrors(async (req, res) => {
   // Validate course ID
   const courseId = courseIdSchema.parse(req.params.id);
 
+  // Get userId for isTeacherOfCourse check
+  const userId = (req as any).userId;
+
   // Call service
-  const course = await getCourseById(courseId);
+  const course = await getCourseById(courseId, userId);
 
   return res.success(OK, {
     data: course,
@@ -261,7 +266,11 @@ export const getQuizzesHandler = catchErrors(async (req, res) => {
 export const completeCourseHandler = catchErrors(async (req, res) => {
   const courseId = courseIdSchema.parse(req.params.courseId);
 
-  const data = await completeCourse(courseId);
+  // Get userId from request (set by authenticate middleware)
+  const userId = (req as any).userId;
+  const role = (req as any).role;
+
+  const data = await completeCourse(courseId, userId, role);
 
   return res.success(OK, {
     data,
@@ -272,8 +281,10 @@ export const completeCourseHandler = catchErrors(async (req, res) => {
 // GET /:courseId/statistics - Get course statistics
 export const getCourseStatisticsHandler = catchErrors(async (req, res) => {
   const courseId = courseIdSchema.parse(req.params.courseId);
+  const userId = (req as any).userId;
+  const role = (req as any).role;
 
-  const data = await getCourseStatistics(courseId);
+  const data = await getCourseStatistics(courseId, userId, role);
 
   return res.success(OK, {
     data,
