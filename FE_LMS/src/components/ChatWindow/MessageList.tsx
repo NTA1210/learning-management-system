@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import MessageItem from "./MessageItem";
 
 import TypingIndicator from "./TypingIndicator";
@@ -59,6 +59,17 @@ const MessageList: React.FC = () => {
     });
   }, [data, selectedChatRoom, socket, user]);
 
+  // Handle scroll to detect when user scrolls to top for infinite scroll
+  const handleScroll = useCallback(() => {
+    const container = containerRef.current;
+    if (!container || isFetchingNextPage || !hasNextPage) return;
+
+    // Load more when scrolled near the top (within 100px)
+    if (container.scrollTop < 100) {
+      handleLoadMore();
+    }
+  }, [handleLoadMore, isFetchingNextPage, hasNextPage]);
+
   useMessageListen(selectedChatRoom?.chatRoomId, containerRef);
 
   const { isTyping } = useTypingListen((user as any)?._id, containerRef);
@@ -74,6 +85,7 @@ const MessageList: React.FC = () => {
   return (
     <div
       ref={containerRef}
+      onScroll={handleScroll}
       className="flex-1 p-4 pb-10 overflow-y-auto"
       style={{
         backgroundColor: darkMode ? "#020617" : "#f9fafb",
@@ -83,11 +95,18 @@ const MessageList: React.FC = () => {
         <div className="flex justify-center mb-4">
           <button
             type="button"
-            className="px-2 py-1 text-xs text-white transition-colors bg-indigo-600 rounded-lg cursor-pointer hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 text-xs font-medium text-white transition-colors bg-indigo-600 rounded-lg cursor-pointer hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleLoadMore}
             disabled={isFetchingNextPage}
           >
-            {isFetchingNextPage ? "Loading..." : "Load More"}
+            {isFetchingNextPage ? (
+              <span className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white" />
+                Loading...
+              </span>
+            ) : (
+              "Load older messages"
+            )}
           </button>
         </div>
       )}
