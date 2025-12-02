@@ -442,16 +442,22 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        <Route path="/create-semester" element={
-          <ProtectedRoute requiredRole="admin">
-            <CreateSemesterPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/semesters" element={
-          <ProtectedRoute requiredRole="admin">
-            <ListSemestersPage />
-          </ProtectedRoute>
-        } />
+        <Route
+          path="/create-semester"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <CreateSemesterPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/semesters"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <ListSemestersPage />
+            </ProtectedRoute>
+          }
+        />
         {/* Not found */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
