@@ -23,7 +23,11 @@ SpecialistSchema.index({ majorId: 1, isActive: 1 });
 
 //hooks
 SpecialistSchema.pre('save', function (next) {
-  this.slug = this.name.toLowerCase().replace(/ /g, '-');
+  this.slug = this.name
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-') // replace nhiều space bằng dấu -
+    .replace(/[^\w-]+/g, ''); // remove ký tự đặc biệt
   next();
 });
 

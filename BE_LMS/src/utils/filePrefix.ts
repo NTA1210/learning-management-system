@@ -65,3 +65,7 @@ export const prefixForumReplyFile = (
 ) => {
   return `courses/${courseId}/forums/${forumId}/posts/${postId}/replies/${replyId}`;
 };
+
+export const prefixBlogImage = () => {
+  return `blogs/images`;
+};
