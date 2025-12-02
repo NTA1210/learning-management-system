@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import { useChatRoomStore } from "../../../stores/chatRoomStore";
 import type { ChatRoom } from "../../../context/ChatRoomContext";
+import { useTheme } from "../../../hooks/useTheme";
 
 const ChatRoomItem = ({
   chatRoomId,
@@ -14,6 +15,7 @@ const ChatRoomItem = ({
   lastMessage,
 }: ChatRoom) => {
   const [user, setUser] = useState(null);
+  const { darkMode } = useTheme();
   const { selectedChatRoom, setSelectedChatRoom } = useChatRoomStore();
 
   let displayTime = "";
@@ -52,11 +54,17 @@ const ChatRoomItem = ({
 
   return (
     <div
-      className={`
-            p-4 border-b border-gray-200 flex items-center space-x-3 cursor-pointer transition-colors ${
-              isSelected ? "bg-blue-100" : "bg-gray-50"
-            }
-        `}
+      className="p-4 border-b flex items-center space-x-3 cursor-pointer transition-colors"
+      style={{
+        backgroundColor: isSelected
+          ? darkMode
+            ? "rgba(99, 102, 241, 0.2)"
+            : "rgba(99, 102, 241, 0.1)"
+          : darkMode
+          ? "transparent"
+          : "#f9fafb",
+        borderColor: darkMode ? "rgba(71, 85, 105, 0.3)" : "rgba(229, 231, 235, 0.7)",
+      }}
       onClick={() => {
         if (isSelected) {
           setSelectedChatRoom(null);
@@ -82,19 +90,30 @@ const ChatRoomItem = ({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold truncate">{name}</h2>
+          <h2 
+            className="text-sm font-semibold truncate"
+            style={{ color: darkMode ? "#e5e7eb" : "#1f2937" }}
+          >
+            {name}
+          </h2>
           {lastMessage?.timestamp && (
-            <span className="text-xs text-gray-500">{displayTime}</span>
+            <span 
+              className="text-xs"
+              style={{ color: darkMode ? "#94a3b8" : "#6b7280" }}
+            >
+              {displayTime}
+            </span>
           )}
         </div>
 
         <div className="flex items-center">
           <p
-            className={
-              unreadCounts[(user as any)?._id] > 0
-                ? "text-sm text-gray-500 truncate min-h-5"
-                : "text-sm text-sky-500 truncate min-h-5"
-            }
+            className="text-sm truncate min-h-5"
+            style={{
+              color: unreadCounts[(user as any)?._id] > 0
+                ? darkMode ? "#94a3b8" : "#6b7280"
+                : darkMode ? "#a78bfa" : "#6366f1",
+            }}
           >
             {lastMessage?.content
               ? lastMessage.isNotification
@@ -103,7 +122,7 @@ const ChatRoomItem = ({
               : "There is no message yet"}
           </p>
           {user && unreadCounts[(user as any)?._id] > 0 && (
-            <div className="flex items-center justify-center ml-2 text-xs text-white rounded-full bg-sky-500 size-5 shrink-0">
+            <div className="flex items-center justify-center ml-2 text-xs text-white rounded-full bg-indigo-600 size-5 shrink-0">
               {unreadCounts[(user as any)?._id]}
             </div>
           )}

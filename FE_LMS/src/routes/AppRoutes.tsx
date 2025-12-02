@@ -39,6 +39,8 @@ import {
   ForumPostDetailPage,
   OnboardingPage,
   DeletedCoursesPage,
+  CreateSemesterPage,
+  ListSemestersPage,
 } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -440,7 +442,22 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-
+        <Route
+          path="/create-semester"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <CreateSemesterPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/semesters"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <ListSemestersPage />
+            </ProtectedRoute>
+          }
+        />
         {/* Not found */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

@@ -35,7 +35,7 @@ const AssignmentFormModal: React.FC<AssignmentFormModalProps> = ({
 
   useEffect(() => {
     setValues(initialValues || defaultValues);
-  }, [initialValues]);
+  }, [initialValues, isOpen]);
 
   if (!isOpen) return null;
 

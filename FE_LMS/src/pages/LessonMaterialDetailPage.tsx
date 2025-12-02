@@ -721,10 +721,10 @@ const LessonMaterialDetailPage: React.FC = () => {
       
       return (
         <div className="w-full h-full flex flex-col">
-          <iframe
-            src={viewerUrl}
+        <iframe
+          src={viewerUrl}
             className="w-full flex-1 border-0"
-            title={material.title || 'Document Viewer'}
+          title={material.title || 'Document Viewer'}
             style={{ backgroundColor: '#fff', minHeight: '500px' }}
             allow="fullscreen"
             sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
@@ -838,35 +838,35 @@ const LessonMaterialDetailPage: React.FC = () => {
     try {
       if (materialModal?.mode === "create") {
         if (file) {
-          const formDataToSend = new FormData();
+        const formDataToSend = new FormData();
           formDataToSend.append("file", file);
           formDataToSend.append("lessonId", lessonId);
           formDataToSend.append("title", values.title);
           if (values.note) {
             formDataToSend.append("note", values.note);
-          }
+        }
           const materialType = inferMaterialType(file.type || values.mimeType);
           formDataToSend.append("type", materialType);
 
-          await httpClient.post("/lesson-materials/upload", formDataToSend, {
-            withCredentials: true,
-            headers: {
+        await httpClient.post("/lesson-materials/upload", formDataToSend, {
+          withCredentials: true,
+          headers: {
               "Content-Type": "multipart/form-data",
-            },
-          });
-        } else {
+          },
+        });
+      } else {
           await httpClient.post(
             "/lesson-material/createMaterial",
             {
-              lessonId,
+          lessonId,
               ...values,
             },
             {
-              withCredentials: true,
+          withCredentials: true,
             }
           );
-        }
-        await showSwalSuccess("Material created successfully");
+      }
+      await showSwalSuccess("Material created successfully");
       } else if (materialModal?.mode === "edit" && materialModal.material) {
         if (file) {
           const formDataToSend = new FormData();
@@ -885,11 +885,11 @@ const LessonMaterialDetailPage: React.FC = () => {
             },
           });
         } else {
-          await httpClient.patch(`/lesson-materials/${materialModal.material._id}`, values, {
-            withCredentials: true,
-          });
+        await httpClient.patch(`/lesson-materials/${materialModal.material._id}`, values, {
+        withCredentials: true,
+      });
         }
-        await showSwalSuccess("Material updated successfully");
+      await showSwalSuccess("Material updated successfully");
       }
 
       setMaterialModal(null);
@@ -956,7 +956,7 @@ const LessonMaterialDetailPage: React.FC = () => {
                 </div>
               ) : lesson ? (
                 <>
-                  <LessonSummary lesson={lesson} darkMode={darkMode} formatDuration={formatDuration} />
+                <LessonSummary lesson={lesson} darkMode={darkMode} formatDuration={formatDuration} />
                   {user?.role === 'student' && lesson.hasAccess && (
                     <div className="mt-4 p-4 rounded-lg border" style={{
                       backgroundColor: darkMode ? "rgba(31, 41, 55, 0.6)" : "rgba(249, 250, 251, 0.8)",
@@ -1079,18 +1079,18 @@ const LessonMaterialDetailPage: React.FC = () => {
             ) : (
               <>
                 <div className="space-y-4 mb-6">
-                  {materials.map((material) => (
-                    <MaterialCard
-                      key={material._id}
-                      material={material}
-                      darkMode={darkMode}
-                      canManage={canCreate}
-                      onView={handleView}
-                      onDownload={handleDownload}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                    />
-                  ))}
+                {materials.map((material) => (
+                  <MaterialCard
+                    key={material._id}
+                    material={material}
+                    darkMode={darkMode}
+                    canManage={canCreate}
+                    onView={handleView}
+                    onDownload={handleDownload}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
+                ))}
                 </div>
                 
                 {/* Pagination Controls */}
@@ -1130,7 +1130,7 @@ const LessonMaterialDetailPage: React.FC = () => {
                         Next
                       </button>
                     </div>
-                  </div>
+              </div>
                 )}
               </>
             )}

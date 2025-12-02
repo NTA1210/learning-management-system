@@ -377,6 +377,23 @@ export default function CourseDetail() {
           </div>
         ) : (
           <>
+            {/* Back Button */}
+            <div className="mb-4">
+              <button
+                onClick={() => navigate("/my-courses")}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
+                style={{
+                  backgroundColor: isDarkMode ? "rgba(55, 65, 81, 0.8)" : "rgba(249, 250, 251, 0.8)",
+                  color: isDarkMode ? "#ffffff" : "#1f2937",
+                }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span>Back to My Courses</span>
+              </button>
+            </div>
+
             {/* Hero */}
             <div
               className="relative rounded-2xl overflow-visible mb-8 shadow-xl"

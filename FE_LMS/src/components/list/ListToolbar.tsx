@@ -22,6 +22,7 @@ interface ListToolbarProps {
   canCreate?: boolean;
   onCreate?: () => void;
   createLabel?: string;
+  showOnlyDateSort?: boolean; // If true, only show date_asc and date_desc options
 }
 
 const ListToolbar: React.FC<ListToolbarProps> = ({
@@ -41,6 +42,7 @@ const ListToolbar: React.FC<ListToolbarProps> = ({
   canCreate,
   onCreate,
   createLabel = "Create",
+  showOnlyDateSort = false,
 }) => {
   const start = totalItems === 0 ? 0 : pageLimit * (currentPage - 1) + 1;
   const end = Math.min(pageLimit * currentPage, totalItems);
@@ -90,8 +92,12 @@ const ListToolbar: React.FC<ListToolbarProps> = ({
             boxShadow: darkMode ? "0 1px 2px rgba(0,0,0,0.25)" : "0 1px 2px rgba(0,0,0,0.06)",
           }}
         >
-          <option value="name_asc">A-Z</option>
-          <option value="name_desc">Z-A</option>
+          {!showOnlyDateSort && (
+            <>
+              <option value="name_asc">A-Z</option>
+              <option value="name_desc">Z-A</option>
+            </>
+          )}
           <option value="date_asc">Oldest</option>
           <option value="date_desc">Newest</option>
         </select>

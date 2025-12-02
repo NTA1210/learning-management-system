@@ -5,14 +5,16 @@ import {
 } from "../../../context/ChatRoomContext";
 import ChatRoomItem from "./ChatRoomItem";
 import Header from "./Header";
+import { useTheme } from "../../../hooks/useTheme";
 
 const ChatSidebar = (): JSX.Element => {
   const { chatRooms = [], isLoading, isError } = useChatRoomsContext();
+  const { darkMode } = useTheme();
 
   if (isLoading) {
     return (
       <div className="items-center justify-center flex-1 h-full">
-        <div className="rounded-full size-10 bg-sky-200 animate-bounce"></div>
+        <div className="rounded-full size-10 bg-indigo-200 animate-bounce"></div>
       </div>
     );
   }
@@ -22,7 +24,11 @@ const ChatSidebar = (): JSX.Element => {
   }
 
   return (
-    <div>
+    <div
+      style={{
+        backgroundColor: darkMode ? "rgba(26, 32, 44, 0.95)" : "#ffffff",
+      }}
+    >
       <Header />
       {chatRooms
         .sort(
@@ -32,7 +38,7 @@ const ChatSidebar = (): JSX.Element => {
         )
         .map((chatRoom, index) => {
           return (
-            <div key={chatRoom.chatRoomId || index} className="text-black">
+            <div key={chatRoom.chatRoomId || index}>
               <ChatRoomItem {...chatRoom} />
             </div>
           );

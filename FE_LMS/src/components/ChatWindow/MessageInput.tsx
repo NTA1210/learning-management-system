@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useChatRoomStore } from "../../stores/chatRoomStore";
 import { useSocketContext } from "../../context/SocketContext";
 import AttachMenu from "./components/AttachMenu";
+import { useTheme } from "../../hooks/useTheme";
 
 const MessageInput: React.FC = () => {
   const [user, setUser] = useState<any>(null);
@@ -10,6 +11,7 @@ const MessageInput: React.FC = () => {
   const { socket } = useSocketContext();
   const [message, setMessage] = useState("");
   const [openPopup, setOpenPopup] = useState(false);
+  const { darkMode } = useTheme();
 
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
@@ -100,13 +102,19 @@ const MessageInput: React.FC = () => {
   };
 
   return (
-    <div className="p-4 bg-white border border-gray-200">
+    <div
+      className="px-4 py-3 border-t"
+      style={{
+        backgroundColor: darkMode ? "#020617" : "#ffffff",
+        borderColor: darkMode ? "rgba(31,41,55,0.9)" : "rgba(229,231,235,1)",
+      }}
+    >
       <div className="flex items-center gap-3">
         <div className="relative">
           <button
             type="button"
             onClick={() => setOpenPopup((prev) => !prev)}
-            className="flex items-center justify-center text-white transition-transform rounded-full cursor-pointer duration-[1500ms] bg-sky-500 size-10 hover:bg-sky-600"
+            className="flex items-center justify-center text-white transition-transform rounded-full cursor-pointer duration-[1500ms] bg-indigo-600 size-10 hover:bg-indigo-700"
             style={{ transform: openPopup ? "rotate(45deg)" : "rotate(0deg)" }}
           >
             <Plus className="size-4" />
@@ -118,17 +126,24 @@ const MessageInput: React.FC = () => {
         <div className="flex-1">
           <input
             placeholder="Type a message..."
-            className="flex items-center w-full px-4 py-3 text-sm bg-gray-100 rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-sky-500"
+            className="flex items-center w-full px-4 py-3 text-sm rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-indigo-600"
             value={message}
             onChange={handleOnChange}
             onKeyDown={handleKeyDown}
+            style={{
+              backgroundColor: darkMode ? "#020617" : "#f3f4f6",
+              color: darkMode ? "#e5e7eb" : "#0f172a",
+              border: darkMode
+                ? "1px solid rgba(55,65,81,1)"
+                : "1px solid rgba(209,213,219,1)",
+            }}
           />
         </div>
 
         <button
           onClick={handleSendMessage}
           type="button"
-          className="flex items-center justify-center text-white rounded-full cursor-pointer bg-sky-500 size-10 hover:bg-sky-600"
+          className="flex items-center justify-center text-white rounded-full cursor-pointer bg-indigo-600 size-10 hover:bg-indigo-700"
         >
           <Send className="size-4" />
         </button>
