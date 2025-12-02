@@ -1,5 +1,5 @@
 import type React from "react";
-import { EllipsisVertical, X, UserPlus } from "lucide-react";
+import { EllipsisVertical, X, UserPlus, Video, Phone } from "lucide-react";
 import { useChatRoomStore } from "../../stores/chatRoomStore";
 import { useEffect, useState } from "react";
 import Modal from "./components/Modal";
@@ -7,6 +7,7 @@ import { useDebounce } from "../../hooks";
 import { userService } from "../../services";
 import { useSocketContext } from "../../context/SocketContext";
 import { useTheme } from "../../hooks/useTheme";
+import { useVideoCall } from "../../hooks/useVideoCall";
 
 const ChatHeader: React.FC = () => {
   const { selectedChatRoom, setSelectedChatRoom } = useChatRoomStore();
@@ -17,8 +18,15 @@ const ChatHeader: React.FC = () => {
   const { socket } = useSocketContext();
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const { darkMode } = useTheme();
+  const { startCall, isInCall } = useVideoCall();
 
   const searchDebounce = useDebounce(search, 500);
+
+  const handleStartVideoCall = () => {
+    if (selectedChatRoom) {
+      startCall(selectedChatRoom.chatRoomId, selectedChatRoom.name);
+    }
+  };
 
   useEffect(() => {
     const storedUser = localStorage.getItem("lms:user");
@@ -82,6 +90,36 @@ const ChatHeader: React.FC = () => {
         </div>
       </div>
       <div className="flex space-x-4">
+        {/* Video Call Button */}
+        <button
+          className={`p-2 rounded-lg transition-colors ${
+            isInCall
+              ? "text-green-500 bg-green-500/20"
+              : darkMode
+              ? "text-gray-400 hover:text-gray-200 hover:bg-slate-700"
+              : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+          }`}
+          onClick={handleStartVideoCall}
+          title={isInCall ? "In call" : "Start video call"}
+          disabled={isInCall}
+        >
+          <Video className="size-5" />
+        </button>
+
+        {/* Audio Call Button */}
+        <button
+          className={`p-2 rounded-lg transition-colors ${
+            darkMode
+              ? "text-gray-400 hover:text-gray-200 hover:bg-slate-700"
+              : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+          }`}
+          onClick={handleStartVideoCall}
+          title="Start audio call"
+          disabled={isInCall}
+        >
+          <Phone className="size-5" />
+        </button>
+
         {user?.role === "student" || (
           <button
             className="text-gray-400 cursor-pointer hover:text-gray-200"

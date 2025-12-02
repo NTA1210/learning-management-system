@@ -9,6 +9,19 @@ import {
   joinNewChatroom,
   leaveChatRoom,
 } from './socketConversation';
+import {
+  handleVideoCallDisconnect,
+  videoCallAnswer,
+  videoCallEnd,
+  videoCallIceCandidate,
+  videoCallJoin,
+  videoCallLeave,
+  videoCallOffer,
+  videoCallReject,
+  videoCallStart,
+  videoCallToggleAudio,
+  videoCallToggleVideo,
+} from './socketVideoCall';
 import { getChatRoom } from './helpers';
 
 const initializeSocket = async (io: Server) => {
@@ -50,6 +63,53 @@ const initializeSocket = async (io: Server) => {
 
       socket.on('chatroom:join', (data) => {
         joinNewChatroom(io, socket, data);
+      });
+
+      // Video Call Events
+      socket.on(SocketEvents.VIDEOCALL_START, (data) => {
+        videoCallStart(io, socket, data);
+      });
+
+      socket.on(SocketEvents.VIDEOCALL_JOIN, (data) => {
+        videoCallJoin(io, socket, data);
+      });
+
+      socket.on(SocketEvents.VIDEOCALL_LEAVE, (data) => {
+        videoCallLeave(io, socket, data);
+      });
+
+      socket.on(SocketEvents.VIDEOCALL_OFFER, (data) => {
+        videoCallOffer(io, socket, data);
+      });
+
+      socket.on(SocketEvents.VIDEOCALL_ANSWER, (data) => {
+        videoCallAnswer(io, socket, data);
+      });
+
+      socket.on(SocketEvents.VIDEOCALL_ICE_CANDIDATE, (data) => {
+        videoCallIceCandidate(io, socket, data);
+      });
+
+      socket.on(SocketEvents.VIDEOCALL_TOGGLE_AUDIO, (data) => {
+        videoCallToggleAudio(io, socket, data);
+      });
+
+      socket.on(SocketEvents.VIDEOCALL_TOGGLE_VIDEO, (data) => {
+        videoCallToggleVideo(io, socket, data);
+      });
+
+      socket.on(SocketEvents.VIDEOCALL_END, (data) => {
+        videoCallEnd(io, socket, data);
+      });
+
+      socket.on(SocketEvents.VIDEOCALL_REJECT, (data) => {
+        videoCallReject(io, socket, data);
+      });
+
+      // Handle disconnect for video calls
+      socket.on('disconnect', () => {
+        handleVideoCallDisconnect(io, socket);
+        console.log('User disconnected', user.id);
       });
     } catch (error) {
       console.error('Error in initializeSocket:', error);
