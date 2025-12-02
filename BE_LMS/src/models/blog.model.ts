@@ -1,4 +1,4 @@
-import IBlog from '@/types/blog.type';
+import { IBlog } from '@/types';
 import mongoose from 'mongoose';
 
 const BlogSchema = new mongoose.Schema<IBlog>(
@@ -23,10 +23,14 @@ BlogSchema.index({ slug: 1 }, { unique: true });
 //hooks
 BlogSchema.pre('save', function (next) {
   this.slug = this.title
+    .normalize('NFD') // tách ký tự và dấu
+    .replace(/[\u0300-\u036f]/g, '') // remove dấu
+    .replace(/đ/g, 'd') // chuyển đ
+    .replace(/Đ/g, 'd') // chuyển Đ
     .toLowerCase()
     .trim()
-    .replace(/\s+/g, '-') // replace nhiều space bằng dấu -
-    .replace(/[^\w-]+/g, ''); // remove ký tự đặc biệt
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '');
   next();
 });
 
