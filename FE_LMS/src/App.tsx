@@ -14,27 +14,38 @@ function App() {
         <Toaster
           position="top-right"
           containerStyle={{
-            top: "80px", // Add padding from top to avoid navbar
+            top: "80px",
           }}
           toastOptions={{
-            duration: 15000,
+            duration: 4000,
             style: {
-              background: "#363636",
-              color: "#fff",
-              marginTop: "16px", // Additional top margin
+              borderRadius: '12px',
+              padding: '16px',
+              fontSize: '14px',
+              fontWeight: '600',
             },
             success: {
-              duration: 3000,
+              duration: 4000,
+              style: {
+                background: '#dcfce7',
+                color: '#065f46',
+                border: '1px solid #86efac',
+              },
               iconTheme: {
-                primary: "#4ade80",
-                secondary: "#fff",
+                primary: '#059669',
+                secondary: '#ffffff',
               },
             },
             error: {
               duration: 4000,
+              style: {
+                background: '#fee2e2',
+                color: '#991b1b',
+                border: '1px solid #fca5a5',
+              },
               iconTheme: {
-                primary: "#ef4444",
-                secondary: "#fff",
+                primary: '#dc2626',
+                secondary: '#ffffff',
               },
             },
           }}
