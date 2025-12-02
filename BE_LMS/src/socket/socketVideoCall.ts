@@ -3,8 +3,11 @@ import { Server, Socket } from 'socket.io';
 // Store active calls: callId -> Set of participant userIds
 const activeCalls = new Map<string, Set<string>>();
 
-// Store user's current call: odUserId -> callId
+// Store user's current call: userId -> callId
 const userCalls = new Map<string, string>();
+
+// Store chatRoom's active call: chatRoomId -> callId
+const chatRoomCalls = new Map<string, string>();
 
 export const videoCallStart = async (io: Server, socket: Socket, data: any) => {
   try {
@@ -19,6 +22,7 @@ export const videoCallStart = async (io: Server, socket: Socket, data: any) => {
     // Initialize the call
     activeCalls.set(callId, new Set([userId]));
     userCalls.set(userId, callId);
+    chatRoomCalls.set(chatRoomId, callId);
 
     // Join a dedicated room for this call
     socket.join(callId);
@@ -232,6 +236,14 @@ export const videoCallEnd = async (io: Server, socket: Socket, data: any) => {
 
     // Remove the call
     activeCalls.delete(callId);
+    
+    // Remove from chatRoom tracking
+    for (const [chatRoomId, cId] of chatRoomCalls.entries()) {
+      if (cId === callId) {
+        chatRoomCalls.delete(chatRoomId);
+        break;
+      }
+    }
   } catch (error) {
     console.error('[VideoCall] Error in videoCallEnd:', error);
   }
@@ -286,7 +298,49 @@ const handleUserLeaveCall = (io: Server, socket: Socket, userId: string, callId?
   // If no participants left, clean up the call
   if (call.size === 0) {
     activeCalls.delete(actualCallId);
+    
+    // Remove from chatRoom tracking
+    for (const [chatRoomId, cId] of chatRoomCalls.entries()) {
+      if (cId === actualCallId) {
+        chatRoomCalls.delete(chatRoomId);
+        break;
+      }
+    }
+    
     console.log(`[VideoCall] Call ${actualCallId} ended - no participants left`);
+  }
+};
+
+// Get active call for a chat room
+export const getActiveCall = async (io: Server, socket: Socket, data: any) => {
+  try {
+    const { chatRoomId } = data;
+    const userId = socket.userId?.toString();
+
+    if (!userId) return;
+
+    const callId = chatRoomCalls.get(chatRoomId);
+    const call = callId ? activeCalls.get(callId) : null;
+
+    if (callId && call && call.size > 0) {
+      // Get participant info
+      const participants = Array.from(call);
+      
+      socket.emit('videocall:active-call-info', {
+        hasActiveCall: true,
+        callId,
+        chatRoomId,
+        participantCount: call.size,
+        participants,
+      });
+    } else {
+      socket.emit('videocall:active-call-info', {
+        hasActiveCall: false,
+        chatRoomId,
+      });
+    }
+  } catch (error) {
+    console.error('[VideoCall] Error in getActiveCall:', error);
   }
 };
 

@@ -12,15 +12,23 @@ function Chat() {
   const { chatRooms, isLoading } = useChatRoomsContext();
   const { setSelectedChatRoom, selectedChatRoom } = useChatRoomStore();
 
-  // Auto-select chat room from URL param
+  // Sync chat room selection with URL - only on initial load or direct URL navigation
   useEffect(() => {
+    // If URL has roomId but no room is selected (e.g., direct URL access or page refresh)
     if (roomId && chatRooms.length > 0 && !isLoading) {
-      const targetRoom = chatRooms.find((room) => room.chatRoomId === roomId);
-      if (targetRoom && selectedChatRoom?.chatRoomId !== roomId) {
-        setSelectedChatRoom(targetRoom);
+      // Only set if not already selected (avoids flicker when clicking items)
+      if (!selectedChatRoom || selectedChatRoom.chatRoomId !== roomId) {
+        const targetRoom = chatRooms.find((room) => room.chatRoomId === roomId);
+        if (targetRoom) {
+          setSelectedChatRoom(targetRoom);
+        }
       }
+    } 
+    // If no roomId in URL but a room is selected, clear it (back button pressed)
+    else if (!roomId && selectedChatRoom) {
+      setSelectedChatRoom(null);
     }
-  }, [roomId, chatRooms, isLoading, setSelectedChatRoom, selectedChatRoom]);
+  }, [roomId, chatRooms, isLoading]);
 
   return (
     <div

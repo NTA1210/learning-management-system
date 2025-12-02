@@ -242,6 +242,66 @@ export const useVideoCall = () => {
     toast("Call declined", { icon: "📴" });
   }, [socket, incomingCall, setIncomingCall]);
 
+  // Join an ongoing call in a chat room
+  const joinCall = useCallback(async (targetCallId: string, targetChatRoomId: string) => {
+    if (!socket || !currentUser) {
+      toast.error("Not connected");
+      return;
+    }
+
+    if (isInCall) {
+      toast.error("Already in a call");
+      return;
+    }
+
+    try {
+      // Get local media stream
+      const stream = await webRTCService.getLocalStream(true, true);
+      setLocalStream(stream);
+
+      // Initialize WebRTC service with handlers
+      webRTCService.initialize(socket, currentUser._id, {
+        onRemoteStream: (userId, remoteStream) => {
+          console.log("[useVideoCall] Remote stream received for:", userId);
+          const state = useVideoCallStore.getState();
+          if (!state.participants.has(userId)) {
+            state.addParticipant(userId, {
+              oderId: userId,
+              odername: `User ${userId.substring(0, 6)}`,
+              stream: remoteStream,
+            });
+          } else {
+            state.updateParticipantStream(userId, remoteStream);
+          }
+        },
+        onPeerDisconnected: (userId) => {
+          console.log("[useVideoCall] Peer disconnected:", userId);
+          useVideoCallStore.getState().removeParticipant(userId);
+        },
+        onConnectionStateChange: (userId, state) => {
+          console.log(`[useVideoCall] Connection with ${userId}: ${state}`);
+        },
+      });
+
+      setCallId(targetCallId);
+      setChatRoomId(targetChatRoomId);
+      setIsInCall(true);
+
+      // Notify server we're joining
+      socket.emit("videocall:join", {
+        callId: targetCallId,
+        chatRoomId: targetChatRoomId,
+      });
+
+      toast.success("Joining call...");
+    } catch (error: unknown) {
+      console.error("Failed to join call:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to access camera/microphone";
+      toast.error(errorMessage);
+      resetCall();
+    }
+  }, [socket, currentUser, isInCall, setLocalStream, setCallId, setChatRoomId, setIsInCall, resetCall]);
+
   // End current call
   const endCall = useCallback(() => {
     if (!socket || !callId) return;
@@ -284,6 +344,7 @@ export const useVideoCall = () => {
 
     // Actions
     startCall,
+    joinCall,
     acceptCall,
     declineCall,
     endCall,
