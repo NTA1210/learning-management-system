@@ -1,9 +1,16 @@
-import { Send, Plus, ThumbsUp, MapPin, X, Smile, Image, Paperclip, Bold, Italic, Underline, Strikethrough, List, ListOrdered, Link, Code, Quote, Type, Trash2 } from "lucide-react";
+import { Send, Plus, ThumbsUp, MapPin, X, Smile, Image, Paperclip, Bold, Italic, Underline, Strikethrough, List, ListOrdered, Link, Code, Quote, Type, Trash2, Upload, File as FileIcon } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useChatRoomStore } from "../../stores/chatRoomStore";
 import { useSocketContext } from "../../context/SocketContext";
 import AttachMenu from "./components/AttachMenu";
 import { useTheme } from "../../hooks/useTheme";
+
+// Type for staged files with preview
+interface StagedFile {
+  file: File;
+  id: string;
+  preview?: string;
+}
 
 const MessageInput: React.FC = () => {
   const [user, setUser] = useState<any>(null);
@@ -13,12 +20,16 @@ const MessageInput: React.FC = () => {
   const [showFormatting, setShowFormatting] = useState(false);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [isEmpty, setIsEmpty] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const { darkMode } = useTheme();
 
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const attachButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dropZoneRef = useRef<HTMLDivElement | null>(null);
+  const dragCounterRef = useRef(0);
 
   useEffect(() => {
     const user = localStorage.getItem("lms:user");
@@ -59,20 +70,38 @@ const MessageInput: React.FC = () => {
 
   const handleSendMessage = () => {
     const content = getPlainText();
-    if (content === "" || !user || !socket) return;
-
-    // Get the HTML content to preserve formatting
-    const htmlContent = getMessageContent();
+    const hasContent = content !== "";
+    const hasFiles = stagedFiles.length > 0;
     
-    // Clean up HTML for sending (keep formatting tags)
-    const cleanedContent = cleanHtmlContent(htmlContent);
+    if ((!hasContent && !hasFiles) || !user || !socket) return;
 
-    socket.emit("chatroom:send-message", {
-      chatRoomId: selectedChatRoom.chatRoomId,
-      userId: user._id,
-      senderRole: user.role,
-      content: cleanedContent,
-    });
+    // Send text message if there's content
+    if (hasContent) {
+      // Get the HTML content to preserve formatting
+      const htmlContent = getMessageContent();
+      
+      // Clean up HTML for sending (keep formatting tags)
+      const cleanedContent = cleanHtmlContent(htmlContent);
+
+      socket.emit("chatroom:send-message", {
+        chatRoomId: selectedChatRoom.chatRoomId,
+        userId: user._id,
+        senderRole: user.role,
+        content: cleanedContent,
+      });
+    }
+
+    // Send all staged files
+    if (hasFiles) {
+      stagedFiles.forEach((stagedFile) => {
+        sendFile(stagedFile.file);
+      });
+      // Clear staged files and revoke object URLs
+      stagedFiles.forEach((sf) => {
+        if (sf.preview) URL.revokeObjectURL(sf.preview);
+      });
+      setStagedFiles([]);
+    }
 
     // Clear editor
     if (editorRef.current) {
@@ -197,20 +226,8 @@ const MessageInput: React.FC = () => {
   ) => {
     setOpenPopup(false);
 
-    if (type === "file" && file && socket && user) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const arrayBuffer = reader.result;
-        socket.emit("chatroom:send-file", {
-          chatRoomId: selectedChatRoom.chatRoomId,
-          userId: user._id,
-          senderRole: user.role,
-          fileName: file.name,
-          mimeType: file.type,
-          data: arrayBuffer,
-        });
-      };
-      reader.readAsArrayBuffer(file);
+    if (type === "file" && file) {
+      stageFile(file);
     }
 
     if (type === "location") {
@@ -221,6 +238,91 @@ const MessageInput: React.FC = () => {
       console.log("Send poll");
     }
   };
+
+  // Stage a file for sending (with preview for images)
+  const stageFile = (file: File) => {
+    const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const isImage = file.type.startsWith("image/");
+    const preview = isImage ? URL.createObjectURL(file) : undefined;
+    
+    setStagedFiles((prev) => [...prev, { file, id, preview }]);
+  };
+
+  // Remove a staged file
+  const removeStagedFile = (id: string) => {
+    setStagedFiles((prev) => {
+      const fileToRemove = prev.find((f) => f.id === id);
+      if (fileToRemove?.preview) {
+        URL.revokeObjectURL(fileToRemove.preview);
+      }
+      return prev.filter((f) => f.id !== id);
+    });
+  };
+
+  // Send file via socket
+  const sendFile = (file: File) => {
+    if (!socket || !user || !selectedChatRoom) return;
+    
+    const reader = new FileReader();
+    reader.onload = () => {
+      const arrayBuffer = reader.result;
+      socket.emit("chatroom:send-file", {
+        chatRoomId: selectedChatRoom.chatRoomId,
+        userId: user._id,
+        senderRole: user.role,
+        fileName: file.name,
+        mimeType: file.type,
+        data: arrayBuffer,
+      });
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // Format file size for display
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  // Drag and drop handlers
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounterRef.current = 0;
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      // Stage all dropped files (don't send immediately)
+      Array.from(files).forEach((file) => {
+        stageFile(file);
+      });
+    }
+  }, []);
 
   const clearEditor = () => {
     if (editorRef.current) {
@@ -248,12 +350,34 @@ const MessageInput: React.FC = () => {
 
   return (
     <div
-      className="px-4 py-3 border-t"
+      ref={dropZoneRef}
+      className="px-4 py-3 border-t relative"
       style={{
         backgroundColor: darkMode ? "#020617" : "#ffffff",
         borderColor: darkMode ? "rgba(31,41,55,0.9)" : "rgba(229,231,235,1)",
       }}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
+      {/* Drag Overlay */}
+      {isDragging && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center rounded-xl border-2 border-dashed"
+          style={{
+            backgroundColor: darkMode ? "rgba(30, 41, 59, 0.95)" : "rgba(248, 250, 252, 0.95)",
+            borderColor: "#6366f1",
+          }}
+        >
+          <div className="flex flex-col items-center gap-2 text-indigo-500">
+            <Upload className="size-10" />
+            <span className="font-medium">Drop files here to send</span>
+            <span className="text-sm text-slate-500">Images, documents, and more</span>
+          </div>
+        </div>
+      )}
+
       {/* Location Picker Modal */}
       {showLocationPicker && (
         <div
@@ -284,6 +408,87 @@ const MessageInput: React.FC = () => {
           >
             📍 Send My Current Location
           </button>
+        </div>
+      )}
+
+      {/* Staged Files Preview */}
+      {stagedFiles.length > 0 && (
+        <div
+          className="mb-3 p-3 rounded-xl border"
+          style={{
+            backgroundColor: darkMode ? "#1e293b" : "#f8fafc",
+            borderColor: darkMode ? "rgba(71, 85, 105, 0.5)" : "rgba(229, 231, 235, 1)",
+          }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-slate-500">
+              {stagedFiles.length} file{stagedFiles.length > 1 ? "s" : ""} ready to send
+            </span>
+            <button
+              onClick={() => {
+                stagedFiles.forEach((sf) => {
+                  if (sf.preview) URL.revokeObjectURL(sf.preview);
+                });
+                setStagedFiles([]);
+              }}
+              className="text-xs text-red-500 hover:text-red-600"
+            >
+              Clear all
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {stagedFiles.map((stagedFile) => (
+              <div
+                key={stagedFile.id}
+                className="relative group"
+              >
+                {stagedFile.preview ? (
+                  // Image preview
+                  <div className="relative">
+                    <img
+                      src={stagedFile.preview}
+                      alt={stagedFile.file.name}
+                      className="h-16 w-16 object-cover rounded-lg border"
+                      style={{
+                        borderColor: darkMode ? "rgba(71, 85, 105, 0.5)" : "rgba(229, 231, 235, 1)",
+                      }}
+                    />
+                    <button
+                      onClick={() => removeStagedFile(stagedFile.id)}
+                      className="absolute -top-1.5 -right-1.5 p-0.5 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                ) : (
+                  // File preview (non-image)
+                  <div
+                    className="relative flex items-center gap-2 px-3 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: darkMode ? "#0f172a" : "#ffffff",
+                      borderColor: darkMode ? "rgba(71, 85, 105, 0.5)" : "rgba(229, 231, 235, 1)",
+                    }}
+                  >
+                    <FileIcon className="size-4 text-indigo-500" />
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium truncate max-w-[120px]">
+                        {stagedFile.file.name}
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        {formatFileSize(stagedFile.file.size)}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => removeStagedFile(stagedFile.id)}
+                      className="ml-1 p-0.5 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -446,14 +651,19 @@ const MessageInput: React.FC = () => {
           <span className={`w-px h-6 mx-2 ${darkMode ? "bg-slate-600" : "bg-slate-300"}`} />
 
           {/* Send button or Like button */}
-          {!isEmpty ? (
+          {!isEmpty || stagedFiles.length > 0 ? (
             <button
               onClick={handleSendMessage}
               type="button"
-              title="Send"
-              className="p-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+              title={stagedFiles.length > 0 ? `Send ${stagedFiles.length} file${stagedFiles.length > 1 ? "s" : ""}` : "Send"}
+              className="p-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors relative"
             >
               <Send className="size-5" />
+              {stagedFiles.length > 0 && (
+                <span className="absolute -top-1 -right-1 size-4 flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full">
+                  {stagedFiles.length}
+                </span>
+              )}
             </button>
           ) : (
             <button
