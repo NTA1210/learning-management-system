@@ -252,10 +252,11 @@ const MyCoursesPage: React.FC = () => {
                                         {courses.map((course) => (
                                             <div
                                                 key={course._id}
-                                                className="rounded-xl p-6 neu-surface transition-all duration-300 hover:scale-[1.02] hover:shadow-xl"
+                                                className="rounded-xl p-6 neu-surface transition-all duration-300 hover:scale-[1.02] hover:shadow-xl flex flex-col"
                                                 style={{
                                                     backgroundColor: darkMode ? 'rgba(31, 41, 55, 0.85)' : '#f7f7fb',
                                                     border: 'none',
+                                                    minHeight: '320px',
                                                 }}
                                             >
                                                 <div className="flex items-start justify-between mb-4">
@@ -326,9 +327,9 @@ const MyCoursesPage: React.FC = () => {
                                                     </div>
                                                 </div>
 
-                                                <div className="flex space-x-2 pt-4 border-t" style={{ borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb' }}>
+                                                <div className="mt-auto pt-4 border-t" style={{ borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb' }}>
                                                     <button
-                                                        className="flex-1 px-4 py-2 rounded-lg text-sm font-medium"
+                                                        className="w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-all hover:opacity-90"
                                                         style={{
                                                             backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff',
                                                             color: darkMode ? '#a5b4fc' : '#4f46e5'

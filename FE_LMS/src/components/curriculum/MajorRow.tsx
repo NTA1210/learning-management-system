@@ -100,6 +100,13 @@ const MajorRow: React.FC<MajorRowProps> = ({
   const { darkMode } = useTheme();
   const specialistList = major.specialists || [];
 
+  // Helper to truncate long text
+  const truncateText = (text: string | undefined, maxLength: number = 100) => {
+    if (!text) return "-";
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + "...";
+  };
+
   const isDropTarget = dropTarget?.type === 'major' && dropTarget.id === major._id;
   const canAcceptDrop = draggedItem?.type === 'specialist';
 
@@ -108,12 +115,12 @@ const MajorRow: React.FC<MajorRowProps> = ({
       {/* Major row */}
       <tr
         style={{
-          backgroundColor: isDropTarget && canAcceptDrop 
-            ? (darkMode ? "#065f46" : "#d1fae5") 
+          backgroundColor: isDropTarget && canAcceptDrop
+            ? (darkMode ? "#065f46" : "#d1fae5")
             : (darkMode ? "#1f2937" : "#ffffff"),
           borderBottom: `1px solid ${darkMode ? "#374151" : "#e5e7eb"}`,
-          border: isDropTarget && canAcceptDrop 
-            ? `2px dashed ${darkMode ? "#10b981" : "#059669"}` 
+          border: isDropTarget && canAcceptDrop
+            ? `2px dashed ${darkMode ? "#10b981" : "#059669"}`
             : undefined,
           display: openInfoId === `major-${major._id}` ? "none" : "table-row",
         }}
@@ -132,6 +139,7 @@ const MajorRow: React.FC<MajorRowProps> = ({
               style={{
                 width: "28px",
                 height: "28px",
+                flexShrink: 0,
                 backgroundColor: darkMode ? "#4c1d95" : "#4f46e5",
                 color: "#ffffff",
                 border: "none",
@@ -154,7 +162,7 @@ const MajorRow: React.FC<MajorRowProps> = ({
                   title="Active"
                 />
               </div>
-              <p style={{ color: darkMode ? "#9ca3af" : "#6b7280", fontSize: "12px", margin: "2px 0 0 0" }}>{major.description || "-"}</p>
+              <p style={{ color: darkMode ? "#9ca3af" : "#6b7280", fontSize: "12px", margin: "2px 0 0 0" }}>{truncateText(major.description)}</p>
             </div>
           </div>
         </td>
@@ -206,7 +214,7 @@ const MajorRow: React.FC<MajorRowProps> = ({
         <InfoCard
           type="major"
           data={major}
-          onClose={onCloseInfo || (() => {})}
+          onClose={onCloseInfo || (() => { })}
           paddingLeft={56}
           openActionMenu={openActionMenu}
           onActionMenuToggle={onActionMenuToggle}
@@ -258,13 +266,15 @@ const MajorRow: React.FC<MajorRowProps> = ({
                   </td>
                 </tr>
               ) : (
-                specialistList.map((specialist) => {
+                specialistList.map((specialist, index) => {
                   const specialistExpanded = expandedSpecialists.has(specialist._id);
+                  const isLastSpecialist = index === specialistList.length - 1;
                   return (
                     <SpecialistRow
                       key={specialist._id}
                       specialist={specialist}
                       isExpanded={specialistExpanded}
+                      isLast={isLastSpecialist}
                       onToggle={() => onToggleSpecialist(specialist._id)}
                       onLoadSubjects={() => onLoadSubjects(specialist._id)}
                       openActionMenu={openActionMenu}

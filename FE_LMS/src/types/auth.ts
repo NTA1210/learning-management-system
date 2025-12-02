@@ -6,6 +6,7 @@ export interface User {
   fullname: string;
   avatar_url: string;
   bio: string;
+  email: string;
 }
 
 export interface LoginRequest {

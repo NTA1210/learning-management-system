@@ -43,6 +43,8 @@ jest.mock("@/services/subject.service", () => ({
   listPrerequisites: jest.fn(),
   searchSubjectsAutocomplete: jest.fn(),
   getRelatedSubjects: jest.fn(),
+  getMySubjects: jest.fn(),
+  deleteQuestionsBySubjectId: jest.fn(),
 }));
 
 // Mock validators
@@ -77,6 +79,8 @@ import {
   listPrerequisitesHandler,
   autocompleteSubjectsHandler,
   relatedSubjectsHandler,
+  getMySubjectsHandler,
+  deleteQuestionsBySubjectIdHandler,
 } from "@/controller/subject.controller";
 import * as subjectService from "@/services/subject.service";
 import * as subjectSchemas from "@/validators/subject.schemas";
@@ -542,6 +546,65 @@ describe("📖 Subject Controller Unit Tests", () => {
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         message: "Related subjects retrieved successfully",
         data: mockRelated,
+      });
+    });
+  });
+
+  describe("getMySubjectsHandler", () => {
+    it("should return my subjects successfully", async () => {
+      const mockSubjects = [{ _id: new mongoose.Types.ObjectId(), name: "Subject 1" }];
+      const mockPagination = { total: 1, page: 1, limit: 10, totalPages: 1, hasNextPage: false, hasPrevPage: false };
+      
+      (subjectSchemas.listSubjectsSchema.parse as jest.Mock).mockReturnValue({
+        page: 1,
+        limit: 10,
+        search: undefined,
+        name: undefined,
+        slug: undefined,
+        code: undefined,
+        specialistId: undefined,
+        isActive: undefined,
+        sortBy: "name",
+        sortOrder: "asc",
+      });
+      
+      (subjectService.getMySubjects as jest.Mock).mockResolvedValue({
+        subjects: mockSubjects,
+        pagination: mockPagination,
+      });
+
+      await getMySubjectsHandler(mockReq as Request, mockRes, mockNext);
+
+      expect(subjectService.getMySubjects).toHaveBeenCalledWith({
+        userId: (mockReq as any).userId,
+        userRole: (mockReq as any).role,
+        params: expect.objectContaining({
+          page: 1,
+          limit: 10,
+        }),
+      });
+      expect(mockRes.success).toHaveBeenCalledWith(200, {
+        data: mockSubjects,
+        message: "My subjects retrieved successfully",
+        pagination: mockPagination,
+      });
+    });
+  });
+
+  describe("deleteQuestionsBySubjectIdHandler", () => {
+    it("should delete quiz questions by subject ID successfully", async () => {
+      const subjectId = new mongoose.Types.ObjectId().toString();
+      mockReq.params = { subjectId };
+      
+      (subjectSchemas.subjectIdSchema.parse as jest.Mock).mockReturnValue(subjectId);
+      (subjectService.deleteQuestionsBySubjectId as jest.Mock).mockResolvedValue({ deletedCount: 5 });
+
+      await deleteQuestionsBySubjectIdHandler(mockReq as Request, mockRes, mockNext);
+
+      expect(subjectService.deleteQuestionsBySubjectId).toHaveBeenCalledWith(subjectId);
+      expect(mockRes.success).toHaveBeenCalledWith(200, {
+        deletedCount: 5,
+        message: "Quiz questions deleted successfully",
       });
     });
   });

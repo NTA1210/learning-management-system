@@ -85,6 +85,12 @@ const InfoCard: React.FC<InfoCardProps> = ({
     });
   };
 
+  const truncateText = (text: string | undefined, maxLength: number = 150) => {
+    if (!text) return "No description";
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + "...";
+  };
+
   const getMenuId = () => {
     switch (type) {
       case "major":
@@ -115,7 +121,7 @@ const InfoCard: React.FC<InfoCardProps> = ({
               </div>
               <div className="col-span-2">
                 <span className="font-semibold" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>Description:</span>{" "}
-                <span style={{ color: darkMode ? "#e5e7eb" : "#1f2937" }}>{data.description || "No description"}</span>
+                <span style={{ color: darkMode ? "#e5e7eb" : "#1f2937" }}>{truncateText(data.description)}</span>
               </div>
               <div>
                 <span className="font-semibold" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>Updated:</span>{" "}
@@ -157,7 +163,7 @@ const InfoCard: React.FC<InfoCardProps> = ({
               </div>
               <div className="col-span-2">
                 <span className="font-semibold" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>Description:</span>{" "}
-                <span style={{ color: darkMode ? "#e5e7eb" : "#1f2937" }}>{data.description || "No description"}</span>
+                <span style={{ color: darkMode ? "#e5e7eb" : "#1f2937" }}>{truncateText(data.description)}</span>
               </div>
               <div>
                 <span className="font-semibold" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>Updated:</span>{" "}
@@ -209,7 +215,7 @@ const InfoCard: React.FC<InfoCardProps> = ({
               </div>
               <div className="col-span-2">
                 <span className="font-semibold" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>Description:</span>{" "}
-                <span style={{ color: darkMode ? "#e5e7eb" : "#1f2937" }}>{data.description || "No description"}</span>
+                <span style={{ color: darkMode ? "#e5e7eb" : "#1f2937" }}>{truncateText(data.description)}</span>
               </div>
               <div>
                 <span className="font-semibold" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>Updated:</span>{" "}
@@ -262,8 +268,8 @@ const InfoCard: React.FC<InfoCardProps> = ({
                       data.status === "ongoing"
                         ? darkMode ? "#6ee7b7" : "#047857"
                         : data.status === "completed"
-                        ? darkMode ? "#93c5fd" : "#1e40af"
-                        : darkMode ? "#9ca3af" : "#6b7280",
+                          ? darkMode ? "#93c5fd" : "#1e40af"
+                          : darkMode ? "#9ca3af" : "#6b7280",
                   }}
                 >
                   {data.status || "draft"}
@@ -297,7 +303,7 @@ const InfoCard: React.FC<InfoCardProps> = ({
               </div>
               <div className="col-span-2">
                 <span className="font-semibold" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>Description:</span>{" "}
-                <span style={{ color: darkMode ? "#e5e7eb" : "#1f2937" }}>{data.description || "No description"}</span>
+                <span style={{ color: darkMode ? "#e5e7eb" : "#1f2937" }}>{truncateText(data.description)}</span>
               </div>
               <div className="col-span-2">
                 <span className="font-semibold" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>Teachers:</span>{" "}
@@ -477,7 +483,7 @@ const InfoCard: React.FC<InfoCardProps> = ({
             <ActionMenu
               isOpen={openActionMenu === getMenuId()}
               onToggle={() => onActionMenuToggle(getMenuId())}
-              onClose={onActionMenuClose || (() => {})}
+              onClose={onActionMenuClose || (() => { })}
               type={type}
               onEdit={onEdit}
               onDelete={onDelete}

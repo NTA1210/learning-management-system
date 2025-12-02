@@ -199,8 +199,8 @@ export const deleteSpecialistById = async (specialistId: string) => {
 
     // Check if any teachers and courses are using this specialist
     const [teachersUsingSpecialist, coursesUsingSpecialist] = await Promise.all([
-        UserModel.countDocuments({role: Role.TEACHER, specialistIds: {$in: specialistId}}),
-        CourseModel.countDocuments({specialistIds: {$in: specialistId}}),
+        UserModel.countDocuments({role: Role.TEACHER, specialistIds: {$in: [specialistId]}}),
+        CourseModel.countDocuments({specialistIds: {$in: [specialistId]}}),
     ]);
     appAssert(
         teachersUsingSpecialist === 0 && coursesUsingSpecialist === 0,

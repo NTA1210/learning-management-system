@@ -117,11 +117,11 @@ const getMenuItems = (
             stroke="currentColor"
           >
             <path
-              stroke-width="2"
+              strokeWidth={2}
               d="M12.005 10.5h.008m3.987 0h.009m-8 0h.009"
             />
             <path
-              stroke-width="1.5"
+              strokeWidth={1.5}
               d="M2 10.5c0-.77.013-1.523.04-2.25c.083-2.373.125-3.56 1.09-4.533c.965-.972 2.186-1.024 4.626-1.129A100 100 0 0 1 12 2.5c1.48 0 2.905.03 4.244.088c2.44.105 3.66.157 4.626 1.13c.965.972 1.007 2.159 1.09 4.532a64 64 0 0 1 0 4.5c-.083 2.373-.125 3.56-1.09 4.533c-.965.972-2.186 1.024-4.626 1.129q-1.102.047-2.275.07c-.74.014-1.111.02-1.437.145s-.6.358-1.148.828l-2.179 1.87A.73.73 0 0 1 8 20.77v-2.348l-.244-.01c-2.44-.105-3.66-.157-4.626-1.13c-.965-.972-1.007-2.159-1.09-4.532A64 64 0 0 1 2 10.5"
             />
           </svg>
@@ -280,6 +280,25 @@ const getMenuItems = (
         label: "Grading",
       },
       {
+        href: "/my-courses",
+        icon: (
+          <svg
+            className="w-5 h-5 min-w-[1.25rem]"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+            ></path>
+          </svg>
+        ),
+        label: "My Courses",
+      },
+      {
         href: "/enrollments-list",
         icon: (
           <svg
@@ -422,10 +441,11 @@ export default function Sidebar({
   const [animatingOut, setAnimatingOut] = useState(false);
   const helpRef = useRef<HTMLDivElement | null>(null);
   const settingsRef = useRef<HTMLDivElement | null>(null);
+  const coursesRef = useRef<HTMLDivElement | null>(null);
   const [helpHeight, setHelpHeight] = useState(0);
   const [settingsHeight, setSettingsHeight] = useState(0);
   const [coursesHeight, setCoursesHeight] = useState(0);
-  const coursesRef = useRef<HTMLDivElement | null>(null);
+  const [mobileCoursesOpen, setMobileCoursesOpen] = useState(false);
 
   const [storedUser, setStoredUser] = useState<null | {
     _id?: string;
@@ -449,7 +469,8 @@ export default function Sidebar({
   useEffect(() => {
     const updateHeights = () => {
       if (helpRef.current) setHelpHeight(helpRef.current.scrollHeight);
-      if (settingsRef.current) setSettingsHeight(settingsRef.current.scrollHeight);
+      if (settingsRef.current)
+        setSettingsHeight(settingsRef.current.scrollHeight);
       if (coursesRef.current) setCoursesHeight(coursesRef.current.scrollHeight);
     };
     updateHeights();
@@ -571,23 +592,105 @@ export default function Sidebar({
           </div>
           <div className="flex-1 px-4 py-5 space-y-5 overflow-y-auto">
             <nav className="space-y-1">
-              {menuItems.map((item, index) => (
-                <Link
-                  key={index}
-                  to={item.href}
-                  onClick={onClose}
-                  className="flex items-center gap-3 px-3 py-2 text-sm font-medium transition-colors rounded-xl"
-                  style={{
-                    backgroundColor: darkMode
-                      ? "rgba(71,85,105,0.3)"
-                      : "rgba(15,23,42,0.05)",
-                    color: darkMode ? "#e2e8f0" : "#0f172a",
-                  }}
-                >
-                  <span>{item.icon}</span>
-                  <span>{item.label}</span>
-                </Link>
-              ))}
+              {menuItems.map((item, index) => {
+                // For teacher/admin on mobile, show All Courses section with collapsible submenu
+                if (item.href === "/courses" && effectiveRole !== "student") {
+                  return (
+                    <div key={index} className="space-y-1">
+                      <div className="flex items-center">
+                        <Link
+                          to="/courses"
+                          onClick={onClose}
+                          className="flex items-center gap-3 flex-1 px-3 py-2 text-sm font-medium transition-colors rounded-xl"
+                          style={{
+                            backgroundColor: darkMode
+                              ? "rgba(71,85,105,0.3)"
+                              : "rgba(15,23,42,0.05)",
+                            color: darkMode ? "#e2e8f0" : "#0f172a",
+                          }}
+                        >
+                          <span>{item.icon}</span>
+                          <span>{item.label}</span>
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => setMobileCoursesOpen((prev) => !prev)}
+                          className="ml-2 p-2 rounded-lg hover:bg-gray-200/40"
+                          style={{
+                            color: darkMode ? "#cbd5f5" : "#4b5563",
+                          }}
+                          aria-label="Toggle courses submenu"
+                        >
+                          <svg
+                            className={`h-4 w-4 transition-transform ${
+                              mobileCoursesOpen ? "rotate-180" : ""
+                            }`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                      {mobileCoursesOpen && (
+                        <div className="pl-9 space-y-1">
+                          <Link
+                            to="/assignments"
+                            onClick={onClose}
+                            className="block px-3 py-2 text-sm rounded-lg"
+                            style={{
+                              color: darkMode ? "#e2e8f0" : "#0f172a",
+                              backgroundColor: darkMode
+                                ? "rgba(148,163,184,0.1)"
+                                : "#f8fafc",
+                            }}
+                          >
+                            Assignments
+                          </Link>
+                          <Link
+                            to="/materials"
+                            onClick={onClose}
+                            className="block px-3 py-2 text-sm rounded-lg"
+                            style={{
+                              color: darkMode ? "#e2e8f0" : "#0f172a",
+                              backgroundColor: darkMode
+                                ? "rgba(148,163,184,0.1)"
+                                : "#f8fafc",
+                            }}
+                          >
+                            Lesson
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                // Default rendering
+                return (
+                  <Link
+                    key={index}
+                    to={item.href}
+                    onClick={onClose}
+                    className="flex items-center gap-3 px-3 py-2 text-sm font-medium transition-colors rounded-xl"
+                    style={{
+                      backgroundColor: darkMode
+                        ? "rgba(71,85,105,0.3)"
+                        : "rgba(15,23,42,0.05)",
+                      color: darkMode ? "#e2e8f0" : "#0f172a",
+                    }}
+                  >
+                    <span>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
             </nav>
             <div
               className="pt-4 border-t"
@@ -727,65 +830,103 @@ export default function Sidebar({
 
           <nav className="space-y-2">
             {menuItems.map((item, index) => {
-              // Special handling for "All Courses" - make it a dropdown
-              if (item.label === "All Courses") {
+              // Desktop dropdown cho "All Courses" - chỉ admin & teacher
+
+              if (item.href === "/courses" && effectiveRole !== "student") {
                 return (
                   <div key={index} className="relative">
-                    <div className="flex items-center w-full">
+                    <div className="flex items-center">
+                      {/* Phần main: click để đi tới /courses */}
+
                       <Link
-                        to={item.href}
                         className="flex items-center flex-1 px-3 py-2 text-sm rounded-md hover:bg-gray-600/20"
-                        style={{ color: darkMode ? '#9ca3af' : '#374151' }}
+                        style={{
+                          color: darkMode ? "#9ca3af" : "#374151",
+                        }}
+                        to={item.href}
                       >
-                        <div style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                        <div
+                          style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
+                        >
                           {item.icon}
                         </div>
+
                         {isExpanded && (
-                          <span className="ml-2 whitespace-nowrap">{item.label}</span>
+                          <span className="ml-2 whitespace-nowrap">
+                            {item.label}
+                          </span>
                         )}
                       </Link>
+
+                      {/* Nút mũi tên: chỉ toggle dropdown */}
+
                       {isExpanded && (
                         <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            toggleSubmenu('courses');
+                          onClick={() => toggleSubmenu("courses")}
+                          className="p-2 text-sm rounded-md hover:bg-gray-600/20 ml-1"
+                          style={{
+                            color: darkMode ? "#9ca3af" : "#374151",
                           }}
-                          className="px-2 py-2 text-sm rounded-md hover:bg-gray-600/20"
-                          style={{ color: darkMode ? '#9ca3af' : '#374151' }}
+                          type="button"
+                          aria-label="Toggle courses submenu"
                         >
-                          <svg className={`h-4 w-4 transition-transform ${openSubmenu === 'courses' ? 'transform rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          <svg
+                            className={`h-4 w-4 transition-transform ${
+                              openSubmenu === "courses"
+                                ? "transform rotate-180"
+                                : ""
+                            }`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 9l-7 7-7-7"
+                            />
                           </svg>
                         </button>
                       )}
                     </div>
+
                     {isExpanded && (
                       <div
                         ref={coursesRef}
-                        className="pl-7 mt-1 space-y-1 overflow-hidden"
+                        className="mt-1 space-y-1 overflow-hidden pl-7"
                         style={{
-                          maxHeight: (openSubmenu === 'courses' || (closingSubmenu === 'courses' && animatingOut)) ? coursesHeight : 0,
-                          transition: 'max-height 300ms ease'
+                          maxHeight:
+                            openSubmenu === "courses" ||
+                            (closingSubmenu === "courses" && animatingOut)
+                              ? coursesHeight
+                              : 0,
+
+                          transition: "max-height 300ms ease",
                         }}
                       >
-                        <Link to="/materials" className="flex items-center w-full px-3 py-2 text-sm hover:bg-gray-100/20 rounded-md" style={{ color: darkMode ? '#9ca3af' : '#374151' }}>
-                          <svg className="w-4 h-4 mr-2 min-w-[1rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                          </svg>
-                          <span className="whitespace-nowrap">Lesson Materials</span>
-                        </Link>
-                        <Link to="/assignments" className="flex items-center w-full px-3 py-2 text-sm hover:bg-gray-100/20 rounded-md" style={{ color: darkMode ? '#9ca3af' : '#374151' }}>
-                          <svg className="w-4 h-4 mr-2 min-w-[1rem]" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                          </svg>
+                        <Link
+                          to="/assignments"
+                          className="flex items-center w-full px-3 py-2 text-sm rounded-md hover:bg-gray-100/20"
+                          style={{ color: darkMode ? "#9ca3af" : "#374151" }}
+                        >
                           <span className="whitespace-nowrap">Assignments</span>
+                        </Link>
+
+                        <Link
+                          to="/materials"
+                          className="flex items-center w-full px-3 py-2 text-sm rounded-md hover:bg-gray-100/20"
+                          style={{ color: darkMode ? "#9ca3af" : "#374151" }}
+                        >
+                          <span className="whitespace-nowrap">Lesson</span>
                         </Link>
                       </div>
                     )}
                   </div>
                 );
               }
-              
+
+              // Default menu item
               return (
                 <Link
                   key={index}

@@ -21,7 +21,7 @@ export interface Lesson {
   accessReason: string;
 }
 
-export type LessonSortOption = 'name_asc' | 'name_desc' | 'date_asc' | 'date_desc';
+export type LessonSortOption = 'date_asc' | 'date_desc';
 
 export interface LessonFormValues {
   courseId: string;

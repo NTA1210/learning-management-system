@@ -41,6 +41,8 @@ import {
   DeletedCoursesPage,
   QuizAttemptsPage,
   GradeAttemptPage,
+  CreateSemesterPage,
+  ListSemestersPage,
 } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -76,6 +78,54 @@ function AppRoutes() {
           }
         />
 
+        {/* Admin Courses */}
+        <Route
+          path="/admin/courses"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <CourseManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/courses/deleted"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <DeletedCoursesPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Course detail */}
+
+        <Route
+          path="/courses/:id"
+          element={
+            <ProtectedRoute>
+              <CourseDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Auth routes */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/email-verify" element={<EmailVerifyPage />} />
+        <Route
+          path="/auth/verify-email/:code"
+          element={<EmailVerificationPage />}
+        />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:code" element={<ResetPasswordPage />} />
+
+        <Route
+          path="/my-courses"
+          element={
+            <ProtectedRoute>
+              <MyCoursesPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/my-courses-v2"
           element={
@@ -266,24 +316,10 @@ function AppRoutes() {
         />
 
         {/* About Us */}
-        <Route
-          path="/help/about"
-          element={
-            <ProtectedRoute>
-              <AboutUsPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/help/about" element={<AboutUsPage />} />
 
         {/* FAQ */}
-        <Route
-          path="/help/faq"
-          element={
-            <ProtectedRoute>
-              <FAQPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/help/faq" element={<FAQPage />} />
 
         {/* Feedback */}
         <Route
@@ -410,7 +446,22 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-
+        <Route
+          path="/create-semester"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <CreateSemesterPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/semesters"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <ListSemestersPage />
+            </ProtectedRoute>
+          }
+        />
         {/* Not found */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

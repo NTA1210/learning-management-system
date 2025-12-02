@@ -52,12 +52,13 @@ export const createScheduleRequest = async (input: CreateScheduleInput) => {
     appAssert(isAssigned, BAD_REQUEST, "Teacher is not assigned to this course");
 
     // Check for conflicts for all requested slots
+    // Include PENDING to prevent duplicate requests, and APPROVED/ACTIVE for actual conflicts
     const conflictChecks = input.slots.map(async (slot) => {
         const conflict = await ScheduleModel.findOne({
             teacherId: input.teacherId,
             dayOfWeek: slot.dayOfWeek,
             timeSlotId: slot.timeSlotId,
-            status: {$in: [ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
+            status: {$in: [ScheduleStatus.PENDING, ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
         });
 
         if (conflict) {
@@ -67,6 +68,7 @@ export const createScheduleRequest = async (input: CreateScheduleInput) => {
                 hasConflict: true,
                 dayOfWeek: slot.dayOfWeek,
                 timeSlot: timeSlot?.slotName || slot.timeSlotId,
+                status: conflict.status,
             };
         }
 
@@ -80,8 +82,8 @@ export const createScheduleRequest = async (input: CreateScheduleInput) => {
         conflicts.length === 0,
         CONFLICT,
         conflicts.length === 1
-            ? `Teacher already has a course scheduled on ${conflicts[0].dayOfWeek} at ${conflicts[0].timeSlot}`
-            : `Teacher already has courses scheduled on: ${conflicts.map(c => `${c.dayOfWeek} at ${c.timeSlot}`).join(", ")}`
+            ? `Teacher already has a ${conflicts[0].status === ScheduleStatus.PENDING ? 'pending request' : 'course scheduled'} on ${conflicts[0].dayOfWeek} at ${conflicts[0].timeSlot}`
+            : `Teacher already has ${conflicts.some(c => c.status === ScheduleStatus.PENDING) ? 'pending requests or courses' : 'courses'} scheduled on: ${conflicts.map(c => `${c.dayOfWeek} at ${c.timeSlot}`).join(", ")}`
     );
 
     // Create schedule records for each slot in a transaction
@@ -89,28 +91,27 @@ export const createScheduleRequest = async (input: CreateScheduleInput) => {
     session.startTransaction();
 
     try {
-        const schedulePromises = input.slots.map(async (slot) => {
-            return await ScheduleModel.create([{
-                courseId: input.courseId,
-                teacherId: input.teacherId,
-                dayOfWeek: slot.dayOfWeek,
-                timeSlotId: slot.timeSlotId,
-                effectiveFrom: input.effectiveFrom,
-                effectiveTo: input.effectiveTo,
-                location: input.location,
-                requestNote: input.requestNote,
-                status: ScheduleStatus.PENDING,
-                requestedBy: input.teacherId,
-                requestedAt: new Date(),
-            }], {session});
-        });
+        // Create all schedule documents in the session
+        const scheduleDocs = input.slots.map((slot) => ({
+            courseId: input.courseId,
+            teacherId: input.teacherId,
+            dayOfWeek: slot.dayOfWeek,
+            timeSlotId: slot.timeSlotId,
+            effectiveFrom: input.effectiveFrom,
+            effectiveTo: input.effectiveTo,
+            location: input.location,
+            requestNote: input.requestNote,
+            status: ScheduleStatus.PENDING,
+            requestedBy: input.teacherId,
+            requestedAt: new Date(),
+        }));
 
-        const schedules = await Promise.all(schedulePromises);
+        // Use insertMany instead of multiple create calls to avoid transaction number mismatch
+        const createdSchedules = await ScheduleModel.insertMany(scheduleDocs, {session});
 
         await session.commitTransaction();
 
-        // Flatten and populate the created schedules
-        const createdSchedules = schedules.flat();
+        // Populate the created schedules
         return await ScheduleModel.find({
             _id: {$in: createdSchedules.map(s => s._id)}
         }).populate([
@@ -133,25 +134,18 @@ export const getTeacherWeeklySchedule = async (
 ) => {
     const query: mongoose.FilterQuery<ISchedule> = {
         teacherId,
-        status: {$in: [ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
+        // Use provided status or default to APPROVED and ACTIVE
+        status: {$in: status && status.length > 0 ? status : [ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
     };
 
     // Filter by date range if provided
     if (date) {
         const targetDate = new Date(date);
-        query.$and = [
-            {effectiveFrom: {$lte: targetDate}},
-            {
-                $or: [
-                    {effectiveTo: {$exists: false}},
-                    {effectiveTo: {$gte: targetDate}},
-                ],
-            },
+        query.effectiveFrom = {$lte: targetDate};
+        query.$or = [
+            {effectiveTo: {$exists: false}},
+            {effectiveTo: {$gte: targetDate}},
         ];
-    }
-
-    if (status && status.length > 0) {
-        query.status = {$in: status};
     }
 
     const schedules = await ScheduleModel.find(query)

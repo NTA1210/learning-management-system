@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import http from "../utils/http";
 import { httpClient } from "../utils/http";
 import type { Course } from "../types/course";
@@ -47,6 +48,34 @@ export interface CourseFilters {
   sortOrder?: "asc" | "desc";
 }
 
+export interface CoursePagination {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface CourseListResponse {
+  data: Course[];
+  pagination?: CoursePagination;
+}
+
+export interface MyCoursesParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  slug?: string;
+  from?: string;
+  to?: string;
+  subjectId?: string;
+  semesterId?: string;
+  teacherId?: string;
+  isPublished?: boolean;
+  status?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+}
+
 export const courseService = {
   // Get all courses with optional filters
   getAllCourses: async (filters?: CourseFilters): Promise<{ courses: Course[]; pagination: unknown }> => {
@@ -81,10 +110,73 @@ export const courseService = {
     return { courses, pagination };
   },
 
+  /**
+   * Get courses (alias for getAllCourses with simpler interface)
+   * GET /courses
+   */
+  getCourses: async (params?: { page?: number; limit?: number }): Promise<CourseListResponse> => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", String(params.page));
+    if (params?.limit) queryParams.append("limit", String(params.limit));
+    
+    const queryString = queryParams.toString();
+    const url = `/courses${queryString ? `?${queryString}` : ""}`;
+    const response = await http.get<any>(url);
+
+    let data: Course[] = [];
+    if (Array.isArray(response?.data)) {
+      data = response.data as Course[];
+    } else if (Array.isArray(response)) {
+      data = response as Course[];
+    }
+
+    const pagination = (response as any)?.pagination;
+    return { data, pagination };
+  },
+
+  /**
+   * Get my courses (courses where the current user is a teacher or enrolled student)
+   * GET /courses/my-courses
+   */
+  getMyCourses: async (params?: MyCoursesParams): Promise<CourseListResponse> => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", String(params.page));
+    if (params?.limit) queryParams.append("limit", String(params.limit));
+    if (params?.search) queryParams.append("search", params.search);
+    if (params?.slug) queryParams.append("slug", params.slug);
+    if (params?.from) queryParams.append("from", params.from);
+    if (params?.to) queryParams.append("to", params.to);
+    if (params?.subjectId) queryParams.append("subjectId", params.subjectId);
+    if (params?.semesterId) queryParams.append("semesterId", params.semesterId);
+    if (params?.teacherId) queryParams.append("teacherId", params.teacherId);
+    if (params?.isPublished !== undefined) queryParams.append("isPublished", String(params.isPublished));
+    if (params?.status) queryParams.append("status", params.status);
+    if (params?.sortBy) queryParams.append("sortBy", params.sortBy);
+    if (params?.sortOrder) queryParams.append("sortOrder", params.sortOrder);
+    
+    const queryString = queryParams.toString();
+    const url = `/courses/my-courses${queryString ? `?${queryString}` : ""}`;
+    const response = await http.get<any>(url);
+
+    let data: Course[] = [];
+    if (Array.isArray(response?.data)) {
+      data = response.data as Course[];
+    } else if (Array.isArray(response)) {
+      data = response as Course[];
+    }
+
+    const pagination = (response as any)?.pagination;
+    return { data, pagination };
+  },
+
   // Get a single course by ID
   getCourseById: async (id: string): Promise<Course> => {
-    const response = await http.get<Course>(`/courses/${id}`);
-    return response.data;
+    const response = await http.get<Course | { data: Course }>(`/courses/${id}`);
+    // Handle both response formats
+    if ((response as { data: Course }).data) {
+      return (response as { data: Course }).data;
+    }
+    return response as Course;
   },
 
   // Create new course (multipart/form-data)

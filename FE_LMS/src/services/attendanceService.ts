@@ -108,6 +108,25 @@ export interface ExportAttendanceResponse {
 }
 
 export const attendanceService = {
+  // Get current user's own attendance records (for students viewing their own attendance)
+  getSelfAttendance: async (
+    params?: { page?: number; limit?: number; courseId?: string; status?: string }
+  ): Promise<StudentAttendanceResult> => {
+    const usp = new URLSearchParams();
+    if (params?.page) usp.append("page", String(params.page));
+    if (params?.limit) usp.append("limit", String(params.limit));
+    if (params?.courseId) usp.append("courseId", params.courseId);
+    if (params?.status) usp.append("status", params.status);
+    const qs = usp.toString();
+    const url = `/attendances/self${qs ? `?${qs}` : ""}`;
+    const response = await http.get<StudentAttendanceResult>(url);
+    return {
+      data: Array.isArray(response.data) ? response.data : [],
+      pagination: response.pagination,
+      summary: response.summary,
+    };
+  },
+
   getStudentAttendance: async (
     studentId: string,
     params?: { page?: number; limit?: number; courseId?: string; status?: string }
