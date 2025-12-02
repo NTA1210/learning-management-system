@@ -289,9 +289,10 @@ export const deleteQuiz = async ({
   const isOnGoing = quiz.startTime.getTime() <= Date.now() && quiz.endTime.getTime() >= Date.now();
   appAssert(!isOnGoing, BAD_REQUEST, 'Cannot delete a quiz that is on going');
 
-  quiz.deletedAt = new Date();
-  quiz.deletedBy = userId;
-  const data = await quiz.save();
+  const count = await QuizAttemptModel.countDocuments({ quizId: quiz._id });
+  appAssert(count === 0, BAD_REQUEST, 'Cannot delete a quiz that has attempts');
+
+  const data = await QuizModel.findByIdAndDelete(quizId);
 
   return data;
 };
