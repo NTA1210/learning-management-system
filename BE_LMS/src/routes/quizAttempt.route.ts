@@ -7,6 +7,7 @@ import {
   gradeQuizAttemptHandler,
   saveQuizHandler,
   submitQuizHandler,
+  updateQuizAttemptScoreHandler,
 } from '@/controller/quizAttempt.controller';
 import { authorize } from '@/middleware';
 import { Role } from '@/types';
@@ -35,5 +36,10 @@ quizAttemptRoutes.put(
   '/:quizAttemptId/re-grade',
   authorize(Role.TEACHER, Role.ADMIN),
   gradeQuizAttemptHandler
+);
+quizAttemptRoutes.put(
+  '/:quizAttemptId',
+  authorize(Role.TEACHER, Role.ADMIN),
+  updateQuizAttemptScoreHandler
 );
 export default quizAttemptRoutes;

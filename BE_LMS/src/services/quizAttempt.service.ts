@@ -8,6 +8,7 @@ import {
   SaveQuizInput,
   SubmitAnswerInput,
   SubmitQuizInput,
+  UpdateQuizAttemptScoreInput,
 } from '@/validators/quizAttempt.schemas';
 import mongoose from 'mongoose';
 import { isTeacherOfCourse } from './helpers/quizHelpers';
@@ -520,4 +521,30 @@ export const gradeQuizAttempt = async (
     passedQuestions,
     answersSubmitted,
   };
+};
+
+export const updateQuizAttemptScore = async (
+  { quizAttemptId, score }: UpdateQuizAttemptScoreInput,
+  userId: mongoose.Types.ObjectId,
+  role: Role
+) => {
+  const quizAttempt = await getQuizAttemptById(quizAttemptId, userId, role);
+  const quizAttemptPopulated = await quizAttempt.populate({
+    path: 'quizId',
+    populate: { path: 'courseId' },
+  });
+
+  if (role === Role.TEACHER) {
+    const course = quizAttemptPopulated.quizId.courseId as unknown as ICourse;
+
+    appAssert(
+      isTeacherOfCourse(course, userId),
+      BAD_REQUEST,
+      'You are not a teacher of this course'
+    );
+  }
+
+  quizAttempt.score = score;
+  await quizAttempt.save();
+  return quizAttempt;
 };
