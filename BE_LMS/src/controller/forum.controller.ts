@@ -126,7 +126,10 @@ export const updateForumByIdHandler = catchErrors(async (req, res) => {
 export const deleteForumByIdHandler = catchErrors(async (req, res) => {
     const forumId = forumIdSchema.parse(req.params.id);
 
-    const result = await deleteForumById(forumId);
+    const userId = req.userId;
+    const role = req.role;
+
+    const result = await deleteForumById(forumId, userId, role);
 
     return res.success(OK, {
         message: "Forum deleted successfully",
