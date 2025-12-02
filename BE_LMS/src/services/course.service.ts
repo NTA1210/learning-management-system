@@ -312,7 +312,7 @@ export const listCourses = async ({
 /**
  * Lấy thông tin chi tiết một khóa học theo ID
  */
-export const getCourseById = async (courseId: string) => {
+export const getCourseById = async (courseId: string, userId?: Types.ObjectId) => {
   // ❌ FIX: Validate courseId format
   appAssert(
     courseId && courseId.match(/^[0-9a-fA-F]{24}$/),
@@ -333,7 +333,18 @@ export const getCourseById = async (courseId: string) => {
 
   appAssert(course, NOT_FOUND, 'Course not found');
 
-  return course;
+  // ✅ Add isTeacherOfCourse field
+  const isTeacherOfCourse = userId
+    ? (course.teacherIds as any[]).some((teacherId: any) =>
+      teacherId._id?.toString() === userId.toString() ||
+      teacherId.toString() === userId.toString()
+    )
+    : false;
+
+  return {
+    ...course,
+    isTeacherOfCourse,
+  };
 };
 
 /**
