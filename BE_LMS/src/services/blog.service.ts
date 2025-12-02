@@ -1,5 +1,5 @@
 import { NOT_FOUND } from '@/constants/http';
-import BlogModel from '@/models/blog.model';
+import { BlogModel } from '@/models';
 import appAssert from '@/utils/appAssert';
 import { prefixBlogImage } from '@/utils/filePrefix';
 import { getKeyFromPublicUrl, removeFile, uploadFile } from '@/utils/uploadFile';

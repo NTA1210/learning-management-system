@@ -95,6 +95,20 @@ CourseSchema.index({ isPublished: 1, title: 'text', description: 'text' });
 CourseSchema.index({ isDeleted: 1, createdAt: -1 });
 CourseSchema.index({ isDeleted: 1, isPublished: 1, createdAt: -1 });
 
+//hooks
+CourseSchema.pre('save', function (next) {
+  this.slug = this.title
+    .normalize('NFD') // tách ký tự và dấu
+    .replace(/[\u0300-\u036f]/g, '') // remove dấu
+    .replace(/đ/g, 'd') // chuyển đ
+    .replace(/Đ/g, 'd') // chuyển Đ
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '');
+  next();
+});
+
 const CourseModel = mongoose.model<ICourse>('Course', CourseSchema, 'courses');
 
 export default CourseModel;
