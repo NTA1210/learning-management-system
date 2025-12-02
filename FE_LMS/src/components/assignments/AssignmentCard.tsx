@@ -68,7 +68,10 @@ const AssignmentCard: React.FC<AssignmentCardProps> = ({
   onDelete,
 }) => {
   const dueStatus = getDueDateStatus(assignment.dueDate, darkMode);
-  const handleCardHover = (event: React.MouseEvent<HTMLDivElement>, entering: boolean) => {
+  const handleCardHover = (
+    event: React.MouseEvent<HTMLDivElement>,
+    entering: boolean
+  ) => {
     const el = event.currentTarget;
     if (entering) {
       el.style.transform = "translateY(-6px) scale(1.02)";
@@ -85,53 +88,83 @@ const AssignmentCard: React.FC<AssignmentCardProps> = ({
     <div
       className="rounded-lg shadow-md overflow-hidden flex flex-col"
       style={{
-        backgroundColor: darkMode ? "rgba(31, 41, 55, 0.8)" : "rgba(255, 255, 255, 0.9)",
-        border: darkMode ? "1px solid rgba(75, 85, 99, 0.3)" : "1px solid rgba(229, 231, 235, 0.5)",
+        backgroundColor: darkMode
+          ? "rgba(31, 41, 55, 0.8)"
+          : "rgba(255, 255, 255, 0.9)",
+        border: darkMode
+          ? "1px solid rgba(75, 85, 99, 0.3)"
+          : "1px solid rgba(229, 231, 235, 0.5)",
         transition: "transform 0.3s ease, box-shadow 0.3s ease",
       }}
       onMouseEnter={(e) => handleCardHover(e, true)}
       onMouseLeave={(e) => handleCardHover(e, false)}
     >
-      <div className="p-6 flex flex-col flex-1 cursor-pointer" onClick={() => onNavigate(assignment._id)}>
+      <div
+        className="p-6 flex flex-col flex-1 cursor-pointer"
+        onClick={() => onNavigate(assignment._id)}
+      >
         <div className="mb-3">
           <span
             className="inline-block px-3 py-1 text-xs font-semibold rounded-full"
             style={{
-              backgroundColor: darkMode ? "rgba(99, 102, 241, 0.2)" : "rgba(99, 102, 241, 0.1)",
+              backgroundColor: darkMode
+                ? "rgba(99, 102, 241, 0.2)"
+                : "rgba(99, 102, 241, 0.1)",
               color: darkMode ? "#a5b4fc" : "#6366f1",
             }}
           >
-            {assignment.courseId.title}
+            {assignment.courseId?.title || "Unknown Course"}
           </span>
         </div>
 
-        <h3 className="text-xl font-semibold mb-2" style={{ color: darkMode ? "#ffffff" : "#1f2937" }}>
+        <h3
+          className="text-xl font-semibold mb-2"
+          style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
+        >
           {assignment.title}
         </h3>
 
-        <p className="text-sm mb-4 line-clamp-2" style={{ color: darkMode ? "#d1d5db" : "#6b7280" }}>
+        <p
+          className="text-sm mb-4 line-clamp-2"
+          style={{ color: darkMode ? "#d1d5db" : "#6b7280" }}
+        >
           {assignment.description}
         </p>
 
         <div className="space-y-2 mb-4">
-          <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+          <div
+            className="flex items-center text-sm"
+            style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
+          >
             <Award className="w-4 h-4 mr-2" />
             Max Score: {assignment.maxScore} points
           </div>
-          <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+          <div
+            className="flex items-center text-sm"
+            style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
+          >
             <Calendar className="w-4 h-4 mr-2" />
             Due: {formatDate(assignment.dueDate)}
           </div>
-          <div className="flex items-center text-sm" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+          <div
+            className="flex items-center text-sm"
+            style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
+          >
             <User className="w-4 h-4 mr-2" />
-            Created by: {assignment.createdBy?.fullname || assignment.createdBy?.username || "Unknown"}
+            Created by:{" "}
+            {assignment.createdBy?.fullname ||
+              assignment.createdBy?.username ||
+              "Unknown"}
           </div>
-          
         </div>
 
         <div
           className="flex items-center justify-between pt-4 mt-auto border-t gap-2 min-h-[32px]"
-          style={{ borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "rgba(229, 231, 235, 0.5)" }}
+          style={{
+            borderColor: darkMode
+              ? "rgba(75, 85, 99, 0.3)"
+              : "rgba(229, 231, 235, 0.5)",
+          }}
         >
           <span
             className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded whitespace-nowrap flex-shrink-0"
@@ -147,7 +180,9 @@ const AssignmentCard: React.FC<AssignmentCardProps> = ({
             <span
               className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded whitespace-nowrap flex-shrink-0"
               style={{
-                backgroundColor: darkMode ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.1)",
+                backgroundColor: darkMode
+                  ? "rgba(239, 68, 68, 0.2)"
+                  : "rgba(239, 68, 68, 0.1)",
                 color: darkMode ? "#fca5a5" : "#dc2626",
                 minHeight: "24px",
               }}
@@ -155,7 +190,10 @@ const AssignmentCard: React.FC<AssignmentCardProps> = ({
               No late submissions
             </span>
           ) : (
-            <span className="inline-flex items-center flex-shrink-0" style={{ minHeight: "24px", width: "0" }} />
+            <span
+              className="inline-flex items-center flex-shrink-0"
+              style={{ minHeight: "24px", width: "0" }}
+            />
           )}
         </div>
       </div>
@@ -163,7 +201,11 @@ const AssignmentCard: React.FC<AssignmentCardProps> = ({
       {canManage && (
         <div
           className="flex space-x-2 p-4 pt-0 border-t"
-          style={{ borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "rgba(229, 231, 235, 0.5)" }}
+          style={{
+            borderColor: darkMode
+              ? "rgba(75, 85, 99, 0.3)"
+              : "rgba(229, 231, 235, 0.5)",
+          }}
           onClick={(e) => e.stopPropagation()}
         >
           <button
@@ -173,11 +215,15 @@ const AssignmentCard: React.FC<AssignmentCardProps> = ({
               color: darkMode ? "#a5b4fc" : "#4f46e5",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = darkMode ? "rgba(99, 102, 241, 0.3)" : "#e0e7ff";
+              e.currentTarget.style.backgroundColor = darkMode
+                ? "rgba(99, 102, 241, 0.3)"
+                : "#e0e7ff";
               e.currentTarget.style.transform = "scale(1.05)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = darkMode ? "rgba(99, 102, 241, 0.2)" : "#eef2ff";
+              e.currentTarget.style.backgroundColor = darkMode
+                ? "rgba(99, 102, 241, 0.2)"
+                : "#eef2ff";
               e.currentTarget.style.transform = "scale(1)";
             }}
             onClick={() => onEdit(assignment)}
@@ -191,11 +237,15 @@ const AssignmentCard: React.FC<AssignmentCardProps> = ({
               color: darkMode ? "#fca5a5" : "#dc2626",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = darkMode ? "rgba(239, 68, 68, 0.3)" : "#fecaca";
+              e.currentTarget.style.backgroundColor = darkMode
+                ? "rgba(239, 68, 68, 0.3)"
+                : "#fecaca";
               e.currentTarget.style.transform = "scale(1.05)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = darkMode ? "rgba(239, 68, 68, 0.2)" : "#fee2e2";
+              e.currentTarget.style.backgroundColor = darkMode
+                ? "rgba(239, 68, 68, 0.2)"
+                : "#fee2e2";
               e.currentTarget.style.transform = "scale(1)";
             }}
             onClick={() => onDelete(assignment._id)}
@@ -209,4 +259,3 @@ const AssignmentCard: React.FC<AssignmentCardProps> = ({
 };
 
 export default AssignmentCard;
-

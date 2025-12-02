@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import NotificationDropdown from "./NotificationDropdown";
 import { authService } from "../services";
+import { useSidebar } from "../context/SidebarContext";
 
 interface NavbarProps {
   onToggleSidebar?: () => void;
@@ -21,6 +22,8 @@ interface NavbarProps {
 
 export default function Navbar({ onToggleSidebar }: NavbarProps) {
   const navigate = useNavigate();
+  const { toggleSidebar } = useSidebar();
+  const handleToggle = onToggleSidebar || toggleSidebar;
   const { darkMode, toggleDarkMode } = useTheme();
   const { user, savedAccounts, switchToAccount, logout } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -168,7 +171,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
                   : "rgba(99, 102, 241, 0.1)",
                 color: darkMode ? "#a5b4fc" : "#4f46e5",
               }}
-              onClick={onToggleSidebar}
+              onClick={handleToggle}
               aria-label="Toggle sidebar"
             >
               <svg
