@@ -118,7 +118,7 @@ const MyCoursesPage: React.FC = () => {
             }}
         >
             <Navbar />
-                  <Sidebar role={'student'} />
+                  <Sidebar role={user?.role as 'admin' | 'teacher' | 'student'} />
             <div className="max-w-[1200px] mt-[100px] mx-auto px-4 sm:pl-[93px] py-6">
                 <h1
                     className="text-2xl font-semibold mb-6"
