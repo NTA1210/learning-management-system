@@ -630,15 +630,6 @@ const ForumDetailPage: React.FC = () => {
                     ) : (
                       <div className="space-y-4">
                         {orderedPosts.map((post) => {
-                          // Debug logging
-                          console.log('Post data:', post);
-                          console.log('Post author:', post.author);
-                          console.log('Author exists?', !!post.author);
-                          if (post.author) {
-                            console.log('Author fullname:', post.author.fullname);
-                            console.log('Author username:', post.author.username);
-                          }
-
                           return (
                             <div
                               key={post._id}
