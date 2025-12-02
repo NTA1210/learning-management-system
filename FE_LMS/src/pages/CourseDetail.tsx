@@ -786,7 +786,7 @@ export default function CourseDetail() {
                   <AssignmentsTab courseId={course._id} darkMode={isDarkMode} />
                 )}
                 {activeTab === "attendance" && course?._id && (
-                  <AttendanceTab courseId={course._id} darkMode={isDarkMode} />
+                  <AttendanceTab courseId={course._id} darkMode={isDarkMode} courseTitle={course.title} />
                 )}
                 {activeTab === "schedule" && course?._id && (
                   <ScheduleTab courseId={course._id} darkMode={isDarkMode} />
