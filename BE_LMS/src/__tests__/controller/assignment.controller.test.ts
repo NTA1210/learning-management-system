@@ -32,7 +32,14 @@ describe("Assignment Controller Unit Tests", () => {
   let mockNext: jest.Mock;
 
   beforeEach(() => {
-    mockReq = { body: {}, params: {}, query: {} } as any;
+    mockReq = {
+      body: {},
+      params: {},
+      query: {},
+      userId: "user1",
+      role: "STUDENT",
+      file: undefined,
+    } as any;
     mockRes = { success: jest.fn().mockReturnThis() };
     mockNext = jest.fn();
     jest.clearAllMocks();
@@ -68,6 +75,8 @@ describe("Assignment Controller Unit Tests", () => {
         dueAfter: null,
         sortBy: "dueDate",
         sortOrder: "asc",
+        userId: "user1",
+        userRole: "STUDENT",
       });
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: result.assignments,
@@ -97,7 +106,11 @@ describe("Assignment Controller Unit Tests", () => {
 
       await getAssignmentByIdHandler(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(assignmentService.getAssignmentById).toHaveBeenCalledWith("ass1");
+      expect(assignmentService.getAssignmentById).toHaveBeenCalledWith(
+        "ass1",
+        "user1",
+        "STUDENT"
+      );
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: assignment,
         message: "Assignment retrieved successfully",
@@ -124,7 +137,41 @@ describe("Assignment Controller Unit Tests", () => {
 
       await createAssignmentHandler(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(assignmentService.createAssignment).toHaveBeenCalledWith(data);
+      expect(assignmentService.createAssignment).toHaveBeenCalledWith(
+        data,
+        "user1",
+        "STUDENT",
+        undefined
+      );
+      expect(mockRes.success).toHaveBeenCalledWith(201, {
+        data: assignment,
+        message: "Assignment created successfully",
+      });
+    });
+
+    it("should create assignment with file successfully", async () => {
+      const data = { title: "New Assignment" };
+      const assignment = { id: "ass1", ...data };
+      const mockFile = {
+        fieldname: "file",
+        originalname: "test.pdf",
+        encoding: "7bit",
+        mimetype: "application/pdf",
+        size: 1024,
+      } as Express.Multer.File;
+
+      mockReq.file = mockFile;
+      (assignmentSchemas.createAssignmentSchema.parse as jest.Mock).mockReturnValue(data);
+      (assignmentService.createAssignment as jest.Mock).mockResolvedValue(assignment);
+
+      await createAssignmentHandler(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(assignmentService.createAssignment).toHaveBeenCalledWith(
+        data,
+        "user1",
+        "STUDENT",
+        mockFile
+      );
       expect(mockRes.success).toHaveBeenCalledWith(201, {
         data: assignment,
         message: "Assignment created successfully",
@@ -155,7 +202,47 @@ describe("Assignment Controller Unit Tests", () => {
 
       await updateAssignmentHandler(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(assignmentService.updateAssignment).toHaveBeenCalledWith("ass1", data);
+      expect(assignmentService.updateAssignment).toHaveBeenCalledWith(
+        "ass1",
+        data,
+        "user1",
+        "STUDENT",
+        undefined
+      );
+      expect(mockRes.success).toHaveBeenCalledWith(200, {
+        data: updatedAssignment,
+        message: "Assignment updated successfully",
+      });
+    });
+
+    it("should update assignment with file successfully", async () => {
+      const data = { title: "Updated Assignment" };
+      const updatedAssignment = { id: "ass1", ...data };
+      const mockFile = {
+        fieldname: "file",
+        originalname: "updated.pdf",
+        encoding: "7bit",
+        mimetype: "application/pdf",
+        size: 2048,
+      } as Express.Multer.File;
+
+      mockReq.params = { id: "ass1" };
+      mockReq.body = data;
+      mockReq.file = mockFile;
+
+      (assignmentSchemas.assignmentIdSchema.parse as jest.Mock).mockReturnValue("ass1");
+      (assignmentSchemas.updateAssignmentSchema.parse as jest.Mock).mockReturnValue(data);
+      (assignmentService.updateAssignment as jest.Mock).mockResolvedValue(updatedAssignment);
+
+      await updateAssignmentHandler(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(assignmentService.updateAssignment).toHaveBeenCalledWith(
+        "ass1",
+        data,
+        "user1",
+        "STUDENT",
+        mockFile
+      );
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: updatedAssignment,
         message: "Assignment updated successfully",
@@ -182,7 +269,11 @@ describe("Assignment Controller Unit Tests", () => {
 
       await deleteAssignmentHandler(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(assignmentService.deleteAssignment).toHaveBeenCalledWith("ass1");
+      expect(assignmentService.deleteAssignment).toHaveBeenCalledWith(
+        "ass1",
+        "user1",
+        "STUDENT"
+      );
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: null,
         message: "Assignment deleted successfully",
