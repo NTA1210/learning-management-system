@@ -49,6 +49,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import Profile from "../pages/profile";
 import Calendar from "../components/Calendar";
 import Chat from "../pages/Chat/Chat";
+import FloatingChatContainer from "../components/FloatingChat/FloatingChatContainer";
 
 function AppRoutes() {
   return (
@@ -443,6 +444,14 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/chat-rooms/:roomId"
+          element={
+            <ProtectedRoute>
+              <Chat />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/create-semester"
           element={
             <ProtectedRoute requiredRole="admin">
@@ -461,6 +470,9 @@ function AppRoutes() {
         {/* Not found */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      
+      {/* Floating Chat Windows - inside Router for useNavigate */}
+      <FloatingChatContainer />
     </Router>
   );
 }
