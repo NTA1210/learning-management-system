@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
+import LandingHeader from "../components/LandingHeader";
 import { useTheme } from "../hooks/useTheme";
 import type { BlogPost } from "../types/blog";
 import {
@@ -135,7 +136,7 @@ function BlogCard({
         {/* Read More Button */}
         <div className="mt-auto flex justify-end">
           <Link
-            to={`/blog/${post.slug}`}
+            to={`/blogs/${post.slug}`}
             className={`group/btn inline-flex items-center gap-1 text-sm font-medium transition-colors ${
               darkMode
                 ? "text-indigo-400 hover:text-indigo-300"
@@ -325,7 +326,7 @@ const BlogPage: React.FC = () => {
 
   return (
     <>
-      <Navbar />
+      {user ? <Navbar /> : <LandingHeader />}
       <div
         className="min-h-screen transition-colors duration-200"
         style={{
@@ -346,7 +347,11 @@ const BlogPage: React.FC = () => {
             }}
           >
             {/* Header */}
-            <section className="mb-12 flex flex-col md:flex-row gap-6 items-center justify-between">
+            <section
+              className={`mb-12 flex flex-col md:flex-row gap-6 items-center ${
+                isAdmin ? "justify-between" : "justify-center"
+              }`}
+            >
               {/* Search */}
               <form className="w-full max-w-xl" onSubmit={handleSearch}>
                 <div className="relative group">
