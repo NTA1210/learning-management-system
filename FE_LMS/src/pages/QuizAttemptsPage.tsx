@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Eye, ShieldOff } from "lucide-react";
+import { Eye, ShieldOff, RefreshCw } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { useTheme } from "../hooks/useTheme";
+import { useAuth } from "../hooks/useAuth";
 import { quizAttemptService } from "../services";
 import type { QuizAttemptSummary, GetQuizAttemptsParams } from "../types/quizAttemptGrading";
 import Swal from "sweetalert2";
@@ -12,11 +13,14 @@ export default function QuizAttemptsPage() {
     const { quizId } = useParams<{ quizId: string }>();
     const navigate = useNavigate();
     const { darkMode } = useTheme();
+    const { user } = useAuth();
+    const isStudent = user?.role === 'student';
 
     const [attempts, setAttempts] = useState<QuizAttemptSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [banProcessingId, setBanProcessingId] = useState<string | null>(null);
+    const [regradeProcessingId, setRegradeProcessingId] = useState<string | null>(null);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
     const handleToggleSidebar = () => {
@@ -25,6 +29,48 @@ export default function QuizAttemptsPage() {
 
     const handleCloseSidebar = () => {
         setMobileSidebarOpen(false);
+    };
+
+    const handleRegradeAttempt = async (attemptId: string) => {
+        const result = await Swal.fire({
+            title: 'Regrade Attempt?',
+            text: 'This will recalculate the score based on current quiz questions.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#3b82f6',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Yes, regrade it!',
+            cancelButtonText: 'Cancel',
+            background: darkMode ? '#1e293b' : '#ffffff',
+            color: darkMode ? '#f1f5f9' : '#0f172a',
+        });
+
+        if (result.isConfirmed) {
+            try {
+                setRegradeProcessingId(attemptId);
+                await quizAttemptService.regradeAttempt(attemptId);
+                await Swal.fire({
+                    title: 'Success!',
+                    text: 'Attempt has been regraded successfully.',
+                    icon: 'success',
+                    confirmButtonColor: '#3b82f6',
+                    background: darkMode ? '#1e293b' : '#ffffff',
+                    color: darkMode ? '#f1f5f9' : '#0f172a',
+                });
+                loadAttempts(); // Reload to show new scores
+            } catch (err: any) {
+                await Swal.fire({
+                    title: 'Error',
+                    text: err?.response?.data?.message || err?.message || 'Failed to regrade attempt',
+                    icon: 'error',
+                    confirmButtonColor: '#ef4444',
+                    background: darkMode ? '#1e293b' : '#ffffff',
+                    color: darkMode ? '#f1f5f9' : '#0f172a',
+                });
+            } finally {
+                setRegradeProcessingId(null);
+            }
+        }
     };
 
     // Pagination
@@ -55,7 +101,16 @@ export default function QuizAttemptsPage() {
             };
             const response = await quizAttemptService.getQuizAttemptsForGrading(quizId, params);
 
-            setAttempts(response.data || []);
+            const response = await quizAttemptService.getQuizAttemptsForGrading(quizId, params);
+
+            let data = response.data || [];
+            if (isStudent) {
+                data = data.filter(a => {
+                    const sId = typeof a.student === 'string' ? a.student : a.student?._id;
+                    return sId === user?._id;
+                });
+            }
+            setAttempts(data);
             if (response.pagination) {
                 setTotalPages(response.pagination.totalPages);
                 setTotal(response.pagination.total);
@@ -153,14 +208,14 @@ export default function QuizAttemptsPage() {
                             <button
                                 onClick={() => navigate(-1)}
                                 className="flex items-center gap-2 text-sm hover:underline mb-4"
-                                style={{ color: "var(--muted-text)" }}
+                                style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                             >
                                 ← Back
                             </button>
                             <h1 className="text-3xl font-bold" style={{ color: "var(--heading-text)" }}>
                                 Quiz Attempts
                             </h1>
-                            <p className="text-sm mt-2" style={{ color: "var(--muted-text)" }}>
+                            <p className="text-sm mt-2" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                                 View student attempts and manage active sessions
                             </p>
                         </div>
@@ -170,7 +225,7 @@ export default function QuizAttemptsPage() {
                         {/* Loading State */}
                         {loading && (
                             <div className="text-center py-12">
-                                <p style={{ color: "var(--muted-text)" }}>Loading attempts...</p>
+                                <p style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>Loading attempts...</p>
                             </div>
                         )}
 
@@ -184,7 +239,7 @@ export default function QuizAttemptsPage() {
                         {/* Attempts Table */}
                         {!loading && !error && (
                             <>
-                                <div className="rounded-lg overflow-hidden" style={{ backgroundColor: "var(--card-surface)", border: "1px solid var(--card-border)" }}>
+                                <div className="rounded-lg overflow-hidden overflow-x-auto" style={{ backgroundColor: "var(--card-surface)", border: "1px solid var(--card-border)" }}>
                                     <table className="w-full">
                                         <thead style={{ backgroundColor: darkMode ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.02)" }}>
                                             <tr>
@@ -199,7 +254,7 @@ export default function QuizAttemptsPage() {
                                         <tbody>
                                             {attempts.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={6} className="p-8 text-center" style={{ color: "var(--muted-text)" }}>
+                                                    <td colSpan={6} className="p-8 text-center" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                                                         No attempts found
                                                     </td>
                                                 </tr>
@@ -213,7 +268,7 @@ export default function QuizAttemptsPage() {
                                                         <td className="p-4 text-sm" style={{ color: "var(--page-text)" }}>
                                                             {attempt.student?.fullname || "N/A"}
                                                         </td>
-                                                        <td className="p-4 text-sm" style={{ color: "var(--muted-text)" }}>
+                                                        <td className="p-4 text-sm" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                                                             {attempt.student?.email || "N/A"}
                                                         </td>
                                                         <td className="p-4 text-sm font-semibold" style={{ color: "var(--heading-text)" }}>
@@ -223,7 +278,7 @@ export default function QuizAttemptsPage() {
                                                                 <>
                                                                     {attempt.score.toFixed(1)} {attempt.totalQuizScore ? `/ ${attempt.totalQuizScore}` : ""}
                                                                     {attempt.scorePercentage !== undefined && (
-                                                                        <span className="ml-2 text-xs" style={{ color: "var(--muted-text)" }}>
+                                                                        <span className="ml-2 text-xs" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                                                                             ({attempt.scorePercentage.toFixed(0)}%)
                                                                         </span>
                                                                     )}
@@ -231,11 +286,11 @@ export default function QuizAttemptsPage() {
                                                             )}
                                                         </td>
                                                         <td className="p-4">
-                                                            <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusBadgeColor(attempt.status)}`}>
+                                                            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getStatusBadgeColor(attempt.status)}`}>
                                                                 {attempt.status === 'in_progress' ? 'In Progress' : attempt.status}
                                                             </span>
                                                         </td>
-                                                        <td className="p-4 text-sm" style={{ color: "var(--muted-text)" }}>
+                                                        <td className="p-4 text-sm" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                                                             {formatDate(attempt.createdAt)}
                                                         </td>
                                                         <td className="p-4">
@@ -247,6 +302,20 @@ export default function QuizAttemptsPage() {
                                                                     <Eye className="w-4 h-4" />
                                                                     View
                                                                 </button>
+                                                                {attempt.status === 'submitted' && (
+                                                                    <>
+                                                                        <div className="h-4 w-px bg-gray-300 dark:bg-gray-600 mx-1"></div>
+                                                                        <button
+                                                                            onClick={() => handleRegradeAttempt(attempt._id)}
+                                                                            disabled={regradeProcessingId === attempt._id}
+                                                                            className="flex items-center gap-2 px-3 py-1.5 rounded border border-green-600 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 text-sm disabled:opacity-50 transition-colors"
+                                                                            title="Recalculate score based on current quiz questions"
+                                                                        >
+                                                                            <RefreshCw className={`w-4 h-4 ${regradeProcessingId === attempt._id ? 'animate-spin' : ''}`} />
+                                                                            {regradeProcessingId === attempt._id ? "Regrading..." : "Regrade"}
+                                                                        </button>
+                                                                    </>
+                                                                )}
                                                                 {attempt.status === 'in_progress' && (
                                                                     <button
                                                                         onClick={() => handleBanAttempt(attempt)}

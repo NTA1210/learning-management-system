@@ -15,7 +15,7 @@ export function QuizPageHeader({ title, onBack, darkMode, textColor }: QuizPageH
   };
 
   return (
-    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between md:ml-[50px]">
+    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between md:ml-[80px]">
       <div className="flex flex-col gap-2">
         <button
           type="button"

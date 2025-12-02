@@ -312,7 +312,7 @@ export default function TakeQuizPage() {
               // Try to load from cached attemptId first
               try {
                 const attempt = await quizAttemptService.getQuizAttempt(cachedData.attemptId);
-                if (attempt.status === "submitted") {
+                if (["submitted", "graded", "regraded"].includes(attempt.status)) {
                   setQuizAttemptId(cachedData.attemptId);
                   setLoadingCompletedAttempt(false);
                   return; // Successfully loaded from cache
@@ -337,7 +337,7 @@ export default function TakeQuizPage() {
         const studentId = typeof attempt.studentId === "string"
           ? attempt.studentId
           : attempt.studentId?._id;
-        return studentId === user._id && attempt.status === "submitted";
+        return studentId === user._id && ["submitted", "graded", "regraded"].includes(attempt.status);
       });
 
       if (userAttempt) {
@@ -552,6 +552,12 @@ export default function TakeQuizPage() {
   const createMarkup = (content?: string) => ({ __html: content || "" });
 
   const getErrorMessage = (error: unknown, fallback: string) => {
+    if (typeof error === "object" && error !== null && "response" in error) {
+      const resp = (error as any).response;
+      if (resp?.data?.message) {
+        return String(resp.data.message);
+      }
+    }
     if (error instanceof Error) {
       return error.message || fallback;
     }

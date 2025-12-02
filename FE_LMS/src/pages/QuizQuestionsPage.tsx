@@ -146,7 +146,7 @@ export default function QuizQuestionsPage() {
     if (!editForm) return;
     setEditForm({
       ...editForm,
-      [field]: field === "points" ? Number(value) : value,
+      [field]: value, // Allow string for points to support decimals during editing
     });
   };
 
@@ -204,12 +204,32 @@ export default function QuizQuestionsPage() {
     });
   };
 
-  const handleSelectNewImages = (event: React.ChangeEvent<HTMLInputElement>) => {
-    // Snapshot editing currently doesn't support uploading NEW images easily via this flow
-    // because quizService.updateQuestionById expects JSON, not FormData.
-    // For now, we can show a warning or just ignore.
-    // Or we could try to support it if backend supported base64, but let's keep it simple.
-    showSwalError("Uploading new images is not supported in Quiz Snapshot mode yet.");
+  const handleSelectNewImages = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!quizId || !editForm) return;
+
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    try {
+      // Convert FileList to File array
+      const fileArray = Array.from(files);
+
+      // Upload images
+      const uploadedImages = await quizService.uploadQuestionImages(quizId, fileArray);
+
+      // Add uploaded images to editForm
+      setEditForm({
+        ...editForm,
+        existingImages: [...(editForm.existingImages || []), ...uploadedImages],
+      });
+
+      // Clear input so user can select same file again if needed
+      if (newImageInputRef.current) {
+        newImageInputRef.current.value = '';
+      }
+    } catch (err: any) {
+      await showSwalError(err?.response?.data?.message || err?.message || "Failed to upload images");
+    }
   };
 
   const handleRemoveNewImage = (index: number) => {
@@ -232,9 +252,9 @@ export default function QuizQuestionsPage() {
       const updatedQuiz = await quizService.deleteQuestionById(quizId, snapshotId);
       setQuiz(updatedQuiz);
       await showSwalSuccess("Question removed.");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to delete snapshot question:", err);
-      await showSwalError("Failed to remove question.");
+      await showSwalError(err?.response?.data?.message || "Failed to remove question.");
     } finally {
       setDeletingId(null);
     }
@@ -294,7 +314,7 @@ export default function QuizQuestionsPage() {
 
       const updatedQuiz = await quizService.updateQuestionById(quizId, snapshotId, {
         text: trimmedText,
-        points: editForm.points,
+        points: Number(editForm.points) || 0,
         explanation: editForm.explanation?.trim() || undefined,
         options: cleanedOptions,
         correctOptions: editForm.correctFlags.map((flag) => (flag ? 1 : 0)),
@@ -305,9 +325,9 @@ export default function QuizQuestionsPage() {
       setQuiz(updatedQuiz);
       await showSwalSuccess("Question updated.");
       closeEditModal();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to update snapshot question:", err);
-      await showSwalError("Failed to update question. Please try again.");
+      await showSwalError(err?.response?.data?.message || "Failed to update question. Please try again.");
     } finally {
       setSavingEdit(false);
     }
@@ -330,7 +350,7 @@ export default function QuizQuestionsPage() {
             />
 
             {quiz?.description && (
-              <p className="text-sm mb-6 md:ml-[50px]" style={{ color: "var(--muted-text)" }}>
+              <p className="text-sm mb-6 md:ml-[80px]" style={{ color: "var(--muted-text)" }}>
                 {quiz.description}
               </p>
             )}
@@ -357,13 +377,13 @@ export default function QuizQuestionsPage() {
               <>
                 {questions.length === 0 ? (
                   <div
-                    className="rounded-lg p-8 text-center md:ml-[50px]"
+                    className="rounded-lg p-8 text-center md:ml-[80px]"
                     style={{ backgroundColor: "var(--card-surface)", border: "1px solid var(--card-border)" }}
                   >
                     <p style={{ color: "var(--muted-text)" }}>No questions available.</p>
                   </div>
                 ) : (
-                  <div className="space-y-4 md:ml-[50px]">
+                  <div className="space-y-4 md:ml-[80px]">
                     {questions.map((question, index) => (
                       <div
                         key={question.id || index}

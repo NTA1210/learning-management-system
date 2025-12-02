@@ -19,7 +19,9 @@ import {
   BarChart3,
   ClipboardList,
   MoreVertical,
-  Users,
+  Eye,
+  EyeOff,
+  Key,
 } from "lucide-react";
 import {
   PieChart,
@@ -45,7 +47,7 @@ interface EditQuizForm {
 export default function CourseQuizzesPage() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
+
   const { darkMode } = useTheme();
   const { user } = useAuth();
   const role = (user?.role as "admin" | "teacher" | "student") || "teacher";
@@ -108,6 +110,8 @@ export default function CourseQuizzesPage() {
     hasPrev: false,
   });
   const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
+  const [passwordVisibility, setPasswordVisibility] = useState<Record<string, boolean>>({});
+
 
   const getSwalBaseOptions = () => ({
     width: 360,
@@ -272,6 +276,12 @@ export default function CourseQuizzesPage() {
       return;
     }
 
+    // Reset pagination state to ensure fresh data fetch when location changes (e.g. returning from quiz)
+    resetPaginationState();
+
+    // Reset pagination state to ensure fresh data fetch when location changes (e.g. returning from quiz)
+    resetPaginationState();
+
     if (isQuestionBankRoute) {
       // Teacher/Admin accessing question bank subjects: skip course fetch and go straight to questions
       setIsSubjectId(true);
@@ -345,7 +355,7 @@ export default function CourseQuizzesPage() {
     return () => {
       cancelled = true;
     };
-  }, [courseId, goToPage, isQuestionBankRoute, resetPaginationState]);
+  }, [courseId, goToPage, isQuestionBankRoute, resetPaginationState, location.key]);
 
   const getQuizStatus = (quiz: QuizResponse) => {
     const now = new Date();
@@ -530,11 +540,8 @@ export default function CourseQuizzesPage() {
         ),
       }));
       await showSwalSuccess("Attempt banned successfully");
-    } catch (err) {
-      const message =
-        typeof err === "object" && err !== null && "message" in err
-          ? String((err as { message?: string }).message)
-          : "Failed to ban attempt";
+    } catch (err: any) {
+      const message = err?.response?.data?.message || err?.message || "Failed to ban attempt";
       await showSwalError(message);
     } finally {
       setBanProcessingId(null);
@@ -563,12 +570,9 @@ export default function CourseQuizzesPage() {
 
       handleCloseEdit();
       await showSwalSuccess("Quiz updated successfully");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to update quiz:", err);
-      const message =
-        typeof err === "object" && err !== null && "message" in err
-          ? String((err as { message?: string }).message)
-          : "Failed to update quiz";
+      const message = err?.response?.data?.message || err?.message || "Failed to update quiz";
       await showSwalError(message);
     } finally {
       setUpdatingQuizId(null);
@@ -592,12 +596,9 @@ export default function CourseQuizzesPage() {
       setQuizzesPage(nextPage);
       await goToPage(nextPage);
       await showSwalSuccess("Quiz deleted successfully");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to delete quiz:", err);
-      const message =
-        typeof err === "object" && err !== null && "message" in err
-          ? String((err as { message?: string }).message)
-          : "Failed to delete quiz";
+      const message = err?.response?.data?.message || err?.message || "Failed to delete quiz";
       await showSwalError(message);
     } finally {
       setDeletingQuizId(null);
@@ -652,7 +653,7 @@ export default function CourseQuizzesPage() {
                 <button
                   onClick={() => navigate(-1)}
                   className="flex items-center gap-2 text-sm hover:underline"
-                  style={{ color: "var(--muted-text)" }}
+                  style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                 >
                   <ArrowLeft className="w-4 h-4" />
                   Back
@@ -665,7 +666,7 @@ export default function CourseQuizzesPage() {
                 {course ? course.title : "Loading..."}
               </h1>
               {course?.code && (
-                <p className="text-sm" style={{ color: "var(--muted-text)" }}>
+                <p className="text-sm" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                   {course.code}
                 </p>
               )}
@@ -674,7 +675,7 @@ export default function CourseQuizzesPage() {
             {/* Loading State */}
             {loading && (
               <div className="text-center py-12">
-                <p style={{ color: "var(--muted-text)" }}>Loading quizzes...</p>
+                <p style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>Loading quizzes...</p>
               </div>
             )}
 
@@ -702,7 +703,7 @@ export default function CourseQuizzesPage() {
                       border: "1px solid var(--card-border)",
                     }}
                   >
-                    <p style={{ color: "var(--muted-text)" }}>
+                    <p style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                       No quizzes available for this course.
                     </p>
                   </div>
@@ -729,38 +730,38 @@ export default function CourseQuizzesPage() {
                           }}
                         >
                           {/* Action menu - top right */}
-                          {!isStudent && (
-                            <div
-                              className="absolute top-3 right-3"
-                              onClick={(e) => e.stopPropagation()}
+                          <div
+                            className="absolute top-3 right-3"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={() => {
+                                setActionMenuOpenId((prev) =>
+                                  prev === quiz._id ? null : quiz._id
+                                );
+                              }}
+                              className="p-2 rounded hover:bg-gray-100 transition-colors"
+                              style={{
+                                color: darkMode ? "#4b5563" : "#4b5563",
+                              }}
+                              title="More actions"
                             >
-                              <button
-                                onClick={() => {
-                                  setActionMenuOpenId((prev) =>
-                                    prev === quiz._id ? null : quiz._id
-                                  );
-                                }}
-                                className="p-2 rounded hover:bg-gray-100 transition-colors"
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+                            {actionMenuOpenId === quiz._id && (
+                              <div
+                                className="absolute right-full top-0 mr-2 w-44 rounded-lg shadow-lg border z-20"
                                 style={{
-                                  color: darkMode ? "#4b5563" : "#4b5563",
+                                  backgroundColor: darkMode
+                                    ? "#020617"
+                                    : "#ffffff",
+                                  borderColor: darkMode
+                                    ? "rgba(148,163,184,0.3)"
+                                    : "rgba(226,232,240,0.9)",
+                                  color: darkMode ? "#e5e7eb" : "#0f172a",
                                 }}
-                                title="More actions"
                               >
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-                              {actionMenuOpenId === quiz._id && (
-                                <div
-                                  className="absolute right-full top-0 mr-2 w-44 rounded-lg shadow-lg border z-20"
-                                  style={{
-                                    backgroundColor: darkMode
-                                      ? "#020617"
-                                      : "#ffffff",
-                                    borderColor: darkMode
-                                      ? "rgba(148,163,184,0.3)"
-                                      : "rgba(226,232,240,0.9)",
-                                    color: darkMode ? "#e5e7eb" : "#0f172a",
-                                  }}
-                                >
+                                {!isStudent && (
                                   <button
                                     className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-green-50"
                                     style={{
@@ -777,59 +778,64 @@ export default function CourseQuizzesPage() {
                                     <BarChart3 className="w-4 h-4" />
                                     <span>View statistics</span>
                                   </button>
-                                  <button
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-purple-50"
-                                    style={{
-                                      color: "#6d28d9",
-                                      backgroundColor: darkMode
-                                        ? "transparent"
-                                        : undefined,
-                                    }}
-                                    onClick={() => {
-                                      handleOpenAttemptModal(quiz);
-                                      setActionMenuOpenId(null);
-                                    }}
-                                  >
-                                    <Users className="w-4 h-4" />
-                                    <span>View attempts</span>
-                                  </button>
-                                  <button
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-blue-50"
-                                    style={{
-                                      color: "#3b82f6",
-                                      backgroundColor: darkMode
-                                        ? "transparent"
-                                        : undefined,
-                                    }}
-                                    onClick={() => {
-                                      handleOpenEditQuiz(quiz);
-                                      setActionMenuOpenId(null);
-                                    }}
-                                  >
-                                    <Edit2 className="w-4 h-4" />
-                                    <span>Edit quiz</span>
-                                  </button>
-                                  <button
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-red-50 disabled:opacity-50"
-                                    style={{
-                                      color: "#ef4444",
-                                      backgroundColor: darkMode
-                                        ? "transparent"
-                                        : undefined,
-                                    }}
-                                    disabled={deletingQuizId === quiz._id}
-                                    onClick={async () => {
-                                      setActionMenuOpenId(null);
-                                      handleDeleteQuiz(quiz._id);
-                                    }}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                    <span>Delete quiz</span>
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          )}
+                                )}
+                                <button
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-orange-50"
+                                  style={{
+                                    color: "#f97316",
+                                    backgroundColor: darkMode
+                                      ? "transparent"
+                                      : undefined,
+                                  }}
+                                  onClick={() => {
+                                    navigate(`/quizzes/${quiz._id}/attempts`);
+                                    setActionMenuOpenId(null);
+                                  }}
+                                >
+                                  <ClipboardList className="w-4 h-4" />
+                                  <span>View attempts</span>
+                                </button>
+                                {!isStudent && (
+                                  <>
+                                    <button
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-blue-50"
+                                      style={{
+                                        color: "#3b82f6",
+                                        backgroundColor: darkMode
+                                          ? "transparent"
+                                          : undefined,
+                                      }}
+                                      onClick={() => {
+                                        handleOpenEditQuiz(quiz);
+                                        setActionMenuOpenId(null);
+                                      }}
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                      <span>Edit quiz</span>
+                                    </button>
+                                    <button
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-red-50 disabled:opacity-50"
+                                      style={{
+                                        color: "#ef4444",
+                                        backgroundColor: darkMode
+                                          ? "transparent"
+                                          : undefined,
+                                      }}
+                                      disabled={deletingQuizId === quiz._id}
+                                      onClick={async () => {
+                                        setActionMenuOpenId(null);
+                                        handleDeleteQuiz(quiz._id);
+                                      }}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      <span>Delete quiz</span>
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
 
                           <div className="p-6">
                             {/* Quiz Title */}
@@ -844,7 +850,7 @@ export default function CourseQuizzesPage() {
                             {quiz.description && (
                               <p
                                 className="text-sm mb-4 line-clamp-2"
-                                style={{ color: "var(--muted-text)" }}
+                                style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                               >
                                 {quiz.description}
                               </p>
@@ -855,21 +861,60 @@ export default function CourseQuizzesPage() {
                               <div className="flex items-center gap-2 text-sm">
                                 <Calendar
                                   className="w-4 h-4"
-                                  style={{ color: "var(--muted-text)" }}
+                                  style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                                 />
-                                <span style={{ color: "var(--muted-text)" }}>
+                                <span style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                                   Start: {formatDate(quiz.startTime)}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2 text-sm">
                                 <Clock
                                   className="w-4 h-4"
-                                  style={{ color: "var(--muted-text)" }}
+                                  style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                                 />
-                                <span style={{ color: "var(--muted-text)" }}>
+                                <span style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                                   End: {formatDate(quiz.endTime)}
                                 </span>
                               </div>
+
+                              {/* Quiz Password - Only for Admin/Teacher */}
+                              {!isStudent && quiz.hashPassword && (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Key
+                                    className="w-4 h-4"
+                                    style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
+                                  />
+                                  <span style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
+                                    Password:
+                                  </span>
+                                  <span
+                                    className="font-mono text-xs px-2 py-1 rounded"
+                                    style={{
+                                      backgroundColor: "var(--card-row-bg)",
+                                      color: "var(--heading-text)",
+                                    }}
+                                  >
+                                    {passwordVisibility[quiz._id] ? quiz.hashPassword : "••••••••"}
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPasswordVisibility(prev => ({
+                                        ...prev,
+                                        [quiz._id]: !prev[quiz._id]
+                                      }));
+                                    }}
+                                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                    title={passwordVisibility[quiz._id] ? "Hide password" : "Show password"}
+                                  >
+                                    {passwordVisibility[quiz._id] ? (
+                                      <EyeOff className="w-4 h-4" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }} />
+                                    ) : (
+                                      <Eye className="w-4 h-4" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }} />
+                                    )}
+                                  </button>
+                                </div>
+                              )}
                             </div>
 
                             {/* Status Badge and Actions */}
@@ -917,57 +962,7 @@ export default function CourseQuizzesPage() {
                                       ? "Take Quiz"
                                       : "Unavailable"}
                                   </button>
-                                )}{" "}
-
-                                <>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenStatisticsModal(quiz);
-                                    }}
-                                    className="p-2 rounded hover:bg-green-50 transition-colors"
-                                    style={{ color: "#10b981" }}
-                                    title="View quiz statistics"
-                                  >
-                                    <BarChart3 className="w-4 h-4" />
-                                  </button>
-
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigate(`/quizzes/${quiz._id}/attempts`);
-                                    }}
-                                    className="p-2 rounded hover:bg-orange-50 transition-colors"
-                                    style={{ color: "#f97316" }}
-                                    title="Grade / View All Attempts"
-                                  >
-                                    <ClipboardList className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenEditQuiz(quiz);
-                                    }}
-                                    className="p-2 rounded hover:bg-blue-50 transition-colors"
-                                    style={{ color: "#3b82f6" }}
-                                    title="Edit quiz"
-                                  >
-                                    <Edit2 className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteQuiz(quiz._id);
-                                    }}
-                                    disabled={deletingQuizId === quiz._id}
-                                    className="p-2 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                                    style={{ color: "#ef4444" }}
-                                    title="Delete quiz"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </>
-
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1007,703 +1002,712 @@ export default function CourseQuizzesPage() {
             )}
           </div>
         </main>
-      </div>
+      </div >
 
       {/* Edit Quiz Modal */}
-      {!isStudent && editingQuiz && editForm && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
-          <div
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-            onClick={handleCloseEdit}
-          />
-          <div
-            className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
-            style={{
-              backgroundColor: "var(--card-surface)",
-              color: "var(--heading-text)",
-              border: "1px solid var(--card-border)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-semibold">Edit Quiz</h2>
-              <button
-                onClick={handleCloseEdit}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                style={{ color: "var(--heading-text)" }}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleUpdateQuiz} className="space-y-4">
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  style={{ color: "var(--muted-text)" }}
-                >
-                  Title
-                </label>
-                <input
-                  type="text"
-                  value={editForm.title}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, title: e.target.value })
-                  }
-                  className="w-full px-3 py-2 rounded-lg border"
-                  style={{
-                    backgroundColor: "var(--input-bg)",
-                    borderColor: "var(--input-border)",
-                    color: "var(--input-text)",
-                  }}
-                  required
-                />
-              </div>
-
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  style={{ color: "var(--muted-text)" }}
-                >
-                  Description
-                </label>
-                <textarea
-                  value={editForm.description}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, description: e.target.value })
-                  }
-                  className="w-full px-3 py-2 rounded-lg border"
-                  style={{
-                    backgroundColor: "var(--input-bg)",
-                    borderColor: "var(--input-border)",
-                    color: "var(--input-text)",
-                  }}
-                  rows={3}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    style={{ color: "var(--muted-text)" }}
-                  >
-                    Start Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={editForm.startTime}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, startTime: e.target.value })
-                    }
-                    className="w-full px-3 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: "var(--input-bg)",
-                      borderColor: "var(--input-border)",
-                      color: "var(--input-text)",
-                    }}
-                    required
-                  />
-                </div>
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    style={{ color: "var(--muted-text)" }}
-                  >
-                    End Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={editForm.endTime}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, endTime: e.target.value })
-                    }
-                    className="w-full px-3 py-2 rounded-lg border"
-                    style={{
-                      backgroundColor: "var(--input-bg)",
-                      borderColor: "var(--input-border)",
-                      color: "var(--input-text)",
-                    }}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={editForm.isPublished}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        isPublished: e.target.checked,
-                      })
-                    }
-                    className="w-4 h-4 rounded border"
-                    style={{
-                      backgroundColor: editForm.isPublished
-                        ? "var(--primary-color)"
-                        : "var(--input-bg)",
-                      borderColor: "var(--input-border)",
-                    }}
-                  />
-                  <span
-                    className="text-sm font-medium"
-                    style={{ color: "var(--muted-text)" }}
-                  >
-                    Published
-                  </span>
-                </label>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-4 border-t">
+      {
+        !isStudent && editingQuiz && editForm && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
+            <div
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={handleCloseEdit}
+            />
+            <div
+              className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
+              style={{
+                backgroundColor: "var(--card-surface)",
+                color: "var(--heading-text)",
+                border: "1px solid var(--card-border)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-semibold">Edit Quiz</h2>
                 <button
-                  type="button"
                   onClick={handleCloseEdit}
-                  className="px-4 py-2 rounded-lg text-sm font-medium"
-                  style={{
-                    backgroundColor: "var(--divider-color)",
-                    color: "var(--heading-text)",
-                  }}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  style={{ color: "var(--heading-text)" }}
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={updatingQuizId === editingQuiz._id}
-                  className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white disabled:opacity-50"
-                >
-                  {updatingQuizId === editingQuiz._id
-                    ? "Updating..."
-                    : "Update Quiz"}
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleUpdateQuiz} className="space-y-4">
+                <div>
+                  <label
+                    className="block text-sm font-medium mb-1"
+                    style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
+                  >
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.title}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, title: e.target.value })
+                    }
+                    className="w-full px-3 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: "var(--input-bg)",
+                      borderColor: "var(--input-border)",
+                      color: "var(--input-text)",
+                    }}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label
+                    className="block text-sm font-medium mb-1"
+                    style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
+                  >
+                    Description
+                  </label>
+                  <textarea
+                    value={editForm.description}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, description: e.target.value })
+                    }
+                    className="w-full px-3 py-2 rounded-lg border"
+                    style={{
+                      backgroundColor: "var(--input-bg)",
+                      borderColor: "var(--input-border)",
+                      color: "var(--input-text)",
+                    }}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      className="block text-sm font-medium mb-1"
+                      style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
+                    >
+                      Start Time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={editForm.startTime}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, startTime: e.target.value })
+                      }
+                      className="w-full px-3 py-2 rounded-lg border"
+                      style={{
+                        backgroundColor: "var(--input-bg)",
+                        borderColor: "var(--input-border)",
+                        color: "var(--input-text)",
+                      }}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="block text-sm font-medium mb-1"
+                      style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
+                    >
+                      End Time
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={editForm.endTime}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, endTime: e.target.value })
+                      }
+                      className="w-full px-3 py-2 rounded-lg border"
+                      style={{
+                        backgroundColor: "var(--input-bg)",
+                        borderColor: "var(--input-border)",
+                        color: "var(--input-text)",
+                      }}
+                      required
+                    />
+                  </div>
+                </div>
+                {editForm.startTime && editForm.endTime && new Date(editForm.startTime) > new Date(editForm.endTime) && (
+                  <p className="text-red-500 text-xs mt-2">Start time cannot be after End time</p>
+                )}
+
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editForm.isPublished}
+                      onChange={(e) =>
+                        setEditForm({
+                          ...editForm,
+                          isPublished: e.target.checked,
+                        })
+                      }
+                      className="w-4 h-4 rounded border"
+                      style={{
+                        backgroundColor: editForm.isPublished
+                          ? "var(--primary-color)"
+                          : "var(--input-bg)",
+                        borderColor: "var(--input-border)",
+                      }}
+                    />
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
+                    >
+                      Published
+                    </span>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-4 border-t">
+                  <button
+                    type="button"
+                    onClick={handleCloseEdit}
+                    className="px-4 py-2 rounded-lg text-sm font-medium"
+                    style={{
+                      backgroundColor: "var(--divider-color)",
+                      color: "var(--heading-text)",
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={updatingQuizId === editingQuiz._id || (!!editForm.startTime && !!editForm.endTime && new Date(editForm.startTime) > new Date(editForm.endTime))}
+                    className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white disabled:opacity-50"
+                  >
+                    {updatingQuizId === editingQuiz._id
+                      ? "Updating..."
+                      : "Update Quiz"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Attempt Modal */}
-      {!isStudent && attemptModal.quiz && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
-          <div
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-            onClick={handleCloseAttemptModal}
-          />
-          <div
-            className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
-            style={{
-              backgroundColor: "var(--card-surface)",
-              color: "var(--heading-text)",
-              border: "1px solid var(--card-border)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm" style={{ color: "var(--muted-text)" }}>
-                  Active attempts
-                </p>
-                <h2 className="text-2xl font-semibold">
-                  {attemptModal.quiz?.title || "Quiz"}
-                </h2>
-              </div>
-              <button
-                onClick={handleCloseAttemptModal}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                style={{ color: "var(--heading-text)" }}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {attemptModal.loading ? (
-              <div className="flex items-center justify-center py-10">
-                <Loader2 className="w-6 h-6 animate-spin" />
-              </div>
-            ) : attemptModal.error ? (
-              <div
-                className="rounded-lg border p-4 text-center space-y-3"
-                style={{ borderColor: "var(--card-border)" }}
-              >
-                <p style={{ color: "#ef4444" }}>{attemptModal.error}</p>
+      {
+        !isStudent && attemptModal.quiz && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
+            <div
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={handleCloseAttemptModal}
+            />
+            <div
+              className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
+              style={{
+                backgroundColor: "var(--card-surface)",
+                color: "var(--heading-text)",
+                border: "1px solid var(--card-border)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
+                    Active attempts
+                  </p>
+                  <h2 className="text-2xl font-semibold">
+                    {attemptModal.quiz?.title || "Quiz"}
+                  </h2>
+                </div>
                 <button
-                  onClick={() =>
-                    attemptModal.quiz &&
-                    handleOpenAttemptModal(attemptModal.quiz)
-                  }
-                  className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-                  style={{ backgroundColor: "#6d28d9" }}
+                  onClick={handleCloseAttemptModal}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  style={{ color: "var(--heading-text)" }}
                 >
-                  Retry
+                  <X className="w-5 h-5" />
                 </button>
               </div>
-            ) : (
-              <>
-                {attemptModal.attempts.filter((a) => a.status === "in_progress")
-                  .length === 0 ? (
+
+              {attemptModal.loading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                </div>
+              ) : attemptModal.error ? (
+                <div
+                  className="rounded-lg border p-4 text-center space-y-3"
+                  style={{ borderColor: "var(--card-border)" }}
+                >
+                  <p style={{ color: "#ef4444" }}>{attemptModal.error}</p>
+                  <button
+                    onClick={() =>
+                      attemptModal.quiz &&
+                      handleOpenAttemptModal(attemptModal.quiz)
+                    }
+                    className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+                    style={{ backgroundColor: "#6d28d9" }}
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {attemptModal.attempts.filter((a) => a.status === "in_progress")
+                    .length === 0 ? (
+                    <div
+                      className="rounded-lg border  p-6 pt-12 text-center"
+                      style={{ borderColor: "var(--card-border)" }}
+                    >
+                      <p style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
+                        No students are currently taking this quiz.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {attemptModal.attempts
+                        .filter((attempt) => attempt.status === "in_progress")
+                        .map((attempt) => (
+                          <div
+                            key={attempt._id}
+                            className="border rounded-xl p-4 flex flex-wrap items-center justify-between gap-4"
+                            style={{ borderColor: "var(--card-border)" }}
+                          >
+                            <div>
+                              <p
+                                className="font-semibold"
+                                style={{ color: "var(--heading-text)" }}
+                              >
+                                {getStudentLabel(attempt)}
+                              </p>
+                              <p
+                                className="text-xs"
+                                style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
+                              >
+                                Started:{" "}
+                                {attempt.startedAt
+                                  ? new Date(attempt.startedAt).toLocaleString()
+                                  : "—"}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() =>
+                                  navigate(`/quiz-attempts/${attempt._id}`)
+                                }
+                                className="px-4 py-2 rounded-lg text-sm font-semibold"
+                                style={{ backgroundColor: "var(--card-row-bg)" }}
+                              >
+                                View
+                              </button>
+                              <button
+                                onClick={() => handleBanAttempt(attempt)}
+                                disabled={banProcessingId === attempt._id}
+                                className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 flex items-center gap-2"
+                                style={{ backgroundColor: "#dc2626" }}
+                              >
+                                <ShieldOff className="w-4 h-4" />
+                                {banProcessingId === attempt._id
+                                  ? "Banning..."
+                                  : "Ban"}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )
+      }
+
+      {/* Statistics Modal */}
+      {
+        !isStudent && statisticsModal.quiz && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
+            <div
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={handleCloseStatisticsModal}
+            />
+            <div
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+              onClick={handleCloseStatisticsModal}
+            />
+            <div
+              className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
+              style={{
+                backgroundColor: "var(--card-surface)",
+                color: "var(--heading-text)",
+                border: "2px solid var(--card-border)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
+                    Quiz Statistics
+                  </p>
+                  <h2 className="text-2xl font-semibold">
+                    {statisticsModal.quiz?.title || "Quiz"}
+                  </h2>
+                </div>
+                <button
+                  onClick={handleCloseStatisticsModal}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  style={{ color: "var(--heading-text)" }}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {statisticsModal.loading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                </div>
+              ) : statisticsModal.error ? (
+                <div
+                  className="rounded-lg border p-4 text-center space-y-3"
+                  style={{ borderColor: "var(--card-border)" }}
+                >
+                  <p style={{ color: "#ef4444" }}>{statisticsModal.error}</p>
+                  <button
+                    onClick={() =>
+                      statisticsModal.quiz &&
+                      handleOpenStatisticsModal(statisticsModal.quiz)
+                    }
+                    className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+                    style={{ backgroundColor: "#10b981" }}
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : statisticsModal.statistics ? (
+                statisticsModal.statistics.submittedCount === 0 ? (
                   <div
-                    className="rounded-lg border  p-6 pt-12 text-center"
+                    className="rounded-lg border p-12 text-center"
                     style={{ borderColor: "var(--card-border)" }}
                   >
-                    <p style={{ color: "var(--muted-text)" }}>
-                      No students are currently taking this quiz.
+                    <BarChart3
+                      className="w-16 h-16 mx-auto mb-4"
+                      style={{ color: "var(--muted-text)", opacity: 0.5 }}
+                    />
+                    <p
+                      className="text-lg font-semibold mb-2"
+                      style={{ color: "var(--heading-text)" }}
+                    >
+                      No submissions yet
+                    </p>
+                    <p className="text-sm" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
+                      Statistics will be available once students submit their quiz
+                      attempts.
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {attemptModal.attempts
-                      .filter((attempt) => attempt.status === "in_progress")
-                      .map((attempt) => (
-                        <div
-                          key={attempt._id}
-                          className="border rounded-xl p-4 flex flex-wrap items-center justify-between gap-4"
-                          style={{ borderColor: "var(--card-border)" }}
-                        >
-                          <div>
-                            <p
-                              className="font-semibold"
-                              style={{ color: "var(--heading-text)" }}
-                            >
-                              {getStudentLabel(attempt)}
-                            </p>
+                  <div className="space-y-6">
+                    {/* Summary Statistics */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Left Column: Stats */}
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div
+                            className="rounded-lg border-2 p-3 bg-gradient-to-br from-blue-500/10 to-blue-600/10"
+                            style={{ borderColor: "#3b82f6" }}
+                          >
                             <p
                               className="text-xs"
-                              style={{ color: "var(--muted-text)" }}
+                              style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                             >
-                              Started:{" "}
-                              {attempt.startedAt
-                                ? new Date(attempt.startedAt).toLocaleString()
-                                : "—"}
+                              Total Students
+                            </p>
+                            <p className="text-xl font-bold mt-1">
+                              {statisticsModal.statistics.totalStudents}
                             </p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() =>
-                                navigate(`/quiz-attempts/${attempt._id}`)
-                              }
-                              className="px-4 py-2 rounded-lg text-sm font-semibold"
-                              style={{ backgroundColor: "var(--card-row-bg)" }}
+                          <div
+                            className="rounded-lg border-2 p-3 bg-gradient-to-br from-green-500/10 to-green-600/10"
+                            style={{ borderColor: "#10b981" }}
+                          >
+                            <p
+                              className="text-xs"
+                              style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                             >
-                              View
-                            </button>
-                            <button
-                              onClick={() => handleBanAttempt(attempt)}
-                              disabled={banProcessingId === attempt._id}
-                              className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 flex items-center gap-2"
-                              style={{ backgroundColor: "#dc2626" }}
+                              Submitted
+                            </p>
+                            <p className="text-xl font-bold mt-1">
+                              {statisticsModal.statistics.submittedCount}
+                            </p>
+                          </div>
+                          <div
+                            className="rounded-lg border-2 p-3 bg-gradient-to-br from-purple-500/10 to-purple-600/10"
+                            style={{ borderColor: "#8b5cf6" }}
+                          >
+                            <p
+                              className="text-xs"
+                              style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                             >
-                              <ShieldOff className="w-4 h-4" />
-                              {banProcessingId === attempt._id
-                                ? "Banning..."
-                                : "Ban"}
-                            </button>
+                              Avg Score
+                            </p>
+                            <p className="text-xl font-bold mt-1">
+                              {isNaN(statisticsModal.statistics.averageScore) ||
+                                statisticsModal.statistics.averageScore === null
+                                ? "N/A"
+                                : statisticsModal.statistics.averageScore.toFixed(
+                                  1
+                                )}
+                            </p>
+                          </div>
+                          <div
+                            className="rounded-lg border-2 p-3 bg-gradient-to-br from-orange-500/10 to-orange-600/10"
+                            style={{ borderColor: "#f97316" }}
+                          >
+                            <p
+                              className="text-xs"
+                              style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
+                            >
+                              Median
+                            </p>
+                            <p className="text-xl font-bold mt-1">
+                              {isNaN(statisticsModal.statistics.medianScore) ||
+                                statisticsModal.statistics.medianScore === null
+                                ? "N/A"
+                                : statisticsModal.statistics.medianScore.toFixed(
+                                  1
+                                )}
+                            </p>
                           </div>
                         </div>
-                      ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
 
-      {/* Statistics Modal */}
-      {!isStudent && statisticsModal.quiz && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
-          <div
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-            onClick={handleCloseStatisticsModal}
-          />
-          <div
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-            onClick={handleCloseStatisticsModal}
-          />
-          <div
-            className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
-            style={{
-              backgroundColor: "var(--card-surface)",
-              color: "var(--heading-text)",
-              border: "2px solid var(--card-border)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm" style={{ color: "var(--muted-text)" }}>
-                  Quiz Statistics
-                </p>
-                <h2 className="text-2xl font-semibold">
-                  {statisticsModal.quiz?.title || "Quiz"}
-                </h2>
-              </div>
-              <button
-                onClick={handleCloseStatisticsModal}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                style={{ color: "var(--heading-text)" }}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {statisticsModal.loading ? (
-              <div className="flex items-center justify-center py-10">
-                <Loader2 className="w-6 h-6 animate-spin" />
-              </div>
-            ) : statisticsModal.error ? (
-              <div
-                className="rounded-lg border p-4 text-center space-y-3"
-                style={{ borderColor: "var(--card-border)" }}
-              >
-                <p style={{ color: "#ef4444" }}>{statisticsModal.error}</p>
-                <button
-                  onClick={() =>
-                    statisticsModal.quiz &&
-                    handleOpenStatisticsModal(statisticsModal.quiz)
-                  }
-                  className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-                  style={{ backgroundColor: "#10b981" }}
-                >
-                  Retry
-                </button>
-              </div>
-            ) : statisticsModal.statistics ? (
-              statisticsModal.statistics.submittedCount === 0 ? (
-                <div
-                  className="rounded-lg border p-12 text-center"
-                  style={{ borderColor: "var(--card-border)" }}
-                >
-                  <BarChart3
-                    className="w-16 h-16 mx-auto mb-4"
-                    style={{ color: "var(--muted-text)", opacity: 0.5 }}
-                  />
-                  <p
-                    className="text-lg font-semibold mb-2"
-                    style={{ color: "var(--heading-text)" }}
-                  >
-                    No submissions yet
-                  </p>
-                  <p className="text-sm" style={{ color: "var(--muted-text)" }}>
-                    Statistics will be available once students submit their quiz
-                    attempts.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Summary Statistics */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Left Column: Stats */}
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div
-                          className="rounded-lg border-2 p-3 bg-gradient-to-br from-blue-500/10 to-blue-600/10"
-                          style={{ borderColor: "#3b82f6" }}
-                        >
-                          <p
-                            className="text-xs"
-                            style={{ color: "var(--muted-text)" }}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div
+                            className="rounded-lg border-2 p-3"
+                            style={{
+                              borderColor: "var(--heading-text)",
+                              opacity: 0.8,
+                            }}
                           >
-                            Total Students
-                          </p>
-                          <p className="text-xl font-bold mt-1">
-                            {statisticsModal.statistics.totalStudents}
-                          </p>
-                        </div>
-                        <div
-                          className="rounded-lg border-2 p-3 bg-gradient-to-br from-green-500/10 to-green-600/10"
-                          style={{ borderColor: "#10b981" }}
-                        >
-                          <p
-                            className="text-xs"
-                            style={{ color: "var(--muted-text)" }}
+                            <p
+                              className="text-xs mb-1"
+                              style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
+                            >
+                              Score Range
+                            </p>
+                            <p className="text-base font-semibold">
+                              {statisticsModal.statistics.minMax?.min !==
+                                undefined &&
+                                statisticsModal.statistics.minMax?.max !== undefined
+                                ? `${statisticsModal.statistics.minMax.min} - ${statisticsModal.statistics.minMax.max}`
+                                : "N/A"}
+                            </p>
+                          </div>
+                          <div
+                            className="rounded-lg border-2 p-3"
+                            style={{
+                              borderColor: "var(--heading-text)",
+                              opacity: 0.8,
+                            }}
                           >
-                            Submitted
-                          </p>
-                          <p className="text-xl font-bold mt-1">
-                            {statisticsModal.statistics.submittedCount}
-                          </p>
-                        </div>
-                        <div
-                          className="rounded-lg border-2 p-3 bg-gradient-to-br from-purple-500/10 to-purple-600/10"
-                          style={{ borderColor: "#8b5cf6" }}
-                        >
-                          <p
-                            className="text-xs"
-                            style={{ color: "var(--muted-text)" }}
-                          >
-                            Avg Score
-                          </p>
-                          <p className="text-xl font-bold mt-1">
-                            {isNaN(statisticsModal.statistics.averageScore) ||
-                              statisticsModal.statistics.averageScore === null
-                              ? "N/A"
-                              : statisticsModal.statistics.averageScore.toFixed(
-                                1
-                              )}
-                          </p>
-                        </div>
-                        <div
-                          className="rounded-lg border-2 p-3 bg-gradient-to-br from-orange-500/10 to-orange-600/10"
-                          style={{ borderColor: "#f97316" }}
-                        >
-                          <p
-                            className="text-xs"
-                            style={{ color: "var(--muted-text)" }}
-                          >
-                            Median
-                          </p>
-                          <p className="text-xl font-bold mt-1">
-                            {isNaN(statisticsModal.statistics.medianScore) ||
-                              statisticsModal.statistics.medianScore === null
-                              ? "N/A"
-                              : statisticsModal.statistics.medianScore.toFixed(
-                                1
-                              )}
-                          </p>
+                            <p
+                              className="text-xs mb-1"
+                              style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
+                            >
+                              Std Deviation
+                            </p>
+                            <p className="text-base font-semibold">
+                              {isNaN(
+                                statisticsModal.statistics.standardDeviationScore
+                              ) ||
+                                statisticsModal.statistics
+                                  .standardDeviationScore === null
+                                ? "N/A"
+                                : statisticsModal.statistics.standardDeviationScore.toFixed(
+                                  2
+                                )}
+                            </p>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div
-                          className="rounded-lg border-2 p-3"
-                          style={{
-                            borderColor: "var(--heading-text)",
-                            opacity: 0.8,
-                          }}
-                        >
-                          <p
-                            className="text-xs mb-1"
-                            style={{ color: "var(--muted-text)" }}
+                      {/* Right Column: Chart */}
+                      {statisticsModal.statistics.scoreDistribution &&
+                        statisticsModal.statistics.scoreDistribution.length >
+                        0 && (
+                          <div
+                            className="flex flex-col items-center justify-center rounded-lg border-2 p-4 shadow-md"
+                            style={{ borderColor: "var(--card-border)", borderWidth: "3px" }}
                           >
-                            Score Range
-                          </p>
-                          <p className="text-base font-semibold">
-                            {statisticsModal.statistics.minMax?.min !==
-                              undefined &&
-                              statisticsModal.statistics.minMax?.max !== undefined
-                              ? `${statisticsModal.statistics.minMax.min} - ${statisticsModal.statistics.minMax.max}`
-                              : "N/A"}
-                          </p>
-                        </div>
-                        <div
-                          className="rounded-lg border-2 p-3"
-                          style={{
-                            borderColor: "var(--heading-text)",
-                            opacity: 0.8,
-                          }}
-                        >
-                          <p
-                            className="text-xs mb-1"
-                            style={{ color: "var(--muted-text)" }}
-                          >
-                            Std Deviation
-                          </p>
-                          <p className="text-base font-semibold">
-                            {isNaN(
-                              statisticsModal.statistics.standardDeviationScore
-                            ) ||
-                              statisticsModal.statistics
-                                .standardDeviationScore === null
-                              ? "N/A"
-                              : statisticsModal.statistics.standardDeviationScore.toFixed(
-                                2
-                              )}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right Column: Chart */}
-                    {statisticsModal.statistics.scoreDistribution &&
-                      statisticsModal.statistics.scoreDistribution.length >
-                      0 && (
-                        <div
-                          className="flex flex-col items-center justify-center rounded-lg border-2 p-4 shadow-md"
-                          style={{ borderColor: "var(--card-border)", borderWidth: "3px" }}
-                        >
-                          <h3 className="text-sm font-semibold mb-2">
-                            Score Distribution
-                          </h3>
-                          <div className="w-full h-48">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <PieChart>
-                                <Pie
-                                  data={statisticsModal.statistics.scoreDistribution.map(
-                                    (d) => ({
-                                      name: d.range,
-                                      value: d.count,
-                                      percentage: d.percentage,
-                                    })
-                                  )}
-                                  cx="50%"
-                                  cy="50%"
-                                  innerRadius={40}
-                                  outerRadius={70}
-                                  paddingAngle={2}
-                                  dataKey="value"
-                                >
-                                  {statisticsModal.statistics.scoreDistribution.map(
-                                    (_, index) => {
-                                      // Softer/Pastel Palette
-                                      // Red -> Orange -> Yellow -> Blue -> Green
-                                      const colors = [
-                                        "#F87171",
-                                        "#FB923C",
-                                        "#FACC15",
-                                        "#60A5FA",
-                                        "#4ADE80",
-                                      ];
-                                      return (
-                                        <Cell
-                                          key={`cell-${index}`}
-                                          fill={colors[index % colors.length]}
-                                        />
-                                      );
-                                    }
-                                  )}
-                                </Pie>
-                                <Tooltip
-                                  formatter={(
-                                    value: number,
-                                    _: string,
-                                    props: any
-                                  ) => {
-                                    // Parse percentage string (e.g. "25.5%") to number, round it, and add % back
-                                    const rawPercent = parseFloat(
-                                      props.payload.percentage.replace("%", "")
-                                    );
-                                    const roundedPercent =
-                                      Math.round(rawPercent);
-                                    return [
-                                      `${roundedPercent}% - ${value} students`,
-                                      null,
-                                    ];
-                                  }}
-                                  contentStyle={{
-                                    backgroundColor: "var(--card-surface)",
-                                    borderColor: "var(--card-border)",
-                                    color: "var(--heading-text)",
-                                    borderRadius: "8px",
-                                    fontSize: "12px",
-                                    boxShadow:
-                                      "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                                  }}
-                                  itemStyle={{ color: "var(--heading-text)" }}
-                                  labelStyle={{ display: "none" }}
-                                />
-                                <Legend
-                                  layout="vertical"
-                                  verticalAlign="middle"
-                                  align="right"
-                                  wrapperStyle={{ fontSize: "10px" }}
-                                  formatter={(value, entry: any) => (
-                                    <span
-                                      style={{ color: "var(--muted-text)" }}
-                                    >
-                                      {value}
-                                    </span>
-                                  )}
-                                />
-                              </PieChart>
-                            </ResponsiveContainer>
-                          </div>
-                        </div>
-                      )}
-                  </div>
-
-                  {/* Students List */}
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3">
-                      Student Results
-                    </h3>
-                    <div className="space-y-2">
-                      {statisticsModal.statistics.students.length === 0 ? (
-                        <p
-                          className="text-sm text-center py-4"
-                          style={{ color: "var(--muted-text)" }}
-                        >
-                          No students have submitted this quiz yet.
-                        </p>
-                      ) : (
-                        <div
-                          className="rounded-lg border overflow-hidden"
-                          style={{ borderColor: "var(--card-border)" }}
-                        >
-                          <table className="w-full">
-                            <thead>
-                              <tr
-                                style={{
-                                  backgroundColor: "var(--card-row-bg)",
-                                }}
-                              >
-                                <th className="px-4 py-2 text-left text-sm font-semibold">
-                                  Rank
-                                </th>
-                                <th className="px-4 py-2 text-left text-sm font-semibold">
-                                  Name
-                                </th>
-                                <th className="px-4 py-2 text-left text-sm font-semibold">
-                                  Email
-                                </th>
-                                <th className="px-4 py-2 text-right text-sm font-semibold">
-                                  Score
-                                </th>
-                                <th className="px-4 py-2 text-right text-sm font-semibold">
-                                  Duration
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {statisticsModal.statistics.students.map(
-                                (student, index) => (
-                                  <tr
-                                    key={index}
-                                    className="border-t"
-                                    style={{
-                                      borderColor: "var(--card-border)",
-                                    }}
+                            <h3 className="text-sm font-semibold mb-2">
+                              Score Distribution
+                            </h3>
+                            <div className="w-full h-48">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                  <Pie
+                                    data={statisticsModal.statistics.scoreDistribution.map(
+                                      (d) => ({
+                                        name: d.range,
+                                        value: d.count,
+                                        percentage: d.percentage,
+                                      })
+                                    )}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={40}
+                                    outerRadius={70}
+                                    paddingAngle={2}
+                                    dataKey="value"
                                   >
-                                    <td className="px-4 py-2 text-sm">
-                                      #{student.rank}
-                                    </td>
-                                    <td className="px-4 py-2 text-sm">
-                                      {student.fullname}
-                                    </td>
-                                    <td
-                                      className="px-4 py-2 text-sm"
-                                      style={{ color: "var(--muted-text)" }}
+                                    {statisticsModal.statistics.scoreDistribution.map(
+                                      (_, index) => {
+                                        // Softer/Pastel Palette
+                                        // Red -> Orange -> Yellow -> Blue -> Green
+                                        const colors = [
+                                          "#F87171",
+                                          "#FB923C",
+                                          "#FACC15",
+                                          "#60A5FA",
+                                          "#4ADE80",
+                                        ];
+                                        return (
+                                          <Cell
+                                            key={`cell-${index}`}
+                                            fill={colors[index % colors.length]}
+                                          />
+                                        );
+                                      }
+                                    )}
+                                  </Pie>
+                                  <Tooltip
+                                    formatter={(
+                                      value: number,
+                                      _: string,
+                                      props: any
+                                    ) => {
+                                      // Parse percentage string (e.g. "25.5%") to number, round it, and add % back
+                                      const rawPercent = parseFloat(
+                                        props.payload.percentage.replace("%", "")
+                                      );
+                                      const roundedPercent =
+                                        Math.round(rawPercent);
+                                      return [
+                                        `${roundedPercent}% - ${value} students`,
+                                        null,
+                                      ];
+                                    }}
+                                    contentStyle={{
+                                      backgroundColor: "var(--card-surface)",
+                                      borderColor: "var(--card-border)",
+                                      color: "var(--heading-text)",
+                                      borderRadius: "8px",
+                                      fontSize: "12px",
+                                      boxShadow:
+                                        "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                                    }}
+                                    itemStyle={{ color: "var(--heading-text)" }}
+                                    labelStyle={{ display: "none" }}
+                                  />
+                                  <Legend
+                                    layout="vertical"
+                                    verticalAlign="middle"
+                                    align="right"
+                                    wrapperStyle={{ fontSize: "10px" }}
+                                    formatter={(value, entry: any) => (
+                                      <span
+                                        style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
+                                      >
+                                        {value}
+                                      </span>
+                                    )}
+                                  />
+                                </PieChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+                        )}
+                    </div>
+
+                    {/* Students List */}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">
+                        Student Results
+                      </h3>
+                      <div className="space-y-2">
+                        {statisticsModal.statistics.students.length === 0 ? (
+                          <p
+                            className="text-sm text-center py-4"
+                            style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
+                          >
+                            No students have submitted this quiz yet.
+                          </p>
+                        ) : (
+                          <div
+                            className="rounded-lg border overflow-hidden"
+                            style={{ borderColor: "var(--card-border)" }}
+                          >
+                            <table className="w-full">
+                              <thead>
+                                <tr
+                                  style={{
+                                    backgroundColor: "var(--card-row-bg)",
+                                  }}
+                                >
+                                  <th className="px-4 py-2 text-left text-sm font-semibold">
+                                    Rank
+                                  </th>
+                                  <th className="px-4 py-2 text-left text-sm font-semibold">
+                                    Name
+                                  </th>
+                                  <th className="px-4 py-2 text-left text-sm font-semibold">
+                                    Email
+                                  </th>
+                                  <th className="px-4 py-2 text-right text-sm font-semibold">
+                                    Score
+                                  </th>
+                                  <th className="px-4 py-2 text-right text-sm font-semibold">
+                                    Duration
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {statisticsModal.statistics.students.map(
+                                  (student, index) => (
+                                    <tr
+                                      key={index}
+                                      className="border-t"
+                                      style={{
+                                        borderColor: "var(--card-border)",
+                                      }}
                                     >
-                                      {student.email}
-                                    </td>
-                                    <td className="px-4 py-2 text-sm text-right font-semibold">
-                                      {student.score.toFixed(1)}
-                                    </td>
-                                    <td
-                                      className="px-4 py-2 text-sm text-right"
-                                      style={{ color: "var(--muted-text)" }}
-                                    >
-                                      {Math.floor(student.durationSeconds / 60)}
-                                      m{" "}
-                                      {Math.floor(student.durationSeconds % 60)}
-                                      s
-                                    </td>
-                                  </tr>
-                                )
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
+                                      <td className="px-4 py-2 text-sm">
+                                        #{student.rank}
+                                      </td>
+                                      <td className="px-4 py-2 text-sm">
+                                        {student.fullname}
+                                      </td>
+                                      <td
+                                        className="px-4 py-2 text-sm"
+                                        style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
+                                      >
+                                        {student.email}
+                                      </td>
+                                      <td className="px-4 py-2 text-sm text-right font-semibold">
+                                        {student.score.toFixed(1)}
+                                      </td>
+                                      <td
+                                        className="px-4 py-2 text-sm text-right"
+                                        style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
+                                      >
+                                        {Math.floor(student.durationSeconds / 60)}
+                                        m{" "}
+                                        {Math.floor(student.durationSeconds % 60)}
+                                        s
+                                      </td>
+                                    </tr>
+                                  )
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )
-            ) : null}
+                )
+              ) : null}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 }
