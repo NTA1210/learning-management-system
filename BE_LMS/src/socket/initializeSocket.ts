@@ -21,6 +21,7 @@ import {
   videoCallStart,
   videoCallToggleAudio,
   videoCallToggleVideo,
+  getActiveCall,
 } from './socketVideoCall';
 import { getChatRoom } from './helpers';
 
@@ -104,6 +105,10 @@ const initializeSocket = async (io: Server) => {
 
       socket.on(SocketEvents.VIDEOCALL_REJECT, (data) => {
         videoCallReject(io, socket, data);
+      });
+
+      socket.on('videocall:get-active-call', (data) => {
+        getActiveCall(io, socket, data);
       });
 
       // Handle disconnect for video calls

@@ -1,13 +1,22 @@
 import type React from "react";
-import { EllipsisVertical, X, UserPlus, Video, Phone } from "lucide-react";
+import { EllipsisVertical, UserPlus, Video, Phone, PhoneCall } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useChatRoomStore } from "../../stores/chatRoomStore";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Modal from "./components/Modal";
 import { useDebounce } from "../../hooks";
 import { userService } from "../../services";
 import { useSocketContext } from "../../context/SocketContext";
 import { useTheme } from "../../hooks/useTheme";
 import { useVideoCall } from "../../hooks/useVideoCall";
+
+interface ActiveCallInfo {
+  hasActiveCall: boolean;
+  callId?: string;
+  chatRoomId: string;
+  participantCount?: number;
+  participants?: string[];
+}
 
 const ChatHeader: React.FC = () => {
   const { selectedChatRoom, setSelectedChatRoom } = useChatRoomStore();
@@ -18,7 +27,13 @@ const ChatHeader: React.FC = () => {
   const { socket } = useSocketContext();
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const { darkMode } = useTheme();
-  const { startCall, isInCall } = useVideoCall();
+  const { startCall, joinCall, isInCall, chatRoomId: currentCallChatRoomId } = useVideoCall();
+  const navigate = useNavigate();
+  const [activeCallInfo, setActiveCallInfo] = useState<ActiveCallInfo | null>(null);
+
+  const handleGoBack = () => {
+    navigate('/chat-rooms', { replace: true });
+  };
 
   const searchDebounce = useDebounce(search, 500);
 
@@ -27,6 +42,62 @@ const ChatHeader: React.FC = () => {
       startCall(selectedChatRoom.chatRoomId, selectedChatRoom.name);
     }
   };
+
+  const handleJoinCall = useCallback(() => {
+    if (selectedChatRoom && activeCallInfo?.callId) {
+      joinCall(activeCallInfo.callId, selectedChatRoom.chatRoomId);
+    }
+  }, [selectedChatRoom, activeCallInfo, joinCall]);
+
+  // Check for active call when chat room changes
+  useEffect(() => {
+    if (!socket || !selectedChatRoom) return;
+
+    // Request active call info for this chat room
+    socket.emit("videocall:get-active-call", {
+      chatRoomId: selectedChatRoom.chatRoomId,
+    });
+
+    // Listen for active call info
+    const handleActiveCallInfo = (data: ActiveCallInfo) => {
+      if (data.chatRoomId === selectedChatRoom.chatRoomId) {
+        setActiveCallInfo(data);
+      }
+    };
+
+    // Listen for new calls starting in this room
+    const handleIncomingCall = (data: { callId: string; chatRoomId: string }) => {
+      if (data.chatRoomId === selectedChatRoom.chatRoomId) {
+        setActiveCallInfo({
+          hasActiveCall: true,
+          callId: data.callId,
+          chatRoomId: data.chatRoomId,
+          participantCount: 1,
+        });
+      }
+    };
+
+    // Listen for calls ending
+    const handleCallEnded = (data: { callId: string }) => {
+      if (activeCallInfo?.callId === data.callId) {
+        setActiveCallInfo(null);
+      }
+    };
+
+    socket.on("videocall:active-call-info", handleActiveCallInfo);
+    socket.on("videocall:incoming-call", handleIncomingCall);
+    socket.on("videocall:call-ended", handleCallEnded);
+
+    return () => {
+      socket.off("videocall:active-call-info", handleActiveCallInfo);
+      socket.off("videocall:incoming-call", handleIncomingCall);
+      socket.off("videocall:call-ended", handleCallEnded);
+    };
+  }, [socket, selectedChatRoom, activeCallInfo?.callId]);
+
+  // Determine if there's an ongoing call we can join (not our own call)
+  const canJoinCall = activeCallInfo?.hasActiveCall && 
+    (!isInCall || currentCallChatRoomId !== selectedChatRoom?.chatRoomId);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("lms:user");
@@ -65,6 +136,7 @@ const ChatHeader: React.FC = () => {
     });
     setSelectedChatRoom(null);
     setIsOpen(false);
+    navigate('/chat-rooms', { replace: true });
   };
   return (
     <div
@@ -75,6 +147,18 @@ const ChatHeader: React.FC = () => {
       }}
     >
       <div className="flex items-center space-x-3">
+        {/* Back button for mobile */}
+        <button
+          onClick={handleGoBack}
+          className="sm:hidden p-1.5 -ml-1 mr-1 rounded-lg transition-colors"
+          style={{
+            color: darkMode ? "#9ca3af" : "#6b7280",
+          }}
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
         <img
           src={selectedChatRoom?.course?.logo || "https://shorturl.at/ARotg"}
           alt="User image"
@@ -90,6 +174,18 @@ const ChatHeader: React.FC = () => {
         </div>
       </div>
       <div className="flex space-x-4">
+        {/* Join Ongoing Call Button - shown when there's an active call we can join */}
+        {canJoinCall && (
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors bg-green-500 hover:bg-green-600 text-white text-sm font-medium animate-pulse"
+            onClick={handleJoinCall}
+            title={`Join call (${activeCallInfo?.participantCount || 1} participant${(activeCallInfo?.participantCount || 1) > 1 ? 's' : ''})`}
+          >
+            <PhoneCall className="size-4" />
+            <span className="hidden sm:inline">Join Call</span>
+          </button>
+        )}
+
         {/* Video Call Button */}
         <button
           className={`p-2 rounded-lg transition-colors ${
@@ -101,7 +197,7 @@ const ChatHeader: React.FC = () => {
           }`}
           onClick={handleStartVideoCall}
           title={isInCall ? "In call" : "Start video call"}
-          disabled={isInCall}
+          disabled={isInCall || canJoinCall}
         >
           <Video className="size-5" />
         </button>
@@ -115,7 +211,7 @@ const ChatHeader: React.FC = () => {
           }`}
           onClick={handleStartVideoCall}
           title="Start audio call"
-          disabled={isInCall}
+          disabled={isInCall || canJoinCall}
         >
           <Phone className="size-5" />
         </button>
@@ -166,12 +262,6 @@ const ChatHeader: React.FC = () => {
               </span>
             </div>
           )}
-        </button>
-        <button
-          onClick={() => setSelectedChatRoom(null)}
-          className="text-gray-500 cursor-pointer sm:hidden hover:text-gray-700"
-        >
-          <X className="size-4" />
         </button>
       </div>
 
