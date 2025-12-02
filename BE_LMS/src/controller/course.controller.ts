@@ -105,8 +105,11 @@ export const getCourseByIdHandler = catchErrors(async (req, res) => {
   // Validate course ID
   const courseId = courseIdSchema.parse(req.params.id);
 
+  // Get userId for isTeacherOfCourse check
+  const userId = (req as any).userId;
+
   // Call service
-  const course = await getCourseById(courseId);
+  const course = await getCourseById(courseId, userId);
 
   return res.success(OK, {
     data: course,
