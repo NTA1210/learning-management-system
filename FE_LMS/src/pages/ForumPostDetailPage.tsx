@@ -710,18 +710,7 @@ const ForumPostDetailPage: React.FC = () => {
                         >
                           <Edit3 className="w-5 h-5" />
                         </button>
-                        <button
-                          onClick={handleDeletePost}
-                          disabled={postDeleteLoading}
-                          className="p-2 rounded-xl text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/20 dark:hover:text-rose-400 transition-colors"
-                          title="Delete post"
-                        >
-                          {postDeleteLoading ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-5 h-5" />
-                          )}
-                        </button>
+                        
                       </div>
                     )}
                   </div>
