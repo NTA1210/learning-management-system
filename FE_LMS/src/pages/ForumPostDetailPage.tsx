@@ -10,7 +10,7 @@ import {
   type ForumPost,
   type ForumReply,
 } from "../services/forumService";
-import { ArrowLeft, Edit3, Loader2, MessageSquare, Trash2 } from "lucide-react";
+import { ArrowLeft, Edit3, Loader2, MessageSquare, Trash2, Save, X } from "lucide-react";
 import MarkdownContent from "../components/MarkdownContent";
 import AttachmentPreview from "../components/AttachmentPreview";
 import MarkdownComposer from "../components/MarkdownComposer";
@@ -53,6 +53,13 @@ const ForumPostDetailPage: React.FC = () => {
   const [visibleRepliesCount, setVisibleRepliesCount] = useState(3);
   const replyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [lightboxImage, setLightboxImage] = useState<{ src: string; alt?: string } | null>(null);
+
+  // Post editing state
+  const [isEditingPost, setIsEditingPost] = useState(false);
+  const [editPostTitle, setEditPostTitle] = useState("");
+  const [editPostContent, setEditPostContent] = useState("");
+  const [postSaving, setPostSaving] = useState(false);
+  const [postDeleteLoading, setPostDeleteLoading] = useState(false);
 
   const fetchForum = useCallback(async () => {
     if (!forumId) return;
@@ -288,6 +295,65 @@ const ForumPostDetailPage: React.FC = () => {
       setReplyManagementError(message);
     } finally {
       setDeletingReplyId(null);
+    }
+  };
+
+  const canManagePost = useMemo(() => {
+    if (!user || !post) return false;
+    return user.role === "admin" || user.role === "teacher" || post.author?._id === user._id;
+  }, [user, post]);
+
+  const startEditingPost = () => {
+    if (!post) return;
+    setEditPostTitle(post.title);
+    setEditPostContent(post.content);
+    setIsEditingPost(true);
+  };
+
+  const cancelEditingPost = () => {
+    setIsEditingPost(false);
+    setEditPostTitle("");
+    setEditPostContent("");
+  };
+
+  const handleUpdatePost = async () => {
+    if (!forumId || !post) return;
+    if (!editPostTitle.trim() || !editPostContent.trim()) {
+      toast.error("Title and content cannot be empty.");
+      return;
+    }
+
+    try {
+      setPostSaving(true);
+      await forumService.updateForumPost(forumId, post._id, {
+        title: editPostTitle.trim(),
+        content: editPostContent,
+        pinned: post.pinned, // Keep existing pinned status
+      });
+      toast.success("Post updated successfully.");
+      setIsEditingPost(false);
+      fetchPost();
+    } catch (err: any) {
+      const message = err instanceof Error ? err.message : "Unable to update post";
+      toast.error(message);
+    } finally {
+      setPostSaving(false);
+    }
+  };
+
+  const handleDeletePost = async () => {
+    if (!forumId || !post) return;
+    if (!window.confirm("Are you sure you want to delete this post? This action cannot be undone.")) return;
+
+    try {
+      setPostDeleteLoading(true);
+      await forumService.deleteForumPost(forumId, post._id);
+      toast.success("Post deleted successfully.");
+      navigate(`/forums/${forumId}`);
+    } catch (err: any) {
+      const message = err instanceof Error ? err.message : "Unable to delete post";
+      toast.error(message);
+      setPostDeleteLoading(false);
     }
   };
 
@@ -552,27 +618,99 @@ const ForumPostDetailPage: React.FC = () => {
                   className={`rounded-2xl p-6 shadow-sm space-y-5 ${darkMode ? "bg-slate-900/70 border border-slate-700/60" : "bg-white border border-slate-100"
                     }`}
                 >
-                  <div className="text-xs text-slate-400 flex items-center gap-2">
-                    {post.pinned && (
-                      <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">Pinned</span>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-4">
+                      <div className="text-xs text-slate-400 flex items-center gap-2">
+                        {post.pinned && (
+                          <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">Pinned</span>
+                        )}
+                        <span>{formatDate(post.createdAt)}</span>
+                      </div>
+
+                      {isEditingPost ? (
+                        <div className="space-y-4">
+                          <input
+                            type="text"
+                            value={editPostTitle}
+                            onChange={(e) => setEditPostTitle(e.target.value)}
+                            className={`w-full text-3xl font-bold bg-transparent border-b-2 focus:outline-none ${darkMode ? "border-slate-700 focus:border-indigo-500 text-white" : "border-slate-200 focus:border-indigo-500 text-slate-900"
+                              }`}
+                            placeholder="Post title"
+                          />
+                          <div className="min-h-[200px]">
+                            <MarkdownComposer
+                              value={editPostContent}
+                              onChange={setEditPostContent}
+                              placeholder="Edit your post content..."
+                              darkMode={darkMode}
+                              attachmentAccept={attachmentAcceptTypes}
+                            />
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={handleUpdatePost}
+                              disabled={postSaving}
+                              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
+                            >
+                              {postSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                              Save Changes
+                            </button>
+                            <button
+                              onClick={cancelEditingPost}
+                              disabled={postSaving}
+                              className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 font-semibold hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                            >
+                              <X className="w-4 h-4" />
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <h1 className="text-3xl font-bold">{post.title}</h1>
+                          <div className="prose max-w-none dark:prose-invert">
+                            <MarkdownContent content={post.content} onImageClick={handleImagePreview} />
+                          </div>
+                          <AttachmentPreview
+                            files={post.key}
+                            size="md"
+                            onImageClick={handleImagePreview}
+                            caption={post.title}
+                          />
+                        </>
+                      )}
+
+                      {post.author && (
+                        <p className="text-xs text-slate-500">
+                          Posted by {post.author.fullname || post.author.username}
+                        </p>
+                      )}
+                    </div>
+
+                    {!isEditingPost && canManagePost && (
+                      <div className="flex flex-col gap-2 shrink-0">
+                        <button
+                          onClick={startEditingPost}
+                          className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-indigo-600 dark:hover:bg-slate-800 dark:hover:text-indigo-400 transition-colors"
+                          title="Edit post"
+                        >
+                          <Edit3 className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={handleDeletePost}
+                          disabled={postDeleteLoading}
+                          className="p-2 rounded-xl text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/20 dark:hover:text-rose-400 transition-colors"
+                          title="Delete post"
+                        >
+                          {postDeleteLoading ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-5 h-5" />
+                          )}
+                        </button>
+                      </div>
                     )}
-                    <span>{formatDate(post.createdAt)}</span>
                   </div>
-                  <h1 className="text-3xl font-bold">{post.title}</h1>
-                  <div className="prose max-w-none dark:prose-invert">
-                    <MarkdownContent content={post.content} onImageClick={handleImagePreview} />
-                  </div>
-                  <AttachmentPreview
-                    files={post.key}
-                    size="md"
-                    onImageClick={handleImagePreview}
-                    caption={post.title}
-                  />
-                  {post.author && (
-                    <p className="text-xs text-slate-500">
-                      Posted by {post.author.fullname || post.author.username}
-                    </p>
-                  )}
 
                   <div className="pt-4 border-t border-slate-100 space-y-4 dark:border-slate-800">
                     <form className="space-y-3" onSubmit={handleReplySubmit}>

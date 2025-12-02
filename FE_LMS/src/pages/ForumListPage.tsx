@@ -7,9 +7,11 @@ import type { Course } from "../types/course";
 import { courseService } from "../services";
 import AttachmentPreview from "../components/AttachmentPreview";
 import { forumService, type ForumResponse, type ForumType } from "../services/forumService";
-import { Book, BookOpen, Edit3, Eye, Loader2, PlusCircle, RefreshCcw, Trash2, X, User } from "lucide-react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Edit3, Eye, Loader2, RefreshCcw, Trash2, X, User } from "lucide-react";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import MarkdownComposer from "../components/MarkdownComposer";
+import MarkdownContent from "../components/MarkdownContent";
 
 type SidebarRole = "admin" | "teacher" | "student";
 
@@ -31,7 +33,6 @@ const ForumListPage: React.FC = () => {
   const { darkMode } = useTheme();
   const { user } = useAuth();
   const location = useLocation();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const locationState = (location.state as ForumListLocationState | null) ?? null;
   const locationCourseId = locationState?.preselectedCourseId ?? "";
@@ -769,15 +770,19 @@ const ForumListPage: React.FC = () => {
                                   )}
                                 </span>
                               </div>
-                              <h4
-                                onClick={() => navigate(`/forums/${forum._id}`)}
-                                className={`text-2xl font-bold cursor-pointer transition-colors ${hasBackgroundImage
-                                  ? "text-white drop-shadow-lg hover:text-indigo-200"
-                                  : "text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200"
-                                  }`}
+                              <Link
+                                to={`/forums/${forum._id}`}
+                                className="block"
                               >
-                                {forumTitle}
-                              </h4>
+                                <h4
+                                  className={`text-2xl font-bold cursor-pointer transition-colors ${hasBackgroundImage
+                                    ? "text-white drop-shadow-lg hover:text-indigo-200"
+                                    : "text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200"
+                                    }`}
+                                >
+                                  {forumTitle}
+                                </h4>
+                              </Link>
                               <p className={`text-sm mt-2 line-clamp-3 ${hasBackgroundImage
                                 ? "text-white/90 drop-shadow"
                                 : "text-slate-500"
@@ -899,46 +904,18 @@ const ForumListPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">Content (Markdown supported)</label>
-                  <textarea
-                    className={`w-full h-36 rounded-2xl border px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                      }`}
-                    placeholder="Share context, add bullet lists...."
+                  <label className="block text-sm font-medium mb-2">Content editor</label>
+                  <MarkdownComposer
                     value={createModal.description}
-                    onChange={(event) => setCreateModal((prev) => ({ ...prev, description: event.target.value }))}
-                  ></textarea>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Attachment (optional)</label>
-                  <input
-                    type="file"
-                    accept={attachmentAcceptTypes}
-                    onChange={(event) =>
-                      setCreateModal((prev) => ({
-                        ...prev,
-                        file: event.target.files?.[0] || null,
-                      }))
-                    }
-                    className="w-full rounded-2xl border px-4 py-2.5 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500 cursor-pointer"
+                    onChange={(next) => setCreateModal((prev) => ({ ...prev, description: next }))}
+                    placeholder="Share context, add bullet lists, or embed resources using Markdown shortcuts."
+                    darkMode={darkMode}
+                    attachment={createModal.file}
+                    onAttachmentChange={(file) => setCreateModal((prev) => ({ ...prev, file }))}
+                    attachmentAccept={attachmentAcceptTypes}
                   />
-                  {createModal.file && (
-                    <div
-                      className={`mt-2 flex items-center justify-between rounded-xl px-3 py-2 text-xs ${darkMode ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-600"
-                        }`}
-                    >
-                      <span className="truncate pr-2">
-                        {createModal.file.name} • {formatFileSize(createModal.file.size)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setCreateModal((prev) => ({ ...prev, file: null }))}
-                        className="text-rose-500 font-semibold hover:text-rose-400"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  )}
                 </div>
+
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Topic type</p>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -1002,13 +979,33 @@ const ForumListPage: React.FC = () => {
                 <p className="text-2xl uppercase tracking-wide text-indigo-400 font-semibold mb-2">Live preview</p>
                 <h4 className="text-xl font-semibold mb-3">What learners will see</h4>
                 <div
-                  className={`rounded-2xl border-dashed border px-4 py-6 min-h-[220px] ${darkMode ? "border-slate-700 text-slate-200" : "border-slate-300 text-slate-500"
+                  className={`rounded-2xl border px-4 py-6 min-h-[220px] overflow-auto ${darkMode ? "border-slate-700 bg-slate-800/40" : "border-slate-200 bg-slate-50"
                     }`}
                 >
-                  <h5 className="text-lg font-semibold mb-2">
-                    {createModal.title || "Start typing to preview your Markdown formatting."}
-                  </h5>
-
+                  {createModal.title && (
+                    <h5 className="text-lg font-semibold mb-3">
+                      {createModal.title}
+                    </h5>
+                  )}
+                  {createModal.description ? (
+                    <div className="prose max-w-none dark:prose-invert">
+                      <MarkdownContent content={createModal.description} onImageClick={() => { }} />
+                    </div>
+                  ) : (
+                    <p className={`text-sm ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
+                      Start typing to preview your Markdown formatting.
+                    </p>
+                  )}
+                  {createModal.file && (
+                    <div className="mt-4">
+                      <AttachmentPreview
+                        files={[URL.createObjectURL(createModal.file)]}
+                        size="sm"
+                        onImageClick={() => { }}
+                        caption={createModal.file.name}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </form>
