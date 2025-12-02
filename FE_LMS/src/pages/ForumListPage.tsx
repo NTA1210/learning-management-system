@@ -9,6 +9,7 @@ import AttachmentPreview from "../components/AttachmentPreview";
 import { forumService, type ForumResponse, type ForumType } from "../services/forumService";
 import { Book, BookOpen, Edit3, Eye, Loader2, PlusCircle, RefreshCcw, Trash2, X, User } from "lucide-react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import toast from "react-hot-toast";
 
 type SidebarRole = "admin" | "teacher" | "student";
 
@@ -157,7 +158,7 @@ const ForumListPage: React.FC = () => {
     file: null,
   });
 
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
   const courseDropdownRef = useRef<HTMLDivElement | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState<{ src: string; alt?: string } | null>(null);
   const handleAttachmentPreview = useCallback((payload: { src: string; alt?: string }) => {
@@ -453,7 +454,7 @@ const ForumListPage: React.FC = () => {
     try {
       setDeleteModal((prev) => ({ ...prev, loading: true, error: null }));
       await forumService.deleteForum(deleteModal.forum._id);
-      setToast({ type: "success", message: "Forum deleted." });
+      toast.success("Forum deleted successfully.");
       closeDeleteModal();
       refreshForums();
     } catch (error: any) {
@@ -466,12 +467,9 @@ const ForumListPage: React.FC = () => {
         message = error.message;
       }
 
-      // If the error mentions posts, try to extract the count and make it more user-friendly
-      if (message.toLowerCase().includes("post") && message.toLowerCase().includes("exist")) {
-        // Keep the API message as is, it should already be formatted correctly
-      }
-
-      setDeleteModal((prev) => ({ ...prev, loading: false, error: message }));
+      // Show error in toast popup and close modal
+      toast.error(message);
+      closeDeleteModal();
     }
   };
 
@@ -512,17 +510,6 @@ const ForumListPage: React.FC = () => {
               </div>
             </header>
 
-            {toast && (
-              <div
-                className={`rounded-xl border px-4 py-3 flex items-center gap-3 ${toast.type === "success"
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                  : "bg-rose-50 border-rose-200 text-rose-700"
-                  }`}
-              >
-                <Book className="w-5 h-5" />
-                <span>{toast.message}</span>
-              </div>
-            )}
 
             <section className={`rounded-2xl p-6 shadow-sm ${panelStyles}`}>
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -689,8 +676,8 @@ const ForumListPage: React.FC = () => {
                               {/* Author Hover Popup */}
                               <div className="absolute left-0 top-14 z-[9999] hidden group-hover:block w-64">
                                 <div className={`rounded-2xl shadow-2xl border p-4 ${darkMode
-                                    ? "bg-slate-900 border-slate-700 text-slate-100"
-                                    : "bg-white border-slate-200 text-slate-900"
+                                  ? "bg-slate-900 border-slate-700 text-slate-100"
+                                  : "bg-white border-slate-200 text-slate-900"
                                   }`}>
                                   <div className="flex items-center gap-3 mb-3">
                                     <div className={`h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden ${darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
@@ -721,14 +708,14 @@ const ForumListPage: React.FC = () => {
                             </div>
                             <div className="flex-1 min-w-[200px]">
                               <div className={`text-xs mb-2 ${hasBackgroundImage
-                                  ? "text-white/90 drop-shadow"
-                                  : "text-slate-400"
+                                ? "text-white/90 drop-shadow"
+                                : "text-slate-400"
                                 }`}>
                                 <span className="relative inline-block group/name" style={{ zIndex: 100 }}>
                                   <span
                                     className={`font-semibold cursor-pointer hover:underline ${hasBackgroundImage
-                                        ? "text-white"
-                                        : "text-slate-600 dark:text-slate-200"
+                                      ? "text-white"
+                                      : "text-slate-600 dark:text-slate-200"
                                       }`}
                                   >
                                     {authorName}
@@ -736,8 +723,8 @@ const ForumListPage: React.FC = () => {
                                   {/* Author Name Hover Popup */}
                                   <div className="absolute left-0 top-6 z-[9999] hidden group-hover/name:block w-64">
                                     <div className={`rounded-2xl shadow-2xl border p-4 ${darkMode
-                                        ? "bg-slate-900 border-slate-700 text-slate-100"
-                                        : "bg-white border-slate-200 text-slate-900"
+                                      ? "bg-slate-900 border-slate-700 text-slate-100"
+                                      : "bg-white border-slate-200 text-slate-900"
                                       }`}>
                                       <div className="flex items-center gap-3 mb-3">
                                         <div className={`h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden ${darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
@@ -772,8 +759,8 @@ const ForumListPage: React.FC = () => {
                                   </span>
                                 )}
                                 <span className={`ml-2 ${hasBackgroundImage
-                                    ? "text-white/80"
-                                    : "text-slate-500"
+                                  ? "text-white/80"
+                                  : "text-slate-500"
                                   }`}>
                                   • Created: {forum.createdAt ? new Date(forum.createdAt).toLocaleString() : "—"}
                                   {forum.updatedAt && forum.updatedAt !== forum.createdAt && (
@@ -785,15 +772,15 @@ const ForumListPage: React.FC = () => {
                               <h4
                                 onClick={() => navigate(`/forums/${forum._id}`)}
                                 className={`text-2xl font-bold cursor-pointer transition-colors ${hasBackgroundImage
-                                    ? "text-white drop-shadow-lg hover:text-indigo-200"
-                                    : "text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200"
+                                  ? "text-white drop-shadow-lg hover:text-indigo-200"
+                                  : "text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200"
                                   }`}
                               >
                                 {forumTitle}
                               </h4>
                               <p className={`text-sm mt-2 line-clamp-3 ${hasBackgroundImage
-                                  ? "text-white/90 drop-shadow"
-                                  : "text-slate-500"
+                                ? "text-white/90 drop-shadow"
+                                : "text-slate-500"
                                 }`}>
                                 {forum.description}
                               </p>
@@ -801,12 +788,12 @@ const ForumListPage: React.FC = () => {
                             <div className="absolute top-0 right-0">
                               <span
                                 className={`text-xs font-semibold px-3 py-1 rounded-full ${hasBackgroundImage
-                                    ? forum.forumType === "announcement"
-                                      ? "bg-amber-500/90 text-white backdrop-blur-sm"
-                                      : "bg-indigo-500/90 text-white backdrop-blur-sm"
-                                    : forum.forumType === "announcement"
-                                      ? "bg-amber-100 text-amber-700"
-                                      : "bg-indigo-100 text-indigo-700"
+                                  ? forum.forumType === "announcement"
+                                    ? "bg-amber-500/90 text-white backdrop-blur-sm"
+                                    : "bg-indigo-500/90 text-white backdrop-blur-sm"
+                                  : forum.forumType === "announcement"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-indigo-100 text-indigo-700"
                                   }`}
                               >
                                 {forumTypeLabels[forum.forumType]}
@@ -825,8 +812,8 @@ const ForumListPage: React.FC = () => {
 
                           <div className="flex flex-wrap items-center justify-between gap-3 pt-12">
                             <div className={`text-xs ${hasBackgroundImage
-                                ? "text-white/80"
-                                : "text-slate-400"
+                              ? "text-white/80"
+                              : "text-slate-400"
                               }`}>
                               Updated: {forum.updatedAt ? new Date(forum.updatedAt).toLocaleString() : "Awaiting update"}
                             </div>
@@ -834,8 +821,8 @@ const ForumListPage: React.FC = () => {
                               <Link
                                 to={`/forums/${forum._id}`}
                                 className={`inline-flex items-center justify-center rounded-xl border active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow px-3 py-2 ${hasBackgroundImage
-                                    ? "border-white/30 text-white bg-white/20 hover:bg-white/30 backdrop-blur-sm"
-                                    : "border-slate-300 text-slate-700 bg-white hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                                  ? "border-white/30 text-white bg-white/20 hover:bg-white/30 backdrop-blur-sm"
+                                  : "border-slate-300 text-slate-700 bg-white hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                                   }`}
                                 title="View forum"
                               >
@@ -847,8 +834,8 @@ const ForumListPage: React.FC = () => {
                                     type="button"
                                     onClick={() => openEditModal(forum)}
                                     className={`inline-flex items-center justify-center rounded-xl border active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow px-3 py-2 ${hasBackgroundImage
-                                        ? "border-white/30 text-white bg-white/20 hover:bg-white/30 backdrop-blur-sm"
-                                        : "border-slate-300 text-slate-700 bg-white hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                                      ? "border-white/30 text-white bg-white/20 hover:bg-white/30 backdrop-blur-sm"
+                                      : "border-slate-300 text-slate-700 bg-white hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                                       }`}
                                     title="Edit forum"
                                   >
@@ -859,8 +846,8 @@ const ForumListPage: React.FC = () => {
                                     type="button"
                                     onClick={() => openDeleteModal(forum)}
                                     className={`inline-flex items-center justify-center rounded-lg px-3 py-2 border ${hasBackgroundImage
-                                        ? "border-rose-300/50 text-rose-200 hover:bg-rose-500/30 backdrop-blur-sm"
-                                        : "border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                      ? "border-rose-300/50 text-rose-200 hover:bg-rose-500/30 backdrop-blur-sm"
+                                      : "border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
                                       }`}
                                   >
                                     <Trash2 className="w-4 h-4" />

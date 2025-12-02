@@ -328,6 +328,32 @@ const buildFindQuery = (results: any[]) => ({
       const toDate = new Date("2024-01-31");
       await getLessonMaterials({ page: 1, limit: 5, from: fromDate, to: toDate }, userIds.admin, Role.ADMIN);
     });
+
+    it("applies createdAt filter with only from date", async () => {
+      const fromDate = new Date("2024-01-01");
+      const mockQuery = buildFindQuery([]);
+      (LessonMaterialModel.find as any).mockImplementation((filter: any) => {
+        expect(filter.createdAt.$gte).toBeDefined();
+        expect(filter.createdAt.$lte).toBeUndefined();
+        return mockQuery;
+      });
+      (LessonMaterialModel.countDocuments as any).mockResolvedValue(0);
+
+      await getLessonMaterials({ page: 1, limit: 5, from: fromDate }, userIds.admin, Role.ADMIN);
+    });
+
+    it("applies createdAt filter with only to date", async () => {
+      const toDate = new Date("2024-12-31");
+      const mockQuery = buildFindQuery([]);
+      (LessonMaterialModel.find as any).mockImplementation((filter: any) => {
+        expect(filter.createdAt.$gte).toBeUndefined();
+        expect(filter.createdAt.$lte).toBeDefined();
+        return mockQuery;
+      });
+      (LessonMaterialModel.countDocuments as any).mockResolvedValue(0);
+
+      await getLessonMaterials({ page: 1, limit: 5, to: toDate }, userIds.admin, Role.ADMIN);
+    });
   });
 
   describe("getLessonMaterialsByLesson", () => {
@@ -450,6 +476,10 @@ const buildFindQuery = (results: any[]) => ({
       expect(result.hasAccess).toBe(false);
     });
 
+    it("throws error for invalid material ID format", async () => {
+      await expect(getLessonMaterialById("invalid", userIds.admin, Role.ADMIN)).rejects.toThrow("Invalid material ID format");
+    });
+
     it("does not generate signed url for manual material", async () => {
       const manualMaterial = { ...material, key: "manual-materials/lesson/file" };
       (LessonMaterialModel.findById as any).mockReturnValue({
@@ -568,7 +598,13 @@ const buildFindQuery = (results: any[]) => ({
       (LessonMaterialModel.exists as any).mockResolvedValue(null);
       (LessonMaterialModel.findByIdAndUpdate as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue({ ...material, title: "New" }) });
 
-      const res = await updateLessonMaterial(materialId.toString(), { title: "New" }, userIds.admin, Role.ADMIN);
+      const res = await updateLessonMaterial(
+        materialId.toString(),
+        { title: "New" },
+        undefined,
+        userIds.admin,
+        Role.ADMIN
+      );
       expect(res?.title).toBe("New");
     });
 
@@ -583,27 +619,207 @@ const buildFindQuery = (results: any[]) => ({
       (LessonMaterialModel.exists as any).mockResolvedValue(null);
       (LessonMaterialModel.findByIdAndUpdate as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue({ ...material, title: "New" }) });
 
-      const res = await updateLessonMaterial(materialId.toString(), { title: "New" }, userIds.teacher, Role.TEACHER);
+      const res = await updateLessonMaterial(
+        materialId.toString(),
+        { title: "New" },
+        undefined,
+        userIds.teacher,
+        Role.TEACHER
+      );
       expect(res?.title).toBe("New");
     });
 
     it("throws error when material not found", async () => {
       const validMaterialId = new mongoose.Types.ObjectId().toString();
       (LessonMaterialModel.findById as any).mockResolvedValue(null);
-      await expect(updateLessonMaterial(validMaterialId, { title: "New" }, userIds.admin, Role.ADMIN)).rejects.toThrow("Material not found");
+      await expect(
+        updateLessonMaterial(
+          validMaterialId,
+          { title: "New" },
+          undefined,
+          userIds.admin,
+          Role.ADMIN
+        )
+      ).rejects.toThrow("Material not found");
     });
 
     it("throws error when title conflict exists", async () => {
       (LessonMaterialModel.findById as any).mockResolvedValue({ ...material, title: "Old Title" });
       (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [userIds.teacher] } }) });
       (LessonMaterialModel.exists as any).mockResolvedValue({ _id: new mongoose.Types.ObjectId() });
-      await expect(updateLessonMaterial(materialId.toString(), { title: "Existing Title" }, userIds.admin, Role.ADMIN)).rejects.toThrow("Material with this title already exists");
+      await expect(
+        updateLessonMaterial(
+          materialId.toString(),
+          { title: "Existing Title" },
+          undefined,
+          userIds.admin,
+          Role.ADMIN
+        )
+      ).rejects.toThrow("Material with this title already exists");
+    });
+
+    it("throws error for invalid material ID format", async () => {
+      await expect(
+        updateLessonMaterial(
+          "invalid",
+          { title: "New" },
+          undefined,
+          userIds.admin,
+          Role.ADMIN
+        )
+      ).rejects.toThrow("Invalid material ID format");
+    });
+
+    it("throws error when student tries to update", async () => {
+      (LessonMaterialModel.findById as any).mockResolvedValue({ ...material });
+      await expect(
+        updateLessonMaterial(
+          materialId.toString(),
+          { title: "New" },
+          undefined,
+          userIds.student,
+          Role.STUDENT
+        )
+      ).rejects.toThrow("Students cannot update lesson materials");
+    });
+
+    it("updates material with file upload", async () => {
+      const materialDoc = {
+        ...material,
+        key: "old-file.pdf",
+        uploadedBy: userIds.admin,
+      };
+      (LessonMaterialModel.findById as any).mockResolvedValue(materialDoc);
+      (LessonModel.findById as any).mockReturnValue({
+        populate: jest.fn().mockResolvedValue({ 
+          _id: lessonId,
+          courseId: { _id: courseId, teacherIds: [userIds.admin] } 
+        }),
+      });
+      (LessonMaterialModel.exists as any).mockResolvedValue(null);
+      (LessonMaterialModel.findByIdAndUpdate as any).mockReturnValue({
+        populate: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue({ ...materialDoc, key: "new-file.pdf" }),
+      });
+      const { uploadFile } = require("@/utils/uploadFile");
+      (uploadFile as jest.Mock).mockResolvedValue({
+        key: "new-file.pdf",
+        originalName: "new.pdf",
+        mimeType: "application/pdf",
+      });
+
+      const mockFile = {
+        size: 1000,
+        buffer: Buffer.from("test"),
+      } as any;
+
+      const result = await updateLessonMaterial(
+        materialId.toString(),
+        { title: "Updated" },
+        mockFile,
+        userIds.admin,
+        Role.ADMIN
+      );
+      expect(result).toBeDefined();
+      expect(uploadFile).toHaveBeenCalled();
+    });
+
+    it("updates material with file upload when courseId has no _id property", async () => {
+      const materialDoc = {
+        ...material,
+        key: "old-file.pdf",
+        uploadedBy: userIds.admin,
+        lessonId: lessonId.toString(), // Not ObjectId
+      };
+      (LessonMaterialModel.findById as any).mockResolvedValue(materialDoc);
+      (LessonModel.findById as any).mockReturnValue({
+        populate: jest.fn().mockResolvedValue({ 
+          _id: lessonId,
+          courseId: courseId, // Direct ObjectId, no _id property
+          teacherIds: [userIds.admin] 
+        }),
+      });
+      (LessonMaterialModel.exists as any).mockResolvedValue(null);
+      (LessonMaterialModel.findByIdAndUpdate as any).mockReturnValue({
+        populate: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue({ ...materialDoc, key: "new-file.pdf" }),
+      });
+      const { uploadFile } = require("@/utils/uploadFile");
+      (uploadFile as jest.Mock).mockResolvedValue({
+        key: "new-file.pdf",
+        originalName: "new.pdf",
+        mimeType: "application/pdf",
+      });
+
+      const mockFile = {
+        size: 1000,
+        buffer: Buffer.from("test"),
+      } as any;
+
+      const result = await updateLessonMaterial(
+        materialId.toString(),
+        { title: "Updated" },
+        mockFile,
+        userIds.admin,
+        Role.ADMIN
+      );
+      expect(result).toBeDefined();
+      expect(uploadFile).toHaveBeenCalled();
+    });
+
+    it("updates material with file upload when courseId is not ObjectId instance", async () => {
+      const materialDoc = {
+        ...material,
+        key: "old-file.pdf",
+        uploadedBy: userIds.admin,
+      };
+      (LessonMaterialModel.findById as any).mockResolvedValue(materialDoc);
+      (LessonModel.findById as any).mockReturnValue({
+        populate: jest.fn().mockResolvedValue({ 
+          _id: lessonId,
+          courseId: { _id: courseId.toString(), teacherIds: [userIds.admin] } // String instead of ObjectId
+        }),
+      });
+      (LessonMaterialModel.exists as any).mockResolvedValue(null);
+      (LessonMaterialModel.findByIdAndUpdate as any).mockReturnValue({
+        populate: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue({ ...materialDoc, key: "new-file.pdf" }),
+      });
+      const { uploadFile } = require("@/utils/uploadFile");
+      (uploadFile as jest.Mock).mockResolvedValue({
+        key: "new-file.pdf",
+        originalName: "new.pdf",
+        mimeType: "application/pdf",
+      });
+
+      const mockFile = {
+        size: 1000,
+        buffer: Buffer.from("test"),
+      } as any;
+
+      const result = await updateLessonMaterial(
+        materialId.toString(),
+        { title: "Updated" },
+        mockFile,
+        userIds.admin,
+        Role.ADMIN
+      );
+      expect(result).toBeDefined();
+      expect(uploadFile).toHaveBeenCalled();
     });
 
     it("throws error when unauthorized (not instructor)", async () => {
       (LessonMaterialModel.findById as any).mockResolvedValue({ ...material });
       (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ courseId: { teacherIds: [] } }) });
-      await expect(updateLessonMaterial(materialId.toString(), { title: "New" }, userIds.teacher, Role.TEACHER)).rejects.toThrow("Not authorized");
+      await expect(
+        updateLessonMaterial(
+          materialId.toString(),
+          { title: "New" },
+          undefined,
+          userIds.teacher,
+          Role.TEACHER
+        )
+      ).rejects.toThrow("Not authorized");
     });
 
     it("updates optional fields when provided", async () => {
@@ -630,6 +846,7 @@ const buildFindQuery = (results: any[]) => ({
           size: 999,
           key: "new/key",
         },
+        undefined,
         userIds.admin,
         Role.ADMIN
       );
@@ -650,7 +867,13 @@ const buildFindQuery = (results: any[]) => ({
     it("throws error when student tries to update", async () => {
       (LessonMaterialModel.findById as any).mockResolvedValue({ ...material });
       await expect(
-        updateLessonMaterial(materialId.toString(), { title: "New" }, userIds.student, Role.STUDENT)
+        updateLessonMaterial(
+          materialId.toString(),
+          { title: "New" },
+          undefined,
+          userIds.student,
+          Role.STUDENT
+        )
       ).rejects.toThrow("Students cannot update lesson materials");
     });
   });
@@ -674,6 +897,10 @@ const buildFindQuery = (results: any[]) => ({
       (LessonMaterialModel.findByIdAndDelete as any).mockResolvedValue(material);
       const res = await deleteLessonMaterial(materialId.toString(), userIds.teacher, Role.TEACHER);
       expect(res).toBeDefined();
+    });
+
+    it("throws error for invalid material ID format", async () => {
+      await expect(deleteLessonMaterial("invalid", userIds.admin, Role.ADMIN)).rejects.toThrow("Invalid material ID format");
     });
 
     it("throws error when material not found", async () => {
@@ -733,6 +960,46 @@ const buildFindQuery = (results: any[]) => ({
       expect(Array.isArray(res)).toBe(true);
     });
 
+    it("multi upload uses originalName when title not provided", async () => {
+      const { uploadFile } = require("@/utils/uploadFile");
+      (uploadFile as jest.Mock).mockResolvedValue({
+        key: "file1.pdf",
+        originalName: "document.pdf",
+        mimeType: "application/pdf",
+        size: 100,
+      });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ _id: lessonId, courseId: { _id: courseId, teacherIds: [userIds.admin] } }) });
+      (LessonMaterialModel.exists as any).mockResolvedValue(null);
+      (LessonMaterialModel.create as any).mockImplementation(async (data: any) => {
+        expect(data.title).toBe("document.pdf"); // Should use originalName
+        return { _id: materialId };
+      });
+      (LessonMaterialModel.find as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), sort: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue([material]) });
+
+      const files = [{ size: 100 } as any];
+      await uploadLessonMaterial({ lessonId: lessonId.toString() }, files, userIds.admin, Role.ADMIN);
+    });
+
+    it("multi upload uses fallback title when title and originalName not provided", async () => {
+      const { uploadFile } = require("@/utils/uploadFile");
+      (uploadFile as jest.Mock).mockResolvedValue({
+        key: "file1.pdf",
+        originalName: undefined,
+        mimeType: "application/pdf",
+        size: 100,
+      });
+      (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ _id: lessonId, courseId: { _id: courseId, teacherIds: [userIds.admin] } }) });
+      (LessonMaterialModel.exists as any).mockResolvedValue(null);
+      (LessonMaterialModel.create as any).mockImplementation(async (data: any) => {
+        expect(data.title).toBe("Material 1"); // Should use fallback
+        return { _id: materialId };
+      });
+      (LessonMaterialModel.find as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), sort: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue([material]) });
+
+      const files = [{ size: 100 } as any];
+      await uploadLessonMaterial({ lessonId: lessonId.toString() }, files, userIds.admin, Role.ADMIN);
+    });
+
     it("throws error when lesson not found", async () => {
       (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue(null) });
       const file = { size: 10 } as any;
@@ -743,6 +1010,28 @@ const buildFindQuery = (results: any[]) => ({
       (LessonModel.findById as any).mockReturnValue({ populate: jest.fn().mockResolvedValue({ _id: lessonId, courseId: { _id: courseId, teacherIds: [] } }) });
       const file = { size: 10 } as any;
       await expect(uploadLessonMaterial({ lessonId: lessonId.toString(), title: "A" }, file, userIds.teacher, Role.TEACHER)).rejects.toThrow("Only course instructors can upload materials");
+    });
+
+    it("throws error when no file uploaded", async () => {
+      const teacherIdsArray = [userIds.teacher];
+      teacherIdsArray.includes = jest.fn((id: any) => teacherIdsArray.some((tid) => tid.toString() === id.toString()));
+      (LessonModel.findById as any).mockReturnValue({
+        populate: jest.fn().mockResolvedValue({ _id: lessonId, courseId: { _id: courseId, teacherIds: teacherIdsArray } }),
+      });
+      await expect(
+        uploadLessonMaterial({ lessonId: lessonId.toString(), title: "Doc" }, undefined as any, userIds.teacher, Role.TEACHER)
+      ).rejects.toThrow("No file uploaded");
+    });
+
+    it("throws error when no files uploaded (empty array)", async () => {
+      const teacherIdsArray = [userIds.teacher];
+      teacherIdsArray.includes = jest.fn((id: any) => teacherIdsArray.some((tid) => tid.toString() === id.toString()));
+      (LessonModel.findById as any).mockReturnValue({
+        populate: jest.fn().mockResolvedValue({ _id: lessonId, courseId: { _id: courseId, teacherIds: teacherIdsArray } }),
+      });
+      await expect(
+        uploadLessonMaterial({ lessonId: lessonId.toString(), title: "Doc" }, [] as any, userIds.teacher, Role.TEACHER)
+      ).rejects.toThrow("No files uploaded");
     });
 
     it("throws error when student uploads material", async () => {
@@ -773,6 +1062,10 @@ const buildFindQuery = (results: any[]) => ({
       (LessonMaterialModel.findById as any).mockReturnValue({ populate: jest.fn().mockReturnThis(), lean: jest.fn().mockResolvedValue(material) });
       const res = await getMaterialForDownload(materialId.toString());
       expect(res).toBeDefined();
+    });
+
+    it("throws error for invalid material ID format", async () => {
+      await expect(getMaterialForDownload("invalid")).rejects.toThrow("Invalid material ID format");
     });
 
     it("throws error when material not found", async () => {
