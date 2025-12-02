@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Eye, Filter, ShieldOff } from "lucide-react";
+import { Eye, ShieldOff } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { useTheme } from "../hooks/useTheme";
@@ -17,26 +17,28 @@ export default function QuizAttemptsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [banProcessingId, setBanProcessingId] = useState<string | null>(null);
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+    const handleToggleSidebar = () => {
+        setMobileSidebarOpen(prev => !prev);
+    };
+
+    const handleCloseSidebar = () => {
+        setMobileSidebarOpen(false);
+    };
 
     // Pagination
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [total, setTotal] = useState(0);
 
-    // Filters
-    const [filters, setFilters] = useState<GetQuizAttemptsParams>({
-        page: 1,
-        limit: 10,
-        sortBy: 'createdAt',
-        order: 'desc',
-    });
-    const [showFilters, setShowFilters] = useState(false);
+
 
     useEffect(() => {
         if (quizId) {
             loadAttempts();
         }
-    }, [quizId, currentPage, filters]);
+    }, [quizId, currentPage]);
 
     const loadAttempts = async () => {
         if (!quizId) return;
@@ -45,7 +47,12 @@ export default function QuizAttemptsPage() {
             setLoading(true);
             setError(null);
 
-            const params = { ...filters, page: currentPage };
+            const params: GetQuizAttemptsParams = {
+                page: currentPage,
+                limit: 10,
+                sortBy: 'createdAt',
+                order: 'desc',
+            };
             const response = await quizAttemptService.getQuizAttemptsForGrading(quizId, params);
 
             setAttempts(response.data || []);
@@ -112,10 +119,7 @@ export default function QuizAttemptsPage() {
         }
     };
 
-    const handleFilterChange = (key: keyof GetQuizAttemptsParams, value: any) => {
-        setFilters(prev => ({ ...prev, [key]: value }));
-        setCurrentPage(1); // Reset to first page when filter changes
-    };
+
 
     const formatDate = (dateString: string) => {
         return new Date(dateString).toLocaleString();
@@ -138,16 +142,18 @@ export default function QuizAttemptsPage() {
 
     return (
         <div className="flex h-screen overflow-hidden" style={{ backgroundColor: darkMode ? "#0f172a" : "#f8fafc" }}>
+            <Sidebar variant="mobile" isOpen={mobileSidebarOpen} onClose={handleCloseSidebar} />
             <Sidebar />
             <div className="flex-1 flex flex-col overflow-hidden">
-                <Navbar />
-                <main className="flex-1 overflow-y-auto p-6" style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}>
+                <Navbar onToggleSidebar={handleToggleSidebar} />
+                <main className="flex-1 overflow-y-auto p-6 pt-28" style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}>
                     <div className="max-w-7xl mx-auto">
                         {/* Header */}
                         <div className="mb-6">
                             <button
                                 onClick={() => navigate(-1)}
-                                className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4"
+                                className="flex items-center gap-2 text-sm hover:underline mb-4"
+                                style={{ color: "var(--muted-text)" }}
                             >
                                 ← Back
                             </button>
@@ -159,76 +165,7 @@ export default function QuizAttemptsPage() {
                             </p>
                         </div>
 
-                        {/* Filters */}
-                        <div className="mb-6 rounded-lg p-4" style={{ backgroundColor: "var(--card-surface)", border: "1px solid var(--card-border)" }}>
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-lg font-semibold flex items-center gap-2">
-                                    <Filter className="w-5 h-5" />
-                                    Filters
-                                </h2>
-                                <button
-                                    onClick={() => setShowFilters(!showFilters)}
-                                    className="text-sm text-blue-600 hover:text-blue-700"
-                                >
-                                    {showFilters ? "Hide" : "Show"}
-                                </button>
-                            </div>
 
-                            {showFilters && (
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {/* Status Filter */}
-                                    <div>
-                                        <label className="block text-sm font-medium mb-2" style={{ color: "var(--muted-text)" }}>
-                                            Status
-                                        </label>
-                                        <select
-                                            value={filters.status || ""}
-                                            onChange={(e) => handleFilterChange('status', e.target.value || undefined)}
-                                            className="w-full p-2 rounded border"
-                                            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--card-border)", color: "var(--page-text)" }}
-                                        >
-                                            <option value="">All</option>
-                                            <option value="in_progress">In Progress</option>
-                                            <option value="submitted">Submitted</option>
-                                            <option value="graded">Graded</option>
-                                            <option value="regraded">Regraded</option>
-                                        </select>
-                                    </div>
-
-                                    {/* Sort By */}
-                                    <div>
-                                        <label className="block text-sm font-medium mb-2" style={{ color: "var(--muted-text)" }}>
-                                            Sort By
-                                        </label>
-                                        <select
-                                            value={filters.sortBy || "createdAt"}
-                                            onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                                            className="w-full p-2 rounded border"
-                                            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--card-border)", color: "var(--page-text)" }}
-                                        >
-                                            <option value="createdAt">Submission Time</option>
-                                            <option value="score">Score</option>
-                                        </select>
-                                    </div>
-
-                                    {/* Order */}
-                                    <div>
-                                        <label className="block text-sm font-medium mb-2" style={{ color: "var(--muted-text)" }}>
-                                            Order
-                                        </label>
-                                        <select
-                                            value={filters.order || "desc"}
-                                            onChange={(e) => handleFilterChange('order', e.target.value as 'asc' | 'desc')}
-                                            className="w-full p-2 rounded border"
-                                            style={{ backgroundColor: "var(--input-bg)", borderColor: "var(--card-border)", color: "var(--page-text)" }}
-                                        >
-                                            <option value="desc">Descending</option>
-                                            <option value="asc">Ascending</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
 
                         {/* Loading State */}
                         {loading && (
@@ -302,16 +239,7 @@ export default function QuizAttemptsPage() {
                                                             {formatDate(attempt.createdAt)}
                                                         </td>
                                                         <td className="p-4">
-                                                            {attempt.status === 'in_progress' ? (
-                                                                <button
-                                                                    onClick={() => handleBanAttempt(attempt)}
-                                                                    disabled={banProcessingId === attempt._id}
-                                                                    className="flex items-center gap-2 px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700 text-sm disabled:opacity-50"
-                                                                >
-                                                                    <ShieldOff className="w-4 h-4" />
-                                                                    {banProcessingId === attempt._id ? "Banning..." : "Ban"}
-                                                                </button>
-                                                            ) : (
+                                                            <div className="flex items-center gap-2">
                                                                 <button
                                                                     onClick={() => handleViewAttempt(attempt._id)}
                                                                     className="flex items-center gap-2 px-3 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm"
@@ -319,7 +247,17 @@ export default function QuizAttemptsPage() {
                                                                     <Eye className="w-4 h-4" />
                                                                     View
                                                                 </button>
-                                                            )}
+                                                                {attempt.status === 'in_progress' && (
+                                                                    <button
+                                                                        onClick={() => handleBanAttempt(attempt)}
+                                                                        disabled={banProcessingId === attempt._id}
+                                                                        className="flex items-center gap-2 px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700 text-sm disabled:opacity-50"
+                                                                    >
+                                                                        <ShieldOff className="w-4 h-4" />
+                                                                        {banProcessingId === attempt._id ? "Banning..." : "Ban"}
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))

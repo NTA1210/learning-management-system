@@ -792,7 +792,7 @@ export default function TakeQuizPage() {
         <div className="flex-1 flex flex-col overflow-hidden">
           <Navbar />
           <main
-            className="flex-1 overflow-y-auto px-6 pb-6 pt-32 flex items-center justify-center"
+            className="flex-1 overflow-y-auto px-6 pb-6 pt-28 flex items-center justify-center"
             style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}
           >
             <div
@@ -841,7 +841,7 @@ export default function TakeQuizPage() {
         <div className="flex-1 flex flex-col overflow-hidden">
           <Navbar />
           <main
-            className="flex-1 overflow-y-auto px-6 pb-6 pt-32"
+            className="flex-1 overflow-y-auto px-6 pb-6 pt-28"
             style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}
           >
             <div className="max-w-2xl mx-auto">
@@ -921,7 +921,7 @@ export default function TakeQuizPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
         <main
-          className="flex-1 overflow-y-auto px-6 pb-6 pt-32"
+          className="flex-1 overflow-y-auto px-6 pb-6 pt-28"
           style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}
         >
           <div className="max-w-4xl mx-auto">
