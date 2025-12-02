@@ -285,10 +285,11 @@ export const listCourses = async ({
   // ✅ Add isTeacher field to each course for teacher role
   const coursesWithTeacherFlag = courses.map((course) => {
     const isTeacherOfCourse = userId
-      ? course.teacherIds.some((teacherId: any) =>
-        teacherId._id?.toString() === userId.toString() ||
-        teacherId.toString() === userId.toString()
-      )
+      ? course.teacherIds.some(
+          (teacherId: any) =>
+            teacherId._id?.toString() === userId.toString() ||
+            teacherId.toString() === userId.toString()
+        )
       : false;
 
     return {
@@ -336,10 +337,11 @@ export const getCourseById = async (courseId: string, userId?: Types.ObjectId) =
 
   // ✅ Add isTeacherOfCourse field
   const isTeacherOfCourse = userId
-    ? (course.teacherIds as any[]).some((teacherId: any) =>
-      teacherId._id?.toString() === userId.toString() ||
-      teacherId.toString() === userId.toString()
-    )
+    ? (course.teacherIds as any[]).some(
+        (teacherId: any) =>
+          teacherId._id?.toString() === userId.toString() ||
+          teacherId.toString() === userId.toString()
+      )
     : false;
 
   return {
@@ -1332,6 +1334,7 @@ export const getQuizzes = async (
 
   if (role === Role.STUDENT) {
     quizzes = quizzes.map((quiz) => {
+      delete quiz.hashPassword;
       return { ...quiz, snapshotQuestions: [] };
     });
   }
