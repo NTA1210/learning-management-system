@@ -1,9 +1,10 @@
-import { Send, Plus, ThumbsUp, MapPin, X, Smile, Image, Paperclip, Bold, Italic, Underline, Strikethrough, List, ListOrdered, Link, Code, Quote, Type, Trash2, Upload, File as FileIcon } from "lucide-react";
+import { Send, Plus, ThumbsUp, MapPin, X, Smile, Image, Paperclip, Bold, Italic, Underline, Strikethrough, List, ListOrdered, Link, Code, Quote, Type, Trash2, Upload, File as FileIcon, Mic } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useChatRoomStore } from "../../stores/chatRoomStore";
 import { useSocketContext } from "../../context/SocketContext";
 import AttachMenu from "./components/AttachMenu";
 import { useTheme } from "../../hooks/useTheme";
+import VoiceRecorder from "./VoiceRecorder";
 
 // Type for staged files with preview
 interface StagedFile {
@@ -22,6 +23,7 @@ const MessageInput: React.FC = () => {
   const [isEmpty, setIsEmpty] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
   const { darkMode } = useTheme();
 
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -492,6 +494,33 @@ const MessageInput: React.FC = () => {
         </div>
       )}
 
+      {/* Voice Recorder - shows above the main editor when recording */}
+      {isRecording && (
+        <div className="mb-3">
+          <VoiceRecorder
+            isRecording={isRecording}
+            setIsRecording={setIsRecording}
+            onSend={(audioBlob, duration) => {
+              if (!user || !socket || !selectedChatRoom) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                socket.emit("chatroom:send-file", {
+                  chatRoomId: selectedChatRoom.chatRoomId,
+                  userId: user._id,
+                  senderRole: user.role,
+                  fileName: `voice_message_${Date.now()}.mp3`,
+                  mimeType: "audio/mpeg",
+                  data: reader.result,
+                  duration,
+                });
+              };
+              reader.readAsArrayBuffer(audioBlob);
+            }}
+            onCancel={() => setIsRecording(false)}
+          />
+        </div>
+      )}
+
       {/* Main Editor Container */}
       <div
         className="rounded-xl border overflow-hidden"
@@ -650,7 +679,7 @@ const MessageInput: React.FC = () => {
           {/* Divider */}
           <span className={`w-px h-6 mx-2 ${darkMode ? "bg-slate-600" : "bg-slate-300"}`} />
 
-          {/* Send button or Like button */}
+          {/* Send button, Voice recorder, or Like button */}
           {!isEmpty || stagedFiles.length > 0 ? (
             <button
               onClick={handleSendMessage}
@@ -666,18 +695,33 @@ const MessageInput: React.FC = () => {
               )}
             </button>
           ) : (
-            <button
-              onClick={handleSendLike}
-              type="button"
-              title="Send Like"
-              className={`p-2 rounded-lg transition-colors ${
-                darkMode
-                  ? "text-slate-400 hover:bg-slate-700 hover:text-slate-200"
-                  : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-              }`}
-            >
-              <ThumbsUp className="size-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              {/* Voice recorder button */}
+              <button
+                onClick={() => setIsRecording(true)}
+                type="button"
+                title="Record voice message"
+                className={`p-2 rounded-lg transition-colors ${
+                  darkMode
+                    ? "text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                }`}
+              >
+                <Mic className="size-5" />
+              </button>
+              <button
+                onClick={handleSendLike}
+                type="button"
+                title="Send Like"
+                className={`p-2 rounded-lg transition-colors ${
+                  darkMode
+                    ? "text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                }`}
+              >
+                <ThumbsUp className="size-5" />
+              </button>
+            </div>
           )}
         </div>
       </div>

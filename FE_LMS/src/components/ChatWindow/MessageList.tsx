@@ -8,6 +8,7 @@ import { useSocketContext } from "../../context/SocketContext";
 import { useMessageListen } from "../../hooks/useMessageListen";
 import { useTypingListen } from "../../hooks/useTypingListen";
 import FileMessageItem from "./FileMessageItem";
+import VoiceMessageItem from "./VoiceMessageItem";
 import { useTheme } from "../../hooks/useTheme";
 import type { Message } from "../../services/messageService";
 
@@ -146,6 +147,22 @@ const MessageList: React.FC = () => {
             />
           );
         } else if ("file" in message) {
+          // Check if it's an audio/voice message
+          const fileData = typeof (message as any).file === 'object' ? (message as any).file : null;
+          const mimeType = fileData?.mimeType?.toLowerCase() || '';
+          const isVoiceMessage = mimeType.startsWith('audio/');
+          
+          if (isVoiceMessage) {
+            return (
+              <VoiceMessageItem
+                key={message._id ?? index}
+                {...(message as any)}
+                isFirstInBlock={isFirstInBlock}
+                isLastInBlock={isLastInBlock}
+              />
+            );
+          }
+          
           return (
             <FileMessageItem
               key={message._id ?? index}

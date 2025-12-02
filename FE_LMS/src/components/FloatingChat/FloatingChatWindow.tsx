@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Send, X, Minus, ThumbsUp, Paperclip, ExternalLink, Upload, File as FileIcon } from "lucide-react";
+import { Send, X, Minus, ThumbsUp, Paperclip, ExternalLink, Upload, File as FileIcon, Mic } from "lucide-react";
 import { useTheme } from "../../hooks/useTheme";
 import { useSocketContext } from "../../context/SocketContext";
 import { useFloatingChatStore, type FloatingChat } from "../../stores/floatingChatStore";
@@ -7,6 +7,8 @@ import { useNavigate } from "react-router-dom";
 import { messageService, type Message as ServiceMessage } from "../../services/messageService";
 import MessageItem from "../ChatWindow/MessageItem";
 import FileMessageItem from "../ChatWindow/FileMessageItem";
+import VoiceMessageItem from "../ChatWindow/VoiceMessageItem";
+import VoiceRecorder from "../ChatWindow/VoiceRecorder";
 
 interface FloatingChatWindowProps {
   chat: FloatingChat;
@@ -44,6 +46,7 @@ const FloatingChatWindow: React.FC<FloatingChatWindowProps> = ({ chat, index }) 
   const [isEmpty, setIsEmpty] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
   
   const editorRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -500,9 +503,28 @@ const FloatingChatWindow: React.FC<FloatingChatWindowProps> = ({ chat, index }) 
                   />
                 );
               } else if (message.file) {
+                // Check if it's an audio/voice message
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const fileData = message.file as any;
+                const mimeType = (fileData?.mimeType || '').toLowerCase();
+                const isVoiceMessage = mimeType.startsWith('audio/');
+                
+                if (isVoiceMessage) {
+                  return (
+                    <VoiceMessageItem
+                      key={message._id ?? index}
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      {...(message as any)}
+                      isFirstInBlock={isFirstInBlock}
+                      isLastInBlock={isLastInBlock}
+                    />
+                  );
+                }
+                
                 return (
                   <FileMessageItem
                     key={message._id ?? index}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     {...(message as any)}
                     isFirstInBlock={isFirstInBlock}
                     isLastInBlock={isLastInBlock}
@@ -567,58 +589,93 @@ const FloatingChatWindow: React.FC<FloatingChatWindowProps> = ({ chat, index }) 
           borderColor: darkMode ? "rgba(71, 85, 105, 0.5)" : "rgba(229, 231, 235, 1)",
         }}
       >
-        <div className="flex items-end gap-2">
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            multiple
-            onChange={handleFileSelect}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-          >
-            <Paperclip className="size-4" style={{ color: darkMode ? "#94a3b8" : "#64748b" }} />
-          </button>
-          
-          <div
-            ref={editorRef}
-            contentEditable
-            onInput={checkIfEmpty}
-            onKeyDown={handleKeyDown}
-            className="flex-1 px-3 py-2 text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 max-h-[80px] overflow-y-auto"
-            style={{
-              backgroundColor: darkMode ? "#0f172a" : "#ffffff",
-              borderColor: darkMode ? "rgba(71, 85, 105, 0.5)" : "rgba(229, 231, 235, 1)",
-              color: darkMode ? "#e5e7eb" : "#0f172a",
-              minHeight: "36px",
+        {/* Voice Recorder - shows when recording */}
+        {isRecording ? (
+          <VoiceRecorder
+            isRecording={isRecording}
+            setIsRecording={setIsRecording}
+            onSend={(audioBlob, duration) => {
+              if (!user || !socket) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                socket.emit("chatroom:send-file", {
+                  chatRoomId,
+                  userId: user._id,
+                  senderRole: user.role,
+                  fileName: `voice_message_${Date.now()}.mp3`,
+                  mimeType: "audio/mpeg",
+                  data: reader.result,
+                  duration,
+                });
+              };
+              reader.readAsArrayBuffer(audioBlob);
             }}
-            data-placeholder="Aa"
-            suppressContentEditableWarning
+            onCancel={() => setIsRecording(false)}
           />
-          
-          {!isEmpty || stagedFiles.length > 0 ? (
+        ) : (
+          <div className="flex items-end gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              multiple
+              onChange={handleFileSelect}
+            />
             <button
-              onClick={handleSendMessage}
-              className="p-2 rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 transition-colors relative"
-            >
-              <Send className="size-4" />
-              {stagedFiles.length > 0 && (
-                <span className="absolute -top-1 -right-1 size-4 flex items-center justify-center text-[10px] font-bold bg-red-500 rounded-full">
-                  {stagedFiles.length}
-                </span>
-              )}
-            </button>
-          ) : (
-            <button
-              onClick={handleSendLike}
+              onClick={() => fileInputRef.current?.click()}
               className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
             >
-              <ThumbsUp className="size-4" style={{ color: darkMode ? "#94a3b8" : "#64748b" }} />
+              <Paperclip className="size-4" style={{ color: darkMode ? "#94a3b8" : "#64748b" }} />
             </button>
-          )}
-        </div>
+            
+            <div
+              ref={editorRef}
+              contentEditable
+              onInput={checkIfEmpty}
+              onKeyDown={handleKeyDown}
+              className="flex-1 px-3 py-2 text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 max-h-[80px] overflow-y-auto"
+              style={{
+                backgroundColor: darkMode ? "#0f172a" : "#ffffff",
+                borderColor: darkMode ? "rgba(71, 85, 105, 0.5)" : "rgba(229, 231, 235, 1)",
+                color: darkMode ? "#e5e7eb" : "#0f172a",
+                minHeight: "36px",
+              }}
+              data-placeholder="Aa"
+              suppressContentEditableWarning
+            />
+            
+            {!isEmpty || stagedFiles.length > 0 ? (
+              <button
+                onClick={handleSendMessage}
+                className="p-2 rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 transition-colors relative"
+              >
+                <Send className="size-4" />
+                {stagedFiles.length > 0 && (
+                  <span className="absolute -top-1 -right-1 size-4 flex items-center justify-center text-[10px] font-bold bg-red-500 rounded-full">
+                    {stagedFiles.length}
+                  </span>
+                )}
+              </button>
+            ) : (
+              <div className="flex items-center gap-1">
+                {/* Voice recorder button */}
+                <button
+                  onClick={() => setIsRecording(true)}
+                  className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                  title="Record voice message"
+                >
+                  <Mic className="size-4" style={{ color: darkMode ? "#94a3b8" : "#64748b" }} />
+                </button>
+                <button
+                  onClick={handleSendLike}
+                  className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                >
+                  <ThumbsUp className="size-4" style={{ color: darkMode ? "#94a3b8" : "#64748b" }} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* CSS for placeholder */}
