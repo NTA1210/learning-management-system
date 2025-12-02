@@ -334,7 +334,21 @@ const ForumPostDetailPage: React.FC = () => {
       setIsEditingPost(false);
       fetchPost();
     } catch (err: any) {
-      const message = err instanceof Error ? err.message : "Unable to update post";
+      let message = "Unable to update post";
+
+      // Authorization / permission errors: show specific toast
+      if (
+        err?.response?.status === 403 ||
+        err?.message?.toLowerCase?.().includes("permission") ||
+        err?.message?.toLowerCase?.().includes("not allowed")
+      ) {
+        message = "You can only edit your own posts";
+      } else if (err?.response?.data?.message) {
+        message = err.response.data.message;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+
       toast.error(message);
     } finally {
       setPostSaving(false);
