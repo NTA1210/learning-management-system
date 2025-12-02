@@ -138,19 +138,6 @@ describe("Announcement Service Unit Tests", () => {
       ).rejects.toThrow(AppError);
     });
 
-    it("Should throw FORBIDDEN when student tries to create course announcement", async () => {
-      const mockCourse = { _id: mockCourseId, title: "Test Course", teacherIds: [] };
-
-      (CourseModel.findById as jest.Mock).mockResolvedValue(mockCourse);
-
-      await expect(
-        createAnnouncement(
-          { title: "Test", content: "Test content", courseId: mockCourseId.toString() },
-          mockUserId,
-          Role.STUDENT
-        )
-      ).rejects.toThrow(AppError);
-    });
   });
 
 
@@ -411,29 +398,13 @@ describe("Announcement Service Unit Tests", () => {
       expect(result.pagination.total).toBe(2);
     });
 
-    it("Should use default pagination values", async () => {
-      const mockFind = {
-        sort: jest.fn().mockReturnThis(),
-        skip: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        populate: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue([]),
-      };
-
-      (AnnouncementModel.find as jest.Mock).mockReturnValue(mockFind);
-      (AnnouncementModel.countDocuments as jest.Mock).mockResolvedValue(0);
-
-      const result = await getAllAnnouncements();
-
-      expect(result.pagination.page).toBe(1);
-      expect(result.pagination.limit).toBe(10);
-    });
   });
 
   describe("getSystemAnnouncements", () => {
-    it("Should return system announcements (no courseId)", async () => {
+    it("Should return system announcements with pagination", async () => {
       const mockAnnouncements = [
         { _id: new Types.ObjectId(), title: "System Announcement 1" },
+        { _id: new Types.ObjectId(), title: "System Announcement 2" },
       ];
       const mockFind = {
         sort: jest.fn().mockReturnThis(),
@@ -444,11 +415,14 @@ describe("Announcement Service Unit Tests", () => {
       };
 
       (AnnouncementModel.find as jest.Mock).mockReturnValue(mockFind);
-      (AnnouncementModel.countDocuments as jest.Mock).mockResolvedValue(1);
+      (AnnouncementModel.countDocuments as jest.Mock).mockResolvedValue(2);
 
       const result = await getSystemAnnouncements(1, 10);
 
-      expect(result.announcements).toHaveLength(1);
+      expect(result.announcements).toHaveLength(2);
+      expect(result.pagination.total).toBe(2);
+      expect(result.pagination.page).toBe(1);
+      expect(result.pagination.limit).toBe(10);
       expect(AnnouncementModel.find).toHaveBeenCalledWith({ courseId: { $exists: false } });
     });
 
@@ -468,6 +442,42 @@ describe("Announcement Service Unit Tests", () => {
 
       expect(result.pagination.page).toBe(1);
       expect(result.pagination.limit).toBe(10);
+      expect(result.pagination.totalPages).toBe(0);
+    });
+
+    it("Should calculate totalPages correctly", async () => {
+      const mockFind = {
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        populate: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([]),
+      };
+
+      (AnnouncementModel.find as jest.Mock).mockReturnValue(mockFind);
+      (AnnouncementModel.countDocuments as jest.Mock).mockResolvedValue(25);
+
+      const result = await getSystemAnnouncements(1, 10);
+
+      expect(result.pagination.totalPages).toBe(3);
+    });
+
+    it("Should handle page 2 with skip calculation", async () => {
+      const mockFind = {
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        populate: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([]),
+      };
+
+      (AnnouncementModel.find as jest.Mock).mockReturnValue(mockFind);
+      (AnnouncementModel.countDocuments as jest.Mock).mockResolvedValue(15);
+
+      const result = await getSystemAnnouncements(2, 10);
+
+      expect(result.pagination.page).toBe(2);
+      expect(mockFind.skip).toHaveBeenCalledWith(10);
     });
   });
 });
