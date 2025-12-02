@@ -108,19 +108,40 @@ type UploadableFiles = File | FileList | File[] | null | undefined;
 
 const buildMultipartPayload = (payload: Record<string, unknown>, files?: UploadableFiles) => {
   const formData = new FormData();
+  
+  // Xử lý payload fields
   Object.entries(payload).forEach(([key, value]) => {
+    // Bỏ qua undefined và null
     if (value === undefined || value === null) return;
-    if (value instanceof Blob) {
+    
+    // Xử lý File/Blob trực tiếp
+    if (value instanceof Blob || value instanceof File) {
       formData.append(key, value);
       return;
     }
+    
+    // Xử lý boolean - convert thành string
+    if (typeof value === "boolean") {
+      formData.append(key, String(value));
+      return;
+    }
+    
+    // Xử lý object/array - stringify
     if (typeof value === "object") {
+      // Bỏ qua null (đã check ở trên) và Date objects
+      if (value instanceof Date) {
+        formData.append(key, value.toISOString());
+        return;
+      }
       formData.append(key, JSON.stringify(value));
       return;
     }
+    
+    // Xử lý các primitive types khác
     formData.append(key, String(value));
   });
 
+  // Xử lý files
   if (files) {
     const normalizedFiles: File[] =
       files instanceof FileList
@@ -140,9 +161,27 @@ const buildMultipartPayload = (payload: Record<string, unknown>, files?: Uploada
 // Helper: chuẩn hóa response array
 const extractArray = <T>(responseData: any, key?: string): T[] => {
   if (!responseData) return [];
-  if (key && Array.isArray(responseData[key])) return responseData[key];
-  if (Array.isArray(responseData)) return responseData;
-  if (Array.isArray(responseData.data)) return responseData.data;
+  
+  // Nếu có key cụ thể, ưu tiên lấy từ key đó
+  if (key && Array.isArray(responseData[key])) {
+    return responseData[key];
+  }
+  
+  // Nếu responseData là array trực tiếp
+  if (Array.isArray(responseData)) {
+    return responseData;
+  }
+  
+  // Nếu có data field và là array
+  if (responseData.data && Array.isArray(responseData.data)) {
+    return responseData.data;
+  }
+  
+  // Nếu có results field và là array (một số API dùng results)
+  if (responseData.results && Array.isArray(responseData.results)) {
+    return responseData.results;
+  }
+  
   return [];
 };
 
@@ -190,6 +229,28 @@ const transformForumReply = (reply: any): ForumReply => {
   return reply;
 };
 
+// Helper: transform createdById thành createdBy cho ForumResponse
+const transformForumResponse = (forum: any): ForumResponse => {
+  if (!forum) return forum;
+  
+  // Nếu có createdById nhưng không có createdBy, map createdById thành createdBy
+  if (forum.createdById && !forum.createdBy) {
+    return {
+      ...forum,
+      createdBy: {
+        _id: forum.createdById._id || forum.createdById,
+        email: forum.createdById.email,
+        fullname: forum.createdById.fullname,
+        username: forum.createdById.username,
+        avatar_url: forum.createdById.avatar_url,
+        role: forum.createdById.role,
+      },
+    };
+  }
+  
+  return forum;
+};
+
 export const forumService = {
   // ===== Forum =====
   getForums: async (params?: ForumQueryParams): Promise<ForumResponse[]> => {
@@ -197,24 +258,25 @@ export const forumService = {
     if (params?.courseId) query.append("courseId", params.courseId);
     if (params?.isActive !== undefined) query.append("isActive", String(params.isActive));
     const response = await http.get(`/forums${query.toString() ? `?${query.toString()}` : ""}`);
-    return extractArray<ForumResponse>(response);
+    const forums = extractArray<ForumResponse>(response);
+    return forums.map(transformForumResponse);
   },
 
   getForumById: async (forumId: string): Promise<ForumResponse> => {
     const response = await http.get(`/forums/${forumId}`);
-    return response as ForumResponse;
+    return transformForumResponse(response);
   },
 
   createForum: async (payload: CreateForumPayload, files?: UploadableFiles): Promise<ForumResponse> => {
-    const formData = buildMultipartPayload({payload}, files);
+    const formData = buildMultipartPayload(payload as unknown as Record<string, unknown>, files);
     const response = await http.post("/forums", formData, { headers: { "Content-Type": "multipart/form-data" } });
-    return response as ForumResponse;
+    return transformForumResponse(response);
   },
 
   updateForum: async (forumId: string, payload: UpdateForumPayload, files?: UploadableFiles): Promise<ForumResponse> => {
-    const formData = buildMultipartPayload({payload}, files);
+    const formData = buildMultipartPayload(payload as unknown as Record<string, unknown>, files);
     const response = await http.patch(`/forums/${forumId}`, formData, { headers: { "Content-Type": "multipart/form-data" } });
-    return response as ForumResponse;
+    return transformForumResponse(response);
   },
 
   deleteForum: async (forumId: string): Promise<void> => {
@@ -236,13 +298,13 @@ export const forumService = {
   },
 
   createForumPost: async (forumId: string, payload: CreateForumPostPayload, files?: UploadableFiles): Promise<ForumPost> => {
-    const formData = buildMultipartPayload({payload}, files);
+    const formData = buildMultipartPayload(payload as unknown as Record<string, unknown>, files);
     const response = await http.post(`/forums/${forumId}/posts`, formData, { headers: { "Content-Type": "multipart/form-data" } });
     return transformForumPost(response);
   },
 
   updateForumPost: async (forumId: string, postId: string, payload: UpdateForumPostPayload, files?: UploadableFiles): Promise<ForumPost> => {
-    const formData = buildMultipartPayload({payload}, files);
+    const formData = buildMultipartPayload(payload as unknown as Record<string, unknown>, files);
     const response = await http.patch(`/forums/${forumId}/posts/${postId}`, formData, { headers: { "Content-Type": "multipart/form-data" } });
     return transformForumPost(response);
   },
@@ -264,13 +326,13 @@ export const forumService = {
   },
 
   createReply: async (forumId: string, postId: string, payload: CreateReplyPayload, files?: UploadableFiles): Promise<ForumReply> => {
-    const formData = buildMultipartPayload({payload}, files);
+    const formData = buildMultipartPayload(payload as unknown as Record<string, unknown>, files);
     const response = await http.post(`/forums/${forumId}/posts/${postId}/replies`, formData, { headers: { "Content-Type": "multipart/form-data" } });
     return transformForumReply(response);
   },
 
   updateReply: async (forumId: string, postId: string, replyId: string, payload: UpdateReplyPayload, files?: UploadableFiles): Promise<ForumReply> => {
-    const formData = buildMultipartPayload({payload}, files);
+    const formData = buildMultipartPayload(payload as unknown as Record<string, unknown>, files);
     const response = await http.patch(`/forums/${forumId}/posts/${postId}/replies/${replyId}`, formData, { headers: { "Content-Type": "multipart/form-data" } });
     return transformForumReply(response);
   },
