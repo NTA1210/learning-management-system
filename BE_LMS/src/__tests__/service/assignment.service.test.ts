@@ -173,6 +173,124 @@ describe("Assignments API", () => {
         })
       );
     });
+
+    it("should check enrollment for student when courseId is provided", async () => {
+      const userId = new mongoose.Types.ObjectId("507f1f77bcf86cd799439012");
+      const courseId = new mongoose.Types.ObjectId("507f1f77bcf86cd799439011");
+
+      (EnrollmentModel.findOne as any).mockResolvedValue({
+        studentId: userId,
+        courseId,
+        status: "APPROVED",
+      });
+      (AssignmentModel.find as any).mockReturnValue({
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([]),
+      });
+      (AssignmentModel.countDocuments as any).mockResolvedValue(0);
+
+      await listAssignments({
+        page: 1,
+        limit: 10,
+        courseId,
+        userId,
+        userRole: Role.STUDENT,
+      });
+
+      expect(EnrollmentModel.findOne).toHaveBeenCalledWith({
+        studentId: userId,
+        courseId,
+        status: expect.any(String),
+      });
+    });
+
+    it("should call ensureTeacherAccessToCourse when teacher filters by specific course", async () => {
+      const userId = new mongoose.Types.ObjectId("507f1f77bcf86cd799439012");
+      const courseId = new mongoose.Types.ObjectId("507f1f77bcf86cd799439011");
+
+      const ensureTeacherAccessToCourse =
+        require("@/services/helpers/courseAccessHelpers")
+          .ensureTeacherAccessToCourse;
+
+      (AssignmentModel.find as any).mockReturnValue({
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([]),
+      });
+      (AssignmentModel.countDocuments as any).mockResolvedValue(0);
+
+      await listAssignments({
+        page: 1,
+        limit: 10,
+        courseId,
+        userId,
+        userRole: Role.TEACHER,
+      });
+
+      expect(ensureTeacherAccessToCourse).toHaveBeenCalledWith({
+        courseId,
+        userId,
+        userRole: Role.TEACHER,
+      });
+    });
+
+    it("should return empty result when teacher has no courses", async () => {
+      const userId = new mongoose.Types.ObjectId("507f1f77bcf86cd799439012");
+
+      (CourseModel.find as any).mockReturnValue({
+        select: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([]),
+      });
+
+      const result = await listAssignments({
+        page: 1,
+        limit: 10,
+        userId,
+        userRole: Role.TEACHER,
+      });
+
+      expect(result.assignments).toHaveLength(0);
+      expect(result.pagination.total).toBe(0);
+    });
+
+    it("should apply due date and createdAt filters", async () => {
+      const now = new Date();
+      const later = new Date(now.getTime() + 1000 * 60 * 60);
+
+      (AssignmentModel.find as any).mockReturnValue({
+        populate: jest.fn().mockReturnThis(),
+        sort: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue([]),
+      });
+      (AssignmentModel.countDocuments as any).mockResolvedValue(0);
+
+      await listAssignments({
+        page: 1,
+        limit: 10,
+        dueAfter: now,
+        dueBefore: later,
+      });
+
+      expect(AssignmentModel.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          createdAt: expect.objectContaining({
+            $gte: now,
+            $lte: later,
+          }),
+          dueDate: expect.objectContaining({
+            $gte: now,
+            $lte: later,
+          }),
+        })
+      );
+    });
   });
   // assignment detail
   describe("GET /assignments/:id", () => {
@@ -443,6 +561,40 @@ describe("Assignments API", () => {
       expect(result).toEqual(mockUpdated);
       expect(removeFile).toHaveBeenCalledWith("old-key");
       expect(uploadFile).toHaveBeenCalled();
+    });
+
+    it("should check teacher access when updating assignment as teacher", async () => {
+      const mockAssignment = {
+        _id: "A1",
+        courseId: new mongoose.Types.ObjectId("507f1f77bcf86cd799439011"),
+        fileKey: null,
+      };
+      const mockUpdated = { _id: "A1", title: "Updated HW" };
+      const userId = new mongoose.Types.ObjectId("507f1f77bcf86cd799439012");
+
+      (AssignmentModel.findById as any).mockReturnValue({
+        select: jest.fn().mockResolvedValue(mockAssignment),
+      });
+      (AssignmentModel.findByIdAndUpdate as any).mockReturnValue({
+        populate: jest.fn().mockReturnThis(),
+        lean: jest.fn().mockResolvedValue(mockUpdated),
+      });
+
+      const { ensureTeacherAccessToCourse } = require("@/services/helpers/courseAccessHelpers");
+
+      const result = await updateAssignment(
+        "A1",
+        { title: "Updated HW" },
+        userId,
+        Role.TEACHER
+      );
+
+      expect(result).toEqual(mockUpdated);
+      expect(ensureTeacherAccessToCourse).toHaveBeenCalledWith({
+        courseId: mockAssignment.courseId,
+        userId,
+        userRole: Role.TEACHER,
+      });
     });
 
     it("should call appAssert if assignment not found", async () => {
