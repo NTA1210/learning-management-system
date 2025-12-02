@@ -39,9 +39,14 @@ import {
   ForumPostDetailPage,
   OnboardingPage,
   DeletedCoursesPage,
+  QuizAttemptsPage,
+  GradeAttemptPage,
   CreateSemesterPage,
   ListSemestersPage,
+  BlogPage,
+  BlogDetailPage,
 } from "../pages";
+
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
 import AssignmentDetailPage from "../pages/AssignmentDetailPage";
@@ -120,7 +125,7 @@ function AppRoutes() {
         <Route
           path="/my-courses"
           element={
-            <ProtectedRoute requiredRole="student">
+            <ProtectedRoute>
               <MyCoursesPage />
             </ProtectedRoute>
           }
@@ -266,6 +271,22 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/quizzes/:quizId/attempts"
+          element={
+            <ProtectedRoute requiredRole={["teacher", "admin"]}>
+              <QuizAttemptsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/quiz-attempts/:attemptId/grade"
+          element={
+            <ProtectedRoute requiredRole={["teacher", "admin"]}>
+              <GradeAttemptPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/quiz-attempts/:attemptId"
           element={
             <ProtectedRoute requiredRole={["teacher", "admin"]}>
@@ -299,24 +320,10 @@ function AppRoutes() {
         />
 
         {/* About Us */}
-        <Route
-          path="/help/about"
-          element={
-            <ProtectedRoute>
-              <AboutUsPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/help/about" element={<AboutUsPage />} />
 
         {/* FAQ */}
-        <Route
-          path="/help/faq"
-          element={
-            <ProtectedRoute>
-              <FAQPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/help/faq" element={<FAQPage />} />
 
         {/* Feedback */}
         <Route
@@ -467,6 +474,8 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route path="/blogs" element={<BlogPage />} />
+        <Route path="/blogs/:slug" element={<BlogDetailPage />} />
         {/* Not found */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

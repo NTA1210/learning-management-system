@@ -51,6 +51,7 @@ import { socketAuthMiddleware } from './socket/middlewares/socketAuthMiddleware'
 import initializeSocket from './socket/initializeSocket';
 import messageRoutes from './routes/message.route';
 import chatRoomRoutes from './routes/chatRoom.route';
+import blogRoutes from './routes/blogRoutes.route';
 
 export const createApp = async () => {
   const app = express();
@@ -125,6 +126,7 @@ export const createApp = async () => {
   app.use('/semesters', semesterRoutes);
   app.use('/chat-rooms', authenticate, messageRoutes);
   app.use('/chat-rooms', authenticate, chatRoomRoutes);
+  app.use('/blogs', blogRoutes);
 
   //socket
   io.use(socketAuthMiddleware);

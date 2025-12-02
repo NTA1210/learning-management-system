@@ -31,7 +31,15 @@ SubjectSchema.index(
 
 // ✅ Hook: Tạo slug tự động
 SubjectSchema.pre('save', function (next) {
-  this.slug = this.name.toLowerCase().replace(/\s+/g, '-');
+  this.slug = this.name
+    .normalize('NFD') // tách ký tự và dấu
+    .replace(/[\u0300-\u036f]/g, '') // remove dấu
+    .replace(/đ/g, 'd') // chuyển đ
+    .replace(/Đ/g, 'd') // chuyển Đ
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '');
   next();
 });
 

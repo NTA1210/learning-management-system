@@ -29,3 +29,4 @@ export { default as ScheduleExceptionModel } from './scheduleException.model';
 export { default as SemesterModel } from './semester.model';
 export { default as ChatRoomModel } from './chatRoom.model';
 export { default as MessageModel } from './message.model';
+export { default as BlogModel } from './blog.model';

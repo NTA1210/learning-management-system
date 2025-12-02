@@ -8,6 +8,7 @@ import {
   gradeQuizAttempt,
   saveQuizAttempt,
   submitQuizAttempt,
+  updateQuizAttemptScore,
 } from '@/services/quizAttempt.service';
 import { catchErrors } from '@/utils/asyncHandler';
 import {
@@ -16,6 +17,7 @@ import {
   saveQuizSchema,
   submitAnswerSchema,
   submitQuizSchema,
+  updateQuizAttemptScoreSchema,
 } from '@/validators/quizAttempt.schemas';
 
 // POST /quiz-attempts/enroll - Enroll in a quiz
@@ -125,5 +127,20 @@ export const gradeQuizAttemptHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     data,
     message: 'Regrade quiz attempt successfully',
+  });
+});
+
+// PUT /quiz-attempts/:quizAttemptId - Update quiz attempt score
+export const updateQuizAttemptScoreHandler = catchErrors(async (req, res) => {
+  const input = updateQuizAttemptScoreSchema.parse({
+    quizAttemptId: req.params.quizAttemptId,
+    score: req.body.score,
+  });
+  const userId = req.userId;
+  const role = req.role;
+  const data = await updateQuizAttemptScore(input, userId, role);
+  return res.success(OK, {
+    data,
+    message: 'Update quiz attempt score successfully',
   });
 });

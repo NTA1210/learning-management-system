@@ -212,7 +212,6 @@ export const courseIdSchema = z.string().regex(objectIdRegex, 'Invalid course ID
 
 export const getQuizzesSchema = listParamsSchema.extend({
   courseId: courseIdSchema,
-  isDeleted: z.boolean().optional(),
   isCompleted: z.boolean().optional(),
   isPublished: z.boolean().optional(),
 });

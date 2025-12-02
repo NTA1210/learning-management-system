@@ -161,5 +161,48 @@ export const quizAttemptService = {
     }
     return [];
   },
+
+  /**
+   * Get quiz attempts with filters and pagination
+   * GET /quizzes/:quizId/attempts
+   */
+  getQuizAttemptsForGrading: async (
+    quizId: string,
+    params?: import('../types/quizAttemptGrading').GetQuizAttemptsParams
+  ): Promise<import('../types/quizAttemptGrading').QuizAttemptsResponse> => {
+    const response = await http.get<import('../types/quizAttemptGrading').QuizAttemptsResponse>(
+      `/quizzes/${quizId}/quiz-attempts`,
+      { params }
+    );
+    return response;
+  },
+
+  /**
+   * Get attempt details for grading
+   * GET /quiz-attempts/:attemptId
+   */
+  getAttemptDetailsForGrading: async (
+    attemptId: string
+  ): Promise<import('../types/quizAttemptGrading').AttemptDetailsResponse> => {
+    const response = await http.get<import('../types/quizAttemptGrading').AttemptDetailsResponse>(
+      `/quiz-attempts/${attemptId}`
+    );
+    return response;
+  },
+
+  /**
+   * Submit regrade for an attempt
+   * POST /quiz-attempts/:attemptId/re-grade
+   */
+  submitRegrade: async (
+    attemptId: string,
+    payload: import('../types/quizAttemptGrading').RegradePayload
+  ): Promise<import('../types/quizAttemptGrading').RegradeResponse> => {
+    const response = await http.post<import('../types/quizAttemptGrading').RegradeResponse>(
+      `/quiz-attempts/${attemptId}/re-grade`,
+      payload
+    );
+    return response;
+  },
 };
 

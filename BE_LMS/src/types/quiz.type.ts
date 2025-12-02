@@ -27,8 +27,6 @@ export default interface IQuiz extends mongoose.Document {
   // questionIds: mongoose.Types.ObjectId[];
   snapshotQuestions: SnapshotQuestion[];
   isPublished?: boolean;
-  deletedAt?: Date;
-  deletedBy?: mongoose.Types.ObjectId;
   createdBy?: mongoose.Types.ObjectId;
   createdAt?: Date;
   updatedAt?: Date;
