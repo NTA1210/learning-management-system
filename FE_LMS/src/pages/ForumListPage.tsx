@@ -43,15 +43,6 @@ const ForumListPage: React.FC = () => {
     user && ["admin", "teacher", "student"].includes(user.role) ? (user.role as SidebarRole) : "student";
   const canManage = user?.role === "admin" || user?.role === "teacher";
 
-  const formatFileSize = (size: number) => {
-    if (!size || Number.isNaN(size)) return "0 B";
-    const units = ["B", "KB", "MB", "GB"];
-    const exponent = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
-    const value = size / 1024 ** exponent;
-    const formatted = exponent === 0 || value >= 10 ? value.toFixed(0) : value.toFixed(1);
-    return `${formatted} ${units[exponent]}`;
-  };
-
   const getInitials = (input?: string) => {
     if (!input) return "U";
     const trimmed = input.trim();
@@ -267,12 +258,6 @@ const ForumListPage: React.FC = () => {
   }, [courses, selectedCourseId, selectedCourseSnapshot]);
 
   useEffect(() => {
-    if (!toast) return;
-    const timeout = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(timeout);
-  }, [toast]);
-
-  useEffect(() => {
     if (courseDropdownOpen) return;
     if (selectedCourse?.title) {
       setCourseSearchQuery(selectedCourse.title);
@@ -323,7 +308,7 @@ const ForumListPage: React.FC = () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to load forum detail";
       setDetailModal({ loading: false, forum: null });
-      setToast({ type: "error", message });
+      toast.error(message);
     }
   };
 
@@ -360,7 +345,7 @@ const ForumListPage: React.FC = () => {
   const openCreateModal = () => {
     if (!canManage) return;
     if (!selectedCourseId) {
-      setToast({ type: "error", message: "Select a course before creating a post." });
+      toast.error("Select a course before creating a post.");
       return;
     }
     setCreateModal((prev) => ({
@@ -403,7 +388,7 @@ const ForumListPage: React.FC = () => {
         },
         editModal.file || undefined
       );
-      setToast({ type: "success", message: "Forum updated successfully." });
+      toast.success("Forum updated successfully.");
       closeEditModal();
       refreshForums();
     } catch (error) {
@@ -434,7 +419,7 @@ const ForumListPage: React.FC = () => {
         },
         createModal.file || undefined
       );
-      setToast({ type: "success", message: "Forum post created." });
+      toast.success("Forum post created.");
       closeCreateModal();
       refreshForums();
     } catch (error) {
@@ -1076,42 +1061,24 @@ const ForumListPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Description</label>
-                <textarea
-                  className={`w-full h-28 rounded-xl border px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                    }`}
+                <label className="block text-sm font-medium mb-2">Content editor</label>
+                <MarkdownComposer
                   value={editModal.description}
-                  onChange={(event) => setEditModal((prev) => ({ ...prev, description: event.target.value }))}
-                ></textarea>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Update attachment</label>
-                <input
-                  type="file"
-                  accept={attachmentAcceptTypes}
-                  onChange={(event) =>
-                    setEditModal((prev) => ({
-                      ...prev,
-                      file: event.target.files?.[0] || null,
-                    }))
-                  }
-                  className="w-full rounded-xl border px-4 py-2.5 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500 cursor-pointer"
+                  onChange={(next) => setEditModal((prev) => ({ ...prev, description: next }))}
+                  placeholder="Share context, add bullet lists, or embed resources using Markdown shortcuts."
+                  darkMode={darkMode}
+                  attachment={editModal.file}
+                  onAttachmentChange={(file) => setEditModal((prev) => ({ ...prev, file }))}
+                  attachmentAccept={attachmentAcceptTypes}
                 />
                 {editModal.file && (
-                  <div
-                    className={`mt-2 flex items-center justify-between rounded-xl px-3 py-2 text-xs ${darkMode ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-600"
-                      }`}
-                  >
-                    <span className="truncate pr-2">
-                      {editModal.file.name} • {formatFileSize(editModal.file.size)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setEditModal((prev) => ({ ...prev, file: null }))}
-                      className="text-rose-500 font-semibold hover:text-rose-400"
-                    >
-                      Remove
-                    </button>
+                  <div className="mt-3">
+                    <AttachmentPreview
+                      files={[URL.createObjectURL(editModal.file)]}
+                      size="sm"
+                      onImageClick={handleAttachmentPreview}
+                      caption={editModal.file.name}
+                    />
                   </div>
                 )}
               </div>

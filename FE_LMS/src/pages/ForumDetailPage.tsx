@@ -65,6 +65,7 @@ const ForumDetailPage: React.FC = () => {
   const [postsLoading, setPostsLoading] = useState(false);
   const [postsError, setPostsError] = useState<string | null>(null);
   const [createModal, setCreateModal] = useState<{
+    open: boolean;
     title: string;
     content: string;
     pinned: boolean;
@@ -72,6 +73,7 @@ const ForumDetailPage: React.FC = () => {
     error: string | null;
     file: File | null;
   }>({
+    open: false,
     title: "",
     content: "",
     pinned: false,
@@ -186,6 +188,7 @@ const ForumDetailPage: React.FC = () => {
 
   const resetCreateForm = () =>
     setCreateModal({
+      open: false,
       title: "",
       content: "",
       pinned: false,
@@ -193,6 +196,19 @@ const ForumDetailPage: React.FC = () => {
       error: null,
       file: null,
     });
+
+  const openCreateModal = () =>
+    setCreateModal((prev) => ({
+      ...prev,
+      open: true,
+      error: null,
+    }));
+
+  const closeCreateModal = () =>
+    setCreateModal((prev) => ({
+      ...prev,
+      open: false,
+    }));
 
   const handleCreatePost = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -317,7 +333,20 @@ const ForumDetailPage: React.FC = () => {
     });
   };
   const totalPosts = pinnedPosts.length + unpinnedPosts.length;
-  const orderedPosts = useMemo(() => [...pinnedPosts, ...unpinnedPosts], [pinnedPosts, unpinnedPosts]);
+  const orderedPosts = useMemo(() => {
+    const sortByCreatedDesc = (items: ForumPost[]) =>
+      [...items].sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bTime - aTime;
+      });
+
+    const sortedPinned = sortByCreatedDesc(pinnedPosts);
+    const sortedUnpinned = sortByCreatedDesc(unpinnedPosts);
+
+    // Pinned posts first, then the rest; each group newest -> oldest
+    return [...sortedPinned, ...sortedUnpinned];
+  }, [pinnedPosts, unpinnedPosts]);
   const handleImagePreview = useCallback((payload: { src: string; alt?: string }) => {
     setLightboxImage(payload);
   }, []);
@@ -330,7 +359,7 @@ const ForumDetailPage: React.FC = () => {
         <div className="flex flex-col flex-1 w-0 overflow-hidden">
           <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 mt-16 sm:pl-24 md:pl-28">
             <div className="max-w-5xl mx-auto space-y-6 pb-16">
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3 justify-between">
                 <Link
                   to="/forum-list"
                   className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 dark:border-slate-700"
@@ -338,17 +367,29 @@ const ForumDetailPage: React.FC = () => {
                   <ArrowLeft className="w-4 h-4" />
                   Back to forums
                 </Link>
-                {toast && (
-                  <div
-                    className={`ml-auto rounded-xl border px-4 py-2 text-sm flex items-center gap-2 ${toast.type === "success"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                      : "border-rose-200 bg-rose-50 text-rose-700"
-                      }`}
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    {toast.message}
-                  </div>
-                )}
+                <div className="flex items-center gap-3 ml-auto">
+                  {toast && (
+                    <div
+                      className={`rounded-xl border px-4 py-2 text-sm flex items-center gap-2 ${toast.type === "success"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : "border-rose-200 bg-rose-50 text-rose-700"
+                        }`}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      {toast.message}
+                    </div>
+                  )}
+                  {user && (
+                    <button
+                      type="button"
+                      onClick={openCreateModal}
+                      className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      Create post
+                    </button>
+                  )}
+                </div>
               </div>
 
               {loading ? (
@@ -687,110 +728,126 @@ const ForumDetailPage: React.FC = () => {
                     )}
                   </section>
 
-                  <section
-                    className={`rounded-2xl p-6 shadow-sm space-y-6 ${darkMode ? "bg-slate-900/70 border border-slate-700/60" : "bg-white border border-slate-100"
-                      }`}
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 text-sm uppercase tracking-wide text-indigo-500 font-semibold">
-                        <PlusCircle className="w-4 h-4" />
-                        Create post
-                      </div>
 
-                      {user && (
-                        <div className="mt-4 flex items-center gap-3">
-                          <div
-                            className={`h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden ${darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
-                              }`}
-                          >
-                            {user.avatar_url ? (
-                              <img
-                                src={user.avatar_url}
-                                alt={user.fullname || user.username || "User avatar"}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              (user.fullname || user.username || "You")
-                                .split(/\s+/)
-                                .map((segment) => segment[0]?.toUpperCase())
-                                .slice(0, 2)
-                                .join("") || "U"
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-xs uppercase tracking-wide text-slate-400">Posting as</p>
-                            <p className="text-sm font-semibold">{user.fullname || user.username || "You"}</p>
-                            <p className="text-xs text-slate-400 capitalize">{user.role}</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <form className="space-y-6" onSubmit={handleCreatePost}>
-                      <div>
-                        <div className="flex items-center justify-between gap-3 mb-2">
-                          <label className="block text-sm font-medium mb-0">Title</label>
-                          {canPin && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setCreateModal((prev) => ({
-                                  ...prev,
-                                  pinned: !prev.pinned,
-                                }))
-                              }
-                              aria-pressed={createModal.pinned}
-                              className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1 text-xs font-semibold transition ${createModal.pinned
-                                ? "bg-amber-500/10 text-amber-600 border-amber-300 dark:text-amber-300 dark:border-amber-500/40"
-                                : "text-slate-500 border-slate-200 hover:bg-slate-50 dark:text-slate-300 dark:border-slate-600 dark:hover:bg-slate-800"
-                                }`}
-                            >
-                              <Pin className="w-4 h-4" />
-                              {createModal.pinned ? "Pinned" : "Pin this post"}
-                            </button>
-                          )}
-                        </div>
-                        <input
-                          type="text"
-                          className={`w-full rounded-2xl border px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                            }`}
-                          placeholder="Example: UI design materials"
-                          value={createModal.title}
-                          onChange={(event) => setCreateModal((prev) => ({ ...prev, title: event.target.value }))}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Content editor</label>
-                        <MarkdownComposer
-                          value={createModal.content}
-                          onChange={(next) => setCreateModal((prev) => ({ ...prev, content: next }))}
-                          placeholder="Share context, add bullet lists, or embed resources using Markdown shortcuts."
-                          darkMode={darkMode}
-                          attachment={createModal.file}
-                          onAttachmentChange={(file) => setCreateModal((prev) => ({ ...prev, file }))}
-                          attachmentAccept={attachmentAcceptTypes}
-                        />
-                      </div>
-                      {createModal.error && <p className="text-sm text-rose-500">{createModal.error}</p>}
-
-                      <div className="flex justify-end">
-                        <button
-                          type="submit"
-                          className="inline-flex items-center justify-center rounded-2xl bg-indigo-600 px-5 py-2.5 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
-                          disabled={createModal.submitting}
-                        >
-                          {createModal.submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                          Publish post
-                        </button>
-                      </div>
-                    </form>
-                  </section>
                 </>
               ) : null}
             </div>
           </main>
         </div>
       </div>
+
+      {createModal.open && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
+          <div
+            className={`max-w-3xl w-full rounded-2xl p-6 md:p-8 relative ${darkMode ? "bg-slate-950 text-slate-100" : "bg-white text-slate-900"
+              }`}
+          >
+            <button className="absolute top-4 right-4" onClick={closeCreateModal}>
+              <X className="w-5 h-5" />
+            </button>
+            <div className="mb-4">
+              <div className="flex items-center gap-2 text-sm uppercase tracking-wide text-indigo-500 font-semibold">
+                <PlusCircle className="w-4 h-4" />
+                Create post
+              </div>
+              {user && (
+                <div className="mt-4 flex items-center gap-3">
+                  <div
+                    className={`h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden ${darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
+                      }`}
+                  >
+                    {user.avatar_url ? (
+                      <img
+                        src={user.avatar_url}
+                        alt={user.fullname || user.username || "User avatar"}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      (user.fullname || user.username || "You")
+                        .split(/\s+/)
+                        .map((segment) => segment[0]?.toUpperCase())
+                        .slice(0, 2)
+                        .join("") || "U"
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400">Posting as</p>
+                    <p className="text-sm font-semibold">{user?.fullname || user?.username || "You"}</p>
+                    {user?.role && <p className="text-xs text-slate-400 capitalize">{user.role}</p>}
+                  </div>
+                </div>
+              )}
+            </div>
+            <form className="space-y-6" onSubmit={handleCreatePost}>
+              <div>
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <label className="block text-sm font-medium mb-0">Title</label>
+                  {canPin && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCreateModal((prev) => ({
+                          ...prev,
+                          pinned: !prev.pinned,
+                        }))
+                      }
+                      aria-pressed={createModal.pinned}
+                      className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1 text-xs font-semibold transition ${createModal.pinned
+                        ? "bg-amber-500/10 text-amber-600 border-amber-300 dark:text-amber-300 dark:border-amber-500/40"
+                        : "text-slate-500 border-slate-200 hover:bg-slate-50 dark:text-slate-300 dark:border-slate-600 dark:hover:bg-slate-800"
+                        }`}
+                    >
+                      <Pin className="w-4 h-4" />
+                      {createModal.pinned ? "Pinned" : "Pin this post"}
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  className={`w-full rounded-2xl border px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+                    }`}
+                  placeholder="Example: UI design materials"
+                  value={createModal.title}
+                  onChange={(event) => setCreateModal((prev) => ({ ...prev, title: event.target.value }))}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Content editor</label>
+                <MarkdownComposer
+                  value={createModal.content}
+                  onChange={(next) => setCreateModal((prev) => ({ ...prev, content: next }))}
+                  placeholder="Share context, add bullet lists, or embed resources using Markdown shortcuts."
+                  darkMode={darkMode}
+                  attachment={createModal.file}
+                  onAttachmentChange={(file) => setCreateModal((prev) => ({ ...prev, file }))}
+                  attachmentAccept={attachmentAcceptTypes}
+                />
+              </div>
+              {createModal.error && <p className="text-sm text-rose-500">{createModal.error}</p>}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeCreateModal}
+                  className="rounded-2xl border px-5 py-2.5 text-sm font-semibold border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-2xl bg-indigo-600 px-5 py-2.5 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
+                  disabled={createModal.submitting}
+                >
+                  {createModal.submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                  Publish post
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {editModal.open && editModal.post && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
           <div
