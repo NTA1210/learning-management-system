@@ -1455,7 +1455,7 @@ export const completeCourse = async (
               },
             },
           },
-          { $match: { status: 'SUBMITTED' } },
+          { $match: { status: AttemptStatus.SUBMITTED } },
         ],
         as: 'quizAttemptsRaw',
       },
