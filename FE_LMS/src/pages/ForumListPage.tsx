@@ -11,6 +11,7 @@ import { Edit3, Eye, Loader2, RefreshCcw, Trash2, X, User } from "lucide-react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import MarkdownComposer from "../components/MarkdownComposer";
+import MarkdownContent from "../components/MarkdownContent";
 
 type SidebarRole = "admin" | "teacher" | "student";
 
@@ -707,12 +708,12 @@ const ForumListPage: React.FC = () => {
                                   {forumTitle}
                                 </h4>
                               </Link>
-                              <p className={`text-sm mt-2 line-clamp-3 ${hasBackgroundImage
+                              <div className={`text-sm mt-2 line-clamp-3 ${hasBackgroundImage
                                 ? "text-white/90 drop-shadow"
                                 : "text-slate-500"
                                 }`}>
-                                {forum.description}
-                              </p>
+                                <MarkdownContent content={forum.description} />
+                              </div>
                             </div>
                             <div className="absolute top-0 right-0">
                               <span
@@ -809,7 +810,9 @@ const ForumListPage: React.FC = () => {
               {forumTypeLabels[detailModal.forum.forumType]}
             </p>
             <h3 className="text-2xl font-semibold mb-2">{detailModal.forum.title}</h3>
-            <p className="text-sm text-slate-500 mb-4">{detailModal.forum.description}</p>
+            <div className="text-sm text-slate-500 mb-4">
+              <MarkdownContent content={detailModal.forum.description} />
+            </div>
             <AttachmentPreview
               files={detailModal.forum.key}
               size="sm"

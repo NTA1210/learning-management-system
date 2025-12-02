@@ -264,19 +264,22 @@ export const forumService = {
 
   getForumById: async (forumId: string): Promise<ForumResponse> => {
     const response = await http.get(`/forums/${forumId}`);
-    return transformForumResponse(response);
+    const forumData = (response as any)?.data || response;
+    return transformForumResponse(forumData);
   },
 
   createForum: async (payload: CreateForumPayload, files?: UploadableFiles): Promise<ForumResponse> => {
     const formData = buildMultipartPayload(payload as unknown as Record<string, unknown>, files);
     const response = await http.post("/forums", formData, { headers: { "Content-Type": "multipart/form-data" } });
-    return transformForumResponse(response);
+    const forumData = (response as any)?.data || response;
+    return transformForumResponse(forumData);
   },
 
   updateForum: async (forumId: string, payload: UpdateForumPayload, files?: UploadableFiles): Promise<ForumResponse> => {
     const formData = buildMultipartPayload(payload as unknown as Record<string, unknown>, files);
     const response = await http.patch(`/forums/${forumId}`, formData, { headers: { "Content-Type": "multipart/form-data" } });
-    return transformForumResponse(response);
+    const forumData = (response as any)?.data || response;
+    return transformForumResponse(forumData);
   },
 
   deleteForum: async (forumId: string): Promise<void> => {
@@ -294,19 +297,22 @@ export const forumService = {
 
   getForumPostById: async (forumId: string, postId: string): Promise<ForumPost> => {
     const response = await http.get(`/forums/${forumId}/posts/${postId}`);
-    return transformForumPost(response);
+    const postData = (response as any)?.data || response;
+    return transformForumPost(postData);
   },
 
   createForumPost: async (forumId: string, payload: CreateForumPostPayload, files?: UploadableFiles): Promise<ForumPost> => {
     const formData = buildMultipartPayload(payload as unknown as Record<string, unknown>, files);
     const response = await http.post(`/forums/${forumId}/posts`, formData, { headers: { "Content-Type": "multipart/form-data" } });
-    return transformForumPost(response);
+    const postData = (response as any)?.data || response;
+    return transformForumPost(postData);
   },
 
   updateForumPost: async (forumId: string, postId: string, payload: UpdateForumPostPayload, files?: UploadableFiles): Promise<ForumPost> => {
     const formData = buildMultipartPayload(payload as unknown as Record<string, unknown>, files);
     const response = await http.patch(`/forums/${forumId}/posts/${postId}`, formData, { headers: { "Content-Type": "multipart/form-data" } });
-    return transformForumPost(response);
+    const postData = (response as any)?.data || response;
+    return transformForumPost(postData);
   },
 
   deleteForumPost: async (forumId: string, postId: string): Promise<void> => {
@@ -328,13 +334,15 @@ export const forumService = {
   createReply: async (forumId: string, postId: string, payload: CreateReplyPayload, files?: UploadableFiles): Promise<ForumReply> => {
     const formData = buildMultipartPayload(payload as unknown as Record<string, unknown>, files);
     const response = await http.post(`/forums/${forumId}/posts/${postId}/replies`, formData, { headers: { "Content-Type": "multipart/form-data" } });
-    return transformForumReply(response);
+    const replyData = (response as any)?.data || response;
+    return transformForumReply(replyData);
   },
 
   updateReply: async (forumId: string, postId: string, replyId: string, payload: UpdateReplyPayload, files?: UploadableFiles): Promise<ForumReply> => {
     const formData = buildMultipartPayload(payload as unknown as Record<string, unknown>, files);
     const response = await http.patch(`/forums/${forumId}/posts/${postId}/replies/${replyId}`, formData, { headers: { "Content-Type": "multipart/form-data" } });
-    return transformForumReply(response);
+    const replyData = (response as any)?.data || response;
+    return transformForumReply(replyData);
   },
 
   deleteReply: async (forumId: string, postId: string, replyId: string): Promise<void> => {
