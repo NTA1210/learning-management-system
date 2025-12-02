@@ -68,6 +68,7 @@ export const listCoursesHandler = catchErrors(async (req, res) => {
 
   // ✅ FIX: Get user role from request (undefined if not authenticated)
   const userRole = (req as any).role;
+  const userId = (req as any).userId; // ✅ NEW: Get userId to check if user is teacher of course
 
   // Call service
   const result = await listCourses({
@@ -87,6 +88,7 @@ export const listCoursesHandler = catchErrors(async (req, res) => {
     sortBy: query.sortBy,
     sortOrder: query.sortOrder,
     userRole, // ✅ FIX: Pass userRole to service for permission check
+    userId, // ✅ NEW: Pass userId to add isTeacher field to each course
   });
 
   return res.success(OK, {
