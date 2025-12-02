@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
+import axios from "axios";
 import { httpClient } from "../../utils/http";
 import type { Lesson } from "../../types/lesson";
 import SimpleLessonCard from "./SimpleLessonCard";
@@ -23,7 +24,6 @@ interface ApiResponse {
     hasPrev: boolean;
   };
 }
-
 
 const LessonsTab: React.FC<LessonsTabProps> = ({ courseId, darkMode }) => {
   const navigate = useNavigate();
@@ -54,14 +54,16 @@ const LessonsTab: React.FC<LessonsTabProps> = ({ courseId, darkMode }) => {
       currentPageState,
       searchTerm,
     });
-    
+
     const fetchLessons = async () => {
       // Prevent duplicate requests for the same page
       if (fetchingRef.current) {
-        console.log("[LessonsTab] Already fetching, skipping duplicate request");
+        console.log(
+          "[LessonsTab] Already fetching, skipping duplicate request"
+        );
         return;
       }
-      
+
       try {
         fetchingRef.current = true;
         console.log("[LessonsTab] Fetching lessons:", {
@@ -70,7 +72,7 @@ const LessonsTab: React.FC<LessonsTabProps> = ({ courseId, darkMode }) => {
           searchTerm,
         });
         setLoading(true);
-        
+
         // If search term exists, try searching by title first, then by content if no results
         let lessons: Lesson[] = [];
         let totalCount = 0;
@@ -122,10 +124,13 @@ const LessonsTab: React.FC<LessonsTabProps> = ({ courseId, darkMode }) => {
             contentParams.sortBy = "createdAt";
             contentParams.sortOrder = "desc";
 
-            const contentResponse = await httpClient.get<ApiResponse>("/lessons/", {
-              params: contentParams,
-              withCredentials: true,
-            });
+            const contentResponse = await httpClient.get<ApiResponse>(
+              "/lessons/",
+              {
+                params: contentParams,
+                withCredentials: true,
+              }
+            );
 
             const contentData = contentResponse.data;
             if (contentData?.success && contentData?.data) {
@@ -193,7 +198,27 @@ const LessonsTab: React.FC<LessonsTabProps> = ({ courseId, darkMode }) => {
         setError("");
       } catch (e: unknown) {
         console.error("[LessonsTab] Error fetching lessons:", e);
-        setError("Failed to load lessons");
+        // Try to extract a helpful message from the backend / axios error
+        let message = "Failed to load lessons";
+        try {
+          if (axios.isAxiosError(e)) {
+            const respData = (e.response && e.response.data) as any;
+            if (respData) {
+              if (typeof respData.message === "string" && respData.message)
+                message = respData.message;
+              else if (typeof respData.error === "string" && respData.error)
+                message = respData.error;
+            }
+            // fallback to axios error message
+            if (!message && e.message) message = e.message;
+          } else if (e instanceof Error) {
+            message = e.message || message;
+          }
+        } catch (ex) {
+          console.warn("[LessonsTab] Failed to parse error object", ex);
+        }
+
+        setError(message);
         setLessons([]);
       } finally {
         setLoading(false);
@@ -243,7 +268,14 @@ const LessonsTab: React.FC<LessonsTabProps> = ({ courseId, darkMode }) => {
       setCurrentPageState(newPage);
     } else {
       console.log("[LessonsTab] Page change skipped:", {
-        reason: newPage < 1 ? "page < 1" : newPage > totalPages ? "page > totalPages" : newPage === currentPageState ? "same page" : "unknown",
+        reason:
+          newPage < 1
+            ? "page < 1"
+            : newPage > totalPages
+            ? "page > totalPages"
+            : newPage === currentPageState
+            ? "same page"
+            : "unknown",
         newPage,
         currentPageState,
         totalPages,
@@ -316,7 +348,11 @@ const LessonsTab: React.FC<LessonsTabProps> = ({ courseId, darkMode }) => {
               <button
                 onClick={() => {
                   const prevPage = Math.max(1, currentPageState - 1);
-                  console.log("[LessonsTab] Previous button clicked:", { currentPageState, prevPage, hasPrev });
+                  console.log("[LessonsTab] Previous button clicked:", {
+                    currentPageState,
+                    prevPage,
+                    hasPrev,
+                  });
                   handlePageChange(prevPage);
                 }}
                 disabled={currentPageState <= 1}
@@ -337,7 +373,11 @@ const LessonsTab: React.FC<LessonsTabProps> = ({ courseId, darkMode }) => {
               <button
                 onClick={() => {
                   const nextPage = Math.min(totalPages, currentPageState + 1);
-                  console.log("[LessonsTab] Next button clicked:", { currentPageState, nextPage, hasNext });
+                  console.log("[LessonsTab] Next button clicked:", {
+                    currentPageState,
+                    nextPage,
+                    hasNext,
+                  });
                   handlePageChange(nextPage);
                 }}
                 disabled={currentPageState >= totalPages}
@@ -358,4 +398,3 @@ const LessonsTab: React.FC<LessonsTabProps> = ({ courseId, darkMode }) => {
 };
 
 export default LessonsTab;
-

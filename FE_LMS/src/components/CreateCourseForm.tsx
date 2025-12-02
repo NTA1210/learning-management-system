@@ -1,11 +1,18 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import http, { httpClient } from "../utils/http";
 import { subjectService, courseService } from "../services";
 import { userService } from "../services/userService";
 
 import type { User } from "../types/auth";
 import type { Subject } from "../types/subject";
-type Semester = { _id: string; name: string; type: string; year: number; startDate: string; endDate: string };
+type Semester = {
+  _id: string;
+  name: string;
+  type: string;
+  year: number;
+  startDate: string;
+  endDate: string;
+};
 
 type Props = {
   darkMode?: boolean;
@@ -16,11 +23,18 @@ type Props = {
 
 const statuses = ["draft", "ongoing", "completed"] as const;
 
-const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, presetTeacherId }) => {
+const CreateCourseForm: React.FC<Props> = ({
+  darkMode,
+  onClose,
+  onCreated,
+  presetTeacherId,
+}) => {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [teachers, setTeachers] = useState<User[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
-  const [currentSpecialistIds, setCurrentSpecialistIds] = useState<string[]>([]);
+  const [currentSpecialistIds, setCurrentSpecialistIds] = useState<string[]>(
+    []
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -44,11 +58,16 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
     const load = async () => {
       setError("");
       try {
-        const [subjectsResult, teachersResult, semestersResult] = await Promise.allSettled([
-          subjectService.getAllSubjects(),
-          userService.getUsers({ role: "teacher", specialistIds: currentSpecialistIds } as any),
-          httpClient.get("/semesters", { withCredentials: true }),
-        ]);
+        const [subjectsResult, teachersResult, semestersResult] =
+          await Promise.allSettled([
+            subjectService.getAllSubjects(),
+            userService.getUsers({
+              role: "teacher",
+              specialistIds: currentSpecialistIds,
+              limit: 100,
+            } as any),
+            httpClient.get("/semesters", { withCredentials: true }),
+          ]);
         if (subjectsResult.status === "fulfilled") {
           setSubjects(subjectsResult.value.data || []);
           console.log("subjects", subjectsResult.value.data || []);
@@ -58,7 +77,11 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
         }
         if (semestersResult.status === "fulfilled") {
           const body: any = semestersResult.value.data;
-          const list = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
+          const list = Array.isArray(body)
+            ? body
+            : Array.isArray(body?.data)
+            ? body.data
+            : [];
           setSemesters(list);
         }
       } catch (e: any) {
@@ -70,22 +93,60 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
 
   useEffect(() => {
     if (presetTeacherId) {
-      setForm(prev => ({ ...prev, teacherIds: Array.from(new Set([presetTeacherId, ...prev.teacherIds])) }));
+      setForm((prev) => ({
+        ...prev,
+        teacherIds: Array.from(new Set([presetTeacherId, ...prev.teacherIds])),
+      }));
     }
   }, [presetTeacherId]);
 
-  const teacherOptions = useMemo(() => {
-    return teachers.map(t => ({ id: t._id, name: t.fullname || t.username }));
-  }, [teachers]);
+  // Dropdown state for teacher selector (mimic Calendar UI)
+  const [showTeacherDropdown, setShowTeacherDropdown] =
+    useState<boolean>(false);
+  const [teacherSearchQuery, setTeacherSearchQuery] = useState<string>("");
+  const teacherDropdownRef = useRef<HTMLDivElement | null>(null);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const filteredTeachers = useMemo(() => {
+    if (!teacherSearchQuery.trim()) return teachers;
+    const q = teacherSearchQuery.toLowerCase();
+    return teachers.filter((t) => {
+      const name = (t.fullname || t.username || "").toLowerCase();
+      const email = (t.email || "").toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+  }, [teachers, teacherSearchQuery]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (ev: MouseEvent) => {
+      if (
+        teacherDropdownRef.current &&
+        !teacherDropdownRef.current.contains(ev.target as Node)
+      ) {
+        setShowTeacherDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
+  ) => {
     const { name, value, type, checked } = e.target as any;
-    setForm(prev => ({
+    setForm((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : name === "capacity" ? Number(value) : value,
+      [name]:
+        type === "checkbox"
+          ? checked
+          : name === "capacity"
+          ? Number(value)
+          : value,
     }));
     if (name === "subjectId") {
-      const selected = subjects.find(s => s._id === value) as any;
+      const selected = subjects.find((s) => s._id === value) as any;
       const rawSpecIds = Array.isArray(selected?.specialistIds)
         ? selected.specialistIds
         : Array.isArray(selected?.specialists)
@@ -103,9 +164,9 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
           const list = res.users || [];
           setTeachers(list);
           const allowedIds = list.map((u: any) => u._id);
-          setForm(prev => ({
+          setForm((prev) => ({
             ...prev,
-            teacherIds: prev.teacherIds.filter(id => allowedIds.includes(id))
+            teacherIds: prev.teacherIds.filter((id) => allowedIds.includes(id)),
           }));
         } catch (_e) {}
       })();
@@ -114,13 +175,18 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
-    setForm(prev => ({ ...prev, logo: file }));
+    setForm((prev) => ({ ...prev, logo: file }));
   };
 
   const toggleTeacher = (id: string) => {
-    setForm(prev => {
+    setForm((prev) => {
       const exists = prev.teacherIds.includes(id);
-      return { ...prev, teacherIds: exists ? prev.teacherIds.filter(t => t !== id) : [...prev.teacherIds, id] };
+      return {
+        ...prev,
+        teacherIds: exists
+          ? prev.teacherIds.filter((t) => t !== id)
+          : [...prev.teacherIds, id],
+      };
     });
   };
 
@@ -154,7 +220,13 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
       });
       const Swal = (await import("sweetalert2")).default;
       await Swal.fire({
-        toast: true, position: "top-end", icon: "success", title: "Create a successful course", showConfirmButton: false, timer: 2000 });
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "Create a successful course",
+        showConfirmButton: false,
+        timer: 2000,
+      });
       setSuccessMsg("Create a successful course");
       setForm({
         title: "",
@@ -173,23 +245,38 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
       if (onCreated) await onCreated();
       if (onClose) onClose();
     } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || "Create a course failed";
+      const msg =
+        e?.response?.data?.message || e?.message || "Create a course failed";
       setError(msg);
       const Swal = (await import("sweetalert2")).default;
-      await Swal.fire({ toast: true, position: "top-end", icon: "error", title: msg, showConfirmButton: false, timer: 2500 });
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "error",
+        title: msg,
+        showConfirmButton: false,
+        timer: 2500,
+      });
     } finally {
       setLoading(false);
     }
   };
-  console.log('teachers', teachers);
-  console.log('subjects', subjects);
+  console.log("teachers", teachers);
+  console.log("subjects", subjects);
   return (
     <form onSubmit={submit} className="px-6 py-6">
-      {successMsg && <div className="mb-4 p-3 rounded bg-green-500/10 text-green-600">{successMsg}</div>}
+      {successMsg && (
+        <div className="mb-4 p-3 rounded bg-green-500/10 text-green-600">
+          {successMsg}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div>
-          <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+          <label
+            className="block text-sm font-medium mb-2"
+            style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
+          >
             Title
           </label>
           <input
@@ -207,7 +294,10 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+          <label
+            className="block text-sm font-medium mb-2"
+            style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
+          >
             Subject
           </label>
           <select
@@ -223,13 +313,18 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
             required
           >
             <option value="">Select subject</option>
-            {subjects.map(s => (
-              <option key={s._id} value={s._id}>{s.name || s.code}</option>
+            {subjects.map((s) => (
+              <option key={s._id} value={s._id}>
+                {s.name || s.code}
+              </option>
             ))}
           </select>
         </div>
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+          <label
+            className="block text-sm font-medium mb-2"
+            style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
+          >
             Description
           </label>
           <textarea
@@ -246,10 +341,337 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
           />
         </div>
       </div>
+      <div className="mb-6">
+        <label
+          className="block text-sm font-medium mb-2"
+          style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
+        >
+          Teachers
+        </label>
+        <div
+          ref={teacherDropdownRef}
+          style={{ position: "relative", minWidth: 320 }}
+        >
+          <div
+            onClick={() => setShowTeacherDropdown(!showTeacherDropdown)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: "8px 12px",
+              borderRadius: 12,
+              border: `2px solid ${
+                showTeacherDropdown
+                  ? "#10b981"
+                  : darkMode
+                  ? "rgba(75,85,99,0.3)"
+                  : "#e5e7eb"
+              }`,
+              background: darkMode ? "#1f2937" : "white",
+              cursor: "pointer",
+              transition: "all 0.2s",
+              boxSizing: "border-box",
+              minHeight: 44,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+                overflow: "hidden",
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
+              {form.teacherIds.length > 0 ? (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "center",
+                    overflow: "hidden",
+                  }}
+                >
+                  {form.teacherIds.slice(0, 3).map((id) => {
+                    const t = teachers.find((x) => x._id === id) as any;
+                    if (!t) return null;
+                    return (
+                      <div
+                        key={id}
+                        title={t.fullname || t.username}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        {t.avatar_url ? (
+                          <img
+                            src={t.avatar_url}
+                            alt={t.fullname || t.username}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: "50%",
+                              objectFit: "cover",
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: "50%",
+                              background: darkMode ? "#374151" : "#f1f5f9",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: darkMode ? "#9ca3af" : "#64748b",
+                              fontSize: 12,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {(t.fullname || t.username || "T")
+                              .substring(0, 2)
+                              .toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {form.teacherIds.length > 3 && (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: darkMode ? "#9ca3af" : "#374151",
+                      }}
+                    >
+                      +{form.teacherIds.length - 3}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ color: darkMode ? "#9ca3af" : "#64748b" }}>
+                  Select teachers...
+                </div>
+              )}
+            </div>
+            <i
+              className={`bi bi-chevron-${showTeacherDropdown ? "up" : "down"}`}
+              style={{
+                color: darkMode ? "#9ca3af" : "#64748b",
+                marginLeft: "auto",
+              }}
+            />
+          </div>
 
+          {showTeacherDropdown && (
+            <div
+              style={{
+                position: "absolute",
+                top: "calc(100% + 8px)",
+                left: 0,
+                right: 0,
+                background: darkMode ? "#1f2937" : "white",
+                borderRadius: 12,
+                border: `1px solid ${darkMode ? "#374151" : "#e5e7eb"}`,
+                boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
+                zIndex: 1000,
+                maxHeight: 360,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  padding: 12,
+                  borderBottom: `1px solid ${darkMode ? "#374151" : "#e5e7eb"}`,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 12px",
+                    borderRadius: 8,
+                    background: darkMode ? "#374151" : "#f1f5f9",
+                  }}
+                >
+                  <i
+                    className="bi bi-search"
+                    style={{ color: darkMode ? "#9ca3af" : "#64748b" }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search teachers..."
+                    value={teacherSearchQuery}
+                    onChange={(e) => setTeacherSearchQuery(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      outline: "none",
+                      width: "100%",
+                      color: darkMode ? "#f1f5f9" : "#1e293b",
+                      fontSize: 14,
+                    }}
+                  />
+                  {teacherSearchQuery && (
+                    <i
+                      className="bi bi-x-circle-fill"
+                      style={{
+                        color: darkMode ? "#6b7280" : "#9ca3af",
+                        cursor: "pointer",
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTeacherSearchQuery("");
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div style={{ maxHeight: 280, overflowY: "auto" }}>
+                {filteredTeachers.length === 0 ? (
+                  <div
+                    style={{
+                      padding: 24,
+                      textAlign: "center",
+                      color: darkMode ? "#9ca3af" : "#64748b",
+                    }}
+                  >
+                    <i
+                      className="bi bi-person-x"
+                      style={{
+                        fontSize: 24,
+                        marginBottom: 8,
+                        display: "block",
+                      }}
+                    />
+                    No teachers found
+                  </div>
+                ) : (
+                  filteredTeachers.map((teacher) => {
+                    const t = teacher as any;
+                    const selected = form.teacherIds.includes(t._id);
+                    return (
+                      <div
+                        key={t._id}
+                        onClick={() => toggleTeacher(t._id)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: "10px 12px",
+                          cursor: "pointer",
+                          background: selected
+                            ? darkMode
+                              ? "rgba(16,185,129,0.12)"
+                              : "rgba(16,185,129,0.08)"
+                            : "transparent",
+                          borderLeft: selected
+                            ? "3px solid #10b981"
+                            : "3px solid transparent",
+                          transition: "all 0.12s",
+                        }}
+                      >
+                        {t.avatar_url ? (
+                          <img
+                            src={t.avatar_url}
+                            alt={t.fullname || t.username}
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: "50%",
+                              objectFit: "cover",
+                              border: selected
+                                ? "2px solid #10b981"
+                                : `2px solid ${
+                                    darkMode ? "#374151" : "#e2e8f0"
+                                  }`,
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: "50%",
+                              background: selected
+                                ? "linear-gradient(135deg,#10b981,#059669)"
+                                : darkMode
+                                ? "#374151"
+                                : "#e2e8f0",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: selected
+                                ? "white"
+                                : darkMode
+                                ? "#9ca3af"
+                                : "#64748b",
+                              fontWeight: 600,
+                              fontSize: 14,
+                            }}
+                          >
+                            {(t.fullname || t.username || "T")
+                              .substring(0, 2)
+                              .toUpperCase()}
+                          </div>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontWeight: 500,
+                              fontSize: 13,
+                              color: darkMode ? "#f1f5f9" : "#1e293b",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            {t.fullname || t.username}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: darkMode ? "#6b7280" : "#94a3b8",
+                              marginTop: 2,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                          >
+                            <i
+                              className="bi bi-envelope"
+                              style={{ fontSize: 10 }}
+                            />
+                            {(t as any).email || ""}
+                          </div>
+                        </div>
+                        {selected && (
+                          <i
+                            className="bi bi-check-circle-fill"
+                            style={{ color: "#10b981", fontSize: 16 }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <div>
-          <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+          <label
+            className="block text-sm font-medium mb-2"
+            style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
+          >
             Start Date
           </label>
           <input
@@ -266,8 +688,11 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
-           End Date
+          <label
+            className="block text-sm font-medium mb-2"
+            style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
+          >
+            End Date
           </label>
           <input
             type="date"
@@ -283,7 +708,10 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+          <label
+            className="block text-sm font-medium mb-2"
+            style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
+          >
             Capacity
           </label>
           <input
@@ -304,7 +732,10 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
       </div>
 
       <div className="mb-6">
-        <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+        <label
+          className="block text-sm font-medium mb-2"
+          style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
+        >
           Logo
         </label>
         <input
@@ -321,7 +752,10 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
       </div>
 
       <div className="mb-6">
-        <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+        <label
+          className="block text-sm font-medium mb-2"
+          style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
+        >
           Semester
         </label>
         <select
@@ -337,46 +771,47 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
           required
         >
           <option value="">Select semester</option>
-          {semesters.map(s => (
-            <option key={s._id} value={s._id}>{s.name} ({s.year})</option>
+          {semesters.map((s) => (
+            <option key={s._id} value={s._id}>
+              {s.name} ({s.year})
+            </option>
           ))}
         </select>
-      </div>
-
-      <div className="mb-6">
-        <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
-          Teachers
-        </label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-auto p-2 rounded border"
-          style={{
-            backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-            borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
-          }}
-        >
-          {teacherOptions.map(t => (
-            <label key={t.id} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={form.teacherIds.includes(t.id)} onChange={() => toggleTeacher(t.id)} />
-              <span>{t.name}</span>
-            </label>
-          ))}
-          {!teacherOptions.length && <div className="text-sm opacity-70">Không có giáo viên</div>}
-        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
           <label className="block text-sm mb-1">Status</label>
-          <select name="status" value={form.status} onChange={handleChange} className="w-full px-3 py-2 rounded border">
-            {statuses.map(s => (<option key={s} value={s}>{s}</option>))}
+          <select
+            name="status"
+            value={form.status}
+            onChange={handleChange}
+            className="w-full px-3 py-2 rounded border"
+          >
+            {statuses.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
           </select>
         </div>
         <div className="flex items-center gap-6">
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="isPublished" checked={form.isPublished} onChange={handleChange} />
+            <input
+              type="checkbox"
+              name="isPublished"
+              checked={form.isPublished}
+              onChange={handleChange}
+            />
             <span>Is published</span>
           </label>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="enrollRequiresApproval" checked={form.enrollRequiresApproval} onChange={handleChange} />
+            <input
+              type="checkbox"
+              name="enrollRequiresApproval"
+              checked={form.enrollRequiresApproval}
+              onChange={handleChange}
+            />
             <span>Enroll requires approval</span>
           </label>
         </div>
@@ -387,7 +822,10 @@ const CreateCourseForm: React.FC<Props> = ({ darkMode, onClose, onCreated, prese
           type="button"
           onClick={onClose}
           className="px-4 py-2 rounded-lg"
-          style={{ backgroundColor: darkMode ? "#1f2937" : "#e5e7eb", color: darkMode ? "#e5e7eb" : "#111827" }}
+          style={{
+            backgroundColor: darkMode ? "#1f2937" : "#e5e7eb",
+            color: darkMode ? "#e5e7eb" : "#111827",
+          }}
         >
           Cancel
         </button>

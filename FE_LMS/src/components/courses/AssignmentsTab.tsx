@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FileText, ChevronLeft, ChevronRight } from "lucide-react";
+import axios from "axios";
 import { httpClient } from "../../utils/http";
 import type { Assignment } from "../../types/assignment";
 import SimpleAssignmentCard from "./SimpleAssignmentCard";
@@ -24,8 +25,10 @@ interface ApiResponse {
   };
 }
 
-
-const AssignmentsTab: React.FC<AssignmentsTabProps> = ({ courseId, darkMode }) => {
+const AssignmentsTab: React.FC<AssignmentsTabProps> = ({
+  courseId,
+  darkMode,
+}) => {
   const navigate = useNavigate();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +55,9 @@ const AssignmentsTab: React.FC<AssignmentsTabProps> = ({ courseId, darkMode }) =
     const fetchAssignments = async () => {
       // Prevent duplicate requests
       if (fetchingRef.current) {
-        console.log("[AssignmentsTab] Already fetching, skipping duplicate request");
+        console.log(
+          "[AssignmentsTab] Already fetching, skipping duplicate request"
+        );
         return;
       }
 
@@ -89,7 +94,7 @@ const AssignmentsTab: React.FC<AssignmentsTabProps> = ({ courseId, darkMode }) =
         let hasNextPage = false;
         let hasPrevPage = false;
         let currentPageFromApi = currentPageState;
-        
+
         if (data?.success && data?.data) {
           setAssignments(data.data);
           if (data.pagination) {
@@ -127,7 +132,26 @@ const AssignmentsTab: React.FC<AssignmentsTabProps> = ({ courseId, darkMode }) =
         setError("");
       } catch (e: unknown) {
         console.error("[AssignmentsTab] Error fetching assignments:", e);
-        setError("Failed to load assignments");
+        // Extract a helpful message from axios/backend error when possible
+        let message = "Failed to load assignments";
+        try {
+          if (axios.isAxiosError(e)) {
+            const respData = (e.response && e.response.data) as any;
+            if (respData) {
+              if (typeof respData.message === "string" && respData.message)
+                message = respData.message;
+              else if (typeof respData.error === "string" && respData.error)
+                message = respData.error;
+            }
+            if (!message && e.message) message = e.message;
+          } else if (e instanceof Error) {
+            message = e.message || message;
+          }
+        } catch (ex) {
+          console.warn("[AssignmentsTab] Failed to parse error object", ex);
+        }
+
+        setError(message);
         setAssignments([]);
       } finally {
         setLoading(false);
@@ -177,7 +201,14 @@ const AssignmentsTab: React.FC<AssignmentsTabProps> = ({ courseId, darkMode }) =
       setCurrentPageState(newPage);
     } else {
       console.log("[AssignmentsTab] Page change skipped:", {
-        reason: newPage < 1 ? "page < 1" : newPage > totalPages ? "page > totalPages" : newPage === currentPageState ? "same page" : "unknown",
+        reason:
+          newPage < 1
+            ? "page < 1"
+            : newPage > totalPages
+            ? "page > totalPages"
+            : newPage === currentPageState
+            ? "same page"
+            : "unknown",
         newPage,
         currentPageState,
         totalPages,
@@ -250,7 +281,11 @@ const AssignmentsTab: React.FC<AssignmentsTabProps> = ({ courseId, darkMode }) =
               <button
                 onClick={() => {
                   const prevPage = Math.max(1, currentPageState - 1);
-                  console.log("[AssignmentsTab] Previous button clicked:", { currentPageState, prevPage, hasPrev });
+                  console.log("[AssignmentsTab] Previous button clicked:", {
+                    currentPageState,
+                    prevPage,
+                    hasPrev,
+                  });
                   handlePageChange(prevPage);
                 }}
                 disabled={currentPageState <= 1}
@@ -271,7 +306,11 @@ const AssignmentsTab: React.FC<AssignmentsTabProps> = ({ courseId, darkMode }) =
               <button
                 onClick={() => {
                   const nextPage = Math.min(totalPages, currentPageState + 1);
-                  console.log("[AssignmentsTab] Next button clicked:", { currentPageState, nextPage, hasNext });
+                  console.log("[AssignmentsTab] Next button clicked:", {
+                    currentPageState,
+                    nextPage,
+                    hasNext,
+                  });
                   handlePageChange(nextPage);
                 }}
                 disabled={currentPageState >= totalPages}
@@ -292,4 +331,3 @@ const AssignmentsTab: React.FC<AssignmentsTabProps> = ({ courseId, darkMode }) =
 };
 
 export default AssignmentsTab;
-
