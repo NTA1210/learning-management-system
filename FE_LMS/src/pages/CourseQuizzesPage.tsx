@@ -1318,6 +1318,10 @@ export default function CourseQuizzesPage() {
             onClick={handleCloseStatisticsModal}
           />
           <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={handleCloseStatisticsModal}
+          />
+          <div
             className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
             style={{
               backgroundColor: "var(--card-surface)",
