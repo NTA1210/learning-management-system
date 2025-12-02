@@ -216,6 +216,7 @@ export const updateForumPostByIdHandler = catchErrors(async (req, res) => {
 
     // Get user ID from authenticated user
     const userId = req.userId;
+    const role = req.role;
 
     let file: Express.Multer.File | Express.Multer.File[] | undefined;
 
