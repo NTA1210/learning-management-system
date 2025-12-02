@@ -39,7 +39,7 @@ export default function QuizCoursePage() {
     } else {
       newParams.set("page", String(page));
     }
-    setSearchParams(newParams);
+    setSearchParams(newParams, { replace: true }); // Prevent history pollution
   };
 
   // Get page from URL or default to 1
@@ -720,7 +720,7 @@ export default function QuizCoursePage() {
         isOpen={mobileSidebarOpen}
         onClose={handleCloseSidebar}
       />
-      <div className="flex relative w-full pt-32 md:pt-28 lg:pt-24">
+      <div className="flex relative w-full pt-28 md:pt-24 lg:pt-20">
         <Sidebar role={resolvedRole} />
         <div className="flex-1 w-full px-4 sm:px-6 py-6 md:ml-[50px] relative overflow-x-hidden">
           <div className="max-w-6xl mx-auto">

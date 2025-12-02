@@ -39,6 +39,8 @@ import {
   ForumPostDetailPage,
   OnboardingPage,
   DeletedCoursesPage,
+  QuizAttemptsPage,
+  GradeAttemptPage,
   CreateSemesterPage,
   ListSemestersPage,
 } from "../pages";
@@ -261,6 +263,22 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <QuizQuestionsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/quizzes/:quizId/attempts"
+          element={
+            <ProtectedRoute requiredRole={["teacher", "admin"]}>
+              <QuizAttemptsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/quiz-attempts/:attemptId/grade"
+          element={
+            <ProtectedRoute requiredRole={["teacher", "admin"]}>
+              <GradeAttemptPage />
             </ProtectedRoute>
           }
         />

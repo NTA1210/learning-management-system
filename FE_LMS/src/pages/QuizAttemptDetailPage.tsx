@@ -9,7 +9,6 @@ import { useAuth } from "../hooks/useAuth";
 import {
   ArrowLeft,
   RefreshCcw,
-  ShieldOff,
   Clock,
   UserRound,
   Book,
@@ -57,7 +56,6 @@ const QuizAttemptDetailPage = () => {
   const [attempt, setAttempt] = useState<QuizAttempt | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [banLoading, setBanLoading] = useState(false);
 
   const quizInfo = useMemo(() => {
     if (attempt && typeof attempt.quizId !== "string") {
@@ -69,9 +67,6 @@ const QuizAttemptDetailPage = () => {
   const answers: QuizAnswer[] = attempt?.answers || [];
 
   const studentLabel = useMemo(() => getStudentLabel(attempt?.studentId || ""), [attempt]);
-
-  const canBan =
-    attempt && attempt.status !== "abandoned" && attempt.status !== "submitted" && !banLoading;
 
   const fetchAttempt = useCallback(async () => {
     if (!attemptId) return;
@@ -91,40 +86,7 @@ const QuizAttemptDetailPage = () => {
     fetchAttempt();
   }, [fetchAttempt]);
 
-  const handleBanAttempt = async () => {
-    if (!attemptId || !canBan) return;
-    const Swal = (await import("sweetalert2")).default;
-    const result = await Swal.fire({
-      title: "Ban this attempt?",
-      text: "The student will be removed immediately and cannot submit this quiz.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Ban attempt",
-      cancelButtonText: "Cancel",
-      confirmButtonColor: "#dc2626",
-    });
-    if (!result.isConfirmed) return;
 
-    try {
-      setBanLoading(true);
-      const updated = await quizAttemptService.banQuizAttempt(attemptId);
-      setAttempt(updated);
-      await Swal.fire({
-        title: "Attempt banned",
-        text: "The student has been blocked from this quiz attempt.",
-        icon: "success",
-        confirmButtonColor: "#6d28d9",
-      });
-    } catch (err) {
-      await Swal.fire({
-        title: "Unable to ban attempt",
-        text: getErrorMessage(err, "Please try again."),
-        icon: "error",
-      });
-    } finally {
-      setBanLoading(false);
-    }
-  };
 
   const renderAnswerOption = (answer: QuizAnswer, option: string, idx: number) => {
     const selected = answer.answer?.[idx] === 1;
@@ -149,7 +111,7 @@ const QuizAttemptDetailPage = () => {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
         <main
-          className="flex-1 overflow-y-auto px-6 pb-6 pt-32"
+          className="flex-1 overflow-y-auto px-6 pb-6 pt-28"
           style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}
         >
           <div className="max-w-5xl mx-auto space-y-6">
@@ -172,15 +134,6 @@ const QuizAttemptDetailPage = () => {
                   <RefreshCcw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                   Refresh
                 </button>
-                <button
-                  onClick={handleBanAttempt}
-                  disabled={!canBan}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
-                  style={{ backgroundColor: "#dc2626" }}
-                >
-                  <ShieldOff className="w-4 h-4" />
-                  Ban Attempt
-                </button>
               </div>
             </div>
 
@@ -202,34 +155,9 @@ const QuizAttemptDetailPage = () => {
               </div>
             )}
 
-            {attempt && !loading && attempt.status === "abandoned" && (
-              <div
-                className="p-10 rounded-2xl border text-center space-y-4"
-                style={{ backgroundColor: "var(--card-surface)", borderColor: "var(--card-border)" }}
-              >
-                <ShieldOff className="w-12 h-12 mx-auto" style={{ color: "#ef4444" }} />
-                <h2 className="text-2xl font-bold" style={{ color: "var(--heading-text)" }}>
-                  This attempt has been banned
-                </h2>
-                <p style={{ color: "var(--muted-text)" }}>
-                  The student is no longer allowed to continue or submit this quiz attempt.
-                </p>
-                <p className="text-sm" style={{ color: "var(--muted-text)" }}>
-                  Attempt ID: {attempt._id}
-                </p>
-                <div className="flex justify-center mt-4">
-                  <button
-                    onClick={() => navigate(-1)}
-                    className="px-6 py-2.5 rounded-lg text-sm font-semibold text-white"
-                    style={{ backgroundColor: "#6d28d9" }}
-                  >
-                    Back
-                  </button>
-                </div>
-              </div>
-            )}
 
-            {attempt && !loading && attempt.status !== "abandoned" && (
+
+            {attempt && !loading && (
               <>
                 <div
                   className="p-6 rounded-2xl border space-y-4"

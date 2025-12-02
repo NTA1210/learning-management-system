@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { File } from "lucide-react";
 import http from "../../utils/http";
+import { useAuth } from "../../hooks/useAuth";
+import { quizService } from "../../services";
 import StudentsEnrollList from "./StudentsEnrollList";
 
 interface StaticCourseTabProps {
@@ -12,9 +14,14 @@ const StaticCourseTab: React.FC<StaticCourseTabProps> = ({
   courseId,
   darkMode,
 }) => {
+  const { user } = useAuth();
+  const role = (user?.role as "admin" | "teacher" | "student") || "student";
+  const isStudent = role === "student";
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [stats, setStats] = useState<any>(null);
+  const [studentQuizCount, setStudentQuizCount] = useState<number | null>(null);
 
   const sanitizeUrl = (url?: string) => (url || "").replace(/`/g, "").trim();
 
@@ -25,9 +32,25 @@ const StaticCourseTab: React.FC<StaticCourseTabProps> = ({
         setLoading(true);
         const res = await http.get(`/courses/${courseId}/statistics`);
         const data = (res as any)?.data || null;
+
         if (mounted) {
           setStats(data);
           setError("");
+        }
+
+        // If student, fetch published quiz count separately
+        if (isStudent && mounted) {
+          try {
+            const quizRes = await quizService.getQuizzesByCourseId(courseId, {
+              isPublished: true,
+              limit: 1, // We only need the total count from pagination
+            });
+            if (mounted) {
+              setStudentQuizCount(quizRes.pagination.total);
+            }
+          } catch (err) {
+            console.error("Failed to fetch student quiz count", err);
+          }
         }
       } catch (e: any) {
         if (mounted) setError(e?.message || "Failed to load statistics");
@@ -35,6 +58,7 @@ const StaticCourseTab: React.FC<StaticCourseTabProps> = ({
         if (mounted) setLoading(false);
       }
     })();
+
     return () => {
       mounted = false;
     };
@@ -67,7 +91,12 @@ const StaticCourseTab: React.FC<StaticCourseTabProps> = ({
   const semester = stats?.semester;
   const teachers = Array.isArray(stats?.teachers) ? stats.teachers : [];
   const totalLessons = Number(statistics.totalLessons ?? 0) || 0;
-  const totalQuizzes = Number(statistics.totalQuizzes ?? 0) || 0;
+  // Use student specific count if available, otherwise fallback to general stats
+  const totalQuizzes =
+    isStudent && studentQuizCount !== null
+      ? studentQuizCount
+      : Number(statistics.totalQuizzes ?? 0) || 0;
+
   const totalAssignments = Number(statistics.totalAssignments ?? 0) || 0;
   const totalAttendances = Number(statistics.totalAttendances ?? 0) || 0;
   const maxTotal = Math.max(
