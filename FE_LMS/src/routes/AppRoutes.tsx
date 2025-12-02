@@ -39,9 +39,13 @@ import {
   ForumPostDetailPage,
   OnboardingPage,
   DeletedCoursesPage,
+  QuizAttemptsPage,
+  GradeAttemptPage,
   CreateSemesterPage,
   ListSemestersPage,
+  BlogPage,
 } from "../pages";
+
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
 import AssignmentDetailPage from "../pages/AssignmentDetailPage";
@@ -265,6 +269,22 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/quizzes/:quizId/attempts"
+          element={
+            <ProtectedRoute requiredRole={["teacher", "admin"]}>
+              <QuizAttemptsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/quiz-attempts/:attemptId/grade"
+          element={
+            <ProtectedRoute requiredRole={["teacher", "admin"]}>
+              <GradeAttemptPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/quiz-attempts/:attemptId"
           element={
             <ProtectedRoute requiredRole={["teacher", "admin"]}>
@@ -444,6 +464,7 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route path="/blog" element={<BlogPage />} />
         {/* Not found */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

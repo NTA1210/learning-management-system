@@ -31,7 +31,11 @@ SubjectSchema.index(
 
 // ✅ Hook: Tạo slug tự động
 SubjectSchema.pre('save', function (next) {
-  this.slug = this.name.toLowerCase().replace(/\s+/g, '-');
+  this.slug = this.name
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-') // replace nhiều space bằng dấu -
+    .replace(/[^\w-]+/g, ''); // remove ký tự đặc biệt
   next();
 });
 

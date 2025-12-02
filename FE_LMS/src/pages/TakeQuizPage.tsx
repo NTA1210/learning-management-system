@@ -390,7 +390,7 @@ export default function TakeQuizPage() {
 
   useEffect(() => {
     if (!quizId) {
-      navigate(courseId ? `/quizz/${courseId}` : "/quizz");
+      navigate(courseId ? `/quizz/${courseId}` : "/quizz", { replace: true });
       return;
     }
 
@@ -412,7 +412,7 @@ export default function TakeQuizPage() {
         console.error("Failed to fetch quiz:", error);
         const message = getErrorMessage(error, "Failed to load quiz");
         alert(message);
-        navigate(courseId ? `/quizz/${courseId}` : "/quizz");
+        navigate(courseId ? `/quizz/${courseId}` : "/quizz", { replace: true });
       } finally {
         setLoading(false);
       }
@@ -473,7 +473,9 @@ export default function TakeQuizPage() {
         let populatedQuiz: QuizResponse | undefined;
         if (latestAttempt.quizId && typeof latestAttempt.quizId !== "string") {
           populatedQuiz = latestAttempt.quizId as QuizResponse;
-          setQuiz(populatedQuiz);
+          if (!quiz) {
+            setQuiz(populatedQuiz);
+          }
         }
 
         if (Array.isArray(latestAttempt.answers)) {
@@ -790,7 +792,7 @@ export default function TakeQuizPage() {
         <div className="flex-1 flex flex-col overflow-hidden">
           <Navbar />
           <main
-            className="flex-1 overflow-y-auto px-6 pb-6 pt-32 flex items-center justify-center"
+            className="flex-1 overflow-y-auto px-6 pb-6 pt-28 flex items-center justify-center"
             style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}
           >
             <div
@@ -814,7 +816,7 @@ export default function TakeQuizPage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <button
-                  onClick={() => navigate(courseId ? `/quizz/${courseId}` : "/quizz")}
+                  onClick={() => navigate(-1)}
                   className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white"
                   style={{ backgroundColor: "#6d28d9" }}
                 >
@@ -839,12 +841,12 @@ export default function TakeQuizPage() {
         <div className="flex-1 flex flex-col overflow-hidden">
           <Navbar />
           <main
-            className="flex-1 overflow-y-auto px-6 pb-6 pt-32"
+            className="flex-1 overflow-y-auto px-6 pb-6 pt-28"
             style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}
           >
             <div className="max-w-2xl mx-auto">
               <button
-                onClick={() => navigate(courseId ? `/quizz/${courseId}` : "/quizz")}
+                onClick={() => navigate(-1)}
                 className="flex items-center gap-2 text-sm mb-6 hover:underline"
                 style={{ color: "var(--muted-text)" }}
               >
@@ -890,7 +892,7 @@ export default function TakeQuizPage() {
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <button
-                    onClick={() => navigate(courseId ? `/quizz/${courseId}` : "/quizz")}
+                    onClick={() => navigate(-1)}
                     className="px-5 py-2.5 rounded-lg text-sm font-medium"
                     style={{ backgroundColor: "var(--divider-color)", color: "var(--heading-text)" }}
                   >
@@ -919,14 +921,14 @@ export default function TakeQuizPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
         <main
-          className="flex-1 overflow-y-auto px-6 pb-6 pt-32"
+          className="flex-1 overflow-y-auto px-6 pb-6 pt-28"
           style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}
         >
           <div className="max-w-4xl mx-auto">
             {/* Header */}
             <div className="mb-6">
               <button
-                onClick={() => navigate(courseId ? `/quizz/${courseId}` : "/quizz")}
+                onClick={() => navigate(-1)}
                 className="flex items-center gap-2 text-sm mb-4 hover:underline"
                 style={{ color: "var(--muted-text)" }}
               >
@@ -1149,7 +1151,7 @@ export default function TakeQuizPage() {
 
                 <div className="mt-6 flex justify-center">
                   <button
-                    onClick={() => navigate(courseId ? `/quizz/${courseId}` : "/quizz")}
+                    onClick={() => navigate(-1)}
                     className="px-6 py-3 rounded-lg font-semibold text-white"
                     style={{ backgroundColor: "#6d28d9" }}
                   >

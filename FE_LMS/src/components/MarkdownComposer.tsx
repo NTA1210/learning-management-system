@@ -20,7 +20,6 @@ type ToolbarAction =
   | "quote"
   | "bullet"
   | "numbered"
-  | "link"
   | "codeblock"
   | "heading";
 
@@ -96,23 +95,6 @@ const MarkdownComposer: React.FC<MarkdownComposerProps> = ({
       case "heading":
         applyLinePrefix("##");
         break;
-      case "link": {
-        const url = window.prompt("Enter link URL");
-        if (!url) return;
-        const textarea = textareaRef.current;
-        if (!textarea) return;
-        const { selectionStart, selectionEnd } = textarea;
-        const selected = value.slice(selectionStart, selectionEnd) || "link text";
-        const markdown = `[${selected}](${url})`;
-        const nextValue = `${value.slice(0, selectionStart)}${markdown}${value.slice(selectionEnd)}`;
-        onChange(nextValue);
-        requestAnimationFrame(() => {
-          const caretPosition = selectionStart + markdown.length;
-          textarea.setSelectionRange(caretPosition, caretPosition);
-          textarea.focus();
-        });
-        break;
-      }
       default:
         break;
     }
@@ -127,7 +109,6 @@ const MarkdownComposer: React.FC<MarkdownComposerProps> = ({
     { action: "numbered", label: "1." },
     { action: "code", label: "</>" },
     { action: "codeblock", label: "{ }" },
-    { action: "link", label: "🔗" },
   ];
 
   const formatFileSize = (size?: number) => {

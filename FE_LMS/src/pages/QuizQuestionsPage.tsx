@@ -320,7 +320,7 @@ export default function QuizQuestionsPage() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Navbar />
-        <main className="flex-1 overflow-y-auto p-6" style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}>
+        <main className="flex-1 overflow-y-auto p-6 pt-28" style={{ backgroundColor: "var(--page-bg)", color: "var(--page-text)" }}>
           <div className="max-w-6xl mx-auto">
             <QuizPageHeader
               title={quiz ? quiz.title : "Loading..."}
@@ -421,8 +421,8 @@ export default function QuizQuestionsPage() {
                                   <li
                                     key={idx}
                                     className={`text-sm ${question.correctOptions?.[idx] === 1
-                                        ? "font-semibold text-emerald-600"
-                                        : ""
+                                      ? "font-semibold text-emerald-600"
+                                      : ""
                                       }`}
                                     style={{
                                       color:

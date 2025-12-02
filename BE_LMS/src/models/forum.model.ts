@@ -16,7 +16,7 @@ const ForumSchema = new mongoose.Schema<IForum>(
         key: [{type: String}],
         isActive: {type: Boolean, default: true},
         isArchived: {type: Boolean, default: false},
-        createdBy: {type: mongoose.Schema.Types.ObjectId, ref: 'User'},
+        createdBy: {type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true},
     },
     {timestamps: true}
 );
