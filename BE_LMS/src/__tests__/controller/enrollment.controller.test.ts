@@ -12,9 +12,12 @@ import {
   enrollSelfHandler,
   updateEnrollmentHandler,
   updateSelfEnrollmentHandler,
+  kickStudentHandler,
+  getEnrollmentStatisticsHandler,
 } from "@/controller/enrollment.controller";
 import * as enrollmentService from "@/services/enrollment.service";
 import * as enrollmentSchemas from "@/validators/enrollment.schemas";
+import { Role } from "@/types/user.type";
 
 jest.mock("@/services/enrollment.service");
 jest.mock("@/validators/enrollment.schemas", () => ({
@@ -26,6 +29,7 @@ jest.mock("@/validators/enrollment.schemas", () => ({
   enrollSelfSchema: { parse: jest.fn() },
   updateEnrollmentSchema: { parse: jest.fn() },
   updateSelfEnrollmentSchema: { parse: jest.fn() },
+  kickStudentSchema: { parse: jest.fn() },
 }));
 
 describe("Enrollment Controller Unit Tests", () => {
@@ -85,7 +89,7 @@ describe("Enrollment Controller Unit Tests", () => {
       await (getMyEnrollmentsHandler as any)(mockReq, mockRes, mockNext);
 
       expect(enrollmentService.getStudentEnrollments).toHaveBeenCalledWith({
-        studentId: "507f1f77bcf86cd799439011",
+        studentId: mockUserId,
         status: "active",
         page: 1,
         limit: 10,
@@ -166,14 +170,21 @@ describe("Enrollment Controller Unit Tests", () => {
       (enrollmentService.getAllEnrollments as jest.Mock).mockResolvedValue(mockResult);
 
       mockReq.query = { status: "active" };
+      mockReq.role = Role.ADMIN;
 
       await (getAllEnrollmentsHandler as any)(mockReq, mockRes, mockNext);
 
-      expect(enrollmentService.getAllEnrollments).toHaveBeenCalledWith({
-        status: "active",
-        page: 1,
-        limit: 10,
-      });
+      expect(enrollmentService.getAllEnrollments).toHaveBeenCalledWith(
+        {
+          status: "active",
+          page: 1,
+          limit: 10,
+        },
+        {
+          role: Role.ADMIN,
+          userId: mockUserId,
+        }
+      );
       expect(mockRes.success).toHaveBeenCalledWith(OK, {
         data: mockResult.enrollments,
         pagination: mockResult.pagination,
@@ -221,6 +232,7 @@ describe("Enrollment Controller Unit Tests", () => {
       expect(enrollmentService.createEnrollment).toHaveBeenCalledWith({
         ...enrollmentData,
         status: "approved",
+        method: "other",
       });
       expect(mockRes.success).toHaveBeenCalledWith(CREATED, {
         data: mockEnrollment,
@@ -270,7 +282,7 @@ describe("Enrollment Controller Unit Tests", () => {
       await (enrollSelfHandler as any)(mockReq, mockRes, mockNext);
 
       expect(enrollmentService.createEnrollment).toHaveBeenCalledWith({
-        studentId: "507f1f77bcf86cd799439011",
+        studentId: mockUserId,
         courseId: "course123",
         role: "student",
         method: "self",
@@ -430,7 +442,7 @@ describe("Enrollment Controller Unit Tests", () => {
 
       expect(enrollmentService.updateSelfEnrollment).toHaveBeenCalledWith(
         "enroll123",
-        "507f1f77bcf86cd799439011",
+        mockUserId,
         updateData
       );
       expect(mockRes.success).toHaveBeenCalledWith(OK, {
@@ -491,6 +503,133 @@ describe("Enrollment Controller Unit Tests", () => {
       mockReq.body = { status: "cancelled" };
 
       await (updateSelfEnrollmentHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(serviceError);
+    });
+  });
+
+  describe("kickStudentHandler", () => {
+    beforeEach(() => {
+      mockReq.role = Role.ADMIN;
+    });
+
+    it("Should kick student from course successfully", async () => {
+      const mockResult = { message: "Student kicked successfully" };
+
+      (enrollmentSchemas.enrollmentIdSchema.parse as jest.Mock).mockReturnValue({ id: "enroll123" });
+      (enrollmentSchemas.kickStudentSchema.parse as jest.Mock).mockReturnValue({ reason: "Violation" });
+      (enrollmentService.kickStudentFromCourse as jest.Mock).mockResolvedValue(mockResult);
+
+      mockReq.params = { id: "enroll123" };
+      mockReq.body = { reason: "Violation" };
+
+      await (kickStudentHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(enrollmentService.kickStudentFromCourse).toHaveBeenCalledWith(
+        "enroll123",
+        "Violation",
+        mockUserId,
+        Role.ADMIN
+      );
+      expect(mockRes.success).toHaveBeenCalledWith(OK, {
+        message: mockResult.message,
+      });
+    });
+
+    it("Should handle validation error for invalid enrollment ID", async () => {
+      const validationError = new Error("Invalid ID format");
+      (enrollmentSchemas.enrollmentIdSchema.parse as jest.Mock).mockImplementation(() => {
+        throw validationError;
+      });
+
+      mockReq.params = { id: "invalid_id" };
+      mockReq.body = { reason: "Violation" };
+
+      await (kickStudentHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(validationError);
+    });
+
+    it("Should handle service error when enrollment not found", async () => {
+      const serviceError = new Error("Enrollment not found");
+      (enrollmentSchemas.enrollmentIdSchema.parse as jest.Mock).mockReturnValue({ id: "enroll123" });
+      (enrollmentSchemas.kickStudentSchema.parse as jest.Mock).mockReturnValue({ reason: "Violation" });
+      (enrollmentService.kickStudentFromCourse as jest.Mock).mockRejectedValue(serviceError);
+
+      mockReq.params = { id: "enroll123" };
+      mockReq.body = { reason: "Violation" };
+
+      await (kickStudentHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(serviceError);
+    });
+  });
+
+  describe("getEnrollmentStatisticsHandler", () => {
+    beforeEach(() => {
+      mockReq.role = Role.STUDENT;
+    });
+
+    it("Should get enrollment statistics successfully", async () => {
+      const mockStatistics = {
+        enrollmentId: "enroll123",
+        courseId: "course123",
+        studentId: "student123",
+        statistics: {
+          totalLessons: 10,
+          completedLessons: 8,
+          progress: 80,
+        },
+      };
+
+      (enrollmentSchemas.enrollmentIdSchema.parse as jest.Mock).mockReturnValue({ id: "enroll123" });
+      (enrollmentService.getEnrollmentStatistics as jest.Mock).mockResolvedValue(mockStatistics);
+
+      mockReq.params = { id: "enroll123" };
+
+      await (getEnrollmentStatisticsHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(enrollmentService.getEnrollmentStatistics).toHaveBeenCalledWith({
+        enrollmentId: "enroll123",
+        userId: mockUserId,
+        role: Role.STUDENT,
+      });
+      expect(mockRes.success).toHaveBeenCalledWith(OK, { data: mockStatistics });
+    });
+
+    it("Should handle validation error for invalid enrollment ID", async () => {
+      const validationError = new Error("Invalid ID format");
+      (enrollmentSchemas.enrollmentIdSchema.parse as jest.Mock).mockImplementation(() => {
+        throw validationError;
+      });
+
+      mockReq.params = { id: "invalid_id" };
+
+      await (getEnrollmentStatisticsHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(validationError);
+    });
+
+    it("Should handle service error when enrollment not found", async () => {
+      const serviceError = new Error("Enrollment not found");
+      (enrollmentSchemas.enrollmentIdSchema.parse as jest.Mock).mockReturnValue({ id: "enroll123" });
+      (enrollmentService.getEnrollmentStatistics as jest.Mock).mockRejectedValue(serviceError);
+
+      mockReq.params = { id: "enroll123" };
+
+      await (getEnrollmentStatisticsHandler as any)(mockReq, mockRes, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(serviceError);
+    });
+
+    it("Should handle service error when user does not have access", async () => {
+      const serviceError = new Error("Access denied");
+      (enrollmentSchemas.enrollmentIdSchema.parse as jest.Mock).mockReturnValue({ id: "enroll123" });
+      (enrollmentService.getEnrollmentStatistics as jest.Mock).mockRejectedValue(serviceError);
+
+      mockReq.params = { id: "enroll123" };
+
+      await (getEnrollmentStatisticsHandler as any)(mockReq, mockRes, mockNext);
 
       expect(mockNext).toHaveBeenCalledWith(serviceError);
     });
