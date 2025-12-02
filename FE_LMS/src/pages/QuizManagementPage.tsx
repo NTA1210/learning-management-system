@@ -108,6 +108,9 @@ export default function QuizManagementPage() {
     },
   ]);
 
+  // Pagination for questions
+  const [currentQuestionPage, setCurrentQuestionPage] = useState(1);
+
   // Fetch subjects for /quiz - Sử dụng environment variable VITE_BASE_API
   useEffect(() => {
     (async () => {
@@ -271,8 +274,8 @@ export default function QuizManagementPage() {
   };
 
   const handleAddQuestion = () => {
-    setQuestions([
-      ...questions,
+    setQuestions((prev) => [
+      ...prev,
       {
         text: "",
         options: ["", "", "", ""],
@@ -281,6 +284,7 @@ export default function QuizManagementPage() {
         imagePreviews: [],
       },
     ]);
+    setCurrentQuestionPage(questions.length + 1);
   };
 
   const handleAddOptionToQuestion = (questionIndex: number) => {
@@ -338,7 +342,11 @@ export default function QuizManagementPage() {
 
   const handleRemoveQuestion = (index: number) => {
     if (questions.length > 1) {
-      setQuestions(questions.filter((_, i) => i !== index));
+      setQuestions((prev) => prev.filter((_, i) => i !== index));
+      // Adjust current page if needed
+      if (currentQuestionPage > questions.length - 1) {
+        setCurrentQuestionPage(Math.max(1, questions.length - 1));
+      }
     }
   };
 
@@ -1033,185 +1041,219 @@ export default function QuizManagementPage() {
 
                     {currentStep === 2 && (
                       <div className="space-y-6">
-                        <h3 className="text-lg font-semibold">Add Questions</h3>
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold">Add Questions</h3>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm" style={{ color: labelColor }}>
+                              {questions.length} question{questions.length !== 1 ? 's' : ''}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={handleAddQuestion}
+                              className="px-3 py-1 rounded bg-indigo-600 text-white text-sm"
+                            >
+                              + Add question
+                            </button>
+                          </div>
+                        </div>
 
-                        {questions.map((question, qIndex) => (
-                          <div
-                            key={qIndex}
-                            className="rounded-lg p-4 space-y-4"
-                            style={{ backgroundColor: darkMode ? "rgba(15,23,42,0.6)" : "#f8fafc", border: cardBorder }}
-                          >
-                            <div className="flex items-center justify-between">
-                              <h4 className="font-semibold">Question {qIndex + 1}</h4>
-                              {questions.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveQuestion(qIndex)}
-                                  className="text-red-500 hover:text-red-700"
-                                >
-                                  <X className="w-5 h-5" />
-                                </button>
-                              )}
-                            </div>
+                        {/* Pagination Navigation */}
+                        {questions.length > 1 && (
+                          <div className="flex items-center justify-between mb-4 pb-3 border-b" style={{ borderColor: cardBorder }}>
+                            <button
+                              type="button"
+                              onClick={() => setCurrentQuestionPage(Math.max(1, currentQuestionPage - 1))}
+                              disabled={currentQuestionPage === 1}
+                              className="px-3 py-1 rounded border text-sm disabled:opacity-50"
+                              style={{ borderColor: inputBorder, color: textColor }}
+                            >
+                              ← Previous
+                            </button>
+                            <span className="text-sm font-medium" style={{ color: textColor }}>
+                              Question {currentQuestionPage} of {questions.length}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setCurrentQuestionPage(Math.min(questions.length, currentQuestionPage + 1))}
+                              disabled={currentQuestionPage === questions.length}
+                              className="px-3 py-1 rounded border text-sm disabled:opacity-50"
+                              style={{ borderColor: inputBorder, color: textColor }}
+                            >
+                              Next →
+                            </button>
+                          </div>
+                        )}
 
-                            {/* Question Text */}
-                            <div>
-                              <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                                Question Text <span className="text-red-500">*</span>
-                              </label>
-                              <textarea
-                                required
-                                value={question.text || ""}
-                                onChange={(e) => handleUpdateQuestion(qIndex, "text", e.target.value)}
-                                className="w-full px-4 py-2 rounded-lg resize-y"
-                                style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
-                                rows={3}
-                                placeholder="Enter question text"
-                                disabled={isSubmitting}
-                              />
-                            </div>
+                        {questions.map((question, qIndex) => {
+                          // Only show the current question
+                          if (qIndex !== currentQuestionPage - 1) return null;
 
-                            {/* Options */}
-                            <div className="space-y-3">
+                          return (
+                            <div
+                              key={qIndex}
+                              className="rounded-lg p-4 space-y-4"
+                              style={{ backgroundColor: darkMode ? "rgba(15,23,42,0.6)" : "#f8fafc", border: cardBorder }}
+                            >
                               <div className="flex items-center justify-between">
-                                <label className="text-sm font-semibold" style={{ color: labelColor }}>
-                                  Options
+                                <h4 className="font-semibold">Question {qIndex + 1}</h4>
+                                {questions.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveQuestion(qIndex)}
+                                    className="text-red-500 hover:text-red-700"
+                                  >
+                                    <X className="w-5 h-5" />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Question Text */}
+                              <div>
+                                <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
+                                  Question Text <span className="text-red-500">*</span>
                                 </label>
-                                <button
-                                  type="button"
-                                  onClick={() => handleAddOptionToQuestion(qIndex)}
-                                  className="text-sm font-semibold px-3 py-1 rounded-lg"
-                                  style={{
-                                    backgroundColor: darkMode ? "rgba(99,102,241,0.15)" : "rgba(99,102,241,0.1)",
-                                    color: "#6366f1",
-                                  }}
-                                >
-                                  + Add option
-                                </button>
+                                <textarea
+                                  required
+                                  value={question.text || ""}
+                                  onChange={(e) => handleUpdateQuestion(qIndex, "text", e.target.value)}
+                                  className="w-full px-4 py-2 rounded-lg resize-y"
+                                  style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
+                                  rows={3}
+                                  placeholder="Enter question text"
+                                  disabled={isSubmitting}
+                                />
                               </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {question.options.map((option, optIndex) => (
-                                  <div key={optIndex}>
-                                    <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                                      Option {String.fromCharCode(65 + optIndex)} <span className="text-red-500">*</span>
-                                    </label>
-                                    <div className="flex gap-2 items-center">
-                                      <input
-                                        type="text"
-                                        required
-                                        value={option}
-                                        onChange={(e) => handleUpdateOption(qIndex, optIndex, e.target.value)}
-                                        className="flex-1 px-4 py-2 rounded-lg"
-                                        style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
-                                        placeholder={`Option ${String.fromCharCode(65 + optIndex)}`}
-                                      />
-                                      <button
-                                        type="button"
-                                        onClick={() => handleUpdateCorrectOption(qIndex, optIndex)}
-                                        className="px-3 py-2 rounded-lg font-semibold text-sm"
-                                        style={{
-                                          backgroundColor: question.correctOptions[optIndex] === 1 ? "#10b981" : inputBg,
-                                          color: question.correctOptions[optIndex] === 1 ? "#fff" : textColor,
-                                          border: `1px solid ${inputBorder}`,
-                                        }}
-                                      >
-                                        {question.correctOptions[optIndex] === 1 ? "✓" : "○"}
-                                      </button>
-                                      {question.options.length > 2 && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleRemoveOptionFromQuestion(qIndex, optIndex)}
-                                          className="text-sm text-red-500 hover:text-red-600"
-                                        >
-                                          Remove
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
 
-                            {/* Removed Difficulty and Category */}
-
-                            {/* Removed Explanation */}
-
-                            {/* Image Upload (multiple) */}
-                            <div>
-                              <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
-                                Question Images
-                              </label>
-                              <input
-                                ref={(el) => {
-                                  fileInputRefs.current[qIndex] = el;
-                                }}
-                                type="file"
-                                multiple
-                                accept="image/*"
-                                onChange={(e) => {
-                                  handleQuestionImageChange(qIndex, e.target.files, question.imagePreviews.length > 0);
-                                  // Reset input để có thể chọn lại file giống nhau
-                                  if (e.target) {
-                                    e.target.value = '';
-                                  }
-                                }}
-                                className="block w-full text-sm file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border file:border-gray-300 file:bg-transparent"
-                              />
-                              {question.imagePreviews.length > 0 && (
-                                <>
-                                  <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-3">
-                                    {question.imagePreviews.map((src, imgIdx) => (
-                                      <div key={imgIdx} className="relative">
-                                        <img
-                                          src={src}
-                                          alt={`Question ${qIndex + 1} image ${imgIdx + 1}`}
-                                          className="w-full max-h-40 object-contain rounded-lg border"
-                                          style={{ borderColor: inputBorder, backgroundColor: darkMode ? 'rgba(15,23,42,0.4)' : '#fff' }}
+                              {/* Options */}
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-sm font-semibold" style={{ color: labelColor }}>
+                                    Options
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddOptionToQuestion(qIndex)}
+                                    className="text-sm font-semibold px-3 py-1 rounded-lg"
+                                    style={{
+                                      backgroundColor: darkMode ? "rgba(99,102,241,0.15)" : "rgba(99,102,241,0.1)",
+                                      color: "#6366f1",
+                                    }}
+                                  >
+                                    + Add option
+                                  </button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  {question.options.map((option, optIndex) => (
+                                    <div key={optIndex}>
+                                      <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
+                                        Option {String.fromCharCode(65 + optIndex)} <span className="text-red-500">*</span>
+                                      </label>
+                                      <div className="flex gap-2 items-center">
+                                        <input
+                                          type="text"
+                                          required
+                                          value={option}
+                                          onChange={(e) => handleUpdateOption(qIndex, optIndex, e.target.value)}
+                                          className="flex-1 px-4 py-2 rounded-lg"
+                                          style={{ backgroundColor: inputBg, border: `1px solid ${inputBorder}`, color: textColor }}
+                                          placeholder={`Option ${String.fromCharCode(65 + optIndex)}`}
                                         />
                                         <button
                                           type="button"
-                                          onClick={() => handleRemoveImageAt(qIndex, imgIdx)}
-                                          className="absolute top-2 right-2 px-2 py-1 rounded-md text-xs font-semibold"
-                                          style={{ backgroundColor: darkMode ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.15)', color: '#ef4444' }}
+                                          onClick={() => handleUpdateCorrectOption(qIndex, optIndex)}
+                                          className="px-3 py-2 rounded-lg font-semibold text-sm"
+                                          style={{
+                                            backgroundColor: question.correctOptions[optIndex] === 1 ? "#10b981" : inputBg,
+                                            color: question.correctOptions[optIndex] === 1 ? "#fff" : textColor,
+                                            border: `1px solid ${inputBorder}`,
+                                          }}
                                         >
-                                          Remove
+                                          {question.correctOptions[optIndex] === 1 ? "✓" : "○"}
                                         </button>
+                                        {question.options.length > 2 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveOptionFromQuestion(qIndex, optIndex)}
+                                            className="text-sm text-red-500 hover:text-red-600"
+                                          >
+                                            Remove
+                                          </button>
+                                        )}
                                       </div>
-                                    ))}
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => fileInputRefs.current[qIndex]?.click()}
-                                    className="mt-3 px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-colors"
-                                    style={{
-                                      backgroundColor: darkMode ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.1)",
-                                      color: "#6366f1",
-                                      border: `2px dashed #6366f1`,
-                                    }}
-                                  >
-                                    <ImagePlus className="w-4 h-4" />
-                                    Chọn thêm ảnh
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
 
-                        {/* Add Next Question Button */}
-                        <button
-                          type="button"
-                          onClick={handleAddQuestion}
-                          className="w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2"
-                          style={{
-                            backgroundColor: darkMode ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.1)",
-                            color: "#6366f1",
-                            border: `2px dashed #6366f1`,
-                          }}
-                        >
-                          <PlusCircle className="w-5 h-5" />
-                          Add Next Question
-                        </button>
+                              {/* Removed Difficulty and Category */}
+
+                              {/* Removed Explanation */}
+
+                              {/* Image Upload (multiple) */}
+                              <div>
+                                <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
+                                  Question Images
+                                </label>
+                                <input
+                                  ref={(el) => {
+                                    fileInputRefs.current[qIndex] = el;
+                                  }}
+                                  type="file"
+                                  multiple
+                                  accept="image/*"
+                                  onChange={(e) => {
+                                    handleQuestionImageChange(qIndex, e.target.files, question.imagePreviews.length > 0);
+                                    // Reset input để có thể chọn lại file giống nhau
+                                    if (e.target) {
+                                      e.target.value = '';
+                                    }
+                                  }}
+                                  className="block w-full text-sm file:mr-3 file:px-3 file:py-2 file:rounded-lg file:border file:border-gray-300 file:bg-transparent"
+                                />
+                                {question.imagePreviews.length > 0 && (
+                                  <>
+                                    <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-3">
+                                      {question.imagePreviews.map((src, imgIdx) => (
+                                        <div key={imgIdx} className="relative">
+                                          <img
+                                            src={src}
+                                            alt={`Question ${qIndex + 1} image ${imgIdx + 1}`}
+                                            className="w-full max-h-40 object-contain rounded-lg border"
+                                            style={{ borderColor: inputBorder, backgroundColor: darkMode ? 'rgba(15,23,42,0.4)' : '#fff' }}
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => handleRemoveImageAt(qIndex, imgIdx)}
+                                            className="absolute top-2 right-2 px-2 py-1 rounded-md text-xs font-semibold"
+                                            style={{ backgroundColor: darkMode ? 'rgba(239,68,68,0.2)' : 'rgba(239,68,68,0.15)', color: '#ef4444' }}
+                                          >
+                                            Remove
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => fileInputRefs.current[qIndex]?.click()}
+                                      className="mt-3 px-4 py-2 rounded-lg font-semibold flex items-center gap-2 transition-colors"
+                                      style={{
+                                        backgroundColor: darkMode ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.1)",
+                                        color: "#6366f1",
+                                        border: `2px dashed #6366f1`,
+                                      }}
+                                    >
+                                      <ImagePlus className="w-4 h-4" />
+                                      Chọn thêm ảnh
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                          );
+                        })}
+
+
 
                         <div className="flex justify-end gap-3 pt-4">
                           <button
@@ -1398,38 +1440,40 @@ export default function QuizManagementPage() {
               </div>
             )}
           </div>
-        </main>
-      </div>
+        </main >
+      </div >
 
       {/* Success Notification */}
-      {showSuccessNotification && (
-        <div
-          className="fixed top-20 right-4 z-[150] animate-slide-in-right"
-          style={{
-            animation: "slideInRight 0.3s ease-out",
-          }}
-        >
+      {
+        showSuccessNotification && (
           <div
-            className="flex items-center gap-3 px-6 py-4 rounded-xl shadow-lg min-w-[320px]"
+            className="fixed top-20 right-4 z-[150] animate-slide-in-right"
             style={{
-              backgroundColor: darkMode ? "rgba(16,185,129,0.95)" : "#10b981",
-              color: "#ffffff",
+              animation: "slideInRight 0.3s ease-out",
             }}
           >
-            <CheckCircle className="w-6 h-6 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="font-semibold">Completed!</p>
-              <p className="text-sm opacity-90">Created questions successfully.</p>
-            </div>
-            <button
-              onClick={() => setShowSuccessNotification(false)}
-              className="ml-2 p-1 rounded-full hover:bg-white/20 transition-colors"
+            <div
+              className="flex items-center gap-3 px-6 py-4 rounded-xl shadow-lg min-w-[320px]"
+              style={{
+                backgroundColor: darkMode ? "rgba(16,185,129,0.95)" : "#10b981",
+                color: "#ffffff",
+              }}
             >
-              <X className="w-4 h-4" />
-            </button>
+              <CheckCircle className="w-6 h-6 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold">Completed!</p>
+                <p className="text-sm opacity-90">Created questions successfully.</p>
+              </div>
+              <button
+                onClick={() => setShowSuccessNotification(false)}
+                className="ml-2 p-1 rounded-full hover:bg-white/20 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Notifications */}
       <div className="fixed top-20 right-4 z-[200] space-y-2">
@@ -1515,7 +1559,7 @@ export default function QuizManagementPage() {
           }
         }
       `}</style>
-    </div>
+    </div >
   );
 }
 

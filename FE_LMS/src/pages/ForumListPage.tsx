@@ -7,9 +7,10 @@ import type { Course } from "../types/course";
 import { courseService } from "../services";
 import AttachmentPreview from "../components/AttachmentPreview";
 import { forumService, type ForumResponse, type ForumType } from "../services/forumService";
-import { Book, BookOpen, Edit3, Eye, Loader2, PlusCircle, RefreshCcw, Trash2, X, User } from "lucide-react";
+import { Edit3, Eye, Loader2, RefreshCcw, Trash2, X, User } from "lucide-react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import MarkdownComposer from "../components/MarkdownComposer";
 
 type SidebarRole = "admin" | "teacher" | "student";
 
@@ -41,15 +42,6 @@ const ForumListPage: React.FC = () => {
   const sidebarRole: SidebarRole =
     user && ["admin", "teacher", "student"].includes(user.role) ? (user.role as SidebarRole) : "student";
   const canManage = user?.role === "admin" || user?.role === "teacher";
-
-  const formatFileSize = (size: number) => {
-    if (!size || Number.isNaN(size)) return "0 B";
-    const units = ["B", "KB", "MB", "GB"];
-    const exponent = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
-    const value = size / 1024 ** exponent;
-    const formatted = exponent === 0 || value >= 10 ? value.toFixed(0) : value.toFixed(1);
-    return `${formatted} ${units[exponent]}`;
-  };
 
   const getInitials = (input?: string) => {
     if (!input) return "U";
@@ -136,26 +128,6 @@ const ForumListPage: React.FC = () => {
     forum: null,
     loading: false,
     error: null,
-  });
-
-  const [createModal, setCreateModal] = useState<{
-    open: boolean;
-    title: string;
-    description: string;
-    forumType: ForumType;
-    isActive: boolean;
-    submitting: boolean;
-    error?: string | null;
-    file: File | null;
-  }>({
-    open: false,
-    title: "",
-    description: "",
-    forumType: "discussion",
-    isActive: true,
-    submitting: false,
-    error: null,
-    file: null,
   });
 
 
@@ -266,12 +238,6 @@ const ForumListPage: React.FC = () => {
   }, [courses, selectedCourseId, selectedCourseSnapshot]);
 
   useEffect(() => {
-    if (!toast) return;
-    const timeout = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(timeout);
-  }, [toast]);
-
-  useEffect(() => {
     if (courseDropdownOpen) return;
     if (selectedCourse?.title) {
       setCourseSearchQuery(selectedCourse.title);
@@ -322,7 +288,7 @@ const ForumListPage: React.FC = () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to load forum detail";
       setDetailModal({ loading: false, forum: null });
-      setToast({ type: "error", message });
+      toast.error(message);
     }
   };
 
@@ -356,37 +322,6 @@ const ForumListPage: React.FC = () => {
       file: null,
     });
 
-  const openCreateModal = () => {
-    if (!canManage) return;
-    if (!selectedCourseId) {
-      setToast({ type: "error", message: "Select a course before creating a post." });
-      return;
-    }
-    setCreateModal((prev) => ({
-      ...prev,
-      open: true,
-      title: "",
-      description: "",
-      forumType: "discussion",
-      isActive: true,
-      submitting: false,
-      error: null,
-      file: null,
-    }));
-  };
-
-  const closeCreateModal = () =>
-    setCreateModal({
-      open: false,
-      title: "",
-      description: "",
-      forumType: "discussion",
-      isActive: true,
-      submitting: false,
-      error: null,
-      file: null,
-    });
-
   const handleUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editModal.forum) return;
@@ -402,7 +337,7 @@ const ForumListPage: React.FC = () => {
         },
         editModal.file || undefined
       );
-      setToast({ type: "success", message: "Forum updated successfully." });
+      toast.success("Forum updated successfully.");
       closeEditModal();
       refreshForums();
     } catch (error) {
@@ -411,35 +346,18 @@ const ForumListPage: React.FC = () => {
     }
   };
 
-  const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!selectedCourseId) {
-      setCreateModal((prev) => ({ ...prev, error: "Please choose a course first." }));
+  const handleCreateForumFromList = () => {
+    if (!selectedCourseId || !selectedCourse) {
+      toast.error("Please select a course first.");
       return;
     }
-    if (!createModal.title.trim() || !createModal.description.trim()) {
-      setCreateModal((prev) => ({ ...prev, error: "Title and content are both required." }));
-      return;
-    }
-    try {
-      setCreateModal((prev) => ({ ...prev, submitting: true, error: null }));
-      await forumService.createForum(
-        {
-          courseId: selectedCourseId,
-          title: createModal.title.trim(),
-          description: createModal.description.trim(),
-          forumType: createModal.forumType,
-          isActive: createModal.isActive,
-        },
-        createModal.file || undefined
-      );
-      setToast({ type: "success", message: "Forum post created." });
-      closeCreateModal();
-      refreshForums();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to create forum post";
-      setCreateModal((prev) => ({ ...prev, submitting: false, error: message }));
-    }
+    const courseTitle = selectedCourse.title ?? "Course";
+    navigate("/forum", {
+      state: {
+        preselectedCourseId: selectedCourseId,
+        preselectedCourseTitle: courseTitle,
+      },
+    });
   };
 
   const openDeleteModal = (forum: ForumResponse) => {
@@ -497,7 +415,14 @@ const ForumListPage: React.FC = () => {
 
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
-
+                <button
+                  type="button"
+                  onClick={handleCreateForumFromList}
+                  disabled={!selectedCourseId || !canManage}
+                  className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
+                >
+                  Create Forum Post
+                </button>
                 <button
                   type="button"
                   onClick={refreshForums}
@@ -769,15 +694,19 @@ const ForumListPage: React.FC = () => {
                                   )}
                                 </span>
                               </div>
-                              <h4
-                                onClick={() => navigate(`/forums/${forum._id}`)}
-                                className={`text-2xl font-bold cursor-pointer transition-colors ${hasBackgroundImage
-                                  ? "text-white drop-shadow-lg hover:text-indigo-200"
-                                  : "text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200"
-                                  }`}
+                              <Link
+                                to={`/forums/${forum._id}`}
+                                className="block"
                               >
-                                {forumTitle}
-                              </h4>
+                                <h4
+                                  className={`text-2xl font-bold cursor-pointer transition-colors ${hasBackgroundImage
+                                    ? "text-white drop-shadow-lg hover:text-indigo-200"
+                                    : "text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200"
+                                    }`}
+                                >
+                                  {forumTitle}
+                                </h4>
+                              </Link>
                               <p className={`text-sm mt-2 line-clamp-3 ${hasBackgroundImage
                                 ? "text-white/90 drop-shadow"
                                 : "text-slate-500"
@@ -867,155 +796,6 @@ const ForumListPage: React.FC = () => {
         </main>
       </div>
 
-      {createModal.open && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
-          <div
-            className={`max-w-4xl w-full rounded-3xl p-6 md:p-8 relative ${darkMode ? "bg-slate-950 text-slate-100" : "bg-white text-slate-900"
-              }`}
-          >
-            <button className="absolute top-5 right-5" onClick={closeCreateModal}>
-              <X className="w-5 h-5" />
-            </button>
-            <form className="grid gap-6 md:grid-cols-2" onSubmit={handleCreate}>
-              <div className="space-y-5">
-                <div >
-                  <p className="text-2xl uppercase tracking-wide text-indigo-400 font-semibold">Create post</p>
-                  <h3 className="text-2xl font-semibold mt-1">Share resources or questions</h3>
-                  {selectedCourse && (
-                    <p className="text-sm text-slate-500 mt-1">
-                      Posting to <span className="font-medium">{selectedCourse.title}</span>
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Title</label>
-                  <input
-                    type="text"
-                    className={`w-full rounded-2xl border px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                      }`}
-                    placeholder="Example: UI design materials"
-                    value={createModal.title}
-                    onChange={(event) => setCreateModal((prev) => ({ ...prev, title: event.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Content (Markdown supported)</label>
-                  <textarea
-                    className={`w-full h-36 rounded-2xl border px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                      }`}
-                    placeholder="Share context, add bullet lists...."
-                    value={createModal.description}
-                    onChange={(event) => setCreateModal((prev) => ({ ...prev, description: event.target.value }))}
-                  ></textarea>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Attachment (optional)</label>
-                  <input
-                    type="file"
-                    accept={attachmentAcceptTypes}
-                    onChange={(event) =>
-                      setCreateModal((prev) => ({
-                        ...prev,
-                        file: event.target.files?.[0] || null,
-                      }))
-                    }
-                    className="w-full rounded-2xl border px-4 py-2.5 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500 cursor-pointer"
-                  />
-                  {createModal.file && (
-                    <div
-                      className={`mt-2 flex items-center justify-between rounded-xl px-3 py-2 text-xs ${darkMode ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-600"
-                        }`}
-                    >
-                      <span className="truncate pr-2">
-                        {createModal.file.name} • {formatFileSize(createModal.file.size)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setCreateModal((prev) => ({ ...prev, file: null }))}
-                        className="text-rose-500 font-semibold hover:text-rose-400"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Topic type</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {(["discussion", "announcement"] as ForumType[]).map((type) => {
-                      const isActive = createModal.forumType === type;
-                      return (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setCreateModal((prev) => ({ ...prev, forumType: type }))}
-                          className={`text-left p-4 rounded-2xl border transition ${isActive
-                            ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-500/20"
-                            : darkMode
-                              ? "border-slate-700 hover:border-slate-500"
-                              : "border-slate-200 hover:border-slate-300"
-                            }`}
-                        >
-                          <p className="font-semibold">{forumTypeLabels[type]}</p>
-                          <p className="text-xs text-slate-500 mt-1">
-                            {type === "discussion"
-                              ? "Perfect for open questions or resource sharing."
-                              : "Use for important, single-source announcements."}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <label className="flex items-center gap-3 text-sm">
-                  <input
-                    type="checkbox"
-                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                    checked={createModal.isActive}
-                    onChange={(event) => setCreateModal((prev) => ({ ...prev, isActive: event.target.checked }))}
-                  />
-                  Allow everyone in the course to participate (active)
-                </label>
-                {createModal.error && <p className="text-sm text-rose-500">{createModal.error}</p>}
-                <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-                  <button
-                    type="submit"
-                    className="inline-flex items-center justify-center rounded-2xl bg-indigo-600 px-5 py-2.5 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
-                    disabled={createModal.submitting}
-                  >
-                    {createModal.submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                    Publish post
-                  </button>
-                  <button
-                    type="button"
-                    onClick={closeCreateModal}
-                    className="rounded-2xl border px-5 py-2.5 font-semibold border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-              <div
-                className={`rounded-2xl border px-4 py-5 h-full ${darkMode ? "bg-slate-900 border-slate-800" : "bg-slate-50 border-slate-200"
-                  }`}
-              >
-                <p className="text-2xl uppercase tracking-wide text-indigo-400 font-semibold mb-2">Live preview</p>
-                <h4 className="text-xl font-semibold mb-3">What learners will see</h4>
-                <div
-                  className={`rounded-2xl border-dashed border px-4 py-6 min-h-[220px] ${darkMode ? "border-slate-700 text-slate-200" : "border-slate-300 text-slate-500"
-                    }`}
-                >
-                  <h5 className="text-lg font-semibold mb-2">
-                    {createModal.title || "Start typing to preview your Markdown formatting."}
-                  </h5>
-
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {detailModal.forum && (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4">
           <div
@@ -1079,42 +859,24 @@ const ForumListPage: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-2">Description</label>
-                <textarea
-                  className={`w-full h-28 rounded-xl border px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                    }`}
+                <label className="block text-sm font-medium mb-2">Content editor</label>
+                <MarkdownComposer
                   value={editModal.description}
-                  onChange={(event) => setEditModal((prev) => ({ ...prev, description: event.target.value }))}
-                ></textarea>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-2">Update attachment</label>
-                <input
-                  type="file"
-                  accept={attachmentAcceptTypes}
-                  onChange={(event) =>
-                    setEditModal((prev) => ({
-                      ...prev,
-                      file: event.target.files?.[0] || null,
-                    }))
-                  }
-                  className="w-full rounded-xl border px-4 py-2.5 text-sm file:mr-4 file:rounded-full file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500 cursor-pointer"
+                  onChange={(next) => setEditModal((prev) => ({ ...prev, description: next }))}
+                  placeholder="Share context, add bullet lists, or embed resources using Markdown shortcuts."
+                  darkMode={darkMode}
+                  attachment={editModal.file}
+                  onAttachmentChange={(file) => setEditModal((prev) => ({ ...prev, file }))}
+                  attachmentAccept={attachmentAcceptTypes}
                 />
                 {editModal.file && (
-                  <div
-                    className={`mt-2 flex items-center justify-between rounded-xl px-3 py-2 text-xs ${darkMode ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-600"
-                      }`}
-                  >
-                    <span className="truncate pr-2">
-                      {editModal.file.name} • {formatFileSize(editModal.file.size)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setEditModal((prev) => ({ ...prev, file: null }))}
-                      className="text-rose-500 font-semibold hover:text-rose-400"
-                    >
-                      Remove
-                    </button>
+                  <div className="mt-3">
+                    <AttachmentPreview
+                      files={[URL.createObjectURL(editModal.file)]}
+                      size="sm"
+                      onImageClick={handleAttachmentPreview}
+                      caption={editModal.file.name}
+                    />
                   </div>
                 )}
               </div>

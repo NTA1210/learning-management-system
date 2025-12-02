@@ -23,7 +23,15 @@ SpecialistSchema.index({ majorId: 1, isActive: 1 });
 
 //hooks
 SpecialistSchema.pre('save', function (next) {
-  this.slug = this.name.toLowerCase().replace(/ /g, '-');
+  this.slug = this.name
+    .normalize('NFD') // tách ký tự và dấu
+    .replace(/[\u0300-\u036f]/g, '') // remove dấu
+    .replace(/đ/g, 'd') // chuyển đ
+    .replace(/Đ/g, 'd') // chuyển Đ
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w-]+/g, '');
   next();
 });
 

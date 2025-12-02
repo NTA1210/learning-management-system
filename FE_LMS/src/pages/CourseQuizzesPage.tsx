@@ -14,12 +14,21 @@ import {
   Trash2,
   Edit2,
   X,
-  Users,
   ShieldOff,
   Loader2,
   BarChart3,
+  ClipboardList,
   MoreVertical,
+  Users,
 } from "lucide-react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import QuizCoursePage from "./QuizCoursePage";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
@@ -171,11 +180,14 @@ export default function CourseQuizzesPage() {
   const fetchBackendPage = useCallback(
     async (pageNumber: number) => {
       if (!courseId) return null;
-      const params = {
-        isPublished: isStudent ? true : undefined,
+      const params: Record<string, any> = {
         page: wrapPaginationValue(pageNumber),
         limit: QUIZZES_PER_PAGE_PARAM,
       };
+      // Students only see published quizzes
+      if (isStudent) {
+        params.isPublished = true;
+      }
       const result = await quizService.getQuizzesByCourseId(courseId, params);
       return {
         active: filterActiveQuizzes(result.data),
@@ -543,8 +555,11 @@ export default function CourseQuizzesPage() {
         isPublished: editForm.isPublished,
       });
 
+      // Force complete cache reset to ensure updated quiz appears
       resetPaginationState();
-      await goToPage(quizzesPage);
+      // Reset to page 1 to ensure fresh data
+      setQuizzesPage(1);
+      await goToPage(1);
 
       handleCloseEdit();
       await showSwalSuccess("Quiz updated successfully");
@@ -902,7 +917,57 @@ export default function CourseQuizzesPage() {
                                       ? "Take Quiz"
                                       : "Unavailable"}
                                   </button>
-                                )}
+                                )}{" "}
+
+                                <>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenStatisticsModal(quiz);
+                                    }}
+                                    className="p-2 rounded hover:bg-green-50 transition-colors"
+                                    style={{ color: "#10b981" }}
+                                    title="View quiz statistics"
+                                  >
+                                    <BarChart3 className="w-4 h-4" />
+                                  </button>
+
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/quizzes/${quiz._id}/attempts`);
+                                    }}
+                                    className="p-2 rounded hover:bg-orange-50 transition-colors"
+                                    style={{ color: "#f97316" }}
+                                    title="Grade / View All Attempts"
+                                  >
+                                    <ClipboardList className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenEditQuiz(quiz);
+                                    }}
+                                    className="p-2 rounded hover:bg-blue-50 transition-colors"
+                                    style={{ color: "#3b82f6" }}
+                                    title="Edit quiz"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteQuiz(quiz._id);
+                                    }}
+                                    disabled={deletingQuizId === quiz._id}
+                                    className="p-2 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                                    style={{ color: "#ef4444" }}
+                                    title="Delete quiz"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </>
+
                               </div>
                             </div>
                           </div>
@@ -964,7 +1029,7 @@ export default function CourseQuizzesPage() {
               <h2 className="text-2xl font-semibold">Edit Quiz</h2>
               <button
                 onClick={handleCloseEdit}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 style={{ color: "var(--heading-text)" }}
               >
                 <X className="w-5 h-5" />
@@ -1253,11 +1318,15 @@ export default function CourseQuizzesPage() {
             onClick={handleCloseStatisticsModal}
           />
           <div
-            className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={handleCloseStatisticsModal}
+          />
+          <div
+            className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl p-6 space-y-4"
             style={{
               backgroundColor: "var(--card-surface)",
               color: "var(--heading-text)",
-              border: "1px solid var(--card-border)",
+              border: "2px solid var(--card-border)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1272,7 +1341,7 @@ export default function CourseQuizzesPage() {
               </div>
               <button
                 onClick={handleCloseStatisticsModal}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 style={{ color: "var(--heading-text)" }}
               >
                 <X className="w-5 h-5" />
@@ -1324,156 +1393,225 @@ export default function CourseQuizzesPage() {
               ) : (
                 <div className="space-y-6">
                   {/* Summary Statistics */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p
-                        className="text-sm"
-                        style={{ color: "var(--muted-text)" }}
-                      >
-                        Total Students
-                      </p>
-                      <p className="text-2xl font-bold mt-1">
-                        {statisticsModal.statistics.totalStudents}
-                      </p>
-                    </div>
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p
-                        className="text-sm"
-                        style={{ color: "var(--muted-text)" }}
-                      >
-                        Submitted
-                      </p>
-                      <p className="text-2xl font-bold mt-1">
-                        {statisticsModal.statistics.submittedCount}
-                      </p>
-                    </div>
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p
-                        className="text-sm"
-                        style={{ color: "var(--muted-text)" }}
-                      >
-                        Average Score
-                      </p>
-                      <p className="text-2xl font-bold mt-1">
-                        {isNaN(statisticsModal.statistics.averageScore) ||
-                        statisticsModal.statistics.averageScore === null
-                          ? "N/A"
-                          : statisticsModal.statistics.averageScore.toFixed(1)}
-                      </p>
-                    </div>
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p
-                        className="text-sm"
-                        style={{ color: "var(--muted-text)" }}
-                      >
-                        Median Score
-                      </p>
-                      <p className="text-2xl font-bold mt-1">
-                        {isNaN(statisticsModal.statistics.medianScore) ||
-                        statisticsModal.statistics.medianScore === null
-                          ? "N/A"
-                          : statisticsModal.statistics.medianScore.toFixed(1)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Score Range */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p
-                        className="text-sm mb-2"
-                        style={{ color: "var(--muted-text)" }}
-                      >
-                        Score Range
-                      </p>
-                      <p className="text-lg font-semibold">
-                        {statisticsModal.statistics.minMax?.min !== undefined &&
-                        statisticsModal.statistics.minMax?.max !== undefined
-                          ? `${statisticsModal.statistics.minMax.min} - ${statisticsModal.statistics.minMax.max}`
-                          : "N/A"}
-                      </p>
-                    </div>
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p
-                        className="text-sm mb-2"
-                        style={{ color: "var(--muted-text)" }}
-                      >
-                        Standard Deviation
-                      </p>
-                      <p className="text-lg font-semibold">
-                        {isNaN(
-                          statisticsModal.statistics.standardDeviationScore
-                        ) ||
-                        statisticsModal.statistics.standardDeviationScore ===
-                          null
-                          ? "N/A"
-                          : statisticsModal.statistics.standardDeviationScore.toFixed(
-                              2
-                            )}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Score Distribution */}
-                  {statisticsModal.statistics.scoreDistribution &&
-                    statisticsModal.statistics.scoreDistribution.length > 0 && (
-                      <div>
-                        <h3 className="text-lg font-semibold mb-3">
-                          Score Distribution
-                        </h3>
-                        <div className="space-y-2">
-                          {statisticsModal.statistics.scoreDistribution.map(
-                            (dist, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center gap-4"
-                              >
-                                <div
-                                  className="w-24 text-sm"
-                                  style={{ color: "var(--muted-text)" }}
-                                >
-                                  {dist.range}
-                                </div>
-                                <div className="flex-1">
-                                  <div
-                                    className="h-6 rounded"
-                                    style={{
-                                      backgroundColor: "var(--card-row-bg)",
-                                      width: `${dist.percentage}`,
-                                      minWidth: dist.count > 0 ? "4px" : "0",
-                                    }}
-                                  />
-                                </div>
-                                <div
-                                  className="w-20 text-sm text-right"
-                                  style={{ color: "var(--muted-text)" }}
-                                >
-                                  {dist.count} ({dist.percentage})
-                                </div>
-                              </div>
-                            )
-                          )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Left Column: Stats */}
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div
+                          className="rounded-lg border-2 p-3 bg-gradient-to-br from-blue-500/10 to-blue-600/10"
+                          style={{ borderColor: "#3b82f6" }}
+                        >
+                          <p
+                            className="text-xs"
+                            style={{ color: "var(--muted-text)" }}
+                          >
+                            Total Students
+                          </p>
+                          <p className="text-xl font-bold mt-1">
+                            {statisticsModal.statistics.totalStudents}
+                          </p>
+                        </div>
+                        <div
+                          className="rounded-lg border-2 p-3 bg-gradient-to-br from-green-500/10 to-green-600/10"
+                          style={{ borderColor: "#10b981" }}
+                        >
+                          <p
+                            className="text-xs"
+                            style={{ color: "var(--muted-text)" }}
+                          >
+                            Submitted
+                          </p>
+                          <p className="text-xl font-bold mt-1">
+                            {statisticsModal.statistics.submittedCount}
+                          </p>
+                        </div>
+                        <div
+                          className="rounded-lg border-2 p-3 bg-gradient-to-br from-purple-500/10 to-purple-600/10"
+                          style={{ borderColor: "#8b5cf6" }}
+                        >
+                          <p
+                            className="text-xs"
+                            style={{ color: "var(--muted-text)" }}
+                          >
+                            Avg Score
+                          </p>
+                          <p className="text-xl font-bold mt-1">
+                            {isNaN(statisticsModal.statistics.averageScore) ||
+                              statisticsModal.statistics.averageScore === null
+                              ? "N/A"
+                              : statisticsModal.statistics.averageScore.toFixed(
+                                1
+                              )}
+                          </p>
+                        </div>
+                        <div
+                          className="rounded-lg border-2 p-3 bg-gradient-to-br from-orange-500/10 to-orange-600/10"
+                          style={{ borderColor: "#f97316" }}
+                        >
+                          <p
+                            className="text-xs"
+                            style={{ color: "var(--muted-text)" }}
+                          >
+                            Median
+                          </p>
+                          <p className="text-xl font-bold mt-1">
+                            {isNaN(statisticsModal.statistics.medianScore) ||
+                              statisticsModal.statistics.medianScore === null
+                              ? "N/A"
+                              : statisticsModal.statistics.medianScore.toFixed(
+                                1
+                              )}
+                          </p>
                         </div>
                       </div>
-                    )}
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div
+                          className="rounded-lg border-2 p-3"
+                          style={{
+                            borderColor: "var(--heading-text)",
+                            opacity: 0.8,
+                          }}
+                        >
+                          <p
+                            className="text-xs mb-1"
+                            style={{ color: "var(--muted-text)" }}
+                          >
+                            Score Range
+                          </p>
+                          <p className="text-base font-semibold">
+                            {statisticsModal.statistics.minMax?.min !==
+                              undefined &&
+                              statisticsModal.statistics.minMax?.max !== undefined
+                              ? `${statisticsModal.statistics.minMax.min} - ${statisticsModal.statistics.minMax.max}`
+                              : "N/A"}
+                          </p>
+                        </div>
+                        <div
+                          className="rounded-lg border-2 p-3"
+                          style={{
+                            borderColor: "var(--heading-text)",
+                            opacity: 0.8,
+                          }}
+                        >
+                          <p
+                            className="text-xs mb-1"
+                            style={{ color: "var(--muted-text)" }}
+                          >
+                            Std Deviation
+                          </p>
+                          <p className="text-base font-semibold">
+                            {isNaN(
+                              statisticsModal.statistics.standardDeviationScore
+                            ) ||
+                              statisticsModal.statistics
+                                .standardDeviationScore === null
+                              ? "N/A"
+                              : statisticsModal.statistics.standardDeviationScore.toFixed(
+                                2
+                              )}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column: Chart */}
+                    {statisticsModal.statistics.scoreDistribution &&
+                      statisticsModal.statistics.scoreDistribution.length >
+                      0 && (
+                        <div
+                          className="flex flex-col items-center justify-center rounded-lg border-2 p-4 shadow-md"
+                          style={{ borderColor: "var(--card-border)", borderWidth: "3px" }}
+                        >
+                          <h3 className="text-sm font-semibold mb-2">
+                            Score Distribution
+                          </h3>
+                          <div className="w-full h-48">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={statisticsModal.statistics.scoreDistribution.map(
+                                    (d) => ({
+                                      name: d.range,
+                                      value: d.count,
+                                      percentage: d.percentage,
+                                    })
+                                  )}
+                                  cx="50%"
+                                  cy="50%"
+                                  innerRadius={40}
+                                  outerRadius={70}
+                                  paddingAngle={2}
+                                  dataKey="value"
+                                >
+                                  {statisticsModal.statistics.scoreDistribution.map(
+                                    (_, index) => {
+                                      // Softer/Pastel Palette
+                                      // Red -> Orange -> Yellow -> Blue -> Green
+                                      const colors = [
+                                        "#F87171",
+                                        "#FB923C",
+                                        "#FACC15",
+                                        "#60A5FA",
+                                        "#4ADE80",
+                                      ];
+                                      return (
+                                        <Cell
+                                          key={`cell-${index}`}
+                                          fill={colors[index % colors.length]}
+                                        />
+                                      );
+                                    }
+                                  )}
+                                </Pie>
+                                <Tooltip
+                                  formatter={(
+                                    value: number,
+                                    _: string,
+                                    props: any
+                                  ) => {
+                                    // Parse percentage string (e.g. "25.5%") to number, round it, and add % back
+                                    const rawPercent = parseFloat(
+                                      props.payload.percentage.replace("%", "")
+                                    );
+                                    const roundedPercent =
+                                      Math.round(rawPercent);
+                                    return [
+                                      `${roundedPercent}% - ${value} students`,
+                                      null,
+                                    ];
+                                  }}
+                                  contentStyle={{
+                                    backgroundColor: "var(--card-surface)",
+                                    borderColor: "var(--card-border)",
+                                    color: "var(--heading-text)",
+                                    borderRadius: "8px",
+                                    fontSize: "12px",
+                                    boxShadow:
+                                      "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                                  }}
+                                  itemStyle={{ color: "var(--heading-text)" }}
+                                  labelStyle={{ display: "none" }}
+                                />
+                                <Legend
+                                  layout="vertical"
+                                  verticalAlign="middle"
+                                  align="right"
+                                  wrapperStyle={{ fontSize: "10px" }}
+                                  formatter={(value, entry: any) => (
+                                    <span
+                                      style={{ color: "var(--muted-text)" }}
+                                    >
+                                      {value}
+                                    </span>
+                                  )}
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      )}
+                  </div>
 
                   {/* Students List */}
                   <div>

@@ -140,11 +140,39 @@ export const quizQuestionService = {
       });
     }
 
-    const response = await http.put(`/quiz-questions/${questionId}`, formData, {
+    const response = await http.put<{ data: QuizQuestion }>(`/quiz-questions/${questionId}`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
     return response.data;
+  },
+
+  // Upload images to a quiz question
+  uploadQuestionImages: async (questionId: string, images: File[], quizId?: string): Promise<QuizQuestion> => {
+    const formData = new FormData();
+    images.forEach((file) => {
+      formData.append('files', file);
+    });
+
+    if (quizId) {
+      formData.append('quizId', quizId);
+    }
+
+    let url = `/quiz-questions/images?questionId=${questionId}`;
+    if (quizId) {
+      url += `&quizId=${quizId}`;
+    }
+
+    const response = await http.post<{ data: QuizQuestion }>(url, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+
+    return response.data;
+  },
+
+  // Delete a single image from quiz questions
+  deleteQuestionImage: async (imageUrl: string): Promise<void> => {
+    await http.del(`/quiz-questions/image?url=${encodeURIComponent(imageUrl)}`);
   },
 
   importQuizFromXml: async (subjectId: string, file: File) => {
