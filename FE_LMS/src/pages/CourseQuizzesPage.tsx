@@ -918,7 +918,7 @@ export default function CourseQuizzesPage() {
                                       : "Unavailable"}
                                   </button>
                                 )}{" "}
-                                : (
+
                                 <>
                                   <button
                                     onClick={(e) => {
@@ -967,7 +967,7 @@ export default function CourseQuizzesPage() {
                                     <Trash2 className="w-4 h-4" />
                                   </button>
                                 </>
-                                )
+
                               </div>
                             </div>
                           </div>
@@ -1437,11 +1437,11 @@ export default function CourseQuizzesPage() {
                           </p>
                           <p className="text-xl font-bold mt-1">
                             {isNaN(statisticsModal.statistics.averageScore) ||
-                            statisticsModal.statistics.averageScore === null
+                              statisticsModal.statistics.averageScore === null
                               ? "N/A"
                               : statisticsModal.statistics.averageScore.toFixed(
-                                  1
-                                )}
+                                1
+                              )}
                           </p>
                         </div>
                         <div
@@ -1456,11 +1456,11 @@ export default function CourseQuizzesPage() {
                           </p>
                           <p className="text-xl font-bold mt-1">
                             {isNaN(statisticsModal.statistics.medianScore) ||
-                            statisticsModal.statistics.medianScore === null
+                              statisticsModal.statistics.medianScore === null
                               ? "N/A"
                               : statisticsModal.statistics.medianScore.toFixed(
-                                  1
-                                )}
+                                1
+                              )}
                           </p>
                         </div>
                       </div>
@@ -1482,7 +1482,7 @@ export default function CourseQuizzesPage() {
                           <p className="text-base font-semibold">
                             {statisticsModal.statistics.minMax?.min !==
                               undefined &&
-                            statisticsModal.statistics.minMax?.max !== undefined
+                              statisticsModal.statistics.minMax?.max !== undefined
                               ? `${statisticsModal.statistics.minMax.min} - ${statisticsModal.statistics.minMax.max}`
                               : "N/A"}
                           </p>
@@ -1504,12 +1504,12 @@ export default function CourseQuizzesPage() {
                             {isNaN(
                               statisticsModal.statistics.standardDeviationScore
                             ) ||
-                            statisticsModal.statistics
-                              .standardDeviationScore === null
+                              statisticsModal.statistics
+                                .standardDeviationScore === null
                               ? "N/A"
                               : statisticsModal.statistics.standardDeviationScore.toFixed(
-                                  2
-                                )}
+                                2
+                              )}
                           </p>
                         </div>
                       </div>
@@ -1518,10 +1518,10 @@ export default function CourseQuizzesPage() {
                     {/* Right Column: Chart */}
                     {statisticsModal.statistics.scoreDistribution &&
                       statisticsModal.statistics.scoreDistribution.length >
-                        0 && (
+                      0 && (
                         <div
-                          className="flex flex-col items-center justify-center rounded-lg border-2 p-4"
-                          style={{ borderColor: "var(--card-border)" }}
+                          className="flex flex-col items-center justify-center rounded-lg border-2 p-4 shadow-md"
+                          style={{ borderColor: "var(--card-border)", borderWidth: "3px" }}
                         >
                           <h3 className="text-sm font-semibold mb-2">
                             Score Distribution
@@ -1612,156 +1612,6 @@ export default function CourseQuizzesPage() {
                         </div>
                       )}
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p
-                        className="text-sm"
-                        style={{ color: "var(--muted-text)" }}
-                      >
-                        Total Students
-                      </p>
-                      <p className="text-2xl font-bold mt-1">
-                        {statisticsModal.statistics.totalStudents}
-                      </p>
-                    </div>
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p
-                        className="text-sm"
-                        style={{ color: "var(--muted-text)" }}
-                      >
-                        Submitted
-                      </p>
-                      <p className="text-2xl font-bold mt-1">
-                        {statisticsModal.statistics.submittedCount}
-                      </p>
-                    </div>
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p
-                        className="text-sm"
-                        style={{ color: "var(--muted-text)" }}
-                      >
-                        Average Score
-                      </p>
-                      <p className="text-2xl font-bold mt-1">
-                        {isNaN(statisticsModal.statistics.averageScore) ||
-                        statisticsModal.statistics.averageScore === null
-                          ? "N/A"
-                          : statisticsModal.statistics.averageScore.toFixed(1)}
-                      </p>
-                    </div>
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p
-                        className="text-sm"
-                        style={{ color: "var(--muted-text)" }}
-                      >
-                        Median Score
-                      </p>
-                      <p className="text-2xl font-bold mt-1">
-                        {isNaN(statisticsModal.statistics.medianScore) ||
-                        statisticsModal.statistics.medianScore === null
-                          ? "N/A"
-                          : statisticsModal.statistics.medianScore.toFixed(1)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Score Range */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p
-                        className="text-sm mb-2"
-                        style={{ color: "var(--muted-text)" }}
-                      >
-                        Score Range
-                      </p>
-                      <p className="text-lg font-semibold">
-                        {statisticsModal.statistics.minMax?.min !== undefined &&
-                        statisticsModal.statistics.minMax?.max !== undefined
-                          ? `${statisticsModal.statistics.minMax.min} - ${statisticsModal.statistics.minMax.max}`
-                          : "N/A"}
-                      </p>
-                    </div>
-                    <div
-                      className="rounded-lg border p-4"
-                      style={{ borderColor: "var(--card-border)" }}
-                    >
-                      <p
-                        className="text-sm mb-2"
-                        style={{ color: "var(--muted-text)" }}
-                      >
-                        Standard Deviation
-                      </p>
-                      <p className="text-lg font-semibold">
-                        {isNaN(
-                          statisticsModal.statistics.standardDeviationScore
-                        ) ||
-                        statisticsModal.statistics.standardDeviationScore ===
-                          null
-                          ? "N/A"
-                          : statisticsModal.statistics.standardDeviationScore.toFixed(
-                              2
-                            )}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Score Distribution */}
-                  {statisticsModal.statistics.scoreDistribution &&
-                    statisticsModal.statistics.scoreDistribution.length > 0 && (
-                      <div>
-                        <h3 className="text-lg font-semibold mb-3">
-                          Score Distribution
-                        </h3>
-                        <div className="space-y-2">
-                          {statisticsModal.statistics.scoreDistribution.map(
-                            (dist, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center gap-4"
-                              >
-                                <div
-                                  className="w-24 text-sm"
-                                  style={{ color: "var(--muted-text)" }}
-                                >
-                                  {dist.range}
-                                </div>
-                                <div className="flex-1">
-                                  <div
-                                    className="h-6 rounded"
-                                    style={{
-                                      backgroundColor: "var(--card-row-bg)",
-                                      width: `${dist.percentage}`,
-                                      minWidth: dist.count > 0 ? "4px" : "0",
-                                    }}
-                                  />
-                                </div>
-                                <div
-                                  className="w-20 text-sm text-right"
-                                  style={{ color: "var(--muted-text)" }}
-                                >
-                                  {dist.count} ({dist.percentage})
-                                </div>
-                              </div>
-                            )
-                          )}
-                        </div>
-                      </div>
-                    )}
 
                   {/* Students List */}
                   <div>
