@@ -89,6 +89,7 @@ export type ListCoursesParams = {
   sortBy?: string;
   sortOrder?: string;
   userRole?: Role; // ✅ FIX: Added to check permissions for viewing deleted courses
+  userId?: Types.ObjectId; // ✅ NEW: User ID for teacher check
 };
 
 /**
@@ -118,6 +119,7 @@ export const listCourses = async ({
   sortBy = 'createdAt',
   sortOrder = 'desc',
   userRole,
+  userId,
 }: ListCoursesParams) => {
   // ❌ FIX: Validate pagination parameters
   appAssert(page > 0 && page <= 10000, BAD_REQUEST, 'Page must be between 1 and 10000');
@@ -279,8 +281,23 @@ export const listCourses = async ({
   const hasNextPage = page < totalPages;
   const hasPrevPage = page > 1;
 
+  // ✅ Add isTeacher field to each course for teacher role
+  const coursesWithTeacherFlag = courses.map((course) => {
+    const isTeacher = userId
+      ? course.teacherIds.some((teacherId: any) =>
+        teacherId._id?.toString() === userId.toString() ||
+        teacherId.toString() === userId.toString()
+      )
+      : false;
+
+    return {
+      ...course,
+      isTeacher,
+    };
+  });
+
   return {
-    courses,
+    courses: coursesWithTeacherFlag,
     pagination: {
       total,
       page,
