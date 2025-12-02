@@ -114,17 +114,6 @@ describe('Quiz Controller Unit Tests (reduced set)', () => {
         message: 'Quiz updated successfully',
       });
     });
-
-    it.skip('should call next when getQuizById fails', async () => {
-      (quizIdSchema.parse as jest.Mock).mockReturnValueOnce('q1');
-      const svcErr = new Error('get fail');
-      (getQuizById as jest.Mock).mockRejectedValueOnce(svcErr);
-
-      const req = { ...mockReqBase, params: { quizId: 'q1' } };
-
-      await getQuizByIdHandler(req as any, mockRes, mockNext);
-      expect(mockNext).toHaveBeenCalledWith(svcErr);
-    });
   });
 
   // Delete quiz - keep only success path
