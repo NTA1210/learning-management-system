@@ -30,10 +30,12 @@ function Chat() {
         color: darkMode ? "#e5e7eb" : "#0f172a",
       }}
     >
-      <div className="w-full sm:w-1/3 sm:max-w-[456px] min-h-screen border-r border-gray-200/70 dark:border-slate-700/60">
+      {/* Sidebar - hidden on mobile when a chat is selected */}
+      <div className={`w-full sm:w-1/3 sm:max-w-[456px] min-h-screen border-r border-gray-200/70 dark:border-slate-700/60 ${selectedChatRoom ? 'hidden sm:block' : 'block'}`}>
         <ChatSidebar />
       </div>
-      <div className="flex-1 hidden min-h-screen sm:flex">
+      {/* Chat Window - shown on mobile only when a chat is selected, always shown on desktop */}
+      <div className={`flex-1 min-h-screen ${selectedChatRoom ? 'flex' : 'hidden sm:flex'}`}>
         <ChatWindow />
       </div>
     </div>

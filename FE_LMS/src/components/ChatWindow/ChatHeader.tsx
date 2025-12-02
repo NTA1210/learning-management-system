@@ -1,5 +1,5 @@
 import type React from "react";
-import { EllipsisVertical, X, UserPlus, Video, Phone } from "lucide-react";
+import { EllipsisVertical, UserPlus, Video, Phone } from "lucide-react";
 import { useChatRoomStore } from "../../stores/chatRoomStore";
 import { useEffect, useState } from "react";
 import Modal from "./components/Modal";
@@ -75,6 +75,18 @@ const ChatHeader: React.FC = () => {
       }}
     >
       <div className="flex items-center space-x-3">
+        {/* Back button for mobile */}
+        <button
+          onClick={() => setSelectedChatRoom(null)}
+          className="sm:hidden p-1.5 -ml-1 mr-1 rounded-lg transition-colors"
+          style={{
+            color: darkMode ? "#9ca3af" : "#6b7280",
+          }}
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
         <img
           src={selectedChatRoom?.course?.logo || "https://shorturl.at/ARotg"}
           alt="User image"
@@ -166,12 +178,6 @@ const ChatHeader: React.FC = () => {
               </span>
             </div>
           )}
-        </button>
-        <button
-          onClick={() => setSelectedChatRoom(null)}
-          className="text-gray-500 cursor-pointer sm:hidden hover:text-gray-700"
-        >
-          <X className="size-4" />
         </button>
       </div>
 
