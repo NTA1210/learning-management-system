@@ -465,8 +465,8 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        <Route path="/blog" element={<BlogPage />} />
-        <Route path="/blog/:slug" element={<BlogDetailPage />} />
+        <Route path="/blogs" element={<BlogPage />} />
+        <Route path="/blogs/:slug" element={<BlogDetailPage />} />
         {/* Not found */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

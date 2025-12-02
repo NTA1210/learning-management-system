@@ -375,10 +375,17 @@ export default function Dashboard() {
                     "Courses",
                     "Enrollments",
                     "Announcements",
+                    "Blogs",
                   ].map((tab) => (
                     <button
                       key={tab}
-                      onClick={() => setActiveTab(tab)}
+                      onClick={() => {
+                        if (tab === "Blogs") {
+                          navigate("/blogs");
+                        } else {
+                          setActiveTab(tab);
+                        }
+                      }}
                       className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
                         tab === activeTab ? "" : "border-transparent"
                       }`}
