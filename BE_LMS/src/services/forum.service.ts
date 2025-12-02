@@ -726,7 +726,8 @@ export const updateForumReplyById = async (
 export const deleteForumReplyById = async (
     postId: string,
     replyId: string,
-    authorId: string
+    authorId: string,
+    role: Role
 ) => {
     // Verify post exists
     const post = await ForumPostModel.findById(postId);
@@ -735,19 +736,23 @@ export const deleteForumReplyById = async (
     const reply = await ForumReplyModel.findOne({_id: replyId, postId});
     appAssert(reply, NOT_FOUND, "Reply not found");
 
-    // Check if user is the author
-    appAssert(
-        reply.authorId.toString() === authorId,
-        FORBIDDEN,
-        "You can only delete your own replies"
-    );
+    if (role === Role.TEACHER || role === Role.ADMIN) {
+        // Allow deletion
+    } else {
+        // Check if user is the author
+        appAssert(
+            reply.authorId.toString() === authorId,
+            FORBIDDEN,
+            "You can only delete your own replies"
+        );
+    }
 
     // Delete nested replies
     const children = await ForumReplyModel.deleteMany({parentReplyId: replyId});
 
     // Decrement reply count in post
     await ForumPostModel.findByIdAndUpdate(postId, {
-        $inc: {replyCount: -children.deletedCount},
+        $inc: {replyCount: -(children.deletedCount + 1)},
     });
 
     return ForumReplyModel.deleteOne({_id: replyId});

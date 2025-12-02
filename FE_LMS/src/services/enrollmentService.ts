@@ -9,11 +9,16 @@ export interface EnrollmentUser {
 
 export interface EnrollmentItem {
   _id: string;
-  userId: EnrollmentUser;
+  userId?: EnrollmentUser; // Legacy field - some endpoints return this
+  studentId?: EnrollmentUser; // Actual API returns studentId for getByCourse
   courseId: string;
   status: string;
   role: string;
-  enrolledAt: string;
+  enrolledAt?: string;
+  method?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  respondedAt?: string;
 }
 
 export interface PaginationMeta {

@@ -2,6 +2,7 @@ import http from "../utils/http";
 
 export interface SnapshotQuestionPayload {
   id?: string;
+  _id?: string;
   text: string;
   type: string;
   options: string[];
@@ -28,6 +29,7 @@ export interface CreateQuizPayload {
 
 export interface SnapshotQuestion {
   id?: string;
+  _id?: string;
   text: string;
   type: string;
   options: string[];
@@ -111,7 +113,7 @@ export const quizService = {
   createQuiz: async (payload: CreateQuizPayload): Promise<QuizResponse> => {
     // MANDATORY: Normalize all snapshot questions to ensure text fields are strings
     const normalizedSnapshots = (payload.snapshotQuestions ?? []).map(normalizeSnapshotForAPI);
-    
+
     const response = await http.post<QuizResponse>("/quizzes", {
       courseId: payload.courseId,
       title: payload.title,
@@ -164,7 +166,7 @@ export const quizService = {
           // If already a string, use it as-is (may contain quotes like "5" for JSON string format)
           // If number or boolean, convert to string
           if (typeof value === 'string') {
-          queryParams[key] = value;
+            queryParams[key] = value;
           } else if (typeof value === 'number') {
             queryParams[key] = String(value);
           } else if (typeof value === 'boolean') {
@@ -176,7 +178,7 @@ export const quizService = {
         }
       });
     }
-    
+
     const response = await http.get<{
       success: boolean;
       data: QuizResponse[];
@@ -220,13 +222,14 @@ export const quizService = {
   deleteQuestionById: async (quizId: string, questionId: string): Promise<QuizResponse> => {
     // Get current quiz
     const quiz = await quizService.getQuizById(quizId);
-    
+
     // Mark question as deleted - ensure isNewQuestion is false for existing questions
-    const updatedQuestions = (quiz.snapshotQuestions || []).map((q) =>
-      q.id === questionId 
-        ? { ...q, isDeleted: true, isDirty: true, isNewQuestion: false } 
-        : q
-    );
+    const updatedQuestions = (quiz.snapshotQuestions || []).map((q) => {
+      const currentId = q.id || q._id;
+      return currentId === questionId
+        ? { ...q, id: currentId, isDeleted: true, isDirty: true, isNewQuestion: false }
+        : q;
+    });
 
     // Update quiz with deleted question
     return await quizService.updateQuiz(quizId, {
@@ -242,28 +245,30 @@ export const quizService = {
    * @returns Updated quiz
    */
   updateQuestionById: async (
-    quizId: string, 
-    questionId: string, 
+    quizId: string,
+    questionId: string,
     questionData: Partial<SnapshotQuestionPayload>
   ): Promise<QuizResponse> => {
     // Get current quiz
     const quiz = await quizService.getQuizById(quizId);
-    
+
     // Update the question - mark as dirty and not new
     // Keep original isExternal value - this is a snapshot, not updating the original question in DB
-    const updatedQuestions = (quiz.snapshotQuestions || []).map((q) =>
-      q.id === questionId 
-        ? { 
-            ...q, 
-            ...questionData,
-            isDirty: true, 
-            isNewQuestion: false, // Ensure it's not treated as a new question
-            isDeleted: false,
-            // Keep original isExternal - don't change it, this is just updating the snapshot
-            isExternal: q.isExternal ?? true
-          } 
-        : q
-    );
+    const updatedQuestions = (quiz.snapshotQuestions || []).map((q) => {
+      const currentId = q.id || q._id;
+      return currentId === questionId
+        ? {
+          ...q,
+          ...questionData,
+          id: currentId, // Ensure ID is present for backend mapping
+          isDirty: true,
+          isNewQuestion: false, // Ensure it's not treated as a new question
+          isDeleted: false,
+          // Keep original isExternal - don't change it, this is just updating the snapshot
+          isExternal: q.isExternal ?? true
+        }
+        : q;
+    });
 
     // Update quiz with updated question
     return await quizService.updateQuiz(quizId, {

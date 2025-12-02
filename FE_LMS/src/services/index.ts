@@ -17,6 +17,11 @@ export * from './semesterService';
 export * from './attendanceService';
 export * from './forumService';
 export * from './sessionService';
+export * from './scheduleService';
+export * from './assignmentService';
+export * from './submissionService';
+export * from './announcementService';
+export * from './notificationService';
 
 // storage keys
 const USER_STORAGE_KEY = 'lms:user';

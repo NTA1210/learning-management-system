@@ -80,6 +80,7 @@ export default function TakeQuizPage() {
     message?: string;
   }>({ status: "idle" });
   const restoredAttemptRef = useRef(false);
+  const completedAttemptFetchKeyRef = useRef<string | null>(null);
   const storageKey = quizId ? `quizAttempt:${quizId}` : null;
   const banStorageKey = quizId ? `quizBan:${quizId}` : null;
   const completedAttemptKey = quizId ? `quizCompleted:${quizId}` : null;
@@ -292,9 +293,15 @@ export default function TakeQuizPage() {
   const loadCompletedAttempt = useCallback(async () => {
     if (!quizId || !user?._id || submitted || quizAttemptId) return;
 
+    const lookupKey = `${quizId}:${user._id}`;
+    if (completedAttemptFetchKeyRef.current === lookupKey) {
+      return;
+    }
+    completedAttemptFetchKeyRef.current = lookupKey;
+
     try {
       setLoadingCompletedAttempt(true);
-      
+
       // First, check localStorage for cached attempt
       if (completedAttemptKey) {
         const cached = localStorage.getItem(completedAttemptKey);
@@ -324,11 +331,11 @@ export default function TakeQuizPage() {
 
       // If not in cache or cache invalid, get from API
       const attempts = await quizAttemptService.getAttemptsByQuiz(quizId);
-      
+
       // Find submitted attempt for current user
       const userAttempt = attempts.find((attempt) => {
-        const studentId = typeof attempt.studentId === "string" 
-          ? attempt.studentId 
+        const studentId = typeof attempt.studentId === "string"
+          ? attempt.studentId
           : attempt.studentId?._id;
         return studentId === user._id && attempt.status === "submitted";
       });
@@ -337,19 +344,19 @@ export default function TakeQuizPage() {
         // Found completed attempt, load it directly
         console.log("Found completed attempt:", userAttempt._id);
         setQuizAttemptId(userAttempt._id);
-        
+
         // Load attempt details immediately
         try {
           const attemptDetail = await quizAttemptService.getQuizAttempt(userAttempt._id);
           const latestAttempt = applyAttemptSnapshot(attemptDetail);
-          
+
           if (latestAttempt && latestAttempt.status === "submitted") {
             // Restore answers
             if (Array.isArray(latestAttempt.answers)) {
               const restored = mapAnswersFromAttempt(latestAttempt.answers);
               setAnswers(restored);
             }
-            
+
             // Derive and set result
             const derived = deriveResultFromAttempt(latestAttempt, quiz);
             if (derived) {
@@ -362,7 +369,7 @@ export default function TakeQuizPage() {
           console.error("Failed to load attempt details:", error);
           // Fallback: let useEffect handle it
         }
-        
+
         // Save to localStorage for future reference
         if (completedAttemptKey) {
           localStorage.setItem(completedAttemptKey, JSON.stringify({
@@ -374,11 +381,12 @@ export default function TakeQuizPage() {
       }
     } catch (error) {
       console.error("Failed to load completed attempt:", error);
-      // Silently fail - user can still enter password if needed
+      // Don't reset the key on error, just silently fail
+      // completedAttemptFetchKeyRef.current = null;
     } finally {
       setLoadingCompletedAttempt(false);
     }
-  }, [quizId, user?._id, submitted, quizAttemptId, completedAttemptKey, quiz, applyAttemptSnapshot, mapAnswersFromAttempt, deriveResultFromAttempt]);
+  }, [quizId, user?._id, submitted, quizAttemptId, completedAttemptKey, quiz, applyAttemptSnapshot]);
 
   useEffect(() => {
     if (!quizId) {
@@ -388,8 +396,10 @@ export default function TakeQuizPage() {
 
     if (quiz) {
       setLoading(false);
-      // Try to load completed attempt after quiz is loaded
-      loadCompletedAttempt();
+      // Only load completed attempt once when quiz is available
+      if (!completedAttemptFetchKeyRef.current) {
+        loadCompletedAttempt();
+      }
       return;
     }
 
@@ -398,8 +408,6 @@ export default function TakeQuizPage() {
         setLoading(true);
         const quizData = await quizService.getQuizById(quizId);
         setQuiz(quizData);
-        // Try to load completed attempt after quiz is loaded
-        await loadCompletedAttempt();
       } catch (error) {
         console.error("Failed to fetch quiz:", error);
         const message = getErrorMessage(error, "Failed to load quiz");
@@ -583,7 +591,7 @@ export default function TakeQuizPage() {
     try {
       setEnrolling(true);
       setPasswordError("");
-      
+
       const attempt = await quizAttemptService.enrollQuiz({
         quizId,
         hashPassword: password.trim(),
@@ -972,9 +980,8 @@ export default function TakeQuizPage() {
                       <button
                         key={idx}
                         onClick={() => goToQuestion(idx)}
-                        className={`w-8 h-8 rounded-full text-sm font-semibold ${
-                          idx === currentQuestionIndex ? "text-white" : ""
-                        }`}
+                        className={`w-8 h-8 rounded-full text-sm font-semibold ${idx === currentQuestionIndex ? "text-white" : ""
+                          }`}
                         style={{
                           backgroundColor: idx === currentQuestionIndex ? "#6d28d9" : "var(--card-surface)",
                           border: "1px solid var(--card-border)",
@@ -1106,7 +1113,7 @@ export default function TakeQuizPage() {
                       (a: QuizAnswer) => a.questionId === question.id
                     );
                     const isCorrect = answerData?.correct;
-                    
+
                     return (
                       <div
                         key={question.id || index}

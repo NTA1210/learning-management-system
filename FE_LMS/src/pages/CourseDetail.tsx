@@ -11,6 +11,7 @@ import type { TabType } from "../components/courses/CourseTabsNavigation";
 import LessonsTab from "../components/courses/LessonsTab";
 import AssignmentsTab from "../components/courses/AssignmentsTab";
 import AttendanceTab from "../components/courses/AttendanceTab";
+import ScheduleTab from "../components/courses/ScheduleTab";
 import StaticCourseTab from "../components/courses/StaticCourseTab";
 import { courseService } from "../services";
 import type { Course } from "../types/course";
@@ -683,6 +684,9 @@ export default function CourseDetail() {
                 )}
                 {activeTab === "attendance" && course?._id && (
                   <AttendanceTab courseId={course._id} darkMode={isDarkMode} />
+                )}
+                {activeTab === "schedule" && course?._id && (
+                  <ScheduleTab courseId={course._id} darkMode={isDarkMode} />
                 )}
                 {activeTab === "static" && course?._id && (
                   <StaticCourseTab courseId={course._id} darkMode={isDarkMode} />
