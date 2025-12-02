@@ -298,24 +298,10 @@ function AppRoutes() {
         />
 
         {/* About Us */}
-        <Route
-          path="/help/about"
-          element={
-            <ProtectedRoute>
-              <AboutUsPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/help/about" element={<AboutUsPage />} />
 
         {/* FAQ */}
-        <Route
-          path="/help/faq"
-          element={
-            <ProtectedRoute>
-              <FAQPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="/help/faq" element={<FAQPage />} />
 
         {/* Feedback */}
         <Route
