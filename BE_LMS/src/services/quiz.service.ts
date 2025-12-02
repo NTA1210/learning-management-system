@@ -127,7 +127,9 @@ export const updateQuiz = async (
     startTime,
     endTime,
     shuffleQuestions,
+    isPublished,
     snapshotQuestions,
+    isChangePassword,
   }: UpdateQuiz,
   userId: mongoose.Types.ObjectId,
   role: Role
@@ -247,9 +249,14 @@ export const updateQuiz = async (
     }
     quiz.endTime = endTime;
   }
+  quiz.isPublished = isPublished ?? quiz.isPublished;
   quiz.shuffleQuestions = shuffleQuestions ?? quiz.shuffleQuestions;
 
+  if (isChangePassword) {
+    quiz.hashPassword = quiz.generateHashPassword();
+  }
   await quiz.save();
+
   return quiz;
 };
 
