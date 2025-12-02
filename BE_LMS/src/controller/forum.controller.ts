@@ -105,6 +105,9 @@ export const updateForumByIdHandler = catchErrors(async (req, res) => {
     const forumId = forumIdSchema.parse(req.params.id);
     const data = updateForumSchema.parse(parseFormData(req.body));
 
+    const userId = req.userId;
+    const role = req.role;
+
     let file: Express.Multer.File | Express.Multer.File[] | undefined;
 
     if (req.files && Array.isArray(req.files) && req.files.length > 0) {
@@ -115,7 +118,7 @@ export const updateForumByIdHandler = catchErrors(async (req, res) => {
         file = req.file;
     }
 
-    const forum = await updateForumById(forumId, data, file);
+    const forum = await updateForumById(forumId, data, userId.toString(), role, file);
 
     return res.success(OK, {
         message: "Forum updated successfully",
@@ -221,7 +224,7 @@ export const updateForumPostByIdHandler = catchErrors(async (req, res) => {
         file = req.file;
     }
 
-    const post = await updateForumPostById(forumId, postId, userId.toString(), data, file);
+    const post = await updateForumPostById(forumId, postId, userId.toString(), data, role, file);
 
     return res.success(OK, {
         message: "Post updated successfully",
@@ -290,6 +293,7 @@ export const createForumReplyHandler = catchErrors(async (req, res) => {
 
     // Get user ID from authenticated user
     const userId = req.userId;
+    const role = req.role;
 
     let file: Express.Multer.File | Express.Multer.File[] | undefined;
 
@@ -321,6 +325,7 @@ export const updateForumReplyByIdHandler = catchErrors(async (req, res) => {
 
     // Get user ID from authenticated user
     const userId = req.userId;
+    const role = req.role;
 
     let file: Express.Multer.File | Express.Multer.File[] | undefined;
 
@@ -332,7 +337,7 @@ export const updateForumReplyByIdHandler = catchErrors(async (req, res) => {
         file = req.file;
     }
 
-    const reply = await updateForumReplyById(postId, replyId, userId.toString(), data, file);
+    const reply = await updateForumReplyById(postId, replyId, userId.toString(), data, role, file);
 
     return res.success(OK, {
         message: "Reply updated successfully",
