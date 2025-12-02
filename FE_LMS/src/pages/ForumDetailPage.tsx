@@ -531,12 +531,12 @@ const ForumDetailPage: React.FC = () => {
                                 }`}>
                                 {forum.title}
                               </h1>
-                              <p className={`mt-3 ${hasBackgroundImage
+                              <div className={`mt-3 ${hasBackgroundImage
                                 ? "text-white/90 drop-shadow"
                                 : "text-slate-500 dark:text-slate-300"
                                 }`}>
-                                {forum.description}
-                              </p>
+                                <MarkdownContent content={forum.description} />
+                              </div>
                             </div>
                             <div className="flex items-center gap-3 text-xs font-semibold">
                               <span
