@@ -261,7 +261,11 @@ export const getQuizzesHandler = catchErrors(async (req, res) => {
 export const completeCourseHandler = catchErrors(async (req, res) => {
   const courseId = courseIdSchema.parse(req.params.courseId);
 
-  const data = await completeCourse(courseId);
+  // Get userId from request (set by authenticate middleware)
+  const userId = (req as any).userId;
+  const role = (req as any).role;
+
+  const data = await completeCourse(courseId, userId, role);
 
   return res.success(OK, {
     data,

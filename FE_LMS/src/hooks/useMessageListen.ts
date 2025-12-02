@@ -1,6 +1,6 @@
 import { useEffect, useState, type RefObject } from "react";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "react-hot-toast";
 import type { Message } from "../services/messageService";
 import { useSocketContext } from "../context/SocketContext";
 
