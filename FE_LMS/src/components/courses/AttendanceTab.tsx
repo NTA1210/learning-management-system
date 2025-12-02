@@ -15,6 +15,7 @@ import type { Schedule, DayOfWeek } from "../../types/schedule";
 import AttendanceForm from "../attendance/AttendanceForm";
 import AttendanceStatsOverview from "../attendance/AttendanceStatsOverview";
 import StudentAttendanceModal from "../attendance/StudentAttendanceModal";
+import ScheduleDatePicker from "../common/ScheduleDatePicker";
 import { getCurrentDateUTC7, formatDateUTC7 } from "../../utils/dateUtils";
 import { format, parseISO, isWithinInterval } from "date-fns";
 import toast from "react-hot-toast";
@@ -518,17 +519,12 @@ const AttendanceTab: React.FC<AttendanceTabProps> = ({ courseId, darkMode, cours
                 Attendance Date:
               </label>
             </div>
-            <input
-              type="date"
+            <ScheduleDatePicker
               value={attendanceDate}
-              onChange={(e) => setAttendanceDate(e.target.value)}
+              onChange={setAttendanceDate}
+              schedules={courseSchedules}
+              darkMode={darkMode}
               max={isTeacher ? getCurrentDateUTC7() : undefined}
-              className="px-3 py-2 rounded-lg text-sm"
-              style={{
-                backgroundColor: darkMode ? "rgba(30, 41, 59, 0.8)" : "#f8fafc",
-                border: darkMode ? "1px solid rgba(148, 163, 184, 0.2)" : "1px solid rgba(148, 163, 184, 0.3)",
-                color: darkMode ? "#e2e8f0" : "#1e293b",
-              }}
             />
             <span className="text-xs" style={{ color: darkMode ? "#94a3b8" : "#64748b" }}>
               {isAdmin 
