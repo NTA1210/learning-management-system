@@ -44,6 +44,7 @@ import {
   CreateSemesterPage,
   ListSemestersPage,
   BlogPage,
+  BlogDetailPage,
 } from "../pages";
 
 import EmailVerificationPage from "../pages/EmailVerificationPage";
@@ -465,6 +466,7 @@ function AppRoutes() {
           }
         />
         <Route path="/blog" element={<BlogPage />} />
+        <Route path="/blog/:slug" element={<BlogDetailPage />} />
         {/* Not found */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
