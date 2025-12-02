@@ -89,7 +89,7 @@ describe("Enrollment Controller Unit Tests", () => {
       await (getMyEnrollmentsHandler as any)(mockReq, mockRes, mockNext);
 
       expect(enrollmentService.getStudentEnrollments).toHaveBeenCalledWith({
-        studentId: "507f1f77bcf86cd799439011",
+        studentId: mockUserId,
         status: "active",
         page: 1,
         limit: 10,
@@ -182,7 +182,7 @@ describe("Enrollment Controller Unit Tests", () => {
         },
         {
           role: Role.ADMIN,
-          userId: "507f1f77bcf86cd799439011",
+          userId: mockUserId,
         }
       );
       expect(mockRes.success).toHaveBeenCalledWith(OK, {
@@ -232,6 +232,7 @@ describe("Enrollment Controller Unit Tests", () => {
       expect(enrollmentService.createEnrollment).toHaveBeenCalledWith({
         ...enrollmentData,
         status: "approved",
+        method: "other",
       });
       expect(mockRes.success).toHaveBeenCalledWith(CREATED, {
         data: mockEnrollment,
@@ -281,7 +282,7 @@ describe("Enrollment Controller Unit Tests", () => {
       await (enrollSelfHandler as any)(mockReq, mockRes, mockNext);
 
       expect(enrollmentService.createEnrollment).toHaveBeenCalledWith({
-        studentId: "507f1f77bcf86cd799439011",
+        studentId: mockUserId,
         courseId: "course123",
         role: "student",
         method: "self",
@@ -441,7 +442,7 @@ describe("Enrollment Controller Unit Tests", () => {
 
       expect(enrollmentService.updateSelfEnrollment).toHaveBeenCalledWith(
         "enroll123",
-        "507f1f77bcf86cd799439011",
+        mockUserId,
         updateData
       );
       expect(mockRes.success).toHaveBeenCalledWith(OK, {
@@ -527,7 +528,7 @@ describe("Enrollment Controller Unit Tests", () => {
       expect(enrollmentService.kickStudentFromCourse).toHaveBeenCalledWith(
         "enroll123",
         "Violation",
-        "507f1f77bcf86cd799439011",
+        mockUserId,
         Role.ADMIN
       );
       expect(mockRes.success).toHaveBeenCalledWith(OK, {
@@ -590,7 +591,7 @@ describe("Enrollment Controller Unit Tests", () => {
 
       expect(enrollmentService.getEnrollmentStatistics).toHaveBeenCalledWith({
         enrollmentId: "enroll123",
-        userId: "507f1f77bcf86cd799439011",
+        userId: mockUserId,
         role: Role.STUDENT,
       });
       expect(mockRes.success).toHaveBeenCalledWith(OK, { data: mockStatistics });
