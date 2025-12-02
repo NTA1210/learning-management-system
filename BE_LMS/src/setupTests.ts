@@ -1,5 +1,5 @@
 // src/setupTests.ts
-import dotenv from "dotenv";
+import dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -16,9 +16,7 @@ beforeEach(() => {
 });
 
 // Sau mỗi test
-afterEach(() => {
-  // Dọn mọi thứ liên quan nếu có
-});
+afterEach(() => jest.clearAllMocks());
 
 // Sau khi tất cả test xong
 afterAll(async () => {
