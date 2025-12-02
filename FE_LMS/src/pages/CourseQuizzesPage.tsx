@@ -18,6 +18,7 @@ import {
   ShieldOff,
   Loader2,
   BarChart3,
+  ClipboardList,
 } from "lucide-react";
 import QuizCoursePage from "./QuizCoursePage";
 import { useTheme } from "../hooks/useTheme";
@@ -755,6 +756,17 @@ export default function CourseQuizzesPage() {
                                       title="View active attempts"
                                     >
                                       <Users className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/quizzes/${quiz._id}/attempts`);
+                                      }}
+                                      className="p-2 rounded hover:bg-orange-50 transition-colors"
+                                      style={{ color: "#f97316" }}
+                                      title="Grade / View All Attempts"
+                                    >
+                                      <ClipboardList className="w-4 h-4" />
                                     </button>
                                     <button
                                       onClick={(e) => {

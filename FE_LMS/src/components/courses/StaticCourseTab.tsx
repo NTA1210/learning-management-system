@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { File } from "lucide-react";
 import http from "../../utils/http";
+import { useAuth } from "../../hooks/useAuth";
+import { quizService } from "../../services";
 
 interface StaticCourseTabProps {
   courseId: string;
@@ -8,9 +10,14 @@ interface StaticCourseTabProps {
 }
 
 const StaticCourseTab: React.FC<StaticCourseTabProps> = ({ courseId, darkMode }) => {
+  const { user } = useAuth();
+  const role = (user?.role as "admin" | "teacher" | "student") || "student";
+  const isStudent = role === "student";
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [stats, setStats] = useState<any>(null);
+  const [studentQuizCount, setStudentQuizCount] = useState<number | null>(null);
 
   const sanitizeUrl = (url?: string) => (url || "").replace(/`/g, "").trim();
 
@@ -21,10 +28,27 @@ const StaticCourseTab: React.FC<StaticCourseTabProps> = ({ courseId, darkMode })
         setLoading(true);
         const res = await http.get(`/courses/${courseId}/statistics`);
         const data = (res as any)?.data || null;
+
         if (mounted) {
           setStats(data);
           setError("");
         }
+
+        // If student, fetch published quiz count separately
+        if (isStudent && mounted) {
+          try {
+            const quizRes = await quizService.getQuizzesByCourseId(courseId, {
+              isPublished: true,
+              limit: 1 // We only need the total count from pagination
+            });
+            if (mounted) {
+              setStudentQuizCount(quizRes.pagination.total);
+            }
+          } catch (err) {
+            console.error("Failed to fetch student quiz count", err);
+          }
+        }
+
       } catch (e: any) {
         if (mounted) setError(e?.message || "Failed to load statistics");
       } finally {
@@ -32,7 +56,7 @@ const StaticCourseTab: React.FC<StaticCourseTabProps> = ({ courseId, darkMode })
       }
     })();
     return () => { mounted = false; };
-  }, [courseId]);
+  }, [courseId, isStudent]);
 
   if (loading) {
     return (
@@ -45,8 +69,9 @@ const StaticCourseTab: React.FC<StaticCourseTabProps> = ({ courseId, darkMode })
   if (error) {
     return (
       <div className="py-12 text-center">
-        <File className="w-16 h-16 mx-auto mb-4" style={{ color: darkMode ? "#4b5563" : "#9ca3af" }} />
-        <p style={{ color: darkMode ? "#fca5a5" : "#dc2626" }}>{error}</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: darkMode ? '#6366f1' : '#4f46e5' }} />
+        {/* <File className="w-16 h-16 mx-auto mb-4" style={{ color: darkMode ? "#4b5563" : "#9ca3af" }} />
+        <p style={{ color: darkMode ? "#fca5a5" : "#dc2626" }}>{error}</p> */}
       </div>
     );
   }
@@ -55,7 +80,11 @@ const StaticCourseTab: React.FC<StaticCourseTabProps> = ({ courseId, darkMode })
   const semester = stats?.semester;
   const teachers = Array.isArray(stats?.teachers) ? stats.teachers : [];
   const totalLessons = Number(statistics.totalLessons ?? 0) || 0;
-  const totalQuizzes = Number(statistics.totalQuizzes ?? 0) || 0;
+  // Use student specific count if available, otherwise fallback to general stats
+  const totalQuizzes = isStudent && studentQuizCount !== null
+    ? studentQuizCount
+    : (Number(statistics.totalQuizzes ?? 0) || 0);
+
   const totalAssignments = Number(statistics.totalAssignments ?? 0) || 0;
   const totalAttendances = Number(statistics.totalAttendances ?? 0) || 0;
   const maxTotal = Math.max(1, totalLessons || 0, totalQuizzes || 0, totalAssignments || 0, totalAttendances || 0);
@@ -88,7 +117,7 @@ const StaticCourseTab: React.FC<StaticCourseTabProps> = ({ courseId, darkMode })
                   <img src={sanitizeUrl(t.avatar_url)} alt={t.fullname || t.username} className="w-10 h-10 rounded-full object-cover" />
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center text-indigo-700 dark:text-indigo-100">
-                    {(t.fullname || t.username || "T").slice(0,1).toUpperCase()}
+                    {(t.fullname || t.username || "T").slice(0, 1).toUpperCase()}
                   </div>
                 )}
                 <div className="text-sm">

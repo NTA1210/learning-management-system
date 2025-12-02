@@ -39,6 +39,8 @@ import {
   ForumPostDetailPage,
   OnboardingPage,
   DeletedCoursesPage,
+  QuizAttemptsPage,
+  GradeAttemptPage,
 } from "../pages";
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
@@ -74,54 +76,6 @@ function AppRoutes() {
           }
         />
 
-        {/* Admin Courses */}
-        <Route
-          path="/admin/courses"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <CourseManagementPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/courses/deleted"
-          element={
-            <ProtectedRoute requiredRole="admin">
-              <DeletedCoursesPage />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Course detail */}
-
-        <Route
-          path="/courses/:id"
-          element={
-            <ProtectedRoute>
-              <CourseDetailPage />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Auth routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/email-verify" element={<EmailVerifyPage />} />
-        <Route
-          path="/auth/verify-email/:code"
-          element={<EmailVerificationPage />}
-        />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password/:code" element={<ResetPasswordPage />} />
-
-        <Route
-          path="/my-courses"
-          element={
-            <ProtectedRoute requiredRole="student">
-              <MyCoursesPage />
-            </ProtectedRoute>
-          }
-        />
         <Route
           path="/my-courses-v2"
           element={
@@ -259,6 +213,22 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <QuizQuestionsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/quizzes/:quizId/attempts"
+          element={
+            <ProtectedRoute requiredRole={["teacher", "admin"]}>
+              <QuizAttemptsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/quiz-attempts/:attemptId/grade"
+          element={
+            <ProtectedRoute requiredRole={["teacher", "admin"]}>
+              <GradeAttemptPage />
             </ProtectedRoute>
           }
         />

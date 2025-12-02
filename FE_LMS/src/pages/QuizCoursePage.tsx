@@ -39,7 +39,7 @@ export default function QuizCoursePage() {
     } else {
       newParams.set("page", String(page));
     }
-    setSearchParams(newParams);
+    setSearchParams(newParams, { replace: true }); // Prevent history pollution
   };
 
   // Get page from URL or default to 1
