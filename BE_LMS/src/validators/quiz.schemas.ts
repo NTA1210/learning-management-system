@@ -82,11 +82,13 @@ export const updateQuizSchema = z
     startTime: nonPastDateSchema.optional(),
     endTime: nonPastDateSchema.optional(),
     shuffleQuestions: z.boolean().optional(),
+    isPublished: z.boolean().optional(),
     snapshotQuestions: z
       .array(snapShotQuestion)
       .min(1, 'At least one question is required')
       .optional()
       .default([]),
+    isChangePassword: z.boolean().default(false),
   })
   .refine(
     (data) => {
