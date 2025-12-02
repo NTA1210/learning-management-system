@@ -9,7 +9,7 @@ import Navbar from "../components/Navbar.tsx";
 import Sidebar from "../components/Sidebar.tsx";
 import CreateCourseForm from "../components/CreateCourseForm.tsx";
 import { Search, Trash } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import http, { httpClient } from "../utils/http";
 import useDebounce from "../hooks/useDebounce";
 
@@ -20,7 +20,8 @@ const CourseManagement: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") ?? "");
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const [_selectedTeacher] = useState(""); // Reserved for future use
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -61,9 +62,9 @@ const CourseManagement: React.FC = () => {
     }>
   >([]);
   const [subjects, setSubjects] = useState<Array<{ _id: string; name: string; specialistIds?: string[] }>>([]);
-  const [selectedSubjectId, setSelectedSubjectId] = useState("");
-  const [selectedSemesterId, setSelectedSemesterId] = useState("");
-  const [selectedTeacherId, setSelectedTeacherId] = useState("");
+  const [selectedSubjectId, setSelectedSubjectId] = useState(searchParams.get("subjectId") ?? "");
+  const [selectedSemesterId, setSelectedSemesterId] = useState(searchParams.get("semesterId") ?? "");
+  const [selectedTeacherId, setSelectedTeacherId] = useState(searchParams.get("teacherId") ?? "");
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailCourse, setDetailCourse] = useState<Course | null>(null);
   const [enrollments, setEnrollments] = useState<
@@ -91,14 +92,14 @@ const CourseManagement: React.FC = () => {
   const [contentPaddingLeft, setContentPaddingLeft] = useState(
     window.innerWidth >= 640 ? 93 : 0
   );
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageLimit, setPageLimit] = useState(25);
+  const [currentPage, setCurrentPage] = useState(Number(searchParams.get("page") ?? "1"));
+  const [pageLimit, setPageLimit] = useState(Number(searchParams.get("limit") ?? "25"));
   const [totalCourses, setTotalCourses] = useState(0);
   const [editLogoFile, setEditLogoFile] = useState<File | null>(null);
   const [editLogoPreview, setEditLogoPreview] = useState("");
   const [sortOption, setSortOption] = useState<
     "name_asc" | "name_desc" | "date_asc" | "date_desc"
-  >("date_desc");
+  >((searchParams.get("sort") as any) || "date_desc");
 
   function closeModal() {
     setModalAnim("leave");
@@ -494,6 +495,18 @@ const CourseManagement: React.FC = () => {
     fetchCourses();
     // eslint-disable-next-line
   }, [currentPage, pageLimit, sortOption, debouncedSearchTerm, selectedSubjectId, selectedSemesterId, selectedTeacherId, darkMode]);
+
+  useEffect(() => {
+    const params: Record<string, string> = {};
+    if (debouncedSearchTerm) params.search = debouncedSearchTerm;
+    if (sortOption) params.sort = sortOption;
+    if (selectedSubjectId) params.subjectId = selectedSubjectId;
+    if (selectedSemesterId) params.semesterId = selectedSemesterId;
+    if (selectedTeacherId) params.teacherId = selectedTeacherId;
+    params.page = String(currentPage);
+    params.limit = String(pageLimit);
+    setSearchParams(params);
+  }, [debouncedSearchTerm, sortOption, selectedSubjectId, selectedSemesterId, selectedTeacherId, currentPage, pageLimit, setSearchParams]);
   console.log("totalPage", totalCourses)
   return (
     <>
@@ -965,7 +978,7 @@ const CourseManagement: React.FC = () => {
                                 color: darkMode ? "#a5b4fc" : "#4f46e5",
                               }}
                             >
-                              {course.code}
+                              {course.status}
                             </span>
                             {course.isPublished ? (
                               <span

@@ -1,89 +1,133 @@
 import axios, {
   AxiosError,
+  type AxiosInstance,
   type AxiosRequestConfig,
   type AxiosResponse,
-  type Method,
 } from "axios";
 
-// ===============================
-// 1️⃣ Cấu hình Axios gốc
-// ===============================
-export const httpClient = axios.create({
+export const httpClient: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_BASE_API,
   timeout: 10000,
-  withCredentials: true, // Enable cookies for authentication
+  withCredentials: true,
 });
 
-// ===============================
-// 2️⃣ Định nghĩa kiểu dữ liệu API
-// ===============================
-export interface ApiResponse<T = unknown> {
-  success: boolean;
-  status?: number | null;
-  message?: string;
-  data?: T;
+// ============================
+// ------ TYPES ---------------
+// ============================
+
+// Cấu trúc API refresh-token trả về
+interface RefreshTokenResponse {
+  status: string;
+  data: {
+    access_token: string;
+    refresh_token: string;
+  };
 }
 
-// ===============================
-// 3️⃣ Interceptors
-// ===============================
-
-// Extend AxiosRequestConfig to track retry flag
-interface ExtendedAxiosRequestConfig extends AxiosRequestConfig {
-  _retry?: boolean;
+// Request bị queue lại khi đang refresh token
+interface FailedQueueItem {
+  resolve: () => void;
+  reject: (error: unknown) => void;
 }
 
-httpClient.interceptors.request.use(
-  (config) => {
-    // Debug: Check if cookies will be sent
-    console.log("Request to:", config.url);
-    console.log("With credentials:", config.withCredentials);
-    
-    // Ví dụ: thêm token nếu cần
-    // const token = localStorage.getItem("token");
-    // if (token) config.headers.Authorization = `Bearer ${token}`;
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
+let isRefreshing = false;
+let failedQueue: FailedQueueItem[] = [];
+
+// ============================
+// --- QUEUE HANDLER ----------
+// ============================
+
+const processQueue = (error: unknown | null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve();
+    }
+  });
+
+  failedQueue = [];
+};
+
+// ============================
+// --- REFRESH TOKEN API ------
+// ============================
+
+const refreshToken = async (): Promise<void> => {
+  try {
+    console.log("refresh token");
+
+    const result = await axios.post<RefreshTokenResponse>(
+      `http://localhost:4004/auth/refresh
+`,
+      {},
+      { withCredentials: true }
+    );
+
+    console.log("RESULT:", result);
+
+    if ((result.data as any).success !== true) {
+      console.log("Refresh token failed");
+      localStorage.clear();
+      throw new Error("Refresh token failed");
+    }
+
+    processQueue(null);
+  } catch (error) {
+    processQueue(error);
+    throw error;
+  }
+};
+
+// ============================
+// --- GET NEW TOKEN ----------
+// ============================
+
+const getNewToken = async (): Promise<void> => {
+  if (!isRefreshing) {
+    isRefreshing = true;
+    await refreshToken();
+    isRefreshing = false;
+    return;
+  }
+
+  return new Promise((resolve, reject) => {
+    failedQueue.push({ resolve, reject });
+  });
+};
+
+// ============================
+// --- REQUEST INTERCEPTOR ----
+// ============================
+
+httpClient.interceptors.request.use((config: any) => {
+  return config;
+});
+
+// ============================
+// --- RESPONSE INTERCEPTOR ---
+// ============================
 
 httpClient.interceptors.response.use(
-  (response) => response,
+  (response: AxiosResponse) => response,
   async (error: AxiosError) => {
-    const originalConfig = error.config as ExtendedAxiosRequestConfig | undefined;
-    const status = error.response?.status;
+    const originalRequest = error.config as any & {
+      _retry?: boolean;
+    };
 
-    // Check if user is on login/auth pages
-    const isOnAuthPage = typeof window !== "undefined" && 
-      (window.location.pathname === "/login" || 
-       window.location.pathname === "/register" ||
-       window.location.pathname === "/forgot-password" ||
-       window.location.pathname.startsWith("/reset-password") ||
-       window.location.pathname.startsWith("/auth/verify-email"));
+    const shouldRenewToken =
+      error.response?.status === 401 && !originalRequest._retry;
 
-    if (
-      status === 401 &&
-      originalConfig &&
-      !originalConfig._retry &&
-      originalConfig.url !== "/auth/refresh" &&
-      !isOnAuthPage
-    ) {
-      originalConfig._retry = true;
+    console.log(shouldRenewToken);
+
+    if (shouldRenewToken) {
+      originalRequest._retry = true;
+
       try {
-        await httpClient.get("/auth/refresh", { withCredentials: true });
-        return httpClient.request(originalConfig);
-      } catch (refreshError) {
-        try {
-          localStorage.removeItem("isAuthenticated");
-          localStorage.removeItem("userData");
-          localStorage.removeItem("lms:user");
-        } catch {
-          // ignore storage errors
-        }
-        if (typeof window !== "undefined") {
-          window.location.href = "/login";
-        }
-        return Promise.reject(refreshError);
+        await getNewToken();
+        return httpClient(originalRequest);
+      } catch (e) {
+        return Promise.reject(e);
       }
     }
 
@@ -91,72 +135,50 @@ httpClient.interceptors.response.use(
   }
 );
 
-// ===============================
-// 4️⃣ Hàm gửi request tổng quát
-// ===============================
-const _send = async <T = unknown>(
-  method: Method,
+// ============================
+// ---- HTTP METHODS ----------
+// ============================
+
+const _send = async <T>(
+  method: any["method"],
   pathname: string,
   data?: unknown,
   config?: AxiosRequestConfig
-): Promise<any> => {
-  try {
-    const response: AxiosResponse<any> = await httpClient.request({
-      method,
-      url: pathname,
-      data,
-      withCredentials: true, // Ensure credentials are always sent
-      ...config,
-    });
-    const responseData = response.data;
-    if (!responseData.success) {
-      throw new Error(responseData.message || "Request failed");
-    }
-    // Return fully structured response
-    return responseData;
-  } catch (err) {
-    const error = err as AxiosError<any>;
-    console.error("HTTP Error:", error);
-    throw {
-      success: false,
-      status: error.response?.status || null,
-      message:
-        error.response?.data?.message ||
-        error.message ||
-        "Unknown error occurred",
-    };
-  }
+): Promise<T> => {
+  const response = await httpClient.request<T>({
+    method,
+    url: pathname,
+    data,
+    ...config,
+  });
+
+  return response.data;
 };
 
-// ===============================
-// 5️⃣ Hàm tiện ích cho từng method
-// ===============================
-const get = <T = unknown>(pathname: string, config?: AxiosRequestConfig) =>
-  _send<T>("GET", pathname, undefined, config);
+const get = <T>(pathname: string, config?: AxiosRequestConfig) =>
+  _send<T>("get", pathname, null, config);
 
-const post = <T = unknown>(
+const post = <T>(
   pathname: string,
   data?: unknown,
   config?: AxiosRequestConfig
-) => _send<T>("POST", pathname, data, config);
+) => _send<T>("post", pathname, data, config);
 
-const put = <T = unknown>(
+const put = <T>(
   pathname: string,
   data?: unknown,
   config?: AxiosRequestConfig
-) => _send<T>("PUT", pathname, data, config);
+) => _send<T>("put", pathname, data, config);
 
-const del = <T = unknown>(pathname: string, config?: AxiosRequestConfig) =>
-  _send<T>("DELETE", pathname, undefined, config);
+const del = <T>(pathname: string, config?: AxiosRequestConfig) =>
+  _send<T>("delete", pathname, null, config);
 
-const patch = <T = unknown>(
+const patch = <T>(
   pathname: string,
   data?: unknown,
   config?: AxiosRequestConfig
-) => _send<T>("PATCH", pathname, data, config);
+) => _send<T>("patch", pathname, data, config);
 
-// ===============================
-// 6️⃣ Export object dùng chung
-// ===============================
 const http = { get, post, put, del, patch };
+
 export default http;

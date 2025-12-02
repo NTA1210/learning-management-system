@@ -295,7 +295,7 @@ const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
                                     <div className="flex items-center gap-3">
                                         <button
                                             onClick={() => openCancelModal(en._id)}
-                                            disabled={updating[en._id] || en.status === 'cancelled' || en.status === 'dropped' || en.status === 'completed'}
+                                            disabled={updating[en._id] || en.status === 'cancelled' || en.status === 'dropped' || en.status === 'completed'|| en.status ==='rejected'}
                                             className="px-3 py-2 rounded-lg text-sm disabled:opacity-50"
                                             style={{
                                                 backgroundColor: darkMode ? 'rgba(239, 68, 68, 0.2)' : '#fee2e2',

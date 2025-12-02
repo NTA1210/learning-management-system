@@ -11,6 +11,9 @@ interface StudentAttendanceModalProps {
   studentId: string;
   studentName: string;
   courseId?: string;
+  courseTitle?: string;
+  courseStartDate?: string;
+  courseEndDate?: string;
   onUpdate?: () => void;
 }
 
@@ -20,6 +23,9 @@ export default function StudentAttendanceModal({
   studentId,
   studentName,
   courseId,
+  courseTitle,
+  courseStartDate,
+  courseEndDate,
   onUpdate,
 }: StudentAttendanceModalProps) {
   const { darkMode } = useTheme();
@@ -28,6 +34,8 @@ export default function StudentAttendanceModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showAllDays, setShowAllDays] = useState(false);
+  const [addingDate, setAddingDate] = useState<string | null>(null);
   const [summary, setSummary] = useState<{
     total: number;
     notyet: number;
@@ -113,6 +121,51 @@ export default function StudentAttendanceModal({
       setError(err.message || "Failed to update attendance");
     }
   };
+
+  // Generate all dates between course start and end
+  const generateCourseDates = (): string[] => {
+    if (!courseStartDate || !courseEndDate) return [];
+
+    const dates: string[] = [];
+    const start = new Date(courseStartDate);
+    const end = new Date(courseEndDate);
+
+    // Iterate from start to end date
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      // Format as YYYY-MM-DD
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      dates.push(`${year}-${month}-${day}`);
+    }
+
+    return dates;
+  };
+
+  const handleAddAttendance = async (date: string, status: "present" | "absent") => {
+    if (!courseId) return;
+
+    try {
+      await attendanceService.createAttendance({
+        courseId,
+        date,
+        entries: [{ studentId, status }],
+      });
+      setAddingDate(null);
+      await fetchAttendance();
+      onUpdate?.();
+    } catch (err: any) {
+      setError(err.message || "Failed to add attendance");
+    }
+  };
+
+  // Get all course dates and determine which have records
+  const allCourseDates = generateCourseDates();
+  const recordDateMap = new Map(
+    attendanceRecords.map(record => [formatDateUTC7(record.date), record])
+  );
+  const missingDatesCount = allCourseDates.length - attendanceRecords.length;
+
 
   if (!isOpen) return null;
 
@@ -238,6 +291,27 @@ export default function StudentAttendanceModal({
           </div>
         )}
 
+        {/* Show All Days Toggle */}
+        {allCourseDates.length > 0 && (
+          <div className="mb-4">
+            <button
+              onClick={() => setShowAllDays(!showAllDays)}
+              className="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
+              style={{
+                backgroundColor: showAllDays
+                  ? darkMode ? "rgba(99, 102, 241, 0.2)" : "rgba(99, 102, 241, 0.1)"
+                  : darkMode ? "rgba(148, 163, 184, 0.1)" : "rgba(148, 163, 184, 0.1)",
+                color: showAllDays ? "#6366f1" : darkMode ? "#94a3b8" : "#64748b",
+                border: showAllDays ? "1px solid rgba(99, 102, 241, 0.3)" : "1px solid rgba(148, 163, 184, 0.2)",
+              }}
+            >
+              <Calendar className="w-4 h-4" />
+              {showAllDays ? "Show Records Only" : `Show All Days (${missingDatesCount} missing)`}
+            </button>
+          </div>
+        )}
+
+
         {/* Loading */}
         {loading && (
           <div className="text-center py-8">
@@ -263,127 +337,346 @@ export default function StudentAttendanceModal({
         {/* Attendance Records */}
         {!loading && !error && (
           <div className="space-y-2">
-            {attendanceRecords.length === 0 ? (
-              <div className="text-center py-8">
-                <p style={{ color: darkMode ? "#94a3b8" : "#64748b" }}>
-                  No attendance records found
-                </p>
-              </div>
-            ) : (
-              attendanceRecords.map((record) => {
-                const isEditing = editingId === record._id;
-                const canDeleteRecord = canDelete(record);
-                
-                return (
-                  <div
-                    key={record._id}
-                    className="p-4 rounded-lg"
-                    style={{
-                      backgroundColor: darkMode
-                        ? "rgba(15, 23, 42, 0.5)"
-                        : "rgba(248, 250, 252, 0.8)",
-                      border: darkMode
-                        ? "1px solid rgba(148, 163, 184, 0.1)"
-                        : "1px solid rgba(148, 163, 184, 0.1)",
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4 flex-1">
-                        {getStatusIcon(record.status)}
-                        <div className="flex-1">
-                          <p
-                            className="font-medium"
-                            style={{ color: darkMode ? "#ffffff" : "#1e293b" }}
-                          >
-                            {record.courseId.title}
-                          </p>
-                          <div className="flex items-center gap-4 mt-1 text-sm">
-                            <span
-                              className="flex items-center gap-1"
-                              style={{ color: getStatusColor(record.status) }}
+            {showAllDays && allCourseDates.length > 0 ? (
+              // Show all course dates mode
+              allCourseDates.map((date) => {
+                const record = recordDateMap.get(date);
+                const isAddingThis = addingDate === date;
+
+                if (record) {
+                  // Existing record
+                  const isEditing = editingId === record._id;
+                  const canDeleteRecord = canDelete(record);
+
+                  return (
+                    <div
+                      key={date}
+                      className="p-4 rounded-lg"
+                      style={{
+                        backgroundColor: darkMode
+                          ? "rgba(15, 23, 42, 0.5)"
+                          : "rgba(248, 250, 252, 0.8)",
+                        border: darkMode
+                          ? "1px solid rgba(148, 163, 184, 0.1)"
+                          : "1px solid rgba(148, 163, 184, 0.1)",
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 flex-1">
+                          {getStatusIcon(record.status)}
+                          <div className="flex-1">
+                            <p
+                              className="font-medium"
+                              style={{ color: darkMode ? "#ffffff" : "#1e293b" }}
                             >
-                              <Calendar className="w-3 h-3" />
-                              {formatDateUTC7(record.date)}
-                            </span>
-                            {record.markedBy && (
+                              {courseTitle || record.courseId.title}
+                            </p>
+                            <div className="flex items-center gap-4 mt-1 text-sm">
                               <span
-                                style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+                                className="flex items-center gap-1"
+                                style={{ color: getStatusColor(record.status) }}
                               >
-                                Marked by: {record.markedBy.fullname || record.markedBy.email} ({record.markedBy.role})
+                                <Calendar className="w-3 h-3" />
+                                {date}
                               </span>
-                            )}
+                              {record.markedBy && (
+                                <span
+                                  style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+                                >
+                                  Marked by: {record.markedBy.fullname || record.markedBy.email}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {isEditing ? (
-                          <div className="flex items-center gap-2">
-                            {(["notyet", "present", "absent"] as const).map((status) => (
+                        <div className="flex items-center gap-2">
+                          {isEditing ? (
+                            <div className="flex items-center gap-2">
+                              {(["notyet", "present", "absent"] as const).map((status) => (
+                                <button
+                                  key={status}
+                                  onClick={() => handleUpdate(record._id, status)}
+                                  className="px-2 py-1 rounded text-xs font-medium capitalize"
+                                  style={{
+                                    backgroundColor: getStatusColor(status) + "20",
+                                    color: getStatusColor(status),
+                                  }}
+                                >
+                                  {status}
+                                </button>
+                              ))}
                               <button
-                                key={status}
-                                onClick={() => handleUpdate(record._id, status)}
-                                className="px-2 py-1 rounded text-xs font-medium capitalize"
+                                onClick={() => setEditingId(null)}
+                                className="px-2 py-1 rounded text-xs"
                                 style={{
-                                  backgroundColor: getStatusColor(status) + "20",
-                                  color: getStatusColor(status),
+                                  backgroundColor: darkMode ? "rgba(148, 163, 184, 0.2)" : "rgba(148, 163, 184, 0.1)",
+                                  color: darkMode ? "#94a3b8" : "#64748b",
                                 }}
                               >
-                                {status}
+                                Cancel
                               </button>
-                            ))}
-                            <button
-                              onClick={() => setEditingId(null)}
-                              className="px-2 py-1 rounded text-xs"
-                              style={{
-                                backgroundColor: darkMode ? "rgba(148, 163, 184, 0.2)" : "rgba(148, 163, 184, 0.1)",
-                                color: darkMode ? "#94a3b8" : "#64748b",
-                              }}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <>
-                            <span
-                              className="px-3 py-1 rounded-lg text-sm font-medium capitalize"
-                              style={{
-                                backgroundColor: getStatusColor(record.status) + "20",
-                                color: getStatusColor(record.status),
-                              }}
-                            >
-                              {record.status}
-                            </span>
-                            <button
-                              onClick={() => setEditingId(record._id)}
-                              className="p-2 rounded-lg hover:bg-opacity-20 transition-colors"
-                              style={{
-                                color: darkMode ? "#9ca3af" : "#6b7280",
-                                backgroundColor: darkMode ? "rgba(148, 163, 184, 0.1)" : "rgba(148, 163, 184, 0.1)",
-                              }}
-                              title="Edit attendance"
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            {canDeleteRecord && (
+                            </div>
+                          ) : (
+                            <>
+                              <span
+                                className="px-3 py-1 rounded-lg text-sm font-medium capitalize"
+                                style={{
+                                  backgroundColor: getStatusColor(record.status) + "20",
+                                  color: getStatusColor(record.status),
+                                }}
+                              >
+                                {record.status}
+                              </span>
                               <button
-                                onClick={() => handleDelete(record._id)}
+                                onClick={() => setEditingId(record._id)}
                                 className="p-2 rounded-lg hover:bg-opacity-20 transition-colors"
                                 style={{
-                                  color: "#ef4444",
-                                  backgroundColor: darkMode ? "rgba(239, 68, 68, 0.1)" : "rgba(239, 68, 68, 0.1)",
+                                  color: darkMode ? "#9ca3af" : "#6b7280",
+                                  backgroundColor: darkMode ? "rgba(148, 163, 184, 0.1)" : "rgba(148, 163, 184, 0.1)",
                                 }}
-                                title="Delete attendance"
+                                title="Edit attendance"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Edit2 className="w-4 h-4" />
                               </button>
-                            )}
-                          </>
-                        )}
+                              {canDeleteRecord && (
+                                <button
+                                  onClick={() => handleDelete(record._id)}
+                                  className="p-2 rounded-lg hover:bg-opacity-20 transition-colors"
+                                  style={{
+                                    color: "#ef4444",
+                                    backgroundColor: darkMode ? "rgba(239, 68, 68, 0.1)" : "rgba(239, 68, 68, 0.1)",
+                                  }}
+                                  title="Delete attendance"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
+                  );
+                } else {
+                  // Missing record - show add button
+                  return (
+                    <div
+                      key={date}
+                      className="p-4 rounded-lg"
+                      style={{
+                        backgroundColor: darkMode
+                          ? "rgba(148, 163, 184, 0.05)"
+                          : "rgba(248, 250, 252, 0.5)",
+                        border: darkMode
+                          ? "1px solid rgba(148, 163, 184, 0.1)"
+                          : "1px dashed rgba(148, 163, 184, 0.3)",
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 flex-1">
+                          <div className="w-4 h-4" />
+                          <div className="flex-1">
+                            <p
+                              className="font-medium"
+                              style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+                            >
+                              {courseTitle || "Course"}
+                            </p>
+                            <div className="flex items-center gap-4 mt-1 text-sm">
+                              <span
+                                className="flex items-center gap-1"
+                                style={{ color: darkMode ? "#64748b" : "#94a3b8" }}
+                              >
+                                <Calendar className="w-3 h-3" />
+                                {date}
+                              </span>
+                              <span
+                                style={{ color: darkMode ? "#64748b" : "#94a3b8" }}
+                              >
+                                NotYet
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isAddingThis ? (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleAddAttendance(date, "present")}
+                                className="px-3 py-1.5 rounded-lg text-sm font-medium"
+                                style={{
+                                  backgroundColor: "#22c55e",
+                                  color: "#ffffff",
+                                }}
+                              >
+                                <CheckCircle className="w-4 h-4 inline mr-1" />
+                                Present
+                              </button>
+                              <button
+                                onClick={() => handleAddAttendance(date, "absent")}
+                                className="px-3 py-1.5 rounded-lg text-sm font-medium"
+                                style={{
+                                  backgroundColor: "#ef4444",
+                                  color: "#ffffff",
+                                }}
+                              >
+                                <XCircle className="w-4 h-4 inline mr-1" />
+                                Absent
+                              </button>
+                              <button
+                                onClick={() => setAddingDate(null)}
+                                className="px-2 py-1 rounded text-xs"
+                                style={{
+                                  backgroundColor: darkMode ? "rgba(148, 163, 184, 0.2)" : "rgba(148, 163, 184, 0.1)",
+                                  color: darkMode ? "#94a3b8" : "#64748b",
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setAddingDate(date)}
+                              className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                              style={{
+                                backgroundColor: darkMode ? "rgba(99, 102, 241, 0.2)" : "rgba(99, 102, 241, 0.1)",
+                                color: "#6366f1",
+                                border: "1px solid rgba(99, 102, 241, 0.3)",
+                              }}
+                            >
+                              ➕ Add Attendance
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
               })
+            ) : (
+              // Show records only mode
+              attendanceRecords.length === 0 ? (
+                <div className="text-center py-8">
+                  <p style={{ color: darkMode ? "#94a3b8" : "#64748b" }}>
+                    No attendance records found
+                  </p>
+                </div>
+              ) : (
+                attendanceRecords.map((record) => {
+                  const isEditing = editingId === record._id;
+                  const canDeleteRecord = canDelete(record);
+
+                  return (
+                    <div
+                      key={record._id}
+                      className="p-4 rounded-lg"
+                      style={{
+                        backgroundColor: darkMode
+                          ? "rgba(15, 23, 42, 0.5)"
+                          : "rgba(248, 250, 252, 0.8)",
+                        border: darkMode
+                          ? "1px solid rgba(148, 163, 184, 0.1)"
+                          : "1px solid rgba(148, 163, 184, 0.1)",
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 flex-1">
+                          {getStatusIcon(record.status)}
+                          <div className="flex-1">
+                            <p
+                              className="font-medium"
+                              style={{ color: darkMode ? "#ffffff" : "#1e293b" }}
+                            >
+                              {record.courseId.title}
+                            </p>
+                            <div className="flex items-center gap-4 mt-1 text-sm">
+                              <span
+                                className="flex items-center gap-1"
+                                style={{ color: getStatusColor(record.status) }}
+                              >
+                                <Calendar className="w-3 h-3" />
+                                {formatDateUTC7(record.date)}
+                              </span>
+                              {record.markedBy && (
+                                <span
+                                  style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+                                >
+                                  Marked by: {record.markedBy.fullname || record.markedBy.email} ({record.markedBy.role})
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isEditing ? (
+                            <div className="flex items-center gap-2">
+                              {(["notyet", "present", "absent"] as const).map((status) => (
+                                <button
+                                  key={status}
+                                  onClick={() => handleUpdate(record._id, status)}
+                                  className="px-2 py-1 rounded text-xs font-medium capitalize"
+                                  style={{
+                                    backgroundColor: getStatusColor(status) + "20",
+                                    color: getStatusColor(status),
+                                  }}
+                                >
+                                  {status}
+                                </button>
+                              ))}
+                              <button
+                                onClick={() => setEditingId(null)}
+                                className="px-2 py-1 rounded text-xs"
+                                style={{
+                                  backgroundColor: darkMode ? "rgba(148, 163, 184, 0.2)" : "rgba(148, 163, 184, 0.1)",
+                                  color: darkMode ? "#94a3b8" : "#64748b",
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <span
+                                className="px-3 py-1 rounded-lg text-sm font-medium capitalize"
+                                style={{
+                                  backgroundColor: getStatusColor(record.status) + "20",
+                                  color: getStatusColor(record.status),
+                                }}
+                              >
+                                {record.status}
+                              </span>
+                              <button
+                                onClick={() => setEditingId(record._id)}
+                                className="p-2 rounded-lg hover:bg-opacity-20 transition-colors"
+                                style={{
+                                  color: darkMode ? "#9ca3af" : "#6b7280",
+                                  backgroundColor: darkMode ? "rgba(148, 163, 184, 0.1)" : "rgba(148, 163, 184, 0.1)",
+                                }}
+                                title="Edit attendance"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              {canDeleteRecord && (
+                                <button
+                                  onClick={() => handleDelete(record._id)}
+                                  className="p-2 rounded-lg hover:bg-opacity-20 transition-colors"
+                                  style={{
+                                    color: "#ef4444",
+                                    backgroundColor: darkMode ? "rgba(239, 68, 68, 0.1)" : "rgba(239, 68, 68, 0.1)",
+                                  }}
+                                  title="Delete attendance"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )
             )}
           </div>
         )}

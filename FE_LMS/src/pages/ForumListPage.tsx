@@ -7,8 +7,8 @@ import type { Course } from "../types/course";
 import { courseService } from "../services";
 import AttachmentPreview from "../components/AttachmentPreview";
 import { forumService, type ForumResponse, type ForumType } from "../services/forumService";
-import { Book, BookOpen, Edit3, Eye, Loader2, PlusCircle, RefreshCcw, Trash2, X } from "lucide-react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Book, BookOpen, Edit3, Eye, Loader2, PlusCircle, RefreshCcw, Trash2, X, User } from "lucide-react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 type SidebarRole = "admin" | "teacher" | "student";
 
@@ -30,6 +30,7 @@ const ForumListPage: React.FC = () => {
   const { darkMode } = useTheme();
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const locationState = (location.state as ForumListLocationState | null) ?? null;
   const locationCourseId = locationState?.preselectedCourseId ?? "";
@@ -61,6 +62,26 @@ const ForumListPage: React.FC = () => {
         .map((segment) => segment[0]?.toUpperCase() || "")
         .join("") || "U"
     );
+  };
+
+  const imageExtensions = new Set(["jpg", "jpeg", "png", "gif", "webp", "svg"]);
+  
+  const getFileExtension = (fileUrl: string): string => {
+    const sanitized = fileUrl.split(/[?#]/)[0];
+    const lastSegment = sanitized.split("/").pop() || "";
+    const hasExtension = lastSegment.includes(".");
+    return hasExtension ? lastSegment.split(".").pop()?.toLowerCase() || "" : "";
+  };
+
+  const getFirstImageUrl = (files?: string[]): string | null => {
+    if (!files || files.length === 0) return null;
+    for (const fileUrl of files) {
+      const extension = getFileExtension(fileUrl);
+      if (extension && imageExtensions.has(extension)) {
+        return fileUrl;
+      }
+    }
+    return null;
   };
 
   const [courses, setCourses] = useState<Course[]>([]);
@@ -603,7 +624,7 @@ const ForumListPage: React.FC = () => {
                   <p className="text-sm">
                     Start from a course detail page using the <span className="font-medium">"Create Forum Post"</span> button.
                   </p>
-                </div>
+                </div>  
               ) : (
                 <div className="space-y-4">
                   {forums.map((forum) => {
@@ -611,89 +632,245 @@ const ForumListPage: React.FC = () => {
                     const avatarUrl = forum.createdBy?.avatar_url;
                     const authorRole = forum.createdBy?.role;
                     const forumTitle = forum.title;
+                    const backgroundImageUrl = getFirstImageUrl(forum.key);
+                    const hasBackgroundImage = Boolean(backgroundImageUrl);
 
                     return (
                       <div
                         key={forum._id}
-                        className={`rounded-2xl border p-5 flex flex-col gap-4 ${
+                        className={`rounded-2xl border p-5 flex flex-col gap-4 relative overflow-hidden ${
                           darkMode ? "border-slate-700" : "border-slate-200"
                         }`}
+                        style={
+                          hasBackgroundImage
+                            ? {
+                                backgroundImage: `url(${backgroundImageUrl})`,
+                                backgroundSize: "cover",
+                                backgroundPosition: "center",
+                                backgroundRepeat: "no-repeat",
+                                filter: darkMode ? "none" : "brightness(1.1)",
+                              }
+                            : undefined
+                        }
                       >
-                        <div className="flex items-start gap-4">
-                          <div
-                            className={`h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden ${
-                              darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
-                            }`}
-                          >
-                            {avatarUrl ? (
-                              <img src={avatarUrl} alt={authorName} className="h-full w-full object-cover" />
-                            ) : (
-                              getInitials(authorName)
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-[200px]">
-                            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                              <span
-                                className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                                  forum.forumType === "announcement"
-                                    ? "bg-amber-100 text-amber-700"
-                                    : "bg-indigo-100 text-indigo-700"
+                        {hasBackgroundImage && (
+                          <div 
+                            className="absolute inset-0 z-0"
+                            style={{
+                              backgroundColor: darkMode ? "rgba(0, 0, 0, 0.4)" : "rgba(0, 0, 0, 0.3)",
+                            }}
+                          />
+                        )}
+                        <div className="relative z-10">
+                          <div className="flex items-start gap-4 relative">
+                            <div className="relative group" style={{ zIndex: 100 }}>
+                              <div
+                                className={`h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden cursor-pointer ${
+                                  darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
                                 }`}
                               >
-                                {forumTypeLabels[forum.forumType]}
-                              </span>
-                              <span>{forum.createdAt ? new Date(forum.createdAt).toLocaleString() : "—"}</span>
+                                {avatarUrl ? (
+                                  <img src={avatarUrl} alt={authorName} className="h-full w-full object-cover" />
+                                ) : (
+                                  getInitials(authorName)
+                                )}
+                              </div>
+                              {/* Author Hover Popup */}
+                              <div className="absolute left-0 top-14 z-[9999] hidden group-hover:block w-64">
+                                <div className={`rounded-2xl shadow-2xl border p-4 ${
+                                  darkMode 
+                                    ? "bg-slate-900 border-slate-700 text-slate-100" 
+                                    : "bg-white border-slate-200 text-slate-900"
+                                }`}>
+                                  <div className="flex items-center gap-3 mb-3">
+                                    <div className={`h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden ${
+                                      darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
+                                    }`}>
+                                      {avatarUrl ? (
+                                        <img src={avatarUrl} alt={authorName} className="h-full w-full object-cover" />
+                                      ) : (
+                                        getInitials(authorName)
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-semibold text-sm truncate">{authorName}</p>
+                                      {authorRole && (
+                                        <p className="text-xs uppercase tracking-wide text-indigo-500 mt-0.5">
+                                          {authorRole}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {forum.createdBy?.username && (
+                                    <div className="flex items-center gap-2 text-xs text-slate-500 pt-2 border-t border-slate-200 dark:border-slate-700">
+                                      <User className="w-3 h-3" />
+                                      <span>@{forum.createdBy.username}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <h4 className="mt-2 text-2xl font-bold text-indigo-600 dark:text-indigo-300">{forumTitle}</h4>
-                            <p className="text-sm text-slate-500 mt-2 line-clamp-3">{forum.description}</p>
-                            <div className="mt-3 text-xs text-slate-400">
-                              <span className="font-semibold text-slate-600 dark:text-slate-200">{authorName}</span>
-                              {authorRole && (
-                                <span className="ml-2 uppercase tracking-wide text-[11px] text-indigo-500">
-                                  {authorRole}
+                            <div className="flex-1 min-w-[200px]">
+                              <div className={`text-xs mb-2 ${
+                                hasBackgroundImage 
+                                  ? "text-white/90 drop-shadow"
+                                  : "text-slate-400"
+                              }`}>
+                                <span className="relative inline-block group/name" style={{ zIndex: 100 }}>
+                                  <span 
+                                    className={`font-semibold cursor-pointer hover:underline ${
+                                      hasBackgroundImage 
+                                        ? "text-white"
+                                        : "text-slate-600 dark:text-slate-200"
+                                    }`}
+                                  >
+                                    {authorName}
+                                  </span>
+                                  {/* Author Name Hover Popup */}
+                                  <div className="absolute left-0 top-6 z-[9999] hidden group-hover/name:block w-64">
+                                    <div className={`rounded-2xl shadow-2xl border p-4 ${
+                                      darkMode 
+                                        ? "bg-slate-900 border-slate-700 text-slate-100" 
+                                        : "bg-white border-slate-200 text-slate-900"
+                                    }`}>
+                                      <div className="flex items-center gap-3 mb-3">
+                                        <div className={`h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 text-indigo-600 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden ${
+                                          darkMode ? "ring-2 ring-indigo-500/40 text-indigo-100" : "ring-2 ring-indigo-100"
+                                        }`}>
+                                          {avatarUrl ? (
+                                            <img src={avatarUrl} alt={authorName} className="h-full w-full object-cover" />
+                                          ) : (
+                                            getInitials(authorName)
+                                          )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="font-semibold text-sm truncate">{authorName}</p>
+                                          {authorRole && (
+                                            <p className="text-xs uppercase tracking-wide text-indigo-500 mt-0.5">
+                                              {authorRole}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                      {forum.createdBy?.username && (
+                                        <div className="flex items-center gap-2 text-xs text-slate-500 pt-2 border-t border-slate-200 dark:border-slate-700">
+                                          <User className="w-3 h-3" />
+                                          <span>@{forum.createdBy.username}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
                                 </span>
+                                {authorRole && (
+                                  <span className="ml-2 uppercase tracking-wide text-[11px] text-indigo-500">
+                                    {authorRole}
+                                  </span>
+                                )}
+                                <span className={`ml-2 ${
+                                  hasBackgroundImage 
+                                    ? "text-white/80"
+                                    : "text-slate-500"
+                                }`}>
+                                  • Created: {forum.createdAt ? new Date(forum.createdAt).toLocaleString() : "—"}
+                                  {forum.updatedAt && forum.updatedAt !== forum.createdAt && (
+                                    <span className="ml-2">
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                              <h4 
+                                onClick={() => navigate(`/forums/${forum._id}`)}
+                                className={`text-2xl font-bold cursor-pointer transition-colors ${
+                                  hasBackgroundImage
+                                    ? "text-white drop-shadow-lg hover:text-indigo-200"
+                                    : "text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200"
+                                }`}
+                              >
+                                {forumTitle}
+                              </h4>
+                              <p className={`text-sm mt-2 line-clamp-3 ${
+                                hasBackgroundImage 
+                                  ? "text-white/90 drop-shadow"
+                                  : "text-slate-500"
+                              }`}>
+                                {forum.description}
+                              </p>
+                            </div>
+                            <div className="absolute top-0 right-0">
+                                <span
+                                  className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                                    hasBackgroundImage
+                                      ? forum.forumType === "announcement"
+                                        ? "bg-amber-500/90 text-white backdrop-blur-sm"
+                                        : "bg-indigo-500/90 text-white backdrop-blur-sm"
+                                      : forum.forumType === "announcement"
+                                        ? "bg-amber-100 text-amber-700"
+                                        : "bg-indigo-100 text-indigo-700"
+                                  }`}
+                                >
+                                  {forumTypeLabels[forum.forumType]}
+                                </span>
+                            </div>
+                          </div>
+
+                          {!hasBackgroundImage && (
+                            <AttachmentPreview
+                              files={forum.key}
+                              size="sm"
+                              onImageClick={handleAttachmentPreview}
+                              caption={forumTitle}
+                            />
+                          )}
+
+                          <div className="flex flex-wrap items-center justify-between gap-3 pt-12">
+                            <div className={`text-xs ${
+                              hasBackgroundImage 
+                                ? "text-white/80"
+                                : "text-slate-400"
+                            }`}>
+                              Updated: {forum.updatedAt ? new Date(forum.updatedAt).toLocaleString() : "Awaiting update"}
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <Link
+                                to={`/forums/${forum._id}`}
+                                className={`inline-flex items-center justify-center rounded-xl border active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow px-3 py-2 ${
+                                  hasBackgroundImage
+                                    ? "border-white/30 text-white bg-white/20 hover:bg-white/30 backdrop-blur-sm"
+                                    : "border-slate-300 text-slate-700 bg-white hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                                }`}
+                                title="View forum"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Link>
+                              {canManage && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditModal(forum)}
+                                    className={`inline-flex items-center justify-center rounded-xl border active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow px-3 py-2 ${
+                                      hasBackgroundImage
+                                        ? "border-white/30 text-white bg-white/20 hover:bg-white/30 backdrop-blur-sm"
+                                        : "border-slate-300 text-slate-700 bg-white hover:bg-slate-100 hover:border-slate-400 dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                                    }`}
+                                    title="Edit forum"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => openDeleteModal(forum)}
+                                    className={`inline-flex items-center justify-center rounded-lg px-3 py-2 border ${
+                                      hasBackgroundImage
+                                        ? "border-rose-300/50 text-rose-200 hover:bg-rose-500/30 backdrop-blur-sm"
+                                        : "border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                    }`}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </>
                               )}
                             </div>
-                          </div>
-                        </div>
-
-                        <AttachmentPreview
-                          files={forum.key}
-                          size="sm"
-                          onImageClick={handleAttachmentPreview}
-                          caption={forumTitle}
-                        />
-
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="text-xs text-slate-400">
-                            Updated: {forum.updatedAt ? new Date(forum.updatedAt).toLocaleString() : "Awaiting update"}
-                          </div>
-                          <div className="flex gap-2 shrink-0">
-                            <Link
-                              to={`/forums/${forum._id}`}
-                              className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-semibold bg-white hover:bg-slate-100 hover:border-slate-400 active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                            >
-                              View
-                            </Link>
-                            {canManage && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => openEditModal(forum)}
-                                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-semibold bg-white hover:bg-slate-100 hover:border-slate-400 active:scale-[0.97] transition-all duration-200 shadow-sm hover:shadow dark:bg-slate-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                                >
-                                  Edit
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => openDeleteModal(forum)}
-                                  className="inline-flex items-center justify-center rounded-lg px-3 py-2 border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </>
-                            )}
                           </div>
                         </div>
                       </div>

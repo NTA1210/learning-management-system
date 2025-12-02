@@ -2,6 +2,7 @@ import { CREATED, OK } from '@/constants/http';
 import {
   createSemester,
   deleteSemester,
+  getSemesterStatistics,
   listAllSemesters,
   updateSemester,
 } from '@/services/semester.service';
@@ -54,5 +55,19 @@ export const deleteSemesterHandler = catchErrors(async (req, res) => {
   return res.success(OK, {
     data,
     message: 'Semesters deleted successfully',
+  });
+});
+
+// GET /semesters/:semesterId/statistics - Get semester statistics
+export const getSemesterStatisticsHandler = catchErrors(async (req, res) => {
+  const semesterId = semesterIdSchema.parse(req.params.semesterId);
+  const userId = req.userId;
+  const userRole = (req as any).role;
+
+  const data = await getSemesterStatistics(semesterId, userId, userRole);
+
+  return res.success(OK, {
+    data,
+    message: 'Semester statistics retrieved successfully',
   });
 });

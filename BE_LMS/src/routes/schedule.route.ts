@@ -30,22 +30,22 @@ scheduleRouter.get("/time-slots", getTimeSlotsHandler);
 scheduleRouter.post(
     "/",
     authenticate,
-    authorize(Role.TEACHER),
+    authorize(Role.TEACHER, Role.ADMIN),
     createScheduleRequestHandler
 );
 
-// Get teacher's weekly schedule (?teacherId=)
-// GET /schedules?teacherId=
+// Get teacher's weekly schedule
+// GET /schedules/per-teacher/:teacherId?date=
 scheduleRouter.get(
-    "/",
+    "/per-teacher/:teacherId",
     authenticate,
     getTeacherScheduleHandler
 );
 
-// Get course schedule (?courseId=)
-// GET /schedules?courseId=
+// Get course schedule
+// GET /schedules/per-teacher/:courseId
 scheduleRouter.get(
-    "/",
+    "/per-course/:courseId",
     authenticate,
     getCourseScheduleHandler
 );

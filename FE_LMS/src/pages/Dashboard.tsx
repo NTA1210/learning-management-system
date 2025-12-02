@@ -97,14 +97,14 @@ export default function Dashboard() {
                       (e.target as HTMLElement).style.color = darkMode ? '#9ca3af' : '#6b7280';
                       (e.target as HTMLElement).style.borderColor = 'transparent';
                     }}
-                    onClick={() => window.location.href = '/semesters'}
+                    onClick={() => window.location.href = '/create-course'}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>
                       <path d="M9 10h6"/>
                       <path d="M12 7v6"/>
                     </svg>
-                    <span>Semester</span>
+                    <span>Course</span>
                   </button>
                   <button 
                     className="whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 border-transparent"

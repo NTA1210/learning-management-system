@@ -172,8 +172,8 @@ export const updateQuiz = async (
   const deleted = snapshotQuestions.filter((q) => q.isDeleted && !q.isNewQuestion);
 
   for (const q of updated) {
-    const index = map.get(q.id) || -1;
-    if (index === -1) continue;
+    const index = map.get(q.id);
+    if (index === undefined) continue;
 
     const oldQuestion = quiz.snapshotQuestions[index];
     const oldImages = oldQuestion.images || [];
@@ -183,10 +183,11 @@ export const updateQuiz = async (
     quiz.snapshotQuestions[index] = {
       ...oldQuestion,
       ...q,
+      images: newImages, // Merge ảnh
+      isDirty: false, // reset flag
+      isNewQuestion: false, // reset flag
+      isDeleted: false,
     };
-
-    // Merge ảnh
-    quiz.snapshotQuestions[index].images = newImages;
 
     // Xóa ảnh
     deletedImages.push(
@@ -201,7 +202,12 @@ export const updateQuiz = async (
     for (const q of added) {
       const exists = quiz.snapshotQuestions.some((sq) => sq.id === q.id);
       appAssert(!exists, BAD_REQUEST, `Question "${q.text}" already exists`);
-      quiz.snapshotQuestions.push(q);
+      quiz.snapshotQuestions.push({
+        ...q,
+        isDirty: false,
+        isNewQuestion: false,
+        isDeleted: false,
+      });
     }
   }
 
