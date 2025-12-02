@@ -10,10 +10,11 @@ import {
   type ForumPost,
   type ForumReply,
 } from "../services/forumService";
-import { AlertCircle, ArrowLeft, CheckCircle, Edit3, Loader2, MessageSquare, Trash2, X } from "lucide-react";
+import { ArrowLeft, Edit3, Loader2, MessageSquare, Trash2 } from "lucide-react";
 import MarkdownContent from "../components/MarkdownContent";
 import AttachmentPreview from "../components/AttachmentPreview";
 import MarkdownComposer from "../components/MarkdownComposer";
+import toast from "react-hot-toast";
 
 type SidebarRole = "admin" | "teacher" | "student";
 type ReplyNode = ForumReply & { children?: ReplyNode[] };
@@ -52,7 +53,6 @@ const ForumPostDetailPage: React.FC = () => {
   const [visibleRepliesCount, setVisibleRepliesCount] = useState(3);
   const replyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [lightboxImage, setLightboxImage] = useState<{ src: string; alt?: string } | null>(null);
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const fetchForum = useCallback(async () => {
     if (!forumId) return;
@@ -123,12 +123,6 @@ const ForumPostDetailPage: React.FC = () => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [lightboxImage]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timeout = setTimeout(() => setToast(null), 4000);
-    return () => clearTimeout(timeout);
-  }, [toast]);
 
   const formatDate = (value?: string | number | Date) => {
     if (!value) return "—";
@@ -237,7 +231,7 @@ const ForumPostDetailPage: React.FC = () => {
     if (!forumId || !postId || !editingReply) return;
     const content = editingReply.content.trim();
     if (!content) {
-      setToast({ type: "error", message: "Reply content cannot be empty." });
+      toast.error("Reply content cannot be empty.");
       return;
     }
     try {
@@ -245,7 +239,7 @@ const ForumPostDetailPage: React.FC = () => {
       setEditError(null);
       await forumService.updateReply(forumId, postId, editingReply.replyId, { content });
       setEditingReply(null);
-      setToast({ type: "success", message: "Reply updated successfully." });
+      toast.success("Reply updated successfully.");
       await Promise.all([fetchPost(), fetchReplies()]);
     } catch (err: any) {
       let message = "Unable to update reply";
@@ -259,7 +253,7 @@ const ForumPostDetailPage: React.FC = () => {
         message = err.message;
       }
 
-      setToast({ type: "error", message });
+      toast.error(message);
       setEditError(message);
     } finally {
       setEditSaving(false);
@@ -276,7 +270,7 @@ const ForumPostDetailPage: React.FC = () => {
         setEditingReply(null);
         setEditError(null);
       }
-      setToast({ type: "success", message: "Reply deleted successfully." });
+      toast.success("Reply deleted successfully.");
       await Promise.all([fetchPost(), fetchReplies()]);
     } catch (err: any) {
       let message = "Unable to delete reply";
@@ -290,7 +284,7 @@ const ForumPostDetailPage: React.FC = () => {
         message = err.message;
       }
 
-      setToast({ type: "error", message });
+      toast.error(message);
       setReplyManagementError(message);
     } finally {
       setDeletingReplyId(null);
@@ -709,35 +703,6 @@ const ForumPostDetailPage: React.FC = () => {
           </main>
         </div>
       </div>
-
-      {/* Toast Notification - Fixed Center Position */}
-      {toast && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none p-4">
-          <div
-            className={`rounded-2xl border px-6 py-4 flex items-center justify-between gap-4 shadow-2xl pointer-events-auto max-w-md w-full animate-in zoom-in-95 fade-in duration-300 ${toast.type === "success"
-              ? "bg-emerald-50 border-emerald-300 text-emerald-900 dark:bg-emerald-900/90 dark:border-emerald-600 dark:text-emerald-50"
-              : "bg-rose-50 border-rose-300 text-rose-900 dark:bg-rose-900/90 dark:border-rose-600 dark:text-rose-50"
-              }`}
-          >
-            <div className="flex items-center gap-3">
-              {toast.type === "success" ? (
-                <CheckCircle className="w-6 h-6 shrink-0" />
-              ) : (
-                <AlertCircle className="w-6 h-6 shrink-0" />
-              )}
-              <span className="font-semibold text-base">{toast.message}</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setToast(null)}
-              className="shrink-0 p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/20 transition-colors"
-              aria-label="Close notification"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      )}
 
       {lightboxImage && (
         <div
