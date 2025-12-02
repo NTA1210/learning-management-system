@@ -2,57 +2,30 @@ import React, { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { useTheme } from "../hooks/useTheme";
-
-interface BlogPost {
-  id: string;
-  slug: string;
-  title: string;
-  excerpt: string;
-  thumbnailUrl: string;
-  createdAt: string;
-  category?: string;
-}
-
-// ---- Fake data fetcher (replace with real API) ----
-async function getBlogs(
-  pageNumber: number,
-  pageSize: number
-): Promise<{ items: BlogPost[]; total: number }> {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  const demo: BlogPost[] = [
-    {
-      id: "1",
-      slug: "khoa-hoc-react-co-ban",
-      title: "Khoá học React cơ bản dành cho người mới",
-      excerpt:
-        "Tìm hiểu cách xây dựng ứng dụng web hiện đại với React, từ component, props đến hook...",
-      thumbnailUrl:
-        "https://cdn.jsdelivr.net/gh/ftesedu/funnycode-images-1757352873747@main/images/tintucFtes.png_1757754180109.png?v=1757754181512",
-      createdAt: "2025-11-20T10:00:00.000Z",
-      category: "Khóa học",
-    },
-    {
-      id: "2",
-      slug: "funnycode-cap-nhat-tinh-nang-moi",
-      title: "FunnyCode ra mắt tính năng học tập mới",
-      excerpt:
-        "Nền tảng FunnyCode tiếp tục được nâng cấp với trải nghiệm học code tương tác hơn.",
-      thumbnailUrl:
-        "https://cdn.jsdelivr.net/gh/ftesedu/funnycode-images-1757352873747@main/images/tintucFtes.png_1757754180109.png?v=1757754181512",
-      createdAt: "2025-11-25T09:00:00.000Z",
-      category: "Cập nhật",
-    },
-  ];
-
-  const start = (pageNumber - 1) * pageSize;
-  const items = demo.slice(start, start + pageSize);
-  return { items, total: demo.length };
-}
+import type { BlogPost } from "../types/blog";
+import {
+  getBlogs,
+  createBlog,
+  updateBlog,
+  deleteBlog,
+} from "../services/blogService";
+import { useAuth } from "../hooks/useAuth";
+import { Plus, Edit2, Trash2, Loader2 } from "lucide-react";
+import BlogFormModal from "../components/blog/BlogFormModal";
+import Swal from "sweetalert2";
 
 // ---- Card component ----
-function BlogCard({ post }: { post: BlogPost }) {
+function BlogCard({
+  post,
+  isAdmin,
+  onEdit,
+  onDelete,
+}: {
+  post: BlogPost;
+  isAdmin: boolean;
+  onEdit: (post: BlogPost) => void;
+  onDelete: (id: string) => void;
+}) {
   const { darkMode } = useTheme();
   const date = new Date(post.createdAt).toLocaleDateString("vi-VN", {
     day: "2-digit",
@@ -62,12 +35,38 @@ function BlogCard({ post }: { post: BlogPost }) {
 
   return (
     <article
-      className={`group flex flex-col md:flex-row gap-6 md:gap-8 p-6 rounded-2xl border transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
+      className={`group relative flex flex-col md:flex-row gap-6 md:gap-8 p-6 rounded-2xl border transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
         darkMode
           ? "bg-[#1a202c] border-slate-700 hover:border-indigo-500/50 hover:shadow-indigo-500/10"
           : "bg-white border-slate-200 hover:border-indigo-300 hover:shadow-indigo-100"
       }`}
     >
+      {/* Admin Actions */}
+      {isAdmin && (
+        <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              onEdit(post);
+            }}
+            className="p-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 shadow-lg"
+            title="Edit"
+          >
+            <Edit2 className="h-4 w-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              onDelete(post._id);
+            }}
+            className="p-2 rounded-full bg-red-500 text-white hover:bg-red-600 shadow-lg"
+            title="Delete"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Image Section */}
       <div className="w-full md:w-5/12 shrink-0">
         <div className="relative aspect-video w-full overflow-hidden rounded-xl">
@@ -120,18 +119,18 @@ function BlogCard({ post }: { post: BlogPost }) {
             <i className="bi bi-calendar3"></i> {date}
           </span>
           <span className="flex items-center gap-1">
-            <i className="bi bi-share"></i> Chia sẻ
+            <i className="bi bi-person"></i> {post.authorName}
           </span>
         </div>
 
-        {/* Description */}
-        <p
+        {/* Description (Excerpt or Content) */}
+        <div
           className={`mb-4 line-clamp-3 text-sm leading-relaxed ${
             darkMode ? "text-slate-400" : "text-slate-600"
           }`}
-        >
-          {post.excerpt}
-        </p>
+          // Use a stripped version of content if no excerpt
+          dangerouslySetInnerHTML={{ __html: post.content }}
+        />
 
         {/* Read More Button */}
         <div className="mt-auto flex justify-end">
@@ -223,29 +222,106 @@ function Pagination({
 // ---- Page component ----
 const BlogPage: React.FC = () => {
   const { darkMode } = useTheme();
-  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
+  const [searchParams, setSearchParams] = useSearchParams();
   const pageNumber = Number(searchParams.get("pageNumber") ?? "1") || 1;
   const pageSize = Number(searchParams.get("pageSize") ?? "10") || 10;
+  const search = searchParams.get("search") || "";
 
   const [items, setItems] = useState<BlogPost[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState(search);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingBlog, setEditingBlog] = useState<BlogPost | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const response = await getBlogs({
+        page: pageNumber,
+        limit: pageSize,
+        search: search,
+      });
+      setItems(response.data);
+      setTotal(response.pagination.total);
+    } catch (error) {
+      console.error("Failed to fetch blogs", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const { items, total } = await getBlogs(pageNumber, pageSize);
-        setItems(items);
-        setTotal(total);
-      } catch (error) {
-        console.error("Failed to fetch blogs", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
-  }, [pageNumber, pageSize]);
+  }, [pageNumber, pageSize, search]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchParams({
+      pageNumber: "1",
+      pageSize: String(pageSize),
+      search: searchTerm,
+    });
+  };
+
+  const handleCreate = () => {
+    setEditingBlog(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEdit = (blog: BlogPost) => {
+    setEditingBlog(blog);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "You won't be able to revert this!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, delete it!",
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await deleteBlog(id);
+        Swal.fire("Deleted!", "Your blog has been deleted.", "success");
+        fetchData(); // Refresh list
+      } catch (error) {
+        console.error("Failed to delete blog", error);
+        Swal.fire("Error!", "Failed to delete blog.", "error");
+      }
+    }
+  };
+
+  const handleFormSubmit = async (formData: FormData) => {
+    setIsSubmitting(true);
+    try {
+      if (editingBlog) {
+        await updateBlog(editingBlog._id, formData);
+        Swal.fire("Success!", "Blog updated successfully.", "success");
+      } else {
+        await createBlog(formData);
+        Swal.fire("Success!", "Blog created successfully.", "success");
+      }
+      setIsModalOpen(false);
+      fetchData(); // Refresh list
+    } catch (error) {
+      console.error("Failed to save blog", error);
+      Swal.fire("Error!", "Failed to save blog.", "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <>
@@ -270,20 +346,15 @@ const BlogPage: React.FC = () => {
             }}
           >
             {/* Header */}
-            <section className="mb-12">
-              {/* Search (Centered) */}
-              <form
-                className="w-full max-w-2xl mx-auto"
-                onSubmit={(e) => e.preventDefault()}
-              >
-                <label className="sr-only" htmlFor="blog-search">
-                  Tìm kiếm bài viết
-                </label>
+            <section className="mb-12 flex flex-col md:flex-row gap-6 items-center justify-between">
+              {/* Search */}
+              <form className="w-full max-w-xl" onSubmit={handleSearch}>
                 <div className="relative group">
                   <input
-                    id="blog-search"
                     type="search"
                     placeholder="Tìm kiếm bài viết..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                     className={`w-full rounded-2xl border px-6 py-4 pl-12 text-base shadow-sm outline-none ring-0 transition-all focus:ring-2 focus:-translate-y-0.5 focus:shadow-lg ${
                       darkMode
                         ? "border-slate-600 bg-slate-900/50 text-slate-50 focus:border-indigo-500 focus:ring-indigo-500/20 placeholder-slate-400"
@@ -301,12 +372,23 @@ const BlogPage: React.FC = () => {
                   </span>
                 </div>
               </form>
+
+              {/* Create Button (Admin Only) */}
+              {isAdmin && (
+                <button
+                  onClick={handleCreate}
+                  className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-indigo-600 text-white font-medium shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all"
+                >
+                  <Plus className="h-5 w-5" />
+                  Create Blog
+                </button>
+              )}
             </section>
 
             {/* Blog List */}
             {loading ? (
               <div className="flex justify-center py-20">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"></div>
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
               </div>
             ) : items.length === 0 ? (
               <div
@@ -323,7 +405,13 @@ const BlogPage: React.FC = () => {
               <>
                 <section className="flex flex-col gap-6">
                   {items.map((post) => (
-                    <BlogCard key={post.id} post={post} />
+                    <BlogCard
+                      key={post._id}
+                      post={post}
+                      isAdmin={isAdmin}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                    />
                   ))}
                 </section>
 
@@ -337,6 +425,15 @@ const BlogPage: React.FC = () => {
             )}
           </div>
         </main>
+
+        {/* Modal */}
+        <BlogFormModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSubmit={handleFormSubmit}
+          initialData={editingBlog}
+          isLoading={isSubmitting}
+        />
       </div>
     </>
   );
