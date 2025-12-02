@@ -26,10 +26,10 @@ export const listMajors = async ({
     // Build filter query
     const filter: any = {};
 
-    // Search by title or description (text search)
+    // Search by name or description (text search)
     if (search) {
         filter.$or = [
-            {title: {$regex: search, $options: "i"}},
+            {name: {$regex: search, $options: "i"}},
             {description: {$regex: search, $options: "i"}},
         ];
     }

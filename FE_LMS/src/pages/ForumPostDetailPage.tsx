@@ -334,7 +334,21 @@ const ForumPostDetailPage: React.FC = () => {
       setIsEditingPost(false);
       fetchPost();
     } catch (err: any) {
-      const message = err instanceof Error ? err.message : "Unable to update post";
+      let message = "Unable to update post";
+
+      // Authorization / permission errors: show specific toast
+      if (
+        err?.response?.status === 403 ||
+        err?.message?.toLowerCase?.().includes("permission") ||
+        err?.message?.toLowerCase?.().includes("not allowed")
+      ) {
+        message = "You can only edit your own posts";
+      } else if (err?.response?.data?.message) {
+        message = err.response.data.message;
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+
       toast.error(message);
     } finally {
       setPostSaving(false);
@@ -696,18 +710,7 @@ const ForumPostDetailPage: React.FC = () => {
                         >
                           <Edit3 className="w-5 h-5" />
                         </button>
-                        <button
-                          onClick={handleDeletePost}
-                          disabled={postDeleteLoading}
-                          className="p-2 rounded-xl text-slate-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/20 dark:hover:text-rose-400 transition-colors"
-                          title="Delete post"
-                        >
-                          {postDeleteLoading ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-5 h-5" />
-                          )}
-                        </button>
+                        
                       </div>
                     )}
                   </div>

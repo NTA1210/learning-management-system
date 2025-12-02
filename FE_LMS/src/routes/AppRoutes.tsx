@@ -43,7 +43,10 @@ import {
   GradeAttemptPage,
   CreateSemesterPage,
   ListSemestersPage,
+  BlogPage,
+  BlogDetailPage,
 } from "../pages";
+
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
 import AssignmentDetailPage from "../pages/AssignmentDetailPage";
@@ -462,6 +465,8 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route path="/blogs" element={<BlogPage />} />
+        <Route path="/blogs/:slug" element={<BlogDetailPage />} />
         {/* Not found */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

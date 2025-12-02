@@ -51,8 +51,6 @@ const QuizSchema = new mongoose.Schema<IQuiz>(
       default: [],
     },
     isPublished: { type: Boolean, default: true },
-    deletedAt: { type: Date },
-    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   { timestamps: true }
@@ -93,17 +91,3 @@ QuizSchema.pre('save', function (next) {
 const QuizModel = mongoose.model<IQuiz>('Quiz', QuizSchema, 'quizzes');
 
 export default QuizModel;
-
-//Chạy mỗi 5 phút kiểm tra quiz đã hết thời gian
-
-// cron.schedule('0 */5 * * * *', async () => {
-//   console.log('🚀 Running daily quiz cleanup task...');
-//   const quizzes = await QuizModel.updateMany(
-//     { endTime: { $lt: new Date() }, isCompleted: false },
-//     { isCompleted: true }
-//   );
-
-//   if (quizzes.modifiedCount > 0) {
-//     console.log(`✅ Updated ${quizzes.modifiedCount} completed quizzes.`);
-//   }
-// });

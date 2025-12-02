@@ -61,10 +61,10 @@ export const listSpecialists = async ({
         filter.updatedAt = updatedAt;
     }
 
-    // Search by title or description (text search)
+    // Search by name or description (text search)
     if (search) {
         filter.$or = [
-            {title: {$regex: search, $options: "i"}},
+            {name: {$regex: search, $options: "i"}},
             {description: {$regex: search, $options: "i"}},
         ];
     }
@@ -154,7 +154,7 @@ export const updateSpecialistById = async (
 
     // If updating major, check if the major exists
     if (data.majorId && data.majorId.toString() !== specialist.majorId.toString()) {
-        const majorExists = await SpecialistModel.findById(data.majorId);
+        const majorExists = await MajorModel.findById(data.majorId);
         appAssert(majorExists, NOT_FOUND, "Major not found");
     }
 
@@ -217,8 +217,8 @@ export const deleteSpecialistBySlug = async (slug: string) => {
 
     // Check if any teachers and courses are using this specialist
     const [teachersUsingSpecialist, coursesUsingSpecialist] = await Promise.all([
-        UserModel.countDocuments({role: Role.TEACHER, specialistIds: {$in: specialist.id}}),
-        CourseModel.countDocuments({specialistIds: {$in: specialist.id}}),
+        UserModel.countDocuments({role: Role.TEACHER, specialistIds: {$in: [specialist.id]}}),
+        CourseModel.countDocuments({specialistIds: {$in: [specialist.id]}}),
     ]);
     appAssert(
         teachersUsingSpecialist === 0 && coursesUsingSpecialist === 0,

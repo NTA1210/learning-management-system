@@ -37,3 +37,4 @@ export { default as IChatRoom } from './chatRoom.type';
 export * from './chatRoom.type';
 export { default as IMessage } from './message.type';
 export * from './message.type';
+export { default as IBlog } from './blog.type';
