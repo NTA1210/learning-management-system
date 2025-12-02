@@ -41,3 +41,4 @@ export { default as ForumPostDetailPage } from "./ForumPostDetailPage";
 export { default as OnboardingPage } from "./Onboarding";
 export { default as CreateSemesterPage } from "./CreateSemesterPage";
 export { default as ListSemestersPage } from "./ListSemestersPage";
+export { default as BlogPage } from "./Blog";

@@ -41,7 +41,9 @@ import {
   DeletedCoursesPage,
   CreateSemesterPage,
   ListSemestersPage,
+  BlogPage,
 } from "../pages";
+
 import EmailVerificationPage from "../pages/EmailVerificationPage";
 import LessonMaterialDetailPage from "../pages/LessonMaterialDetailPage";
 import AssignmentDetailPage from "../pages/AssignmentDetailPage";
@@ -444,6 +446,7 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route path="/blog" element={<BlogPage />} />
         {/* Not found */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
