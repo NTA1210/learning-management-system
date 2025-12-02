@@ -3,7 +3,7 @@ import http from "../utils/http";
 export interface Semester {
   _id: string;
   name: string;
-  type: "fall" | "spring" | "summer" | "winter";
+  type: "fall" | "spring" | "summer";
   year: number;
   startDate: string;
   endDate: string;

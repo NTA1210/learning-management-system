@@ -25,10 +25,11 @@ const CreateSemesterPage: React.FC = () => {
     { value: "fall", label: "Fall" },
     { value: "spring", label: "Spring" },
     { value: "summer", label: "Summer" },
-    { value: "winter", label: "Winter" },
   ];
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
     setForm((prev) => ({
       ...prev,
@@ -88,7 +89,8 @@ const CreateSemesterPage: React.FC = () => {
         throw new Error(response.data?.message || "Failed to create semester");
       }
     } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || "Failed to create semester";
+      const msg =
+        e?.response?.data?.message || e?.message || "Failed to create semester";
       setError(msg);
       const Swal = (await import("sweetalert2")).default;
       await Swal.fire({
@@ -141,14 +143,18 @@ const CreateSemesterPage: React.FC = () => {
               className="rounded-lg shadow-lg p-6"
               style={{
                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
-                border: darkMode ? "1px solid rgba(255,255,255,0.1)" : "1px solid #e5e7eb",
+                border: darkMode
+                  ? "1px solid rgba(255,255,255,0.1)"
+                  : "1px solid #e5e7eb",
               }}
             >
               {successMsg && (
                 <div
                   className="mb-4 p-3 rounded"
                   style={{
-                    backgroundColor: darkMode ? "rgba(34, 197, 94, 0.2)" : "rgba(34, 197, 94, 0.1)",
+                    backgroundColor: darkMode
+                      ? "rgba(34, 197, 94, 0.2)"
+                      : "rgba(34, 197, 94, 0.1)",
                     color: darkMode ? "#86efac" : "#16a34a",
                   }}
                 >
@@ -160,7 +166,9 @@ const CreateSemesterPage: React.FC = () => {
                 <div
                   className="mb-4 p-3 rounded"
                   style={{
-                    backgroundColor: darkMode ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.1)",
+                    backgroundColor: darkMode
+                      ? "rgba(239, 68, 68, 0.2)"
+                      : "rgba(239, 68, 68, 0.1)",
                     color: darkMode ? "#fca5a5" : "#dc2626",
                   }}
                 >
@@ -186,8 +194,12 @@ const CreateSemesterPage: React.FC = () => {
                       max="2100"
                       className="w-full px-4 py-2 rounded-lg border"
                       style={{
-                        backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                        borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                        backgroundColor: darkMode
+                          ? "rgba(55, 65, 81, 0.8)"
+                          : "#ffffff",
+                        borderColor: darkMode
+                          ? "rgba(75, 85, 99, 0.3)"
+                          : "#e5e7eb",
                         color: darkMode ? "#ffffff" : "#000000",
                       }}
                       placeholder="Enter year"
@@ -208,8 +220,12 @@ const CreateSemesterPage: React.FC = () => {
                       onChange={handleChange}
                       className="w-full px-4 py-2 rounded-lg border"
                       style={{
-                        backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                        borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                        backgroundColor: darkMode
+                          ? "rgba(55, 65, 81, 0.8)"
+                          : "#ffffff",
+                        borderColor: darkMode
+                          ? "rgba(75, 85, 99, 0.3)"
+                          : "#e5e7eb",
                         color: darkMode ? "#ffffff" : "#000000",
                       }}
                       required
@@ -236,8 +252,12 @@ const CreateSemesterPage: React.FC = () => {
                       onChange={handleChange}
                       className="w-full px-4 py-2 rounded-lg border"
                       style={{
-                        backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                        borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                        backgroundColor: darkMode
+                          ? "rgba(55, 65, 81, 0.8)"
+                          : "#ffffff",
+                        borderColor: darkMode
+                          ? "rgba(75, 85, 99, 0.3)"
+                          : "#e5e7eb",
                         color: darkMode ? "#ffffff" : "#000000",
                       }}
                       required
@@ -258,8 +278,12 @@ const CreateSemesterPage: React.FC = () => {
                       onChange={handleChange}
                       className="w-full px-4 py-2 rounded-lg border"
                       style={{
-                        backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                        borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                        backgroundColor: darkMode
+                          ? "rgba(55, 65, 81, 0.8)"
+                          : "#ffffff",
+                        borderColor: darkMode
+                          ? "rgba(75, 85, 99, 0.3)"
+                          : "#e5e7eb",
                         color: darkMode ? "#ffffff" : "#000000",
                       }}
                       required
@@ -283,15 +307,25 @@ const CreateSemesterPage: React.FC = () => {
                     type="submit"
                     disabled={loading}
                     className="px-5 py-2 rounded-lg text-white font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ backgroundColor: darkMode ? "#4c1d95" : "#4f46e5" }}
+                    style={{
+                      backgroundColor: darkMode ? "#4c1d95" : "#4f46e5",
+                    }}
                     onMouseEnter={(e) => {
                       if (!loading) {
-                        (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? "#5b21b6" : "#4338ca";
+                        (
+                          e.currentTarget as HTMLButtonElement
+                        ).style.backgroundColor = darkMode
+                          ? "#5b21b6"
+                          : "#4338ca";
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!loading) {
-                        (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? "#4c1d95" : "#4f46e5";
+                        (
+                          e.currentTarget as HTMLButtonElement
+                        ).style.backgroundColor = darkMode
+                          ? "#4c1d95"
+                          : "#4f46e5";
                       }
                     }}
                   >
@@ -308,4 +342,3 @@ const CreateSemesterPage: React.FC = () => {
 };
 
 export default CreateSemesterPage;
-

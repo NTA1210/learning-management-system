@@ -38,7 +38,6 @@ const ListSemestersPage: React.FC = () => {
     { value: "fall", label: "Fall" },
     { value: "spring", label: "Spring" },
     { value: "summer", label: "Summer" },
-    { value: "winter", label: "Winter" },
   ];
 
   const fetchSemesters = async () => {
@@ -48,19 +47,27 @@ const ListSemestersPage: React.FC = () => {
         withCredentials: true,
       });
       const data = response.data;
-      const list = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+        ? data.data
+        : [];
       setAllSemesters(list);
       setSemesters(list);
       setError("");
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || "Failed to load semesters");
+      setError(
+        e?.response?.data?.message || e?.message || "Failed to load semesters"
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const getSemesterName = (semester: Semester) => {
-    const typeLabel = semesterTypes.find((t) => t.value === semester.type)?.label || semester.type;
+    const typeLabel =
+      semesterTypes.find((t) => t.value === semester.type)?.label ||
+      semester.type;
     return `${typeLabel.toUpperCase()} ${semester.year}`;
   };
 
@@ -80,7 +87,7 @@ const ListSemestersPage: React.FC = () => {
       const semesterName = getSemesterName(semester).toLowerCase();
       const year = semester.year.toString();
       const type = semester.type.toLowerCase();
-      
+
       return (
         semesterName.includes(searchLower) ||
         year.includes(searchLower) ||
@@ -108,7 +115,10 @@ const ListSemestersPage: React.FC = () => {
       if (!dateString) return "";
       const parts = dateString.split("/");
       if (parts.length === 3) {
-        return `${parts[0]}-${parts[1].padStart(2, "0")}-${parts[2].padStart(2, "0")}`;
+        return `${parts[0]}-${parts[1].padStart(2, "0")}-${parts[2].padStart(
+          2,
+          "0"
+        )}`;
       }
       return dateString;
     };
@@ -148,7 +158,10 @@ const ListSemestersPage: React.FC = () => {
         });
         await fetchSemesters();
       } catch (e: any) {
-        const msg = e?.response?.data?.message || e?.message || "Failed to delete semester";
+        const msg =
+          e?.response?.data?.message ||
+          e?.message ||
+          "Failed to delete semester";
         await Swal.fire({
           toast: true,
           position: "top-end",
@@ -195,7 +208,9 @@ const ListSemestersPage: React.FC = () => {
         toast: true,
         position: "top-end",
         icon: "success",
-        title: isEdit ? "Semester updated successfully!" : "Semester created successfully!",
+        title: isEdit
+          ? "Semester updated successfully!"
+          : "Semester created successfully!",
         showConfirmButton: false,
         timer: 2000,
       });
@@ -205,7 +220,8 @@ const ListSemestersPage: React.FC = () => {
       setEditingSemester(null);
       await fetchSemesters();
     } catch (e: any) {
-      const msg = e?.response?.data?.message || e?.message || "Failed to save semester";
+      const msg =
+        e?.response?.data?.message || e?.message || "Failed to save semester";
       const Swal = (await import("sweetalert2")).default;
       await Swal.fire({
         toast: true,
@@ -220,7 +236,7 @@ const ListSemestersPage: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "N/A";
-    
+
     // Handle ISO date format (2026-08-31T17:00:00.000Z)
     if (dateString.includes("T")) {
       const date = new Date(dateString);
@@ -230,7 +246,7 @@ const ListSemestersPage: React.FC = () => {
         day: "numeric",
       });
     }
-    
+
     // Handle YYYY/MM/DD format
     const parts = dateString.split("/");
     if (parts.length === 3) {
@@ -241,7 +257,7 @@ const ListSemestersPage: React.FC = () => {
         day: "numeric",
       });
     }
-    
+
     // Handle YYYY-MM-DD format
     if (dateString.includes("-") && dateString.length === 10) {
       const date = new Date(dateString);
@@ -251,7 +267,7 @@ const ListSemestersPage: React.FC = () => {
         day: "numeric",
       });
     }
-    
+
     return dateString;
   };
 
@@ -302,10 +318,12 @@ const ListSemestersPage: React.FC = () => {
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium transition-all"
                 style={{ backgroundColor: darkMode ? "#4c1d95" : "#4f46e5" }}
                 onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? "#5b21b6" : "#4338ca";
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                    darkMode ? "#5b21b6" : "#4338ca";
                 }}
                 onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? "#4c1d95" : "#4f46e5";
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                    darkMode ? "#4c1d95" : "#4f46e5";
                 }}
               >
                 <Plus className="w-4 h-4" />
@@ -329,7 +347,9 @@ const ListSemestersPage: React.FC = () => {
                   style={{
                     backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                     color: darkMode ? "#ffffff" : "#111827",
-                    border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
+                    border: darkMode
+                      ? "1px solid rgba(255,255,255,0.08)"
+                      : "1px solid #e5e7eb",
                   }}
                 />
               </div>
@@ -340,7 +360,9 @@ const ListSemestersPage: React.FC = () => {
               <div
                 className="mb-4 p-3 rounded-lg"
                 style={{
-                  backgroundColor: darkMode ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.1)",
+                  backgroundColor: darkMode
+                    ? "rgba(239, 68, 68, 0.2)"
+                    : "rgba(239, 68, 68, 0.1)",
                   color: darkMode ? "#fca5a5" : "#dc2626",
                 }}
               >
@@ -390,7 +412,9 @@ const ListSemestersPage: React.FC = () => {
                     className="rounded-lg p-6"
                     style={{
                       backgroundColor: darkMode ? "#1f2937" : "#ffffff",
-                      border: darkMode ? "1px solid rgba(255,255,255,0.1)" : "1px solid #e5e7eb",
+                      border: darkMode
+                        ? "1px solid rgba(255,255,255,0.1)"
+                        : "1px solid #e5e7eb",
                     }}
                   >
                     <div className="flex items-start justify-between mb-4">
@@ -418,7 +442,9 @@ const ListSemestersPage: React.FC = () => {
                         >
                           Start:
                         </span>
-                        <span style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                        <span
+                          style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
+                        >
                           {formatDate(semester.startDate)}
                         </span>
                       </div>
@@ -429,18 +455,29 @@ const ListSemestersPage: React.FC = () => {
                         >
                           End:
                         </span>
-                        <span style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                        <span
+                          style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
+                        >
                           {formatDate(semester.endDate)}
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex gap-2 pt-4 border-t" style={{ borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb" }}>
+                    <div
+                      className="flex gap-2 pt-4 border-t"
+                      style={{
+                        borderColor: darkMode
+                          ? "rgba(75, 85, 99, 0.3)"
+                          : "#e5e7eb",
+                      }}
+                    >
                       <button
                         onClick={() => handleEdit(semester)}
                         className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90 flex items-center justify-center gap-2"
                         style={{
-                          backgroundColor: darkMode ? "rgba(59, 130, 246, 0.2)" : "#dbeafe",
+                          backgroundColor: darkMode
+                            ? "rgba(59, 130, 246, 0.2)"
+                            : "#dbeafe",
                           color: darkMode ? "#93c5fd" : "#2563eb",
                         }}
                       >
@@ -451,7 +488,9 @@ const ListSemestersPage: React.FC = () => {
                         onClick={() => handleDelete(semester._id)}
                         className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all hover:opacity-90 flex items-center justify-center gap-2"
                         style={{
-                          backgroundColor: darkMode ? "rgba(239, 68, 68, 0.2)" : "#fee2e2",
+                          backgroundColor: darkMode
+                            ? "rgba(239, 68, 68, 0.2)"
+                            : "#fee2e2",
                           color: darkMode ? "#fca5a5" : "#dc2626",
                         }}
                       >
@@ -488,7 +527,9 @@ const ListSemestersPage: React.FC = () => {
             <div
               className="flex items-center justify-between px-6 py-4"
               style={{
-                borderBottom: darkMode ? "1px solid rgba(255,255,255,0.06)" : "1px solid #eee",
+                borderBottom: darkMode
+                  ? "1px solid rgba(255,255,255,0.06)"
+                  : "1px solid #eee",
               }}
             >
               <h3
@@ -535,8 +576,12 @@ const ListSemestersPage: React.FC = () => {
                     max="2100"
                     className="w-full px-4 py-2 rounded-lg border"
                     style={{
-                      backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                      borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                      backgroundColor: darkMode
+                        ? "rgba(55, 65, 81, 0.8)"
+                        : "#ffffff",
+                      borderColor: darkMode
+                        ? "rgba(75, 85, 99, 0.3)"
+                        : "#e5e7eb",
                       color: darkMode ? "#ffffff" : "#000000",
                     }}
                     required
@@ -558,8 +603,12 @@ const ListSemestersPage: React.FC = () => {
                     }
                     className="w-full px-4 py-2 rounded-lg border"
                     style={{
-                      backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                      borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                      backgroundColor: darkMode
+                        ? "rgba(55, 65, 81, 0.8)"
+                        : "#ffffff",
+                      borderColor: darkMode
+                        ? "rgba(75, 85, 99, 0.3)"
+                        : "#e5e7eb",
                       color: darkMode ? "#ffffff" : "#000000",
                     }}
                     required
@@ -584,12 +633,19 @@ const ListSemestersPage: React.FC = () => {
                     name="startDate"
                     value={formData.startDate}
                     onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, startDate: e.target.value }))
+                      setFormData((prev) => ({
+                        ...prev,
+                        startDate: e.target.value,
+                      }))
                     }
                     className="w-full px-4 py-2 rounded-lg border"
                     style={{
-                      backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                      borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                      backgroundColor: darkMode
+                        ? "rgba(55, 65, 81, 0.8)"
+                        : "#ffffff",
+                      borderColor: darkMode
+                        ? "rgba(75, 85, 99, 0.3)"
+                        : "#e5e7eb",
                       color: darkMode ? "#ffffff" : "#000000",
                     }}
                     required
@@ -608,12 +664,19 @@ const ListSemestersPage: React.FC = () => {
                     name="endDate"
                     value={formData.endDate}
                     onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, endDate: e.target.value }))
+                      setFormData((prev) => ({
+                        ...prev,
+                        endDate: e.target.value,
+                      }))
                     }
                     className="w-full px-4 py-2 rounded-lg border"
                     style={{
-                      backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                      borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                      backgroundColor: darkMode
+                        ? "rgba(55, 65, 81, 0.8)"
+                        : "#ffffff",
+                      borderColor: darkMode
+                        ? "rgba(75, 85, 99, 0.3)"
+                        : "#e5e7eb",
                       color: darkMode ? "#ffffff" : "#000000",
                     }}
                     required
@@ -638,10 +701,14 @@ const ListSemestersPage: React.FC = () => {
                   className="px-5 py-2 rounded-lg text-white font-medium transition-all duration-200"
                   style={{ backgroundColor: darkMode ? "#4c1d95" : "#4f46e5" }}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? "#5b21b6" : "#4338ca";
+                    (
+                      e.currentTarget as HTMLButtonElement
+                    ).style.backgroundColor = darkMode ? "#5b21b6" : "#4338ca";
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? "#4c1d95" : "#4f46e5";
+                    (
+                      e.currentTarget as HTMLButtonElement
+                    ).style.backgroundColor = darkMode ? "#4c1d95" : "#4f46e5";
                   }}
                 >
                   Create Semester
@@ -674,7 +741,9 @@ const ListSemestersPage: React.FC = () => {
             <div
               className="flex items-center justify-between px-6 py-4"
               style={{
-                borderBottom: darkMode ? "1px solid rgba(255,255,255,0.06)" : "1px solid #eee",
+                borderBottom: darkMode
+                  ? "1px solid rgba(255,255,255,0.06)"
+                  : "1px solid #eee",
               }}
             >
               <h3
@@ -698,10 +767,7 @@ const ListSemestersPage: React.FC = () => {
               </button>
             </div>
 
-            <form
-              onSubmit={(e) => handleSubmit(e, true)}
-              className="px-6 py-6"
-            >
+            <form onSubmit={(e) => handleSubmit(e, true)} className="px-6 py-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                   <label
@@ -724,8 +790,12 @@ const ListSemestersPage: React.FC = () => {
                     max="2100"
                     className="w-full px-4 py-2 rounded-lg border"
                     style={{
-                      backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                      borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                      backgroundColor: darkMode
+                        ? "rgba(55, 65, 81, 0.8)"
+                        : "#ffffff",
+                      borderColor: darkMode
+                        ? "rgba(75, 85, 99, 0.3)"
+                        : "#e5e7eb",
                       color: darkMode ? "#ffffff" : "#000000",
                     }}
                     required
@@ -747,8 +817,12 @@ const ListSemestersPage: React.FC = () => {
                     }
                     className="w-full px-4 py-2 rounded-lg border"
                     style={{
-                      backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                      borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                      backgroundColor: darkMode
+                        ? "rgba(55, 65, 81, 0.8)"
+                        : "#ffffff",
+                      borderColor: darkMode
+                        ? "rgba(75, 85, 99, 0.3)"
+                        : "#e5e7eb",
                       color: darkMode ? "#ffffff" : "#000000",
                     }}
                     required
@@ -773,12 +847,19 @@ const ListSemestersPage: React.FC = () => {
                     name="startDate"
                     value={formData.startDate}
                     onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, startDate: e.target.value }))
+                      setFormData((prev) => ({
+                        ...prev,
+                        startDate: e.target.value,
+                      }))
                     }
                     className="w-full px-4 py-2 rounded-lg border"
                     style={{
-                      backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                      borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                      backgroundColor: darkMode
+                        ? "rgba(55, 65, 81, 0.8)"
+                        : "#ffffff",
+                      borderColor: darkMode
+                        ? "rgba(75, 85, 99, 0.3)"
+                        : "#e5e7eb",
                       color: darkMode ? "#ffffff" : "#000000",
                     }}
                     required
@@ -797,12 +878,19 @@ const ListSemestersPage: React.FC = () => {
                     name="endDate"
                     value={formData.endDate}
                     onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, endDate: e.target.value }))
+                      setFormData((prev) => ({
+                        ...prev,
+                        endDate: e.target.value,
+                      }))
                     }
                     className="w-full px-4 py-2 rounded-lg border"
                     style={{
-                      backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-                      borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                      backgroundColor: darkMode
+                        ? "rgba(55, 65, 81, 0.8)"
+                        : "#ffffff",
+                      borderColor: darkMode
+                        ? "rgba(75, 85, 99, 0.3)"
+                        : "#e5e7eb",
                       color: darkMode ? "#ffffff" : "#000000",
                     }}
                     required
@@ -830,10 +918,14 @@ const ListSemestersPage: React.FC = () => {
                   className="px-5 py-2 rounded-lg text-white font-medium transition-all duration-200"
                   style={{ backgroundColor: darkMode ? "#4c1d95" : "#4f46e5" }}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? "#5b21b6" : "#4338ca";
+                    (
+                      e.currentTarget as HTMLButtonElement
+                    ).style.backgroundColor = darkMode ? "#5b21b6" : "#4338ca";
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? "#4c1d95" : "#4f46e5";
+                    (
+                      e.currentTarget as HTMLButtonElement
+                    ).style.backgroundColor = darkMode ? "#4c1d95" : "#4f46e5";
                   }}
                 >
                   Update Semester
@@ -848,4 +940,3 @@ const ListSemestersPage: React.FC = () => {
 };
 
 export default ListSemestersPage;
-
