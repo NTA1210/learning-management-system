@@ -19,7 +19,10 @@ import {
   BarChart3,
   ClipboardList,
   MoreVertical,
-  Users,
+  Eye,
+  EyeOff,
+  Key,
+  Copy,
 } from "lucide-react";
 import {
   PieChart,
@@ -108,6 +111,7 @@ export default function CourseQuizzesPage() {
     hasPrev: false,
   });
   const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
+  const [passwordVisibility, setPasswordVisibility] = useState<Record<string, boolean>>({});
 
   const getSwalBaseOptions = () => ({
     width: 360,
@@ -530,11 +534,8 @@ export default function CourseQuizzesPage() {
         ),
       }));
       await showSwalSuccess("Attempt banned successfully");
-    } catch (err) {
-      const message =
-        typeof err === "object" && err !== null && "message" in err
-          ? String((err as { message?: string }).message)
-          : "Failed to ban attempt";
+    } catch (err: any) {
+      const message = err?.response?.data?.message || err?.message || "Failed to ban attempt";
       await showSwalError(message);
     } finally {
       setBanProcessingId(null);
@@ -563,12 +564,9 @@ export default function CourseQuizzesPage() {
 
       handleCloseEdit();
       await showSwalSuccess("Quiz updated successfully");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to update quiz:", err);
-      const message =
-        typeof err === "object" && err !== null && "message" in err
-          ? String((err as { message?: string }).message)
-          : "Failed to update quiz";
+      const message = err?.response?.data?.message || err?.message || "Failed to update quiz";
       await showSwalError(message);
     } finally {
       setUpdatingQuizId(null);
@@ -592,12 +590,9 @@ export default function CourseQuizzesPage() {
       setQuizzesPage(nextPage);
       await goToPage(nextPage);
       await showSwalSuccess("Quiz deleted successfully");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to delete quiz:", err);
-      const message =
-        typeof err === "object" && err !== null && "message" in err
-          ? String((err as { message?: string }).message)
-          : "Failed to delete quiz";
+      const message = err?.response?.data?.message || err?.message || "Failed to delete quiz";
       await showSwalError(message);
     } finally {
       setDeletingQuizId(null);
@@ -652,7 +647,7 @@ export default function CourseQuizzesPage() {
                 <button
                   onClick={() => navigate(-1)}
                   className="flex items-center gap-2 text-sm hover:underline"
-                  style={{ color: "var(--muted-text)" }}
+                  style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                 >
                   <ArrowLeft className="w-4 h-4" />
                   Back
@@ -665,7 +660,7 @@ export default function CourseQuizzesPage() {
                 {course ? course.title : "Loading..."}
               </h1>
               {course?.code && (
-                <p className="text-sm" style={{ color: "var(--muted-text)" }}>
+                <p className="text-sm" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                   {course.code}
                 </p>
               )}
@@ -674,7 +669,7 @@ export default function CourseQuizzesPage() {
             {/* Loading State */}
             {loading && (
               <div className="text-center py-12">
-                <p style={{ color: "var(--muted-text)" }}>Loading quizzes...</p>
+                <p style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>Loading quizzes...</p>
               </div>
             )}
 
@@ -702,7 +697,7 @@ export default function CourseQuizzesPage() {
                       border: "1px solid var(--card-border)",
                     }}
                   >
-                    <p style={{ color: "var(--muted-text)" }}>
+                    <p style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                       No quizzes available for this course.
                     </p>
                   </div>
@@ -778,19 +773,19 @@ export default function CourseQuizzesPage() {
                                     <span>View statistics</span>
                                   </button>
                                   <button
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-purple-50"
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-orange-50"
                                     style={{
-                                      color: "#6d28d9",
+                                      color: "#f97316",
                                       backgroundColor: darkMode
                                         ? "transparent"
                                         : undefined,
                                     }}
                                     onClick={() => {
-                                      handleOpenAttemptModal(quiz);
+                                      navigate(`/quizzes/${quiz._id}/attempts`);
                                       setActionMenuOpenId(null);
                                     }}
                                   >
-                                    <Users className="w-4 h-4" />
+                                    <ClipboardList className="w-4 h-4" />
                                     <span>View attempts</span>
                                   </button>
                                   <button
@@ -844,7 +839,7 @@ export default function CourseQuizzesPage() {
                             {quiz.description && (
                               <p
                                 className="text-sm mb-4 line-clamp-2"
-                                style={{ color: "var(--muted-text)" }}
+                                style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                               >
                                 {quiz.description}
                               </p>
@@ -855,21 +850,84 @@ export default function CourseQuizzesPage() {
                               <div className="flex items-center gap-2 text-sm">
                                 <Calendar
                                   className="w-4 h-4"
-                                  style={{ color: "var(--muted-text)" }}
+                                  style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                                 />
-                                <span style={{ color: "var(--muted-text)" }}>
+                                <span style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                                   Start: {formatDate(quiz.startTime)}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2 text-sm">
                                 <Clock
                                   className="w-4 h-4"
-                                  style={{ color: "var(--muted-text)" }}
+                                  style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                                 />
-                                <span style={{ color: "var(--muted-text)" }}>
+                                <span style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                                   End: {formatDate(quiz.endTime)}
                                 </span>
                               </div>
+
+                              {/* Quiz Password - Only for Admin/Teacher */}
+                              {!isStudent && quiz.hashPassword && (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Key
+                                    className="w-4 h-4"
+                                    style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
+                                  />
+                                  <span style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
+                                    Password:
+                                  </span>
+                                  <span
+                                    className="font-mono text-xs px-2 py-1 rounded"
+                                    style={{
+                                      backgroundColor: "var(--card-row-bg)",
+                                      color: "var(--heading-text)",
+                                    }}
+                                  >
+                                    {passwordVisibility[quiz._id] ? quiz.hashPassword : "••••••••"}
+                                  </span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPasswordVisibility(prev => ({
+                                        ...prev,
+                                        [quiz._id]: !prev[quiz._id]
+                                      }));
+                                    }}
+                                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                    title={passwordVisibility[quiz._id] ? "Hide password" : "Show password"}
+                                  >
+                                    {passwordVisibility[quiz._id] ? (
+                                      <EyeOff className="w-4 h-4" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }} />
+                                    ) : (
+                                      <Eye className="w-4 h-4" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }} />
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      if (quiz.hashPassword) {
+                                        try {
+                                          await navigator.clipboard.writeText(quiz.hashPassword);
+                                          const Swal = (await import("sweetalert2")).default;
+                                          Swal.fire({
+                                            icon: "success",
+                                            title: "Copied!",
+                                            text: "Password copied to clipboard",
+                                            timer: 1500,
+                                            showConfirmButton: false,
+                                          });
+                                        } catch (err) {
+                                          console.error("Failed to copy:", err);
+                                        }
+                                      }
+                                    }}
+                                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                    title="Copy password"
+                                  >
+                                    <Copy className="w-4 h-4" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }} />
+                                  </button>
+                                </div>
+                              )}
                             </div>
 
                             {/* Status Badge and Actions */}
@@ -917,57 +975,7 @@ export default function CourseQuizzesPage() {
                                       ? "Take Quiz"
                                       : "Unavailable"}
                                   </button>
-                                )}{" "}
-
-                                <>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenStatisticsModal(quiz);
-                                    }}
-                                    className="p-2 rounded hover:bg-green-50 transition-colors"
-                                    style={{ color: "#10b981" }}
-                                    title="View quiz statistics"
-                                  >
-                                    <BarChart3 className="w-4 h-4" />
-                                  </button>
-
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigate(`/quizzes/${quiz._id}/attempts`);
-                                    }}
-                                    className="p-2 rounded hover:bg-orange-50 transition-colors"
-                                    style={{ color: "#f97316" }}
-                                    title="Grade / View All Attempts"
-                                  >
-                                    <ClipboardList className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleOpenEditQuiz(quiz);
-                                    }}
-                                    className="p-2 rounded hover:bg-blue-50 transition-colors"
-                                    style={{ color: "#3b82f6" }}
-                                    title="Edit quiz"
-                                  >
-                                    <Edit2 className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteQuiz(quiz._id);
-                                    }}
-                                    disabled={deletingQuizId === quiz._id}
-                                    className="p-2 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                                    style={{ color: "#ef4444" }}
-                                    title="Delete quiz"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </>
-
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1040,7 +1048,7 @@ export default function CourseQuizzesPage() {
               <div>
                 <label
                   className="block text-sm font-medium mb-1"
-                  style={{ color: "var(--muted-text)" }}
+                  style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                 >
                   Title
                 </label>
@@ -1063,7 +1071,7 @@ export default function CourseQuizzesPage() {
               <div>
                 <label
                   className="block text-sm font-medium mb-1"
-                  style={{ color: "var(--muted-text)" }}
+                  style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                 >
                   Description
                 </label>
@@ -1086,7 +1094,7 @@ export default function CourseQuizzesPage() {
                 <div>
                   <label
                     className="block text-sm font-medium mb-1"
-                    style={{ color: "var(--muted-text)" }}
+                    style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                   >
                     Start Time
                   </label>
@@ -1108,7 +1116,7 @@ export default function CourseQuizzesPage() {
                 <div>
                   <label
                     className="block text-sm font-medium mb-1"
-                    style={{ color: "var(--muted-text)" }}
+                    style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                   >
                     End Time
                   </label>
@@ -1150,7 +1158,7 @@ export default function CourseQuizzesPage() {
                   />
                   <span
                     className="text-sm font-medium"
-                    style={{ color: "var(--muted-text)" }}
+                    style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                   >
                     Published
                   </span>
@@ -1202,7 +1210,7 @@ export default function CourseQuizzesPage() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm" style={{ color: "var(--muted-text)" }}>
+                <p className="text-sm" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                   Active attempts
                 </p>
                 <h2 className="text-2xl font-semibold">
@@ -1247,7 +1255,7 @@ export default function CourseQuizzesPage() {
                     className="rounded-lg border  p-6 pt-12 text-center"
                     style={{ borderColor: "var(--card-border)" }}
                   >
-                    <p style={{ color: "var(--muted-text)" }}>
+                    <p style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                       No students are currently taking this quiz.
                     </p>
                   </div>
@@ -1270,7 +1278,7 @@ export default function CourseQuizzesPage() {
                             </p>
                             <p
                               className="text-xs"
-                              style={{ color: "var(--muted-text)" }}
+                              style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                             >
                               Started:{" "}
                               {attempt.startedAt
@@ -1332,7 +1340,7 @@ export default function CourseQuizzesPage() {
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm" style={{ color: "var(--muted-text)" }}>
+                <p className="text-sm" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                   Quiz Statistics
                 </p>
                 <h2 className="text-2xl font-semibold">
@@ -1385,7 +1393,7 @@ export default function CourseQuizzesPage() {
                   >
                     No submissions yet
                   </p>
-                  <p className="text-sm" style={{ color: "var(--muted-text)" }}>
+                  <p className="text-sm" style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}>
                     Statistics will be available once students submit their quiz
                     attempts.
                   </p>
@@ -1403,7 +1411,7 @@ export default function CourseQuizzesPage() {
                         >
                           <p
                             className="text-xs"
-                            style={{ color: "var(--muted-text)" }}
+                            style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                           >
                             Total Students
                           </p>
@@ -1417,7 +1425,7 @@ export default function CourseQuizzesPage() {
                         >
                           <p
                             className="text-xs"
-                            style={{ color: "var(--muted-text)" }}
+                            style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                           >
                             Submitted
                           </p>
@@ -1431,7 +1439,7 @@ export default function CourseQuizzesPage() {
                         >
                           <p
                             className="text-xs"
-                            style={{ color: "var(--muted-text)" }}
+                            style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                           >
                             Avg Score
                           </p>
@@ -1450,7 +1458,7 @@ export default function CourseQuizzesPage() {
                         >
                           <p
                             className="text-xs"
-                            style={{ color: "var(--muted-text)" }}
+                            style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                           >
                             Median
                           </p>
@@ -1475,7 +1483,7 @@ export default function CourseQuizzesPage() {
                         >
                           <p
                             className="text-xs mb-1"
-                            style={{ color: "var(--muted-text)" }}
+                            style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                           >
                             Score Range
                           </p>
@@ -1496,7 +1504,7 @@ export default function CourseQuizzesPage() {
                         >
                           <p
                             className="text-xs mb-1"
-                            style={{ color: "var(--muted-text)" }}
+                            style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                           >
                             Std Deviation
                           </p>
@@ -1600,7 +1608,7 @@ export default function CourseQuizzesPage() {
                                   wrapperStyle={{ fontSize: "10px" }}
                                   formatter={(value, entry: any) => (
                                     <span
-                                      style={{ color: "var(--muted-text)" }}
+                                      style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                                     >
                                       {value}
                                     </span>
@@ -1622,7 +1630,7 @@ export default function CourseQuizzesPage() {
                       {statisticsModal.statistics.students.length === 0 ? (
                         <p
                           className="text-sm text-center py-4"
-                          style={{ color: "var(--muted-text)" }}
+                          style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                         >
                           No students have submitted this quiz yet.
                         </p>
@@ -1673,7 +1681,7 @@ export default function CourseQuizzesPage() {
                                     </td>
                                     <td
                                       className="px-4 py-2 text-sm"
-                                      style={{ color: "var(--muted-text)" }}
+                                      style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                                     >
                                       {student.email}
                                     </td>
@@ -1682,7 +1690,7 @@ export default function CourseQuizzesPage() {
                                     </td>
                                     <td
                                       className="px-4 py-2 text-sm text-right"
-                                      style={{ color: "var(--muted-text)" }}
+                                      style={{ color: darkMode ? "#cbd5e1" : "#4b5563" }}
                                     >
                                       {Math.floor(student.durationSeconds / 60)}
                                       m{" "}

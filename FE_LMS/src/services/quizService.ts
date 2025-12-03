@@ -58,6 +58,7 @@ export interface QuizResponse {
   createdAt?: string;
   updatedAt?: string;
   snapshotQuestions?: SnapshotQuestion[];
+  hashPassword?: string;
 }
 
 export interface GetQuizzesParams {
@@ -225,8 +226,8 @@ export const quizService = {
 
     // Mark question as deleted - ensure isNewQuestion is false for existing questions
     const updatedQuestions = (quiz.snapshotQuestions || []).map((q) => {
-      const currentId = q.id || q._id;
-      return currentId === questionId
+      const currentId = String(q.id || q._id || "");
+      return currentId === String(questionId)
         ? { ...q, id: currentId, isDeleted: true, isDirty: true, isNewQuestion: false }
         : q;
     });
@@ -255,19 +256,26 @@ export const quizService = {
     // Update the question - mark as dirty and not new
     // Keep original isExternal value - this is a snapshot, not updating the original question in DB
     const updatedQuestions = (quiz.snapshotQuestions || []).map((q) => {
-      const currentId = q.id || q._id;
-      return currentId === questionId
+      const currentId = String(q.id || q._id || "");
+      return currentId === String(questionId)
         ? {
           ...q,
           ...questionData,
-          id: currentId, // Ensure ID is present for backend mapping
-          isDirty: true,
+          id: currentId, // MUST keep ID for backend mapping (line 177 in backend)
+          isDirty: true, // Mark as dirty so backend processes it as updated
           isNewQuestion: false, // Ensure it's not treated as a new question
           isDeleted: false,
-          // Keep original isExternal - don't change it, this is just updating the snapshot
-          isExternal: q.isExternal ?? true
+          // Set isExternal to false - this is now a modified local copy
+          isExternal: false
         }
-        : q;
+        : {
+          ...q,
+          // ONLY reset isDirty and isNewQuestion to prevent backend errors
+          // PRESERVE isDeleted and isExternal to maintain question state
+          isDirty: false,
+          isNewQuestion: false,
+          // DO NOT reset isDeleted or isExternal - keep original values
+        };
     });
 
     // Update quiz with updated question
@@ -343,6 +351,25 @@ export const quizService = {
         }>;
       };
     }>(`/quizzes/${quizId}/statistics`);
+    return response.data;
+  },
+
+  /**
+   * Upload images for quiz question
+   * POST /quiz-questions/images
+   */
+  uploadQuestionImages: async (quizId: string, images: File[]): Promise<{ url: string; fromDB: boolean }[]> => {
+    const formData = new FormData();
+    formData.append('quizId', quizId);
+    images.forEach((file) => {
+      formData.append('files', file); // Backend expects 'files' field name
+    });
+
+    const response = await http.post<{ data: { url: string; fromDB: boolean }[] }>('/quiz-questions/images', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
 };
