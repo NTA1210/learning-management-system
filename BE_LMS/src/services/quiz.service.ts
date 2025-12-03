@@ -23,6 +23,7 @@ import {
   standardDeviation,
 } from './helpers/quizHelpers';
 import { QuizQuestionType } from '@/types/quizQuestion.type';
+import { CourseStatus } from '@/types/course.type';
 
 /**
  * Create a new quiz.
@@ -46,7 +47,10 @@ export const createQuiz = async (
   userId: mongoose.Types.ObjectId,
   role: Role
 ): Promise<IQuiz> => {
-  const course = await CourseModel.findById(courseId);
+  const course = await CourseModel.findOne({
+    courseId,
+    status: CourseStatus.ONGOING,
+  });
   appAssert(course, NOT_FOUND, 'Course not found');
 
   //check whether user is teacher of course
@@ -136,6 +140,8 @@ export const updateQuiz = async (
 ) => {
   const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId');
   appAssert(quiz, NOT_FOUND, 'Quiz not found');
+
+  appAssert(quiz.courseId.status === CourseStatus.ONGOING, BAD_REQUEST, 'Course is not ongoing');
 
   //isTeacher of course
   if (role === Role.TEACHER) {
@@ -290,6 +296,8 @@ export const deleteQuiz = async ({
 }) => {
   const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId');
   appAssert(quiz, NOT_FOUND, 'Quiz not found');
+
+  appAssert(quiz.courseId.status === CourseStatus.ONGOING, BAD_REQUEST, 'Course is not ongoing');
 
   //isTeacher of course
   if (role === Role.TEACHER) {
