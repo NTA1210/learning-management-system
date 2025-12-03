@@ -809,13 +809,25 @@ export default function CourseDetail() {
               />
               <div className="p-6">
                 {activeTab === "lessons" && course?._id && (
-                  <LessonsTab courseId={course._id} darkMode={isDarkMode} />
+                  <LessonsTab
+                    courseId={course._id}
+                    darkMode={isDarkMode}
+                    courseTitle={course.title}
+                  />
                 )}
                 {activeTab === "assignments" && course?._id && (
-                  <AssignmentsTab courseId={course._id} darkMode={isDarkMode} />
+                  <AssignmentsTab
+                    courseId={course._id}
+                    darkMode={isDarkMode}
+                    courseTitle={course.title}
+                  />
                 )}
                 {activeTab === "attendance" && course?._id && (
-                  <AttendanceTab courseId={course._id} darkMode={isDarkMode} courseTitle={course.title} />
+                  <AttendanceTab
+                    courseId={course._id}
+                    darkMode={isDarkMode}
+                    courseTitle={course.title}
+                  />
                 )}
                 {activeTab === "quiz" && course?._id && (
                   <QuizTab

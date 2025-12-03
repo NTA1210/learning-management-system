@@ -5,10 +5,14 @@ import axios from "axios";
 import { httpClient } from "../../utils/http";
 import type { Assignment } from "../../types/assignment";
 import SimpleAssignmentCard from "./SimpleAssignmentCard";
+import { useAuth } from "../../hooks/useAuth";
+import AssignmentFormModal from "../assignments/AssignmentFormModal";
+import type { AssignmentFormValues } from "../../types/assignment";
 
 interface AssignmentsTabProps {
   courseId: string;
   darkMode: boolean;
+  courseTitle?: string;
 }
 
 interface ApiResponse {
@@ -28,8 +32,10 @@ interface ApiResponse {
 const AssignmentsTab: React.FC<AssignmentsTabProps> = ({
   courseId,
   darkMode,
+  courseTitle,
 }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -43,6 +49,13 @@ const AssignmentsTab: React.FC<AssignmentsTabProps> = ({
   const itemsPerPage = 5;
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fetchingRef = useRef<boolean>(false);
+
+  const [modalState, setModalState] = useState<{ mode: "create" } | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const isAdmin = user?.role === "admin";
+  const isTeacher = user?.role === "teacher";
+  const canCreate = isAdmin || isTeacher;
 
   useEffect(() => {
     // Reset to page 1 when courseId changes
@@ -162,7 +175,64 @@ const AssignmentsTab: React.FC<AssignmentsTabProps> = ({
     if (courseId) {
       fetchAssignments();
     }
-  }, [courseId, currentPageState, searchTerm]);
+  }, [courseId, currentPageState, searchTerm, refreshTrigger]);
+
+  const handleCreate = () => setModalState({ mode: "create" });
+  const closeModal = () => setModalState(null);
+
+  const handleModalSubmit = async (values: AssignmentFormValues) => {
+    try {
+      const formData = new FormData();
+      formData.append("courseId", values.courseId);
+      formData.append("title", values.title);
+      formData.append("description", values.description || "");
+      formData.append("maxScore", String(values.maxScore));
+      if (values.dueDate) {
+        formData.append("dueDate", values.dueDate);
+      }
+      formData.append("allowLate", String(values.allowLate));
+      if (values.file) {
+        formData.append("file", values.file);
+      }
+
+      await httpClient.post("/assignments", formData, {
+        withCredentials: true,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      // Show success message
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Assignment created successfully",
+        confirmButtonColor: darkMode ? "#4c1d95" : "#4f46e5",
+        background: darkMode ? "#1f2937" : "#ffffff",
+        color: darkMode ? "#ffffff" : "#1e293b",
+      });
+
+      closeModal();
+      setCurrentPageState(1);
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (err: any) {
+      console.error("Error creating assignment:", err);
+      const message =
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to create assignment";
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: message,
+        confirmButtonColor: darkMode ? "#4c1d95" : "#4f46e5",
+        background: darkMode ? "#1f2937" : "#ffffff",
+        color: darkMode ? "#ffffff" : "#1e293b",
+      });
+    }
+  };
 
   const handleNavigate = (assignmentId: string) => {
     navigate(`/assignments/${assignmentId}`);
@@ -234,6 +304,18 @@ const AssignmentsTab: React.FC<AssignmentsTabProps> = ({
             }}
           />
         </div>
+        {canCreate && (
+          <button
+            onClick={handleCreate}
+            className="px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap"
+            style={{
+              backgroundColor: darkMode ? "#4c1d95" : "#4f46e5",
+              color: "#ffffff",
+            }}
+          >
+            + Create Assignment
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -326,6 +408,24 @@ const AssignmentsTab: React.FC<AssignmentsTabProps> = ({
           </div>
         </>
       )}
+
+      <AssignmentFormModal
+        darkMode={darkMode}
+        isOpen={Boolean(modalState)}
+        mode="create"
+        courses={[{ _id: courseId, title: courseTitle || "Current Course" }]}
+        initialValues={{
+          courseId: courseId,
+          title: "",
+          description: "",
+          maxScore: 10,
+          dueDate: "",
+          allowLate: false,
+          file: null,
+        }}
+        onClose={closeModal}
+        onSubmit={handleModalSubmit}
+      />
     </div>
   );
 };
