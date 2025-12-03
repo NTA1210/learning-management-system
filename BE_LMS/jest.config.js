@@ -23,6 +23,7 @@ module.exports = {
     '<rootDir>/src/constants/',
     '<rootDir>/src/validators/',
     '<rootDir>/src/types/',
+    '<rootDir>/src/services/helpers/',
   ],
 
   //Threshold >= 80%

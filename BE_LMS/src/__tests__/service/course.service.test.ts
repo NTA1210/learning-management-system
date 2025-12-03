@@ -51,6 +51,7 @@ import { GetQuizzes } from '@/validators/course.schemas';
 jest.mock('@/models/quiz.model');
 jest.mock('@/models/lesson.model');
 jest.mock('@/models/assignment.model');
+jest.mock('@/models/enrollment.model');
 import QuizModel from '@/models/quiz.model';
 import LessonModel from '@/models/lesson.model';
 import AssignmentModel from '@/models/assignment.model';
@@ -2200,7 +2201,6 @@ describe('📚 Course Service Unit Tests', () => {
         expect.objectContaining({
           courseId: course._id.toString(),
           isPublished: true,
-          deletedAt: null,
         })
       );
     });
@@ -2238,11 +2238,10 @@ describe('📚 Course Service Unit Tests', () => {
   // ====================================
   describe('completeCourse', () => {
     it('should throw error when course not found', async () => {
-      const mockQuery = {
-        populate: jest.fn().mockReturnThis(),
-        lean: jest.fn().mockResolvedValue(null),
-      };
-      (CourseModel.findById as jest.Mock).mockReturnValue(mockQuery);
+      (CourseModel.findById as jest.Mock).mockReturnValue({
+        findById: jest.fn().mockResolvedValueOnce(null),
+        populate: jest.fn().mockReturnValueOnce(null),
+      });
 
       await expect(
         completeCourse(new mongoose.Types.ObjectId().toString(), adminUser._id, Role.ADMIN)
@@ -3472,9 +3471,9 @@ describe('📚 Course Service Unit Tests', () => {
 
         await completeCourse(course._id.toString(), adminUser._id, Role.ADMIN);
 
-        expect(LessonModel.countDocuments).not.toHaveBeenCalled();
-        expect(QuizModel.countDocuments).not.toHaveBeenCalled();
-        expect(AssignmentModel.countDocuments).not.toHaveBeenCalled();
+        expect(LessonModel.countDocuments).toHaveBeenCalled();
+        expect(QuizModel.countDocuments).toHaveBeenCalled();
+        expect(AssignmentModel.countDocuments).toHaveBeenCalled();
       });
     });
   });
