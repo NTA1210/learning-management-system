@@ -17,12 +17,12 @@ export const listForumsSchema = listParamsSchema.extend({
     forumType: z.enum(ForumType).optional(),
     isActive: z
         .string()
-        .optional()
-        .transform((val) => val === 'true'),
+        .transform((val) => val === 'true')
+        .optional(),
     isArchived: z
         .string()
-        .optional()
-        .transform((val) => val === 'true'),
+        .transform((val) => val === 'true')
+        .optional(),
     createdBy: z.string().optional(),
 });
 
