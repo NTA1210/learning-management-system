@@ -90,6 +90,7 @@ export default function CourseDetail() {
   const [expiresInDays, setExpiresInDays] = useState(7);
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState("");
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [users, setUsers] = useState<
     Array<{ _id: string; fullname?: string; username: string; email: string }>
   >([]);
@@ -426,7 +427,7 @@ export default function CourseDetail() {
         role={(user?.role as "admin" | "teacher" | "student") || "student"}
       />
 
-      <div className="max-w-[1200px] mx-auto px-4 py-10 mt-16 sm:pl-24 md:pl-28">
+      <div className="max-w-[1200px] mx-auto px-4 py-10 mt-20 sm:pl-24 md:pl-28">
         {loading ? (
           <div className="animate-pulse">
             <div className="h-8 w-48 bg-gray-300 dark:bg-gray-700 rounded mb-6" />
@@ -905,7 +906,22 @@ export default function CourseDetail() {
               ) : null;
             })()}
 
-            <div className="flex gap-2">
+            <button
+              onClick={() => setMobileActionsOpen((v) => !v)}
+              className="sm:hidden px-3 py-2 rounded-lg border text-sm flex items-center justify-center"
+              style={{
+                backgroundColor: isDarkMode ? "#111827" : "#ffffff",
+                border: isDarkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
+              }}
+            >
+              {mobileActionsOpen ? "Hide Actions" : "Show Actions"}
+              <i
+                className={`bi ${mobileActionsOpen ? "bi-chevron-up" : "bi-chevron-down"}`}
+                style={{ marginLeft: 6 }}
+              />
+            </button>
+
+            <div className={(mobileActionsOpen ? "flex" : "hidden") + " sm:flex flex-col sm:flex-row flex-wrap gap-2 w-full sm:w-auto"}>
               {user?.role === "student" ? null : (
                 <button
                   onClick={openInviteModal}
