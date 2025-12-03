@@ -962,11 +962,12 @@ const EnrollmentsListPage: React.FC = () => {
                     }}
                   >
                     <div
-                      className="px-4 py-3 border-b bg-blue-100"
+                      className="px-4 py-3 border-b"
                       style={{
                         borderColor: darkMode
                           ? "rgba(255,255,255,0.08)"
                           : "#e5e7eb",
+                        backgroundColor: darkMode ? "#46536df2" : "#dbeafe",
                       }}
                     >
                       <div className="font-semibold">{group.courseTitle}</div>

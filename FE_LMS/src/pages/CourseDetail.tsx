@@ -1013,7 +1013,7 @@ export default function CourseDetail() {
                       border: `1px solid ${isDarkMode ? "#374151" : "#e5e7eb"}`,
                       boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
                       zIndex: 1000,
-                      maxHeight: 360,
+                      maxHeight: 395,
                       overflow: "hidden",
                     }}
                   >
