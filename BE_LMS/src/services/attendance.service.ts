@@ -14,14 +14,14 @@ import {
   CourseStatsInput,
   StudentHistoryInput,
 } from '@/validators/attendance.schemas';
-import{
+import {
   normalizeDateOnly,
-  daysDiffFromToday,  
+  daysDiffFromToday,
   assertDateWithinCourseSchedule,
   clampDateRangeToCourse,
   buildDateRangeFilter,
   ensureAttendanceManagePermission,
-  verifyStudentsBelongToCourse, 
+  verifyStudentsBelongToCourse,
   countAbsentSessions,
   sendAbsenceNotificationEmail,
   updateSingleAttendanceRecord,
@@ -40,8 +40,8 @@ const buildAttendanceFilter = async (
 ) => {
   const filter: Record<string, any> = {};
   let courseDateRange: {
-        from: Date;
-        to: Date;
+    from: Date;
+    to: Date;
   } | null = null;
 
   if (params.courseId) {
@@ -315,9 +315,9 @@ export const exportAttendanceReport = async (
     formatCsvValue(record.status),
     formatCsvValue(record.markedBy?.fullname || record.markedBy?.email),
     formatCsvValue(record.markedBy?.role),
-    ]
-      .map((cell) => String(cell))
-      .join(',')
+  ]
+    .map((cell) => String(cell))
+    .join(',')
   );
 
   const csv = [header.join(','), ...csvRows].join('\n');
@@ -442,12 +442,12 @@ export const getCourseAttendanceStats = async (
     // Only count records that have been marked (not NOTYET)
     const markedCount = data.counts[AttendanceStatus.PRESENT] + data.counts[AttendanceStatus.ABSENT];
     const attended = data.counts[AttendanceStatus.PRESENT];
-    
+
     // Attendance rate: PRESENT / (PRESENT + ABSENT), excluding NOTYET
     const attendanceRate = markedCount > 0
       ? Number(((attended / markedCount) * 100).toFixed(2))
       : 0;
-    
+
     // Absent rate: ABSENT / (PRESENT + ABSENT), excluding NOTYET
     const absentRate = markedCount > 0
       ? Number(((data.counts[AttendanceStatus.ABSENT] / markedCount) * 100).toFixed(2))
@@ -482,8 +482,8 @@ export const getCourseAttendanceStats = async (
       ? 0
       : Number(
 
-          ((presentRecords.length / markedRecords.length) * 100).toFixed(2)
-        );
+        ((presentRecords.length / markedRecords.length) * 100).toFixed(2)
+      );
 
   const studentsAtRisk = studentStats.filter((stat) => stat.alerts.highAbsence);
 
@@ -529,7 +529,7 @@ export const getStudentAttendanceStats = async (
 
   const counts = summarizeStatuses(records);
   const total = records.length;
-  
+
   // Only count records that have been marked (not NOTYET)
   const markedCount = counts[AttendanceStatus.PRESENT] + counts[AttendanceStatus.ABSENT];
   const attended = counts[AttendanceStatus.PRESENT];
@@ -580,7 +580,7 @@ export const markAttendance = async (
   );
 
   const courseObjectId = new mongoose.Types.ObjectId(courseId);
-  
+
   // Remove duplicate student IDs and verify they belong to course
   const uniqueStudentIds = [...new Set(entries.map((entry) => entry.studentId))];
   await verifyStudentsBelongToCourse(courseId, uniqueStudentIds);
@@ -599,7 +599,7 @@ export const markAttendance = async (
           studentId: studentObjectId,
           date: normalizedDate,
         },
-        update: { 
+        update: {
           $set: {
             status: entry.status,
             markedBy: actorId,
@@ -810,7 +810,7 @@ export const deleteAttendance = async (
       skipped: attendanceIds.length - deletedCount,
       deletedIds: recordsToReset.map((id) => id.toString()),
       deletedRecords: deletedRecordsMeta,
-      errors: errors.length > 0 ? errors : undefined, 
+      errors: errors.length > 0 ? errors : undefined,
     };
   }
 
