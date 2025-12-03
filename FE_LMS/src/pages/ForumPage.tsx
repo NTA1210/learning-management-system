@@ -9,6 +9,7 @@ import { forumService, type CreateForumPayload, type ForumType } from "../servic
 import { Book, Flame, Loader2, MessageSquare, MessageSquareText, Sparkles, Users } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import MarkdownComposer from "../components/MarkdownComposer";
+import toast from "react-hot-toast";
 
 
 type SidebarRole = "admin" | "teacher" | "student";
@@ -163,12 +164,17 @@ const ForumPage: React.FC = () => {
     setFeedback(null);
 
     if (!form.courseId) {
-      setFeedback({ type: "error", message: "Open the course detail page and use \"Create Forum Post\" to start a topic." });
+      const message =
+        'Open the course detail page and use "Create Forum Post" to start a topic.';
+      setFeedback({ type: "error", message });
+      toast.error(message);
       return;
     }
 
     if (!form.title.trim() || !form.description.trim()) {
-      setFeedback({ type: "error", message: "Please enter both a title and a description." });
+      const message = "Please enter both a title and a description.";
+      setFeedback({ type: "error", message });
+      toast.error(message);
       return;
     }
 
@@ -183,7 +189,9 @@ const ForumPage: React.FC = () => {
       };
       await forumService.createForum(payload, form.file || undefined);
 
-      setFeedback({ type: "success", message: "Forum topic created successfully." });
+      const successMessage = "Forum topic created successfully.";
+      setFeedback({ type: "success", message: successMessage });
+      toast.success(successMessage);
       setForm((prev) => ({
         ...prev,
         title: "",
@@ -191,9 +199,51 @@ const ForumPage: React.FC = () => {
         file: null,
       }));
 
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to create forum topic";
-      setFeedback({ type: "error", message });
+      // Redirect to forum list with the same course preselected so user can see the new topic
+      navigate("/forum-list", {
+        state: {
+          preselectedCourseId: form.courseId,
+          preselectedCourseTitle: lockedCourseTitle || "",
+        },
+      });
+
+    } catch (error: any) {
+      // Ưu tiên đọc lỗi từ API (validation error, v.v.)
+      const apiData = error?.response?.data;
+      const apiMessage: string | undefined = apiData?.message;
+      const fieldErrors: Array<{ path?: string | string[]; message?: string }> =
+        apiData?.errors ?? [];
+
+      let finalMessage = apiMessage || "Unable to create forum topic";
+
+      if (fieldErrors.length > 0) {
+        // Hiển thị toast cho từng lỗi field
+        fieldErrors.forEach((err) => {
+          const path =
+            Array.isArray(err.path) && err.path.length > 0
+              ? err.path.join(".")
+              : typeof err.path === "string"
+              ? err.path
+              : "";
+          const msg = err.message || apiMessage || "Invalid input";
+          toast.error(path ? `${path}: ${msg}` : msg);
+        });
+        // Gộp message chính để show ở feedback box
+        finalMessage =
+          apiMessage ||
+          fieldErrors.map((e) => e.message).filter(Boolean).join(", ") ||
+          finalMessage;
+      } else if (apiMessage) {
+        toast.error(apiMessage);
+        finalMessage = apiMessage;
+      } else if (error instanceof Error && error.message) {
+        toast.error(error.message);
+        finalMessage = error.message;
+      } else {
+        toast.error(finalMessage);
+      }
+
+      setFeedback({ type: "error", message: finalMessage });
     } finally {
       setSubmitting(false);
     }
@@ -234,45 +284,33 @@ const ForumPage: React.FC = () => {
               </div>
             </header>
 
-            {feedback && (
-              <div
-                className={`rounded-xl border px-4 py-3 flex items-start gap-3 ${
-                  feedback.type === "success"
-                    ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                    : "bg-rose-50 border-rose-200 text-rose-700"
-                }`}
-              >
-                <MessageSquareText className="w-5 h-5 mt-0.5" />
-                <div>
-                  <p className="font-semibold">{feedback.type === "success" ? "Success" : "Something went wrong"}</p>
-                  <p className="text-sm">{feedback.message}</p>
+            {/* Sticky summary header for selected course when form scrolls out of view */}
+            {showCreateSticky && (
+              <div className="sticky top-0 z-20 mb-4">
+                <div
+                  className={`rounded-2xl border px-4 py-3 shadow-lg flex items-center gap-3 ${
+                    darkMode
+                      ? "bg-slate-900/90 border-slate-700/80 backdrop-blur"
+                      : "bg-white/95 border-slate-200 backdrop-blur"
+                  }`}
+                >
+                  <Book className="w-4 h-4 text-indigo-500" />
+                  <div className="min-w-0">
+                    <p className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">Course</p>
+                    <p
+                      className={`text-sm font-semibold truncate ${
+                        darkMode ? "text-white" : "text-slate-900"
+                      }`}
+                    >
+                      {courseTitleDisplay || "Select a course to start"}
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
 
             <div className="grid gap-6 xl:grid-cols-[2fr,1fr]">
               <section className="space-y-6">
-   
-
-              <div
-  className={`rounded-2xl border px-4 py-3 shadow-lg flex items-center gap-3 ${
-    darkMode ? "bg-slate-900/80 border-slate-700/70 backdrop-blur" : "bg-white border-slate-200"
-  }`}
->
-  <Book className="w-4 h-4 text-indigo-500" /> 
-  <div className="min-w-0">
-    <p className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">Course</p>
-    <p
-      className={`text-sm font-semibold truncate ${
-        darkMode ? "text-white" : "text-slate-900"
-      }`}
-    >
-      {courseTitleDisplay || "Select a course to start"}
-    </p>
-  </div>
-</div>
-
-
                 <div className={`rounded-2xl p-6 shadow-sm ${panelStyles}`} ref={createCardRef}>
                   
 
@@ -326,14 +364,22 @@ const ForumPage: React.FC = () => {
                               disabled={disabledOption}
                               className={`text-left p-4 rounded-xl border transition-all ${
                                 isActive
-                                  ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-500/20"
+                                  ? darkMode
+                                    ? "border-indigo-400 bg-indigo-500/20 text-white"
+                                    : "border-indigo-400 bg-indigo-50 text-slate-900"
                                   : darkMode
-                                  ? "border-slate-700 hover:border-slate-500"
-                                  : "border-slate-200 hover:border-slate-300"
+                                  ? "border-slate-700 hover:border-slate-500 text-slate-200"
+                                  : "border-slate-200 hover:border-slate-300 text-slate-700"
                               } ${disabledOption ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
                               <p className="font-semibold">{option.label}</p>
-                              <p className="text-sm text-slate-500 mt-1">{option.hint}</p>
+                              <p
+                                className={`text-sm mt-1 ${
+                                  darkMode ? "text-slate-300" : "text-slate-500"
+                                }`}
+                              >
+                                {option.hint}
+                              </p>
                             </button>
                           );
                         })}

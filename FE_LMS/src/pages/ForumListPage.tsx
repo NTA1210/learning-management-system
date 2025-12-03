@@ -342,9 +342,40 @@ const ForumListPage: React.FC = () => {
       toast.success("Forum updated successfully.");
       closeEditModal();
       refreshForums();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to update forum";
-      setEditModal((prev) => ({ ...prev, saving: false, error: message }));
+    } catch (error: any) {
+      const apiData = error?.response?.data;
+      const apiMessage: string | undefined = apiData?.message;
+      const fieldErrors: Array<{ path?: string | string[]; message?: string }> =
+        apiData?.errors ?? [];
+
+      let finalMessage = apiMessage || "Unable to update forum";
+
+      if (fieldErrors.length > 0) {
+        fieldErrors.forEach((e) => {
+          const path =
+            Array.isArray(e.path) && e.path.length > 0
+              ? e.path.join(".")
+              : typeof e.path === "string"
+              ? e.path
+              : "";
+          const msg = e.message || apiMessage || "Invalid input";
+          toast.error(path ? `${path}: ${msg}` : msg);
+        });
+        finalMessage =
+          apiMessage ||
+          fieldErrors.map((e) => e.message).filter(Boolean).join(", ") ||
+          finalMessage;
+      } else if (apiMessage) {
+        toast.error(apiMessage);
+        finalMessage = apiMessage;
+      } else if (error instanceof Error && error.message) {
+        toast.error(error.message);
+        finalMessage = error.message;
+      } else {
+        toast.error(finalMessage);
+      }
+
+      setEditModal((prev) => ({ ...prev, saving: false, error: finalMessage }));
     }
   };
 
@@ -867,12 +898,15 @@ const ForumListPage: React.FC = () => {
                       type="button"
                       key={type}
                       onClick={() => setEditModal((prev) => ({ ...prev, forumType: type }))}
-                      className={`text-left p-4 rounded-xl border transition-all ${isActive
-                        ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-500/20"
-                        : darkMode
-                          ? "border-slate-700 hover:border-slate-500"
-                          : "border-slate-200 hover:border-slate-300"
-                        }`}
+                      className={`text-left p-4 rounded-xl border transition-all ${
+                        isActive
+                          ? darkMode
+                            ? "border-indigo-400 bg-indigo-500/20 text-white"
+                            : "border-indigo-400 bg-indigo-50 text-slate-900"
+                          : darkMode
+                          ? "border-slate-700 hover:border-slate-500 text-slate-200"
+                          : "border-slate-200 hover:border-slate-300 text-slate-700"
+                      }`}
                     >
                       <p className="font-semibold">{forumTypeLabels[type]}</p>
                     </button>
@@ -888,7 +922,7 @@ const ForumListPage: React.FC = () => {
                 />
                 <span className="text-sm">Active (visible to everyone in the course)</span>
               </label>
-              {editModal.error && <p className="text-sm text-rose-500">{editModal.error}</p>}
+              {/* Error message now shown via react-hot-toast */}
               <div className="flex justify-end gap-3">
                 <button
                   type="button"
