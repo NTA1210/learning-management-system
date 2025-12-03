@@ -9,6 +9,7 @@ import AttendanceForm from "../components/attendance/AttendanceForm.tsx";
 import AttendanceProgressIndicator from "../components/attendance/AttendanceProgressIndicator.tsx";
 import StudentAttendanceModal from "../components/attendance/StudentAttendanceModal.tsx";
 import CourseGrid from "../components/common/CourseGrid.tsx";
+import ScheduleDatePicker from "../components/common/ScheduleDatePicker.tsx";
 import { CourseCardSkeleton, AttendanceStatsSkeleton } from "../components/common/Skeleton.tsx";
 import {
   semesterService,
@@ -34,6 +35,7 @@ export default function AttendancePage() {
   const { semesterId, courseId } = useParams<{ semesterId?: string; courseId?: string }>();
 
   const isAdmin = user?.role === "admin";
+  const isTeacher = user?.role === "teacher";
 
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [selectedSemester, setSelectedSemester] = useState<Semester | null>(null);
@@ -634,8 +636,8 @@ export default function AttendancePage() {
               <div className="space-y-6">
                 <AttendanceStatsOverview stats={attendanceStats} />
 
-                {/* Date Selection for Admin */}
-                {isAdmin && (
+                {/* Date Selection for Admin/Teacher */}
+                {(isAdmin || isTeacher) && (
                   <div
                     className="p-4 rounded-lg"
                     style={{
@@ -655,24 +657,20 @@ export default function AttendancePage() {
                           Attendance Date:
                         </label>
                       </div>
-                      <input
-                        type="date"
+                      <ScheduleDatePicker
                         value={attendanceDate}
-                        onChange={(e) => setAttendanceDate(e.target.value)}
-                        className="px-3 py-2 rounded-lg text-sm"
-                        style={{
-                          backgroundColor: darkMode ? "rgba(30, 41, 59, 0.8)" : "#f8fafc",
-                          border: darkMode
-                            ? "1px solid rgba(148, 163, 184, 0.2)"
-                            : "1px solid rgba(148, 163, 184, 0.3)",
-                          color: darkMode ? "#e2e8f0" : "#1e293b",
-                        }}
+                        onChange={setAttendanceDate}
+                        schedules={courseSchedules}
+                        darkMode={darkMode}
+                        maxDate={isTeacher ? getCurrentDateUTC7() : undefined}
                       />
                       <span
                         className="text-xs"
                         style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
                       >
-                        (Admin can modify attendance for any date)
+                        {isAdmin 
+                          ? "(Admin can modify attendance for any date)"
+                          : "(Teacher can view past dates, edit only today)"}
                       </span>
                     </div>
                   </div>
@@ -729,6 +727,7 @@ export default function AttendancePage() {
                     onStudentClick={handleStudentClick}
                     saving={saving}
                     attendanceDate={attendanceDate}
+                    viewOnly={isTeacher && attendanceDate !== getCurrentDateUTC7()}
                   />
                 )}
               </div>

@@ -1,10 +1,8 @@
-import { ZodError } from 'zod';
 import {
   createQuizHandler,
   updateQuizHandler,
   deleteQuizHandler,
   getStatisticByQuizIdHandler,
-  getQuizByIdHandler,
   getQuizAttemptsByQuizIdHandler,
 } from '@/controller/quiz.controller';
 import {
@@ -12,7 +10,6 @@ import {
   updateQuiz,
   deleteQuiz,
   getStatisticByQuizId,
-  getQuizById,
   getQuizAttemptsByQuizId,
 } from '@/services/quiz.service';
 import {

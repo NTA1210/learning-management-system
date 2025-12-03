@@ -1,6 +1,8 @@
 /node_modules
+.env
+.env.production
 .env*
-*.env
+.env.*
 dist
 setupTests.unit.ts
 # Logs
@@ -29,4 +31,4 @@ dist-ssr
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?
+*.sw?.env.production

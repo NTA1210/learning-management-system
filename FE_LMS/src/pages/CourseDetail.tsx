@@ -11,9 +11,10 @@ import type { TabType } from "../components/courses/CourseTabsNavigation";
 import LessonsTab from "../components/courses/LessonsTab";
 import AssignmentsTab from "../components/courses/AssignmentsTab";
 import AttendanceTab from "../components/courses/AttendanceTab";
+import QuizTab from "../components/courses/QuizTab";
 import ScheduleTab from "../components/courses/ScheduleTab";
 import StaticCourseTab from "../components/courses/StaticCourseTab";
-import { courseService } from "../services";
+import { courseService, quizService } from "../services";
 import type { Course } from "../types/course";
 import { httpClient } from "../utils/http";
 import { userService } from "../services/userService";
@@ -96,6 +97,7 @@ export default function CourseDetail() {
   const [completing, setCompleting] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [statsData, setStatsData] = useState<any>(null);
+  const [quizCount, setQuizCount] = useState(0);
 
   const showToastSuccess = async (message: string) => {
     try {
@@ -337,6 +339,22 @@ export default function CourseDetail() {
     return () => {
       mounted = false;
     };
+  }, [id]);
+
+  // Fetch quiz count when course loads
+  useEffect(() => {
+    if (!id) return;
+    (async () => {
+      try {
+        // Don't pass pagination params - backend will use defaults
+        const result = await quizService.getQuizzesByCourseId(id, {
+          isPublished: true,
+        });
+        setQuizCount(result.pagination.total);
+      } catch (err) {
+        console.error("Failed to fetch quiz count:", err);
+      }
+    })();
   }, [id]);
 
   const logoUrl = useMemo(() => sanitizeLogo(course?.logo), [course?.logo]);
@@ -777,6 +795,7 @@ export default function CourseDetail() {
                 activeTab={activeTab}
                 onTabChange={handleTabChange}
                 darkMode={isDarkMode}
+                quizCount={quizCount}
               />
               <div className="p-6">
                 {activeTab === "lessons" && course?._id && (
@@ -786,7 +805,14 @@ export default function CourseDetail() {
                   <AssignmentsTab courseId={course._id} darkMode={isDarkMode} />
                 )}
                 {activeTab === "attendance" && course?._id && (
-                  <AttendanceTab courseId={course._id} darkMode={isDarkMode} />
+                  <AttendanceTab courseId={course._id} darkMode={isDarkMode} courseTitle={course.title} />
+                )}
+                {activeTab === "quiz" && course?._id && (
+                  <QuizTab
+                    courseId={course._id}
+                    darkMode={isDarkMode}
+                    onQuizCountChange={setQuizCount}
+                  />
                 )}
                 {activeTab === "schedule" && course?._id && (
                   <ScheduleTab courseId={course._id} darkMode={isDarkMode} />

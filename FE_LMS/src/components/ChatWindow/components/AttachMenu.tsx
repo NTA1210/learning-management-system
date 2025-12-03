@@ -1,15 +1,29 @@
 import { File, MapPin } from "lucide-react";
-import React, { useRef } from "react";
+import React, { useRef, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTheme } from "../../../hooks/useTheme";
 
 interface AttachMenuProps {
   className?: string;
   onItemClick?: (type: "poll" | "file" | "location", file?: File) => void;
+  anchorRef?: React.RefObject<HTMLElement>;
 }
 
-const AttachMenu: React.FC<AttachMenuProps> = ({ className, onItemClick }) => {
+const AttachMenu: React.FC<AttachMenuProps> = ({ className, onItemClick, anchorRef }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { darkMode } = useTheme();
+  const [position, setPosition] = useState({ left: 0, bottom: 0 });
+
+  useEffect(() => {
+    if (anchorRef?.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      setPosition({
+        left: rect.left,
+        bottom: window.innerHeight - rect.top + 8, // 8px gap above the button
+      });
+    }
+  }, [anchorRef]);
 
   const handleFileClick = () => {
     fileInputRef.current?.click();
@@ -23,10 +37,13 @@ const AttachMenu: React.FC<AttachMenuProps> = ({ className, onItemClick }) => {
     }
   };
 
-  return (
+  const menuContent = (
     <div
-      className={`absolute left-0 bottom-14 shadow-lg rounded-xl p-3 w-48 border ${className}`}
+      ref={menuRef}
+      className={`fixed shadow-lg rounded-xl p-3 w-48 border z-[9999] ${className}`}
       style={{
+        left: position.left,
+        bottom: position.bottom,
         backgroundColor: darkMode ? "#1e293b" : "#ffffff",
         borderColor: darkMode
           ? "rgba(71, 85, 105, 0.5)"
@@ -65,6 +82,8 @@ const AttachMenu: React.FC<AttachMenuProps> = ({ className, onItemClick }) => {
       </div>
     </div>
   );
+
+  return createPortal(menuContent, document.body);
 };
 
 export default AttachMenu;

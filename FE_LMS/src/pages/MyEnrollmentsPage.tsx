@@ -169,15 +169,15 @@ const MyEnrollmentsPage: React.FC = () => {
           My Enrollments
         </h1>
 
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex flex-wrap items-center gap-3">
             <select
               value={limit}
               onChange={(e) => {
                 setPage(1);
                 setLimit(Number(e.target.value));
               }}
-              className="px-3 py-2 rounded-lg"
+              className="px-3 py-2 rounded-lg w-full sm:w-auto"
               style={{
                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                 color: darkMode ? "#ffffff" : "#111827",
@@ -193,11 +193,11 @@ const MyEnrollmentsPage: React.FC = () => {
               ))}
             </select>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="px-3 py-2 rounded-lg disabled:opacity-50 flex items-center gap-1"
+              className="px-3 py-2 rounded-lg disabled:opacity-50 flex items-center gap-1 w-full sm:w-auto"
               style={{
                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                 color: darkMode ? "#ffffff" : "#111827",
@@ -218,7 +218,7 @@ const MyEnrollmentsPage: React.FC = () => {
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="px-3 py-2 rounded-lg disabled:opacity-50 flex items-center gap-1"
+              className="px-3 py-2 rounded-lg disabled:opacity-50 flex items-center gap-1 w-full sm:w-auto"
               style={{
                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                 color: darkMode ? "#ffffff" : "#111827",
@@ -373,7 +373,7 @@ const MyEnrollmentsPage: React.FC = () => {
               return (
                 <div
                   key={en._id}
-                  className="rounded-lg p-5 flex gap-4 items-start"
+                  className="rounded-lg p-5 flex flex-col sm:flex-row gap-4 items-start"
                   style={{
                     backgroundColor: darkMode
                       ? "rgba(31, 41, 55, 0.85)"
@@ -416,7 +416,7 @@ const MyEnrollmentsPage: React.FC = () => {
                     </Link>
                     {en.courseId?.description && (
                       <p
-                        className="text-sm mt-1"
+                        className="text-sm mt-1 break-words"
                         style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
                       >
                         {en.courseId?.description}
@@ -449,7 +449,7 @@ const MyEnrollmentsPage: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:mt-0 mt-2">
                     <button
                       onClick={() => openCancelModal(en._id)}
                       disabled={

@@ -15,6 +15,7 @@ interface AttendanceFormProps {
   onStudentClick?: (studentId: string, studentName: string) => void;
   saving?: boolean;
   attendanceDate?: string; // Optional: if provided, use this date instead of internal state
+  viewOnly?: boolean; // If true, hide edit buttons (for viewing past attendance)
 }
 
 export default function AttendanceForm({
@@ -25,6 +26,7 @@ export default function AttendanceForm({
   onStudentClick,
   saving = false,
   attendanceDate: externalDate,
+  viewOnly = false,
 }: AttendanceFormProps) {
   const { darkMode } = useTheme();
   // Use external date if provided, otherwise use internal state
@@ -234,22 +236,23 @@ export default function AttendanceForm({
         </div>
       )}
 
-      {/* Select All Buttons */}
-      <div className="mb-4 flex gap-2 justify-end">
-        {!isEditMode ? (
-          <button
-            onClick={handleStartEditing}
-            className="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
-            style={{
-              backgroundColor: darkMode ? "rgba(99, 102, 241, 0.2)" : "rgba(99, 102, 241, 0.1)",
-              color: "#6366f1",
-              border: "1px solid rgba(99, 102, 241, 0.3)",
-            }}
-          >
-            <Calendar className="w-4 h-4" />
-            Take Attendance
-          </button>
-        ) : (
+      {/* Select All Buttons - Hide in viewOnly mode */}
+      {!viewOnly && (
+        <div className="mb-4 flex gap-2 justify-end">
+          {!isEditMode ? (
+            <button
+              onClick={handleStartEditing}
+              className="px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
+              style={{
+                backgroundColor: darkMode ? "rgba(99, 102, 241, 0.2)" : "rgba(99, 102, 241, 0.1)",
+                color: "#6366f1",
+                border: "1px solid rgba(99, 102, 241, 0.3)",
+              }}
+            >
+              <Calendar className="w-4 h-4" />
+              Take Attendance
+            </button>
+          ) : (
           <>
             <button
               onClick={() => handleSelectAll("present")}
@@ -289,7 +292,8 @@ export default function AttendanceForm({
             </button>
           </>
         )}
-      </div>
+        </div>
+      )}
 
       {/* Students List */}
       <div className="space-y-2 mb-6">
@@ -388,7 +392,7 @@ export default function AttendanceForm({
                 {/* Only show attendance buttons for currently enrolled students */}
                 {stat.isCurrentlyEnrolled !== false && (
                   <div className="flex items-center gap-2">
-                    {!isEditMode ? (
+                    {(!isEditMode || viewOnly) ? (
                       // View mode - show status label  
                       <span className="px-3 py-1.5 rounded-lg text-sm font-medium capitalize"
                         style={{

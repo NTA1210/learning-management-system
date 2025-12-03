@@ -118,7 +118,7 @@ const MyCoursesPage: React.FC = () => {
             }}
         >
             <Navbar />
-                  <Sidebar role={'student'} />
+                  <Sidebar role={user?.role as 'admin' | 'teacher' | 'student'} />
             <div className="max-w-[1200px] mt-[100px] mx-auto px-4 sm:pl-[93px] py-6">
                 <h1
                     className="text-2xl font-semibold mb-6"
@@ -127,15 +127,15 @@ const MyCoursesPage: React.FC = () => {
                     My Courses
                 </h1>
 
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div className="flex flex-wrap items-center gap-3">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }} />
                             <input
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Search courses by title or description"
-                                className="pl-9 pr-3 py-2 rounded-lg outline-none shadow-sm"
+                                className="pl-9 pr-3 py-2 rounded-lg outline-none shadow-sm w-full sm:w-64"
                                 style={{
                                     backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                                     color: darkMode ? "#ffffff" : "#111827",
@@ -146,7 +146,7 @@ const MyCoursesPage: React.FC = () => {
                         <select
                             value={sortOption}
                             onChange={(e) => setSortOption(e.target.value as 'name_asc' | 'name_desc' | 'date_asc' | 'date_desc')}
-                            className="px-3 py-2 rounded-lg"
+                            className="px-3 py-2 rounded-lg w-full sm:w-auto"
                             style={{
                                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                                 color: darkMode ? "#ffffff" : "#111827",
@@ -161,7 +161,7 @@ const MyCoursesPage: React.FC = () => {
                         <select
                             value={selectedSubjectId}
                             onChange={(e) => { setSelectedSubjectId(e.target.value); setCurrentPage(1); }}
-                            className="px-3 py-2 rounded-lg"
+                            className="px-3 py-2 rounded-lg w-full sm:w-auto"
                             style={{
                                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                                 color: darkMode ? "#ffffff" : "#111827",
@@ -176,7 +176,7 @@ const MyCoursesPage: React.FC = () => {
                         <select
                             value={selectedSemesterId}
                             onChange={(e) => { setSelectedSemesterId(e.target.value); setCurrentPage(1); }}
-                            className="px-3 py-2 rounded-lg"
+                            className="px-3 py-2 rounded-lg w-full sm:w-auto"
                             style={{
                                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                                 color: darkMode ? "#ffffff" : "#111827",
@@ -191,7 +191,7 @@ const MyCoursesPage: React.FC = () => {
                         <select
                             value={selectedTeacherId}
                             onChange={(e) => { setSelectedTeacherId(e.target.value); setCurrentPage(1); }}
-                            className="px-3 py-2 rounded-lg"
+                            className="px-3 py-2 rounded-lg w-full sm:w-auto"
                             style={{
                                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                                 color: darkMode ? "#ffffff" : "#111827",
@@ -210,7 +210,7 @@ const MyCoursesPage: React.FC = () => {
                             setCurrentPage(1);
                             setPageLimit(Number(e.target.value));
                         }}
-                        className="px-3 py-2 rounded-lg"
+                        className="px-3 py-2 rounded-lg w-full sm:w-auto"
                         style={{
                             backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                             color: darkMode ? "#ffffff" : "#111827",

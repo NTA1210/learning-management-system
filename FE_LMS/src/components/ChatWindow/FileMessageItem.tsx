@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useTheme } from "../../hooks/useTheme";
+import { FileText, FileSpreadsheet, Presentation, Eye } from "lucide-react";
+import FilePreviewModal from "../common/FilePreviewModal";
 
 export interface FileMessage {
   _id: string;
@@ -22,6 +24,45 @@ type FileMessageItemProps = FileMessage & {
   isLastInBlock?: boolean;
 };
 
+// File extensions that support preview
+const previewableExtensions = new Set([
+  "pdf",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+  "ppt",
+  "pptx",
+  "txt",
+  "md",
+]);
+
+const getFileExtension = (filename: string): string => {
+  return filename.split(".").pop()?.toLowerCase() || "";
+};
+
+const getFileIcon = (extension: string) => {
+  if (["xls", "xlsx", "csv"].includes(extension)) return FileSpreadsheet;
+  if (["ppt", "pptx"].includes(extension)) return Presentation;
+  return FileText;
+};
+
+const isPreviewable = (file: { originalName: string; mimeType?: string }): boolean => {
+  const extension = getFileExtension(file.originalName);
+  const mimeType = file.mimeType?.toLowerCase() || "";
+  
+  return (
+    previewableExtensions.has(extension) ||
+    mimeType.includes("pdf") ||
+    mimeType.includes("word") ||
+    mimeType.includes("excel") ||
+    mimeType.includes("powerpoint") ||
+    mimeType.includes("presentation") ||
+    mimeType.includes("spreadsheet") ||
+    mimeType.startsWith("text/")
+  );
+};
+
 const FileMessageItem: React.FC<FileMessageItemProps> = ({
   senderId,
   file,
@@ -30,6 +71,7 @@ const FileMessageItem: React.FC<FileMessageItemProps> = ({
   isLastInBlock = true,
 }) => {
   const [user, setUser] = useState<any>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const { darkMode } = useTheme();
 
   useEffect(() => {
@@ -45,6 +87,18 @@ const FileMessageItem: React.FC<FileMessageItemProps> = ({
     minute: "2-digit",
   });
 
+  const canPreview = isPreviewable(file);
+  const extension = getFileExtension(file.originalName);
+  const FileIcon = getFileIcon(extension);
+
+  const handleFileClick = () => {
+    if (canPreview) {
+      setIsPreviewOpen(true);
+    } else {
+      window.open(file.url, "_blank");
+    }
+  };
+
   const renderFile = () => {
     if (file.mimeType?.startsWith("image/")) {
       return (
@@ -58,22 +112,28 @@ const FileMessageItem: React.FC<FileMessageItemProps> = ({
     }
 
     return (
-      <a
-        href={file.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`flex items-center gap-2 p-2 text-sm font-medium rounded-lg
+      <button
+        onClick={handleFileClick}
+        className={`flex items-center gap-2 p-2 text-sm font-medium rounded-lg w-full text-left group
                     ${
                       userIsSender
-                        ? "bg-indigo-700 text-white"
+                        ? "bg-indigo-700 text-white hover:bg-indigo-800"
                         : darkMode
-                        ? "bg-slate-700 text-slate-50"
-                        : "bg-gray-200 text-gray-800"
+                        ? "bg-slate-700 text-slate-50 hover:bg-slate-600"
+                        : "bg-gray-200 text-gray-800 hover:bg-gray-300"
                     } 
-                    hover:opacity-90`}
+                    transition-colors`}
       >
-        📎 {file.originalName}
-      </a>
+        <FileIcon className="size-5 flex-shrink-0" />
+        <span className="truncate flex-1 max-w-[180px]">{file.originalName}</span>
+        {canPreview && (
+          <Eye 
+            className={`size-4 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ${
+              userIsSender ? "text-indigo-200" : darkMode ? "text-slate-400" : "text-gray-500"
+            }`} 
+          />
+        )}
+      </button>
     );
   };
 
@@ -133,6 +193,13 @@ const FileMessageItem: React.FC<FileMessageItemProps> = ({
           </span>
         </div>
       </div>
+
+      {/* File Preview Modal */}
+      <FilePreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        file={file}
+      />
     </div>
   );
 };

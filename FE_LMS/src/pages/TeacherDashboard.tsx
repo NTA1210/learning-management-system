@@ -621,11 +621,11 @@ export default function TeacherDashboard() {
 
               {/* Carousel Container */}
               <div className="relative">
-                {/* Previous Button */}
+                {/* Previous Button - hidden on mobile */}
                 {courseCarouselIndex > 0 && (
                   <button
                     onClick={handlePrevCourse}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110 hidden sm:block"
                     style={{
                       backgroundColor: darkMode ? '#4f46e5' : '#6366f1',
                       color: '#ffffff'
@@ -637,12 +637,12 @@ export default function TeacherDashboard() {
                   </button>
                 )}
 
-                {/* Next Button */}
+                {/* Next Button - hidden on mobile */}
                 {(courseCarouselIndex < courses.length - VISIBLE_COURSES || hasMoreCourses) && (
                   <button
                     onClick={handleNextCourse}
                     disabled={coursesLoading}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110 disabled:opacity-50"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110 disabled:opacity-50 hidden sm:block"
                     style={{
                       backgroundColor: darkMode ? '#4f46e5' : '#6366f1',
                       color: '#ffffff'
@@ -661,11 +661,14 @@ export default function TeacherDashboard() {
                   </button>
                 )}
 
-                {/* Courses Carousel */}
-                <div className="overflow-hidden px-2">
+                {/* Courses Carousel - scrollable on mobile, transform-based on desktop */}
+                <div className="overflow-x-auto sm:overflow-hidden px-2 pb-2 -mx-2 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   <div 
-                    className="flex transition-all duration-500 ease-out gap-6"
-                    style={{ transform: `translateX(-${courseCarouselIndex * (100 / VISIBLE_COURSES + 2)}%)` }}
+                    className="flex gap-4 sm:gap-6"
+                    style={{ 
+                      transform: `translateX(-${courseCarouselIndex * (100 / VISIBLE_COURSES + 2)}%)`,
+                      transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
                   >
                     {loading ? (
                       [1, 2, 3].map((i) => (
@@ -673,7 +676,9 @@ export default function TeacherDashboard() {
                           key={i}
                           className="flex-shrink-0 rounded-2xl shadow-lg overflow-hidden"
                           style={{
-                            width: `calc(${100 / VISIBLE_COURSES}% - 16px)`,
+                            width: 'calc(85vw - 32px)',
+                            minWidth: '260px',
+                            maxWidth: '320px',
                             backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
                             border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                           }}
@@ -702,7 +707,9 @@ export default function TeacherDashboard() {
                           key={course._id}
                           className="flex-shrink-0 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden cursor-pointer"
                           style={{
-                            width: `calc(${100 / VISIBLE_COURSES}% - 16px)`,
+                            width: 'calc(85vw - 32px)',
+                            minWidth: '260px',
+                            maxWidth: '320px',
                             backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
                             border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                             backdropFilter: 'blur(10px)'
@@ -764,9 +771,9 @@ export default function TeacherDashboard() {
                   </div>
                 </div>
 
-                {/* Carousel Indicators */}
+                {/* Carousel Indicators - hidden on mobile */}
                 {courses.length > VISIBLE_COURSES && (
-                  <div className="flex justify-center gap-2 mt-4">
+                  <div className="hidden sm:flex justify-center gap-2 mt-4">
                     {Array.from({ length: Math.ceil(totalCourses / VISIBLE_COURSES) }).map((_, idx) => (
                       <button
                         key={idx}

@@ -55,12 +55,12 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
       border: darkMode ? "1px solid rgba(75, 85, 99, 0.3)" : "1px solid rgba(229, 231, 235, 0.5)",
     }}
   >
-    <div className="p-6">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-center mb-3">
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start mb-3">
             <div
-              className="p-2 rounded-lg mr-3"
+              className="p-2 rounded-lg mr-3 flex-shrink-0"
               style={{
                 backgroundColor: darkMode ? "rgba(99, 102, 241, 0.2)" : "rgba(99, 102, 241, 0.1)",
                 color: darkMode ? "#a5b4fc" : "#6366f1",
@@ -68,12 +68,12 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
             >
               {getFileIcon(material.mimeType)}
             </div>
-            <div className="flex-1">
-              <h3 className="text-xl font-semibold mb-1" style={{ color: darkMode ? "#ffffff" : "#1f2937" }}>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg sm:text-xl font-semibold mb-1 break-words" style={{ color: darkMode ? "#ffffff" : "#1f2937" }}>
                 {material.title}
               </h3>
               {material.originalName && (
-                <p className="text-sm mb-2" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                <p className="text-sm mb-2 truncate" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }} title={material.originalName}>
                   {material.originalName}
                 </p>
               )}
@@ -133,24 +133,24 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
           </div>
         </div>
 
-        <div className="ml-4 flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap sm:ml-4 sm:flex-nowrap">
           {material.hasAccess && (
             <>
               <button
                 onClick={() => onView(material)}
-                className="px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-lg flex items-center"
+                className="flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg transition-all duration-200 hover:shadow-lg flex items-center justify-center"
                 style={{
                   backgroundColor: darkMode ? "rgba(99, 102, 241, 0.15)" : "rgba(99, 102, 241, 0.1)",
                   color: darkMode ? "#a5b4fc" : "#4f46e5",
                   border: darkMode ? "1px solid rgba(99, 102, 241, 0.35)" : "1px solid rgba(79, 70, 229, 0.25)",
                 }}
               >
-                <Eye size={18} className="mr-2" />
-                View
+                <Eye size={18} className="sm:mr-2" />
+                <span className="hidden sm:inline">View</span>
               </button>
               <button
                 onClick={() => onDownload(material._id)}
-                className="px-4 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg flex items-center"
+                className="flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg flex items-center justify-center"
                 style={{ backgroundColor: darkMode ? "#059669" : "#10b981" }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = darkMode ? "#047857" : "#059669";
@@ -159,8 +159,8 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                   e.currentTarget.style.backgroundColor = darkMode ? "#059669" : "#10b981";
                 }}
               >
-                <Download size={18} className="mr-2" />
-                Download
+                <Download size={18} className="sm:mr-2" />
+                <span className="hidden sm:inline">Download</span>
               </button>
             </>
           )}
@@ -168,7 +168,7 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
             <>
               <button
                 onClick={() => onEdit(material)}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md flex items-center gap-2"
+                className="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md flex items-center justify-center gap-1 sm:gap-2"
                 style={{
                   backgroundColor: darkMode ? "rgba(99, 102, 241, 0.2)" : "#eef2ff",
                   color: darkMode ? "#a5b4fc" : "#4f46e5",
@@ -183,11 +183,11 @@ const MaterialCard: React.FC<MaterialCardProps> = ({
                 }}
               >
                 <Pencil size={16} />
-                Edit
+                <span className="hidden sm:inline">Edit</span>
               </button>
               <button
                 onClick={() => onDelete(material._id)}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md flex items-center gap-2"
+                className="px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md flex items-center justify-center gap-1 sm:gap-2"
                 style={{
                   backgroundColor: darkMode ? "rgba(239, 68, 68, 0.2)" : "#fee2e2",
                   color: darkMode ? "#fca5a5" : "#dc2626",

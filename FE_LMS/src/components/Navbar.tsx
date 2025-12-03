@@ -13,6 +13,7 @@ import {
   Paintbrush,
 } from "lucide-react";
 import NotificationDropdown from "./NotificationDropdown";
+import ChatButton from "./FloatingChat/ChatButton";
 import { authService } from "../services";
 import { useSidebar } from "../context/SidebarContext";
 
@@ -247,6 +248,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
           </div>
           <div className="flex items-center gap-3 md:gap-4">
             <NotificationDropdown isDarkMode={darkMode} />
+            <ChatButton darkMode={darkMode} />
             {user && (
               <div className="relative" ref={dropdownRef}>
                 <button
