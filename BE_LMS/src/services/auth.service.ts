@@ -13,7 +13,6 @@ import { UserModel, SessionModel, VerificationCodeModel } from '@/models';
 import appAssert from '../utils/appAssert';
 import { hashValue } from '../utils/bcrypt';
 import {
-  fifteenMinutesFromNow,
   fiveMinutesAgo,
   ONE_DAY_MS,
   oneHourFromNow,
@@ -95,7 +94,7 @@ export const loginUser = async ({ email, password, userAgent }: LoginParams) => 
   const existingSession = await SessionModel.findOne({
     userId: user._id,
     userAgent,
-    expiresAt: { $gt: fifteenMinutesFromNow() },
+    expiresAt: { $gt: Date.now() },
   });
 
   appAssert(!existingSession, FORBIDDEN, 'User already logged in');
