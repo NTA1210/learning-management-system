@@ -13,6 +13,7 @@ const RegisterPage: React.FC = () => {
     email: "",
     password: "",
     confirmPassword: "",
+    fullname: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword] = useState(false);
@@ -38,7 +39,12 @@ const RegisterPage: React.FC = () => {
 
   const passwordValidation = validatePassword(formData.password);
   const isPasswordValid = passwordValidation.hasMinLength && passwordValidation.hasNumberOrSymbol && passwordValidation.hasUpperAndLower;
-  const isFormValid = formData.username && formData.email && isPasswordValid && formData.password === formData.confirmPassword;
+  const isFormValid =
+    formData.fullname &&
+    formData.username &&
+    formData.email &&
+    isPasswordValid &&
+    formData.password === formData.confirmPassword;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,29 +57,39 @@ const RegisterPage: React.FC = () => {
       console.log("Registration successful:", response);
       setSuccess(true);
       // Don't redirect immediately - show success message about email verification
-  } catch (err: unknown) {
-    console.error("Registration error:", err);
-  
-    let finalError: ErrorType | ErrorType[] = "Đăng ký thất bại";
-  
-    const maybeMessage = (err as { message?: unknown })?.message;
-    if (typeof maybeMessage === "string") {
-      try {
-        const parsed = JSON.parse(maybeMessage);
-        if (Array.isArray(parsed)) {
-          finalError = parsed as ErrorType[];
-        } else {
-          finalError = maybeMessage;
+    } catch (err: unknown) {
+      console.error("Registration error:", err);
+
+      let finalError: ErrorType | ErrorType[] = "Đăng ký thất bại";
+
+      // Ưu tiên lấy message từ response của API (vd: \"Email already in use\")
+      const apiMessage =
+        (err as any)?.response?.data?.message ??
+        (err as any)?.response?.data?.error?.message;
+
+      if (typeof apiMessage === "string" && apiMessage.trim()) {
+        finalError = apiMessage;
+      } else {
+        // Fallback: lấy từ err.message như trước (có thể là JSON string)
+        const maybeMessage = (err as { message?: unknown })?.message;
+        if (typeof maybeMessage === "string") {
+          try {
+            const parsed = JSON.parse(maybeMessage);
+            if (Array.isArray(parsed)) {
+              finalError = parsed as ErrorType[];
+            } else {
+              finalError = maybeMessage;
+            }
+          } catch {
+            finalError = maybeMessage;
+          }
         }
-      } catch {
-        finalError = maybeMessage;
       }
+
+      setError(finalError);
+    } finally {
+      setLoading(false);
     }
-  
-    setError(finalError);
-  } finally {
-    setLoading(false);
-  }
   };
 
   return (
@@ -148,6 +164,31 @@ const RegisterPage: React.FC = () => {
 
               {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Fullname Field */}
+                <div className="form-group">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      name="fullname"
+                      value={formData.fullname}
+                      onChange={handleInputChange}
+                      className="auth-input w-full pl-12 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors duration-300"
+                      style={{
+                        backgroundColor: darkMode ? 'rgba(55, 65, 81, 0.8)' : 'rgba(255, 255, 255, 0.8)',
+                        borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : 'rgba(209, 213, 219, 0.3)',
+                        color: darkMode ? '#ffffff' : '#000000',
+                      }}
+                      placeholder="Enter your full name"
+                      required
+                    />
+                  </div>
+                </div>
+
                 {/* Username Field */}
                 <div className="form-group">
                   <div className="relative">
