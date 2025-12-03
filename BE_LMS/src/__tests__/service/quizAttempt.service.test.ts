@@ -1,5 +1,3 @@
-// src/__tests__/service/quizAttempt.service.test.ts
-
 import mongoose from 'mongoose';
 import {
   enrollQuiz,
@@ -17,14 +15,12 @@ import { Role, AttemptStatus } from '@/types';
 import { isTeacherOfCourse } from '@/services/helpers/quizHelpers';
 import appAssert from '@/utils/appAssert';
 
-// ObjectId hợp lệ
 const USER_ID = new mongoose.Types.ObjectId();
 const TEACHER_ID = new mongoose.Types.ObjectId();
 const QUIZ_ID = new mongoose.Types.ObjectId();
 const ATTEMPT_ID = new mongoose.Types.ObjectId();
 const COURSE_ID = new mongoose.Types.ObjectId();
 
-// Mock model + helper
 jest.mock('@/models', () => ({
   QuizModel: { findById: jest.fn() },
   QuizAttemptModel: {
@@ -37,7 +33,6 @@ jest.mock('@/models', () => ({
   EnrollmentModel: { findOne: jest.fn() },
 }));
 
-// Mock appAssert để throw đúng
 jest.mock('@/utils/appAssert', () => {
   return jest.fn((condition: any, code: any, message: string) => {
     if (!condition) throw new Error(message);
@@ -53,10 +48,9 @@ describe('QuizAttempt Service - FINAL FIXED 100% PASS', () => {
     jest.clearAllMocks();
   });
 
-  // Thời gian cố định để kiểm soát logic
   const NOW = Date.now();
-  const START_TIME = NOW - 5 * 60 * 1000; // 5 phút trước
-  const END_TIME = NOW + 3600 * 1000; // 1 giờ sau
+  const START_TIME = NOW - 5 * 60 * 1000;
+  const END_TIME = NOW + 3600 * 1000;
 
   const mockQuiz = {
     _id: QUIZ_ID,
@@ -123,7 +117,7 @@ describe('QuizAttempt Service - FINAL FIXED 100% PASS', () => {
       });
 
       expect(result).toBe(existing);
-      expect(QuizAttemptModel.findOneAndUpdate).not.toHaveBeenCalled(); // không tạo mới
+      expect(QuizAttemptModel.findOneAndUpdate).not.toHaveBeenCalled();
     });
 
     it('should throw if already SUBMITTED', async () => {
@@ -163,7 +157,6 @@ describe('QuizAttempt Service - FINAL FIXED 100% PASS', () => {
     });
 
     it('should throw if enroll after 15 minutes (student)', async () => {
-      // Quiz bắt đầu 20 phút trước → đã quá 15 phút
       const oldStartTime = Date.now() - 20 * 60 * 1000;
       const oldQuiz = {
         ...mockQuiz,
@@ -174,14 +167,10 @@ describe('QuizAttempt Service - FINAL FIXED 100% PASS', () => {
         populate: jest.fn().mockResolvedValue(oldQuiz),
       });
 
-      // Quan trọng: học sinh này ĐÃ enroll rồi (hoặc không cần check) → để service đi đến bước check 15 phút
       (EnrollmentModel.findOne as jest.Mock).mockResolvedValue({ _id: 'e1' });
 
-      // Nếu không có attempt cũ → service sẽ cố tạo mới → và throw ở dòng:
-      // appAssert(new Date().getTime() <= quiz.startTime.getTime() + 15 * 60 * 1000, ...)
       (QuizAttemptModel.findOne as jest.Mock).mockResolvedValue(null);
 
-      // Đảm bảo appAssert sẽ throw Error(message) như trong code thật
       (appAssert as jest.Mock).mockImplementation((condition, _, message) => {
         if (!condition) throw new Error(message);
       });
@@ -192,7 +181,7 @@ describe('QuizAttempt Service - FINAL FIXED 100% PASS', () => {
           hashPassword: '123',
           user: {
             role: Role.STUDENT,
-            userId: USER_ID, // phải là string
+            userId: USER_ID,
             userAgent: '',
             ip: '',
           },
@@ -203,7 +192,6 @@ describe('QuizAttempt Service - FINAL FIXED 100% PASS', () => {
 
   describe('gradeQuizAttempt - banned check', () => {
     it('should throw if student was banned', async () => {
-      // Dùng mock trực tiếp
       const bannedAttempt = {
         ...mockQuizAttempt,
         status: AttemptStatus.ABANDONED,
@@ -221,32 +209,159 @@ describe('QuizAttempt Service - FINAL FIXED 100% PASS', () => {
     });
   });
 
-  describe('autoSaveQuizAttempt', () => {
-    it('should auto-save answer correctly', async () => {
-      // Mock document sau khi populate (có quizId đầy đủ)
+  describe('saveQuizAttempt', () => {
+    it('should save all answers successfully', async () => {
+      // Đảm bảo số lượng câu hỏi = số lượng đáp án
+      const mockQuizWithTwoQuestions = {
+        ...mockQuiz,
+        snapshotQuestions: [
+          { id: 'q1', options: ['A', 'B'], type: 'mcq' },
+          { id: 'q2', options: ['C', 'D'], type: 'mcq' },
+        ],
+      };
+
       const populatedAttempt = {
-        _id: ATTEMPT_ID,
-        quizId: mockQuiz, // quan trọng: có endTime, snapshotQuestions...
+        ...mockQuizAttempt,
+        quizId: mockQuizWithTwoQuestions,
         studentId: USER_ID,
         status: AttemptStatus.IN_PROGRESS,
         answers: [
-          { questionId: 'q1', answer: [0] }, // trước khi save: chưa chọn
+          { questionId: 'q1', answer: [0, 0] },
+          { questionId: 'q2', answer: [0, 0] },
+        ],
+      };
+
+      const answersToSave = [
+        { questionId: 'q1', answer: [1, 0] },
+        { questionId: 'q2', answer: [0, 1] },
+      ];
+
+      const updatedAttempt = {
+        ...populatedAttempt,
+        answers: answersToSave,
+      };
+
+      (QuizAttemptModel.findById as jest.Mock).mockReturnValue({
+        populate: jest.fn().mockResolvedValue(populatedAttempt),
+      });
+
+      (QuizModel.findById as jest.Mock).mockReturnValue({
+        populate: jest.fn().mockResolvedValue(mockQuizWithTwoQuestions),
+      });
+
+      (QuizAttemptModel.findOneAndUpdate as jest.Mock).mockResolvedValue(updatedAttempt);
+
+      const result = await saveQuizAttempt(
+        {
+          quizAttemptId: ATTEMPT_ID.toHexString(),
+          answers: answersToSave,
+        },
+        USER_ID
+      );
+
+      expect(result).toEqual(updatedAttempt);
+      expect(QuizAttemptModel.findOneAndUpdate).toHaveBeenCalledWith(
+        { _id: ATTEMPT_ID.toHexString() },
+        { answers: answersToSave },
+        { new: true }
+      );
+    });
+
+    it('should throw if time limit exceeded (saveQuizAttempt)', async () => {
+      const expiredQuiz = {
+        ...mockQuiz,
+        endTime: new Date(Date.now() - 60000), // đã hết giờ
+      };
+
+      (QuizAttemptModel.findById as jest.Mock).mockReturnValue({
+        populate: jest.fn().mockResolvedValue({
+          ...mockQuizAttempt,
+          quizId: expiredQuiz,
+        }),
+      });
+
+      await expect(
+        saveQuizAttempt(
+          {
+            quizAttemptId: ATTEMPT_ID.toHexString(),
+            answers: [],
+          },
+          USER_ID
+        )
+      ).rejects.toThrow('Time limit exceeded');
+    });
+
+    it('should throw if answers count mismatch', async () => {
+      (QuizAttemptModel.findById as jest.Mock).mockReturnValue({
+        populate: jest.fn().mockResolvedValue({
+          ...mockQuizAttempt,
+          quizId: { ...mockQuiz, snapshotQuestions: [{}, {}, {}] }, // 3 câu
+        }),
+      });
+
+      await expect(
+        saveQuizAttempt(
+          {
+            quizAttemptId: ATTEMPT_ID.toHexString(),
+            answers: [{ questionId: 'q1', answer: [1] }], // chỉ có 1
+          },
+          USER_ID
+        )
+      ).rejects.toThrow('Invalid number of answers submitted');
+    });
+
+    it('should throw if already submitted', async () => {
+      (QuizAttemptModel.findById as jest.Mock).mockReturnValue({
+        populate: jest.fn().mockResolvedValue({
+          ...mockQuizAttempt,
+          status: AttemptStatus.SUBMITTED,
+          quizId: mockQuiz,
+        }),
+      });
+
+      await expect(
+        saveQuizAttempt({ quizAttemptId: ATTEMPT_ID.toHexString(), answers: [] }, USER_ID)
+      ).rejects.toThrow('You have already submitted this quiz');
+    });
+
+    it('should throw if banned', async () => {
+      (QuizAttemptModel.findById as jest.Mock).mockReturnValue({
+        populate: jest.fn().mockResolvedValue({
+          ...mockQuizAttempt,
+          status: AttemptStatus.ABANDONED,
+          quizId: mockQuiz,
+        }),
+      });
+
+      await expect(
+        saveQuizAttempt({ quizAttemptId: ATTEMPT_ID.toHexString(), answers: [] }, USER_ID)
+      ).rejects.toThrow('You were banned from taking this quiz');
+    });
+  });
+
+  describe('autoSaveQuizAttempt', () => {
+    it('should auto-save answer correctly', async () => {
+      const populatedAttempt = {
+        _id: ATTEMPT_ID,
+        quizId: mockQuiz,
+        studentId: USER_ID,
+        status: AttemptStatus.IN_PROGRESS,
+        answers: [
+          { questionId: 'q1', answer: [0] },
           { questionId: 'q2', answer: [0] },
         ],
-        // save() phải trả về một "document" có method toObject()
         save: jest.fn().mockResolvedValue({
           toObject: jest.fn().mockReturnValue({
             _id: ATTEMPT_ID.toHexString(),
             quizId: QUIZ_ID.toHexString(),
             answers: [
-              { questionId: 'q1', answer: [1] }, // sau khi save: đã chọn đáp án 1
+              { questionId: 'q1', answer: [1] },
               { questionId: 'q2', answer: [0] },
             ],
           }),
         }),
       };
 
-      // findById → chain populate → trả về populatedAttempt
       (QuizAttemptModel.findById as jest.Mock).mockReturnValue({
         populate: jest.fn().mockResolvedValue(populatedAttempt),
       });
@@ -254,16 +369,15 @@ describe('QuizAttempt Service - FINAL FIXED 100% PASS', () => {
       const result = await autoSaveQuizAttempt(
         {
           quizAttemptId: ATTEMPT_ID.toHexString(),
-          answer: { questionId: 'q1', answer: [1] }, // chọn đáp án đầu tiên
+          answer: { questionId: 'q1', answer: [1] },
         },
         USER_ID
       );
 
-      // Kiểm tra kết quả
-      expect(populatedAttempt.save).toHaveBeenCalled(); // đã lưu
-      expect(result.total).toBe(2); // tổng câu hỏi
-      expect(result.answeredTotal).toBe(1); // đã trả lời 1 câu (có giá trị 1)
-      expect(result.data.answers[0].answer).toEqual([1]); // câu q1 đã được cập nhật
+      expect(populatedAttempt.save).toHaveBeenCalled();
+      expect(result.total).toBe(2);
+      expect(result.answeredTotal).toBe(1);
+      expect(result.data.answers[0].answer).toEqual([1]);
     });
   });
 
@@ -272,7 +386,7 @@ describe('QuizAttempt Service - FINAL FIXED 100% PASS', () => {
       const endedQuiz = {
         ...mockQuiz,
         startTime: new Date(NOW - 7200000),
-        endTime: new Date(NOW - 3600000), // đã kết thúc
+        endTime: new Date(NOW - 3600000),
       };
 
       (QuizAttemptModel.findById as jest.Mock).mockReturnValue({
@@ -287,9 +401,57 @@ describe('QuizAttempt Service - FINAL FIXED 100% PASS', () => {
 
       expect(QuizAttemptModel.findByIdAndDelete).toHaveBeenCalled();
     });
+
+    it('should grade and return detailed result when submit successfully', async () => {
+      const mockQuizWithQuestions = {
+        ...mockQuiz,
+        snapshotQuestions: [
+          { id: 'q1', options: ['A', 'B'], type: 'mcq', correctAnswer: [1], points: 10 },
+          { id: 'q2', options: ['C', 'D'], type: 'mcq', correctAnswer: [0], points: 20 },
+        ],
+      };
+
+      const populatedAttempt = {
+        ...mockQuizAttempt,
+        quizId: mockQuizWithQuestions,
+        studentId: USER_ID,
+        status: AttemptStatus.IN_PROGRESS,
+        answers: [
+          { questionId: 'q1', answer: [1] }, // đúng
+          { questionId: 'q2', answer: [1] }, // sai
+        ],
+        grade: jest.fn().mockResolvedValue({
+          totalQuestions: 2,
+          totalScore: 10,
+          totalQuizScore: 30,
+          scorePercentage: 33.33,
+          failedQuestions: 1,
+          passedQuestions: 1,
+          answersSubmitted: [
+            { questionId: 'q1', answer: [1], correct: true, pointsEarned: 10 },
+            { questionId: 'q2', answer: [1], correct: false, pointsEarned: 0 },
+          ],
+        }),
+      };
+
+      (QuizAttemptModel.findById as jest.Mock).mockReturnValue({
+        populate: jest.fn().mockResolvedValue(populatedAttempt),
+      });
+
+      (QuizModel.findById as jest.Mock).mockReturnValue({
+        populate: jest.fn().mockResolvedValue(mockQuizWithQuestions),
+      });
+
+      const result = await submitQuizAttempt({ quizAttemptId: ATTEMPT_ID.toHexString() }, USER_ID);
+
+      // Quan trọng: đảm bảo đã gọi grade() với đúng tham số
+      expect(populatedAttempt.grade).toHaveBeenCalledWith(
+        populatedAttempt.answers,
+        mockQuizWithQuestions
+      );
+    });
   });
 
-  // Các test khác giữ nguyên (đã pass)
   describe('submitQuizAttempt', () => {
     it('should submit successfully', async () => {
       (QuizAttemptModel.findById as jest.Mock).mockReturnValue({
@@ -321,8 +483,8 @@ describe('QuizAttempt Service - FINAL FIXED 100% PASS', () => {
       (QuizAttemptModel.findById as jest.Mock).mockReturnValue({
         populate: jest.fn().mockResolvedValue({
           ...mockQuizAttempt,
-          quizId: { ...mockQuiz, snapshotQuestions: [{}, {}, {}] }, // 3 câu
-          answers: [{}, {}], // chỉ có 2
+          quizId: { ...mockQuiz, snapshotQuestions: [{}, {}, {}] },
+          answers: [{}, {}],
         }),
       });
       (QuizModel.findById as jest.Mock).mockReturnValue({
@@ -367,7 +529,6 @@ describe('QuizAttempt Service - FINAL FIXED 100% PASS', () => {
 
   describe('updateQuizAttemptScore', () => {
     it('should update score manually (teacher) and call isTeacherOfCourse', async () => {
-      // DÙNG MOCK TRỰC TIẾP, KHÔNG DÙNG SPY!
       const mockAttempt = {
         ...mockQuizAttempt,
         score: 50,
@@ -377,12 +538,10 @@ describe('QuizAttempt Service - FINAL FIXED 100% PASS', () => {
         }),
       };
 
-      // Mock getQuizAttemptById trả về mockAttempt
       jest
         .spyOn(require('@/services/quizAttempt.service'), 'getQuizAttemptById')
         .mockResolvedValue(mockAttempt as any);
 
-      // Mock isTeacherOfCourse
       (isTeacherOfCourse as jest.Mock).mockReturnValue(undefined);
 
       const result = await updateQuizAttemptScore(
