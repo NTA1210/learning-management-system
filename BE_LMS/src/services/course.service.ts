@@ -529,6 +529,20 @@ export const createCourse = async (
 
   const isAdmin = creator.role === Role.ADMIN;
 
+  // ✅ PERMISSION RULE: Teacher can ONLY assign themselves
+  if (!isAdmin) {
+    const isOnlyAddingSelf =
+      data.teacherIds.length === 1 && data.teacherIds[0].toString() === userId.toString();
+
+    appAssert(
+      isOnlyAddingSelf,
+      FORBIDDEN,
+      'Teachers can only assign themselves when creating a course. ' +
+      'To add co-teachers, please use the course invitation system or contact an administrator.'
+    );
+  }
+  // Admin có full control - can assign any teachers
+
   // Determine final status and publish state
   let finalIsPublished = data.isPublished || false;
   let finalStatus = data.status || CourseStatus.DRAFT;
