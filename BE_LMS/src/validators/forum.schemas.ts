@@ -73,8 +73,8 @@ export const listForumPostsSchema = listParamsSchema.extend({
     content: z.string().optional(),
     pinned: z
         .string()
-        .optional()
-        .transform((val) => val === 'true'),
+        .transform((val) => val === 'true')
+        .optional(),
     replyCount: z.number().optional(),
 });
 
