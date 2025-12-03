@@ -208,17 +208,24 @@ export const listCourses = async ({
 
   // ✅ NEW: Filter by specialist ID (through subject's specialistIds)
   if (specialistId) {
+
+
     // Find all subjects that have this specialist
     const subjectsWithSpecialist = await SubjectModel.find({
       specialistIds: specialistId,
-    }).select('_id');
+    }).select('_id name specialistIds');
+
+
     const subjectIds = subjectsWithSpecialist.map((s) => s._id);
+
 
     if (subjectIds.length > 0) {
       filter.subjectId = { $in: subjectIds };
+
     } else {
       // No subjects found with this specialist, return empty result
       filter.subjectId = null; // This will match no courses
+
     }
   }
 
@@ -277,6 +284,9 @@ export const listCourses = async ({
   const sort: any = {};
   sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
+  // ✅ DEBUG: Log final filter before query
+
+
   // Execute query with pagination
   const [courses, total] = await Promise.all([
     CourseModel.find(filter)
@@ -297,6 +307,7 @@ export const listCourses = async ({
       .lean(),
     CourseModel.countDocuments(filter),
   ]);
+
 
   // Calculate pagination metadata
   const totalPages = Math.ceil(total / limit);
@@ -1257,10 +1268,13 @@ export const getMyCourses = async ({
 
   // Filter by specialist ID (through subject's specialistIds)
   if (specialistId) {
+
+
     // Find all subjects that have this specialist
     const subjectsWithSpecialist = await SubjectModel.find({
       specialistIds: specialistId,
-    }).select('_id');
+    }).select('_id name specialistIds');
+
     const subjectIds = subjectsWithSpecialist.map((s) => s._id);
 
     if (subjectIds.length > 0) {
@@ -1268,6 +1282,7 @@ export const getMyCourses = async ({
     } else {
       // No subjects found with this specialist, return empty result
       filter.subjectId = null; // This will match no courses
+
     }
   }
 
