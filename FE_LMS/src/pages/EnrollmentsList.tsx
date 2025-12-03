@@ -1040,6 +1040,7 @@ const EnrollmentsListPage: React.FC = () => {
                                 <button
                                   onClick={() => openRejectModal(it._id)}
                                   disabled={
+                                    it?.status !== "pending" ||
                                     !canUpdateEnrollment(it) ||
                                     !!updating[it._id]
                                   }
@@ -1050,10 +1051,11 @@ const EnrollmentsListPage: React.FC = () => {
                                 <button
                                   onClick={() => openKickModal(it._id)}
                                   disabled={
+                                    it?.status !== "approved" ||
                                     !canUpdateEnrollment(it) ||
                                     !!updating[it._id]
                                   }
-                                  className="px-3 py-1 rounded-lg text-sm bg-[#9ca3af] text-white disabled:opacity-50"
+                                  className="px-3 py-1 rounded-lg text-sm bg-[#7688a8] text-white disabled:opacity-50"
                                 >
                                   Remove
                                 </button>
