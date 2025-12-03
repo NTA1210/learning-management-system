@@ -91,14 +91,6 @@ export const loginUser = async ({ email, password, userAgent }: LoginParams) => 
   const isValidatePassword = await user.comparePassword(password);
   appAssert(isValidatePassword, UNAUTHORIZED, 'Invalid email or password');
 
-  const existingSession = await SessionModel.findOne({
-    userId: user._id,
-    userAgent,
-    expiresAt: { $gt: Date.now() },
-  });
-
-  appAssert(!existingSession, FORBIDDEN, 'User already logged in');
-
   //create session
   const session = await SessionModel.create({
     userId: user._id,
