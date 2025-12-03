@@ -134,22 +134,21 @@ export default function TakeQuizPage() {
 
   const markAttemptAsBanned = useCallback(
     ({ reason, attempt }: { reason?: string; attempt?: QuizAttempt | null } = {}) => {
-      setBanInfo((prev) => ({
-        attemptId: attempt?._id || prev?.attemptId || quizAttemptId || undefined,
+      const banData = {
+        attemptId: attempt?._id || quizAttemptId || undefined,
         reason:
           reason ||
-          prev?.reason ||
           "You have been banned from this quiz attempt. Please contact your instructor for more details.",
         timestamp:
           attempt?.updatedAt ||
           attempt?.submittedAt ||
           attempt?.startedAt ||
-          prev?.timestamp ||
           new Date().toISOString(),
-      }));
+      };
+      setBanInfo(banData);
       clearPersistedAttempt();
       if (banStorageKey) {
-        sessionStorage.setItem(banStorageKey, "true");
+        localStorage.setItem(banStorageKey, JSON.stringify(banData));
       }
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -223,10 +222,18 @@ export default function TakeQuizPage() {
 
   useEffect(() => {
     if (banInfo) return;
-    if (banStorageKey && sessionStorage.getItem(banStorageKey) === "true") {
-      navigate(courseId ? `/quizz/${courseId}` : "/quizz", { replace: true });
+    if (banStorageKey) {
+      const cached = localStorage.getItem(banStorageKey);
+      if (cached) {
+        try {
+          const banData = JSON.parse(cached);
+          setBanInfo(banData);
+        } catch {
+          localStorage.removeItem(banStorageKey);
+        }
+      }
     }
-  }, [banInfo, banStorageKey, navigate, courseId]);
+  }, [banStorageKey, banInfo]);
 
   useEffect(() => {
     setCurrentQuestionIndex((prev) => {
@@ -812,28 +819,30 @@ export default function TakeQuizPage() {
               className="w-full max-w-2xl text-center p-10 rounded-2xl border shadow-xl space-y-4"
               style={{ backgroundColor: "var(--card-surface)", borderColor: "var(--card-border)" }}
             >
-              <ShieldOff className="w-12 h-12 mx-auto" style={{ color: "#ef4444" }} />
-              <h1 className="text-2xl font-bold" style={{ color: "var(--heading-text)" }}>
-                Quiz attempt banned
+              <ShieldOff className="w-16 h-16 mx-auto" style={{ color: "#ef4444" }} />
+              <h1 className="text-3xl font-bold" style={{ color: "#ef4444" }}>
+                You are banned from this quiz
               </h1>
-              <p style={{ color: "var(--muted-text)" }}>
-                {banInfo.reason || "This attempt has been banned by your instructor."}
+              <p className="text-lg" style={{ color: "var(--page-text)" }}>
+                {banInfo.reason || "You have been banned from taking this quiz. Please contact your instructor for more details."}
               </p>
               {banInfo.attemptId && (
                 <p className="text-sm font-mono" style={{ color: "var(--muted-text)" }}>
                   Attempt ID: {banInfo.attemptId}
                 </p>
               )}
-              <p className="text-xs" style={{ color: "var(--muted-text)" }}>
-                {banInfo.timestamp ? `Updated at ${new Date(banInfo.timestamp).toLocaleString()}` : ""}
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              {banInfo.timestamp && (
+                <p className="text-xs" style={{ color: "var(--muted-text)" }}>
+                  Updated at {new Date(banInfo.timestamp).toLocaleString()}
+                </p>
+              )}
+              <div className="flex flex-col sm:flex-row gap-3 justify-center mt-6">
                 <button
-                  onClick={() => navigate(-1)}
-                  className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white"
-                  style={{ backgroundColor: "#6d28d9" }}
+                  onClick={() => navigate(courseId ? `/quizz/${courseId}` : "/quizz")}
+                  className="px-6 py-3 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90"
+                  style={{ backgroundColor: "#6366f1" }}
                 >
-                  Back to quizzes
+                  Back to Quizzes
                 </button>
               </div>
             </div>
