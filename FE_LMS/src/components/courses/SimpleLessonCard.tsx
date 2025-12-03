@@ -18,19 +18,26 @@ const formatDuration = (minutes: number) => {
   return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
 };
 
-const SimpleLessonCard: React.FC<SimpleLessonCardProps> = ({ lesson, darkMode, onNavigate }) => {
+const SimpleLessonCard: React.FC<SimpleLessonCardProps> = ({
+  lesson,
+  darkMode,
+  onNavigate,
+}) => {
   const { user } = useAuth();
   const [progressPercent, setProgressPercent] = useState<number>(0);
-  const isStudent = user?.role === 'student';
+  const isStudent = user?.role === "student";
 
   useEffect(() => {
     const fetchProgress = async () => {
       if (!lesson.hasAccess || !isStudent) return;
-      
+
       try {
-        const response = await httpClient.get(`/lesson-progress/lessons/${lesson._id}`, {
-          withCredentials: true,
-        });
+        const response = await httpClient.get(
+          `/lesson-progress/lessons/${lesson._id}`,
+          {
+            withCredentials: true,
+          }
+        );
         if (response.data?.success && response.data?.data) {
           const progressData = response.data.data;
           if (progressData.isCompleted) {
@@ -45,7 +52,7 @@ const SimpleLessonCard: React.FC<SimpleLessonCardProps> = ({ lesson, darkMode, o
     };
 
     fetchProgress();
-    
+
     const handleProgressUpdate = (event: CustomEvent) => {
       if (event.detail.lessonId === lesson._id) {
         if (event.detail.isCompleted) {
@@ -55,11 +62,17 @@ const SimpleLessonCard: React.FC<SimpleLessonCardProps> = ({ lesson, darkMode, o
         }
       }
     };
-    
-    window.addEventListener('lessonProgressUpdated', handleProgressUpdate as EventListener);
-    
+
+    window.addEventListener(
+      "lessonProgressUpdated",
+      handleProgressUpdate as EventListener
+    );
+
     return () => {
-      window.removeEventListener('lessonProgressUpdated', handleProgressUpdate as EventListener);
+      window.removeEventListener(
+        "lessonProgressUpdated",
+        handleProgressUpdate as EventListener
+      );
     };
   }, [lesson._id, lesson.hasAccess, isStudent]);
 
@@ -110,8 +123,18 @@ const SimpleLessonCard: React.FC<SimpleLessonCardProps> = ({ lesson, darkMode, o
         </div>
         {lesson.createdAt && (
           <div className="flex items-center">
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            <svg
+              className="w-4 h-4 mr-1"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+              />
             </svg>
             {new Date(lesson.createdAt).toLocaleDateString("en-US", {
               year: "numeric",
@@ -120,7 +143,7 @@ const SimpleLessonCard: React.FC<SimpleLessonCardProps> = ({ lesson, darkMode, o
             })}
           </div>
         )}
-        {lesson.isPublished && (
+        {lesson.isPublished ? (
           <span
             className="px-2 py-1 rounded"
             style={{
@@ -131,6 +154,18 @@ const SimpleLessonCard: React.FC<SimpleLessonCardProps> = ({ lesson, darkMode, o
             }}
           >
             Published
+          </span>
+        ) : (
+          <span
+            className="px-2 py-1 rounded"
+            style={{
+              backgroundColor: darkMode
+                ? "rgba(234, 179, 8, 0.2)"
+                : "rgba(234, 179, 8, 0.1)",
+              color: darkMode ? "#fcd34d" : "#d97706",
+            }}
+          >
+            Unpublished
           </span>
         )}
       </div>
@@ -168,4 +203,3 @@ const SimpleLessonCard: React.FC<SimpleLessonCardProps> = ({ lesson, darkMode, o
 };
 
 export default SimpleLessonCard;
-

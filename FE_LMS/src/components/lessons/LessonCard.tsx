@@ -321,7 +321,7 @@ const LessonCard: React.FC<LessonCardProps> = ({
               </span>
             )}
           </div>
-          {lesson.isPublished && (
+          {lesson.isPublished ? (
             <span
               className="text-xs px-2 py-1 rounded"
               style={{
@@ -333,6 +333,20 @@ const LessonCard: React.FC<LessonCardProps> = ({
             >
               Published
             </span>
+          ) : (
+            canManage && (
+              <span
+                className="text-xs px-2 py-1 rounded"
+                style={{
+                  backgroundColor: darkMode
+                    ? "rgba(234, 179, 8, 0.2)"
+                    : "rgba(234, 179, 8, 0.1)",
+                  color: darkMode ? "#fcd34d" : "#d97706",
+                }}
+              >
+                Unpublished
+              </span>
+            )
           )}
         </div>
       </div>

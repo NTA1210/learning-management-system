@@ -1293,6 +1293,41 @@ const LessonMaterialDetailPage: React.FC = () => {
                   style={{ borderColor: darkMode ? "#6366f1" : "#4f46e5" }}
                 ></div>
               </div>
+            ) : user?.role === "student" && lesson && !lesson.hasAccess ? (
+              <div className="text-center py-12">
+                <div
+                  className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4"
+                  style={{
+                    backgroundColor: darkMode
+                      ? "rgba(239, 68, 68, 0.2)"
+                      : "rgba(239, 68, 68, 0.1)",
+                    color: darkMode ? "#fca5a5" : "#dc2626",
+                  }}
+                >
+                  <svg
+                    className="w-8 h-8"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                    />
+                  </svg>
+                </div>
+                <h3
+                  className="text-lg font-semibold mb-2"
+                  style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
+                >
+                  Access Denied
+                </h3>
+                <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                  You do not have permission to view materials for this lesson.
+                </p>
+              </div>
             ) : materials.length === 0 ? (
               <div className="text-center py-12">
                 <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>

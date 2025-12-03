@@ -255,6 +255,7 @@ const LessonsTab: React.FC<LessonsTabProps> = ({
       const payload: any = {
         courseId: values.courseId,
         title: values.title,
+        isPublished: values.isPublished,
       };
       if (values.content) payload.content = values.content;
       if (values.durationMinutes > 0)
@@ -488,6 +489,7 @@ const LessonsTab: React.FC<LessonsTabProps> = ({
           order: 0,
           durationMinutes: 0,
           publishedAt: "",
+          isPublished: false,
         }}
         onClose={closeModal}
         onSubmit={handleModalSubmit}
