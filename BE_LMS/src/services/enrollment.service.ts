@@ -405,37 +405,20 @@ export const createEnrollment = async (data: {
       // Anti-spam: Chỉ áp dụng cho Student self-enroll
       // Admin/Teacher tạo enrollment sẽ bypass các giới hạn này
       if (method === EnrollmentMethod.SELF) {
-        // 1. Check cooldown period: 30 phút
-        const COOLDOWN_MINUTES = 30;
+        // Check cooldown period: 1 phút
+        const COOLDOWN_MINUTES = 1;
         const lastAttemptAt = existingEnrollment.createdAt ?? existingEnrollment.updatedAt;
-        const nextAllowedTime = new Date(lastAttemptAt);;
+        const nextAllowedTime = new Date(lastAttemptAt);
         nextAllowedTime.setMinutes(nextAllowedTime.getMinutes() + COOLDOWN_MINUTES);
 
         if (new Date() < nextAllowedTime) {
-          const remainingMinutes = Math.ceil((nextAllowedTime.getTime() - Date.now()) / 60000);
+          const remainingSeconds = Math.ceil((nextAllowedTime.getTime() - Date.now()) / 1000);
           appAssert(
             false,
             BAD_REQUEST,
-            `Please wait ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''} before re-enrolling in this course`
+            `Please wait ${remainingSeconds} second${remainingSeconds > 1 ? 's' : ''} before re-enrolling in this course`
           );
         }
-
-        // 2. Check daily limit: 5 lần enrollment trong 24 giờ
-        const DAILY_LIMIT = 5;
-        const last24Hours = new Date();
-        last24Hours.setHours(last24Hours.getHours() - 24);
-
-        const enrollAttemptsCount = await EnrollmentModel.countDocuments({
-          studentId,
-          courseId,
-          createdAt: { $gte: last24Hours },
-        });
-
-        appAssert(
-          enrollAttemptsCount < DAILY_LIMIT,
-          BAD_REQUEST,
-          `Maximum ${DAILY_LIMIT} enrollment attempts per day reached for this course. Please try again later.`
-        );
       }
 
       // Verify password again for re-enrollment if needed
