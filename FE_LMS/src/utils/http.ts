@@ -114,8 +114,13 @@ httpClient.interceptors.response.use(
       _retry?: boolean;
     };
 
+    // Skip token refresh for auth endpoints (login, register, etc.)
+    const isAuthEndpoint = originalRequest?.url?.includes('/auth/login') || 
+                           originalRequest?.url?.includes('/auth/register') ||
+                           originalRequest?.url?.includes('/auth/refresh');
+
     const shouldRenewToken =
-      error.response?.status === 401 && !originalRequest._retry;
+      error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint;
 
     console.log(shouldRenewToken);
 

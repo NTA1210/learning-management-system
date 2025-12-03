@@ -99,7 +99,7 @@ function BlogCard({
         {/* Title */}
         <h2 className="mb-2 text-xl font-bold md:text-2xl">
           <Link
-            to={`/blog/${post.slug}`}
+            to={`/blogs/${post.slug}`}
             className={`transition-colors ${
               darkMode
                 ? "text-slate-50 group-hover:text-indigo-400"
@@ -424,7 +424,7 @@ const BlogPage: React.FC = () => {
                   pageNumber={pageNumber}
                   pageSize={pageSize}
                   total={total}
-                  basePath="/blog"
+                  basePath="/blogs"
                 />
               </>
             )}

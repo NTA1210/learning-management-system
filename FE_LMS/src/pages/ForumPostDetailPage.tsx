@@ -597,253 +597,260 @@ const ForumPostDetailPage: React.FC = () => {
         <Sidebar role={sidebarRole} />
 
         <div className="flex flex-col flex-1 w-0 overflow-hidden">
-          <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 mt-16 sm:pl-24 md:pl-28">
-            <div className="max-w-4xl mx-auto space-y-6 pb-16">
-              <div className="flex flex-wrap items-center gap-3">
+  <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 mt-16 sm:pl-24 md:pl-28">
+    <div className="max-w-4xl mx-auto space-y-6 pb-16">
+      
+      {/* --- HEADER / BREADCRUMB --- */}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 dark:border-slate-700 dark:text-white"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
+
+        <Link
+          to={`/forums/${forumId}`}
+          className="text-22xl font-semibold text-indigo-500 hover:text-indigo-400 dark:text-indigo-400"
+        >
+          Forum overview
+        </Link>
+
+        {forum && (
+          <span className="text-1xl text-slate-600 dark:text-white">
+            View post in {forum.title}
+          </span>
+        )}
+      </div>
+
+      {/* --- LOADING / ERROR --- */}
+      {loading ? (
+        <div className="flex items-center gap-3 text-slate-400 dark:text-white">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          Loading post...
+        </div>
+      ) : error ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-700 dark:text-white">
+          <p className="font-semibold mb-2">Unable to load post</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      ) : post ? (
+        <section
+          className={`rounded-2xl p-6 shadow-sm space-y-5 ${
+            darkMode
+              ? "bg-slate-900/70 border border-slate-700/60 text-white"
+              : "bg-white border border-slate-100"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 space-y-4">
+
+              {/* --- TIME + PIN --- */}
+              <div className="text-xs text-slate-400 dark:text-white flex items-center gap-2">
+                {post.pinned && (
+                  <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">
+                    Pinned
+                  </span>
+                )}
+                <span>{formatDate(post.createdAt)}</span>
+              </div>
+
+              {/* --- EDITING MODE --- */}
+              {isEditingPost ? (
+                <div className="space-y-4">
+                  <input
+                    type="text"
+                    value={editPostTitle}
+                    onChange={(e) => setEditPostTitle(e.target.value)}
+                    className={`w-full text-3xl font-bold bg-transparent border-b-2 focus:outline-none ${
+                      darkMode
+                        ? "border-slate-700 focus:border-indigo-500 text-white"
+                        : "border-slate-200 focus:border-indigo-500 text-slate-900"
+                    }`}
+                    placeholder="Post title"
+                  />
+
+                  <div className="min-h-[200px]">
+                    <MarkdownComposer
+                      value={editPostContent}
+                      onChange={setEditPostContent}
+                      placeholder="Edit your post content..."
+                      darkMode={darkMode}
+                      attachmentAccept={attachmentAcceptTypes}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleUpdatePost}
+                      disabled={postSaving}
+                      className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
+                    >
+                      {postSaving ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4" />
+                      )}
+                      Save Changes
+                    </button>
+
+                    <button
+                      onClick={cancelEditingPost}
+                      disabled={postSaving}
+                      className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 font-semibold hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800 dark:text-white"
+                    >
+                      <X className="w-4 h-4" />
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* --- TITLE --- */}
+                  <h1 className="text-3xl font-bold dark:text-white">
+                    {post.title}
+                  </h1>
+
+                  {/* --- CONTENT (MARKDOWN) --- */}
+                  <div className="prose max-w-none dark:prose-invert dark:text-white">
+                    <MarkdownContent
+                      content={post.content}
+                      onImageClick={handleImagePreview}
+                    />
+                  </div>
+
+                  <AttachmentPreview
+                    files={post.key}
+                    size="md"
+                    onImageClick={handleImagePreview}
+                    caption={post.title}
+                  />
+                </>
+              )}
+
+              {/* --- AUTHOR --- */}
+              {post.author && (
+                <p className="text-xs text-slate-500 dark:text-white">
+                  Posted by {post.author.fullname || post.author.username}
+                </p>
+              )}
+            </div>
+
+            {/* --- EDIT BUTTON --- */}
+            {!isEditingPost && canManagePost && (
+              <div className="flex flex-col gap-2 shrink-0">
+                <button
+                  onClick={startEditingPost}
+                  className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-indigo-600 dark:hover:bg-slate-800 dark:text-white dark:hover:text-indigo-400 transition-colors"
+                >
+                  <Edit3 className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* --- REPLIES SECTION --- */}
+          <div className="pt-4 border-t border-slate-100 space-y-4 dark:border-slate-800 dark:text-white">
+
+            {/* --- ADD REPLY FORM --- */}
+            <form className="space-y-3" onSubmit={handleReplySubmit}>
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-semibold dark:text-white">
+                  Add reply
+                </label>
+
+                {replyTarget?.displayName && (
+                  <button
+                    type="button"
+                    onClick={() => beginReplyTo()}
+                    className="text-xs font-semibold text-indigo-500 hover:text-indigo-400 dark:text-indigo-400"
+                  >
+                    Replying to @{replyTarget.displayName} • Cancel
+                  </button>
+                )}
+              </div>
+
+              {replyTarget?.displayName && (
+                <div
+                  className={`text-xs rounded-xl px-3 py-2 border ${
+                    darkMode
+                      ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-100"
+                      : "border-indigo-200 bg-indigo-50 text-indigo-600"
+                  }`}
+                >
+                  You are replying to{" "}
+                  <span className="font-semibold">
+                    @{replyTarget.displayName}
+                  </span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium mb-2 dark:text-white">
+                  Content editor
+                </label>
+
+                <MarkdownComposer
+                  value={replyContent}
+                  onChange={(next) => {
+                    setReplyContent(next);
+                    setReplyError(null);
+                  }}
+                  placeholder="Share your thoughts..."
+                  darkMode={darkMode}
+                  attachment={replyFile}
+                  onAttachmentChange={(file) => setReplyFile(file)}
+                  attachmentAccept={attachmentAcceptTypes}
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => navigate(-1)}
-                  className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 dark:border-slate-700"
+                  className="rounded-xl border px-5 py-2 text-sm font-semibold border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800 dark:text-white"
                 >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back
+                  Cancel
                 </button>
-                <Link
-                  to={`/forums/${forumId}`}
-                  className="text-22xl font-semibold text-indigo-500 hover:text-indigo-400"
+
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
+                  disabled={replySubmitting}
                 >
-                  Forum overview
-                </Link>
-                {forum && <span className="text-1xl text-slate-600">View post in {forum.title}</span>}
+                  {replySubmitting && (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  )}
+                  Send
+                </button>
+              </div>
+            </form>
+
+            {/* --- REPLIES HEADER --- */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-lg font-semibold dark:text-white">
+                  Replies
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-white">
+                  {replyCount} replies
+                </p>
               </div>
 
-              {loading ? (
-                <div className="flex items-center gap-3 text-slate-400">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Loading post...
-                </div>
-              ) : error ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-700">
-                  <p className="font-semibold mb-2">Unable to load post</p>
-                  <p className="text-sm">{error}</p>
-                </div>
-              ) : post ? (
-                <section
-                  className={`rounded-2xl p-6 shadow-sm space-y-5 ${darkMode ? "bg-slate-900/70 border border-slate-700/60" : "bg-white border border-slate-100"
-                    }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 space-y-4">
-                      <div className="text-xs text-slate-400 flex items-center gap-2">
-                        {post.pinned && (
-                          <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-700 font-semibold">Pinned</span>
-                        )}
-                        <span>{formatDate(post.createdAt)}</span>
-                      </div>
-
-                      {isEditingPost ? (
-                        <div className="space-y-4">
-                          <input
-                            type="text"
-                            value={editPostTitle}
-                            onChange={(e) => setEditPostTitle(e.target.value)}
-                            className={`w-full text-3xl font-bold bg-transparent border-b-2 focus:outline-none ${darkMode ? "border-slate-700 focus:border-indigo-500 text-white" : "border-slate-200 focus:border-indigo-500 text-slate-900"
-                              }`}
-                            placeholder="Post title"
-                          />
-                          <div className="min-h-[200px]">
-                            <MarkdownComposer
-                              value={editPostContent}
-                              onChange={setEditPostContent}
-                              placeholder="Edit your post content..."
-                              darkMode={darkMode}
-                              attachmentAccept={attachmentAcceptTypes}
-                            />
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={handleUpdatePost}
-                              disabled={postSaving}
-                              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
-                            >
-                              {postSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                              Save Changes
-                            </button>
-                            <button
-                              onClick={cancelEditingPost}
-                              disabled={postSaving}
-                              className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 font-semibold hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-                            >
-                              <X className="w-4 h-4" />
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <h1 className="text-3xl font-bold">{post.title}</h1>
-                          <div className="prose max-w-none dark:prose-invert">
-                            <MarkdownContent content={post.content} onImageClick={handleImagePreview} />
-                          </div>
-                          <AttachmentPreview
-                            files={post.key}
-                            size="md"
-                            onImageClick={handleImagePreview}
-                            caption={post.title}
-                          />
-                        </>
-                      )}
-
-                      {post.author && (
-                        <p className="text-xs text-slate-500">
-                          Posted by {post.author.fullname || post.author.username}
-                        </p>
-                      )}
-                    </div>
-
-                    {!isEditingPost && canManagePost && (
-                      <div className="flex flex-col gap-2 shrink-0">
-                        <button
-                          onClick={startEditingPost}
-                          className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-indigo-600 dark:hover:bg-slate-800 dark:hover:text-indigo-400 transition-colors"
-                          title="Edit post"
-                        >
-                          <Edit3 className="w-5 h-5" />
-                        </button>
-                        
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="pt-4 border-t border-slate-100 space-y-4 dark:border-slate-800">
-                    <form className="space-y-3" onSubmit={handleReplySubmit}>
-                      <div className="flex items-center justify-between">
-                        <label className="block text-sm font-semibold">Add reply</label>
-                        {replyTarget?.displayName && (
-                          <button
-                            type="button"
-                            onClick={() => beginReplyTo()}
-                            className="text-xs font-semibold text-indigo-500 hover:text-indigo-400"
-                          >
-                            Replying to @{replyTarget.displayName} • Cancel
-                          </button>
-                        )}
-                      </div>
-                      {replyTarget?.displayName && (
-                        <div
-                          className={`text-xs rounded-xl px-3 py-2 border ${darkMode
-                            ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-100"
-                            : "border-indigo-200 bg-indigo-50 text-indigo-600"
-                            }`}
-                        >
-                          You are replying to <span className="font-semibold">@{replyTarget.displayName}</span>
-                        </div>
-                      )}
-                      <div>
-                        <label className="block text-sm font-medium mb-2">Content editor</label>
-                        <MarkdownComposer
-                          value={replyContent}
-                          onChange={(next) => {
-                            setReplyContent(next);
-                            setReplyError(null);
-                          }}
-                          placeholder="Share your thoughts, code snippets, or resources using Markdown shortcuts."
-                          darkMode={darkMode}
-                          attachment={replyFile}
-                          onAttachmentChange={(file) => setReplyFile(file)}
-                          attachmentAccept={attachmentAcceptTypes}
-                        />
-                      </div>
-                      <div className="flex items-center justify-end gap-3">
-                        <button
-                          type="button"
-                          onClick={() => navigate(-1)}
-                          className="rounded-xl border px-5 py-2 text-sm font-semibold border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
-                          disabled={replySubmitting}
-                        >
-                          {replySubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                          Send
-                        </button>
-                      </div>
-                    </form>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-lg font-semibold">Replies</h4>
-                        <p className="text-xs text-slate-500">{replyCount} replies</p>
-                      </div>
-                      <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-200">
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        {replyCount}
-                      </span>
-                    </div>
-
-                    {repliesLoading ? (
-                      <div className="flex items-center gap-2 text-slate-400">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Loading replies...
-                      </div>
-                    ) : repliesError ? (
-                      <p className="text-sm text-rose-500">{repliesError}</p>
-                    ) : nestedReplies.length > 0 ? (
-                      <div className="space-y-4">
-                        {repliesExpanded ? (
-                          <>
-                            <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
-                              {nestedReplies.slice(0, visibleRepliesCount).map((reply) => renderReplyItem(reply))}
-                            </div>
-                            {nestedReplies.length > visibleRepliesCount && (
-                              <div className="flex justify-center">
-                                <button
-                                  type="button"
-                                  onClick={() => setVisibleRepliesCount(nestedReplies.length)}
-                                  className="text-sm font-semibold text-indigo-600 hover:text-indigo-500"
-                                >
-                                  Show {nestedReplies.length - visibleRepliesCount} more {nestedReplies.length - visibleRepliesCount === 1 ? 'reply' : 'replies'}
-                                </button>
-                              </div>
-                            )}
-                            {visibleRepliesCount > 3 && (
-                              <div className="flex justify-center">
-                                <button
-                                  type="button"
-                                  onClick={() => setVisibleRepliesCount(3)}
-                                  className="text-xs font-semibold text-slate-500 hover:text-indigo-500"
-                                >
-                                  Show less
-                                </button>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <div className="flex justify-center">
-                            <button
-                              type="button"
-                              onClick={() => setRepliesExpanded(true)}
-                              className="text-sm font-semibold text-indigo-600 hover:text-indigo-500"
-                            >
-                              View replies ({replyCount})
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-slate-500">No replies yet. Be the first to respond.</p>
-                    )}
-
-
-                  </div>
-                </section>
-              ) : null}
+              <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-white">
+                <MessageSquare className="w-3.5 h-3.5" />
+                {replyCount}
+              </span>
             </div>
-          </main>
-        </div>
-      </div>
+          </div>
+        </section>
+      ) : null}
+    </div>
+  </main>
+</div>
+</div>
 
       {lightboxImage && (
         <div

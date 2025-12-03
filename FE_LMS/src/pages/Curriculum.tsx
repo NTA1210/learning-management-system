@@ -236,7 +236,7 @@ const Curriculum: React.FC = () => {
         const { specialists } = await specialistService.getAllSpecialists({
           majorId,
           limit: 100,
-          ...(isNameSort ? { sortBy: "title" as const } : {}),
+          ...(isNameSort ? { sortBy: "name" as const } : {}),
           sortOrder: order,
         });
 
@@ -324,7 +324,7 @@ const Curriculum: React.FC = () => {
       const subjectsResponse = await subjectService.getAllSubjects({
         specialistId,
         limit: 100,
-        sortBy: "title",
+        sortBy: "name",
         sortOrder: "asc",
       });
 
@@ -500,7 +500,7 @@ const Curriculum: React.FC = () => {
         ...(searchTerm && { search: searchTerm }),
         page: currentPage,
         limit: pageLimit,
-        ...(isName ? { sortBy: "title" } : {}),
+        ...(isName ? { sortBy: "name" } : {}),
         ...(order ? { sortOrder: order } : {}),
       });
 
@@ -646,10 +646,24 @@ const Curriculum: React.FC = () => {
         title: "Specialist created successfully!",
         showConfirmButton: false,
         timer: 2000,
+        didOpen: () => {
+          const swalContainer = document.querySelector(
+            ".swal2-container"
+          ) as HTMLElement;
+          if (swalContainer) swalContainer.style.zIndex = "99999";
+        },
       });
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Failed to create specialist";
+      let msg = "Failed to create specialist";
+      if (err && typeof err === "object" && "response" in err) {
+        const axiosError = err as {
+          response?: { data?: { message?: string } };
+          message?: string;
+        };
+        msg = axiosError.response?.data?.message || axiosError.message || msg;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
       setError(msg);
       const Swal = (await import("sweetalert2")).default;
       await Swal.fire({
@@ -659,6 +673,12 @@ const Curriculum: React.FC = () => {
         title: msg,
         showConfirmButton: false,
         timer: 2500,
+        didOpen: () => {
+          const swalContainer = document.querySelector(
+            ".swal2-container"
+          ) as HTMLElement;
+          if (swalContainer) swalContainer.style.zIndex = "99999";
+        },
       });
     }
   };
@@ -689,10 +709,24 @@ const Curriculum: React.FC = () => {
         title: "Specialist updated successfully!",
         showConfirmButton: false,
         timer: 2000,
+        didOpen: () => {
+          const swalContainer = document.querySelector(
+            ".swal2-container"
+          ) as HTMLElement;
+          if (swalContainer) swalContainer.style.zIndex = "99999";
+        },
       });
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Failed to update specialist";
+      let msg = "Failed to update specialist";
+      if (err && typeof err === "object" && "response" in err) {
+        const axiosError = err as {
+          response?: { data?: { message?: string } };
+          message?: string;
+        };
+        msg = axiosError.response?.data?.message || axiosError.message || msg;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
       setError(msg);
       const Swal = (await import("sweetalert2")).default;
       await Swal.fire({
@@ -702,6 +736,12 @@ const Curriculum: React.FC = () => {
         title: msg,
         showConfirmButton: false,
         timer: 2500,
+        didOpen: () => {
+          const swalContainer = document.querySelector(
+            ".swal2-container"
+          ) as HTMLElement;
+          if (swalContainer) swalContainer.style.zIndex = "99999";
+        },
       });
     }
   };

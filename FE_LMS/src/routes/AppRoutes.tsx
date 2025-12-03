@@ -39,6 +39,7 @@ import {
   ForumPostDetailPage,
   OnboardingPage,
   DeletedCoursesPage,
+  ApprovedCoursesPage,
   QuizAttemptsPage,
   GradeAttemptPage,
   CreateSemesterPage,
@@ -96,6 +97,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute requiredRole="admin">
               <DeletedCoursesPage />
+            </ProtectedRoute>
+          }
+        />
+         <Route
+          path="/admin/courses/approved"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <ApprovedCoursesPage />
             </ProtectedRoute>
           }
         />

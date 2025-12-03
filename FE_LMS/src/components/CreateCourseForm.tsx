@@ -264,7 +264,7 @@ const CreateCourseForm: React.FC<Props> = ({
   console.log("teachers", teachers);
   console.log("subjects", subjects);
   return (
-    <form onSubmit={submit} className="px-6 py-6">
+    <form onSubmit={submit} className="px-6 py-6 overflow-y-auto flex-1 min-h-0">
       {successMsg && (
         <div className="mb-4 p-3 rounded bg-green-500/10 text-green-600">
           {successMsg}
