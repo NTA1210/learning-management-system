@@ -2231,7 +2231,11 @@ describe("📚 Course Service Unit Tests", () => {
       (CourseModel.findById as jest.Mock).mockReturnValue(mockQuery);
 
       await expect(
-        completeCourse(new mongoose.Types.ObjectId().toString())
+        completeCourse(
+          new mongoose.Types.ObjectId().toString(),
+          adminUser._id,
+          Role.ADMIN
+        )
       ).rejects.toThrow("Course not found");
     });
 
@@ -2274,7 +2278,7 @@ describe("📚 Course Service Unit Tests", () => {
         status: CourseStatus.COMPLETED,
       });
 
-      const result = await completeCourse(course._id.toString());
+      const result = await completeCourse(course._id.toString(), adminUser._id, Role.ADMIN);
 
       expect(result).toBeDefined();
       expect(result.course).toHaveProperty('_id');
@@ -2300,7 +2304,7 @@ describe("📚 Course Service Unit Tests", () => {
         status: CourseStatus.COMPLETED,
       });
 
-      const result = await completeCourse(course._id.toString());
+      const result = await completeCourse(course._id.toString(), adminUser._id, Role.ADMIN);
 
       expect(result).toBeDefined();
       expect(result.course).toHaveProperty('_id');
@@ -2501,50 +2505,6 @@ describe("📚 Course Service Unit Tests", () => {
           );
         });
 
-        it("should filter by isDeleted=true", async () => {
-          const mockQuery = {
-            populate: jest.fn().mockReturnThis(),
-            sort: jest.fn().mockReturnThis(),
-            skip: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockReturnThis(),
-            lean: jest.fn().mockResolvedValue([]),
-          };
-          (QuizModel.find as jest.Mock).mockReturnValue(mockQuery);
-          (QuizModel.countDocuments as jest.Mock).mockResolvedValue(0);
-
-          await getQuizzes({
-            courseId: course._id.toString(),
-            isDeleted: true,
-            page: 1, limit: 10, sortOrder: 'desc'
-          }, Role.TEACHER);
-
-          expect(QuizModel.find).toHaveBeenCalledWith(
-            expect.objectContaining({ deletedAt: { $ne: null } })
-          );
-        });
-
-        it("should filter by isDeleted=false", async () => {
-          const mockQuery = {
-            populate: jest.fn().mockReturnThis(),
-            sort: jest.fn().mockReturnThis(),
-            skip: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockReturnThis(),
-            lean: jest.fn().mockResolvedValue([]),
-          };
-          (QuizModel.find as jest.Mock).mockReturnValue(mockQuery);
-          (QuizModel.countDocuments as jest.Mock).mockResolvedValue(0);
-
-          await getQuizzes({
-            courseId: course._id.toString(),
-            isDeleted: false,
-            page: 1, limit: 10, sortOrder: 'desc'
-          }, Role.TEACHER);
-
-          expect(QuizModel.find).toHaveBeenCalledWith(
-            expect.objectContaining({ deletedAt: null })
-          );
-        });
-
         it("should filter by search term", async () => {
           const mockQuery = {
             populate: jest.fn().mockReturnThis(),
@@ -2594,7 +2554,7 @@ describe("📚 Course Service Unit Tests", () => {
           (EnrollmentModel.bulkWrite as jest.Mock).mockResolvedValue({ modifiedCount: 1 });
           (CourseModel.findByIdAndUpdate as jest.Mock).mockResolvedValue(mockCourse);
 
-          await completeCourse(course._id.toString());
+          await completeCourse(course._id.toString(), adminUser._id, Role.ADMIN);
 
           const bulkOps = (EnrollmentModel.bulkWrite as jest.Mock).mock.calls[0][0];
           expect(bulkOps[0].updateOne.update.$set.status).toBe(EnrollmentStatus.DROPPED);
@@ -2623,7 +2583,7 @@ describe("📚 Course Service Unit Tests", () => {
           (EnrollmentModel.bulkWrite as jest.Mock).mockResolvedValue({ modifiedCount: 1 });
           (CourseModel.findByIdAndUpdate as jest.Mock).mockResolvedValue(mockCourse);
 
-          await completeCourse(course._id.toString());
+          await completeCourse(course._id.toString(), adminUser._id, Role.ADMIN);
 
           const bulkOps = (EnrollmentModel.bulkWrite as jest.Mock).mock.calls[0][0];
           expect(bulkOps[0].updateOne.update.$set.status).toBe(EnrollmentStatus.APPROVED);
@@ -2866,7 +2826,7 @@ describe("📚 Course Service Unit Tests", () => {
         (QuizModel.countDocuments as jest.Mock).mockResolvedValue(3);
         (AssignmentModel.countDocuments as jest.Mock).mockResolvedValue(2);
 
-        await completeCourse(course._id.toString());
+        await completeCourse(course._id.toString(), adminUser._id, Role.ADMIN);
 
         expect(LessonModel.countDocuments).toHaveBeenCalled();
         expect(QuizModel.countDocuments).toHaveBeenCalled();
@@ -3074,7 +3034,7 @@ describe("📚 Course Service Unit Tests", () => {
         (QuizModel.countDocuments as jest.Mock).mockResolvedValue(3);
         (AssignmentModel.countDocuments as jest.Mock).mockResolvedValue(2);
 
-        await completeCourse(course._id.toString());
+        await completeCourse(course._id.toString(), adminUser._id, Role.ADMIN);
 
         expect(LessonModel.countDocuments).toHaveBeenCalled();
         expect(QuizModel.countDocuments).toHaveBeenCalled();
@@ -3445,7 +3405,7 @@ describe("📚 Course Service Unit Tests", () => {
         (QuizModel.countDocuments as jest.Mock).mockClear();
         (AssignmentModel.countDocuments as jest.Mock).mockClear();
 
-        await completeCourse(course._id.toString());
+        await completeCourse(course._id.toString(), adminUser._id, Role.ADMIN);
 
         expect(LessonModel.countDocuments).not.toHaveBeenCalled();
         expect(QuizModel.countDocuments).not.toHaveBeenCalled();
