@@ -1,5 +1,5 @@
-import { BAD_REQUEST, NOT_FOUND } from '@/constants/http';
-import { EnrollmentModel, QuizAttemptModel, QuizModel } from '@/models';
+import { BAD_REQUEST, FORBIDDEN, NOT_FOUND } from '@/constants/http';
+import { EnrollmentModel, QuizAttemptModel, QuizModel, SessionModel } from '@/models';
 import { AttemptStatus, EnrollmentStatus, ICourse, IQuestionAnswer, IQuiz, Role } from '@/types';
 import appAssert from '@/utils/appAssert';
 import {
@@ -34,6 +34,14 @@ export const enrollQuiz = async ({
   // Logic đăng ký làm bài quiz
   const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId');
   appAssert(quiz, NOT_FOUND, 'Quiz not found');
+
+  const existingSession = await SessionModel.findOne({
+    userId,
+    userAgent,
+    expiresAt: { $gt: Date.now() },
+  });
+
+  appAssert(!existingSession, FORBIDDEN, 'User already enrolled in this quiz');
 
   if (role === Role.STUDENT) {
     // Chỉ học sinh của khóa học mới được đăng ký làm bài quiz
