@@ -25,6 +25,7 @@ jest.mock('@/models', () => {
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
         save: jest.fn().mockResolvedValue({}),
       }),
+      findOne: jest.fn().mockResolvedValue({}),
       deleteMany: jest.fn().mockResolvedValue({}),
     },
   };
@@ -168,6 +169,7 @@ describe('Auth Service Unit Tests', () => {
     };
     it('should return user and token', async () => {
       (UserModel.findOne as jest.Mock).mockResolvedValue(user);
+      (SessionModel.findOne as jest.Mock).mockResolvedValue(null);
 
       const res = await loginUser({
         email: user.email,
