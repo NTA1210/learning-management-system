@@ -663,7 +663,7 @@ const CourseManagement: React.FC = () => {
           <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 sm:mt-16 mt-36">
             <div className="max-w-7xl mx-auto">
               {/* Header */}
-              <div className="flex justify-between items-center mb-6 flex-col  sm:flex-row">
+              <div className="flex justify-between items-center mb-6 gap-4 flex-col sm:flex-row">
                 <div>
                   <h1
                     className="text-3xl font-bold mb-2"
@@ -677,11 +677,11 @@ const CourseManagement: React.FC = () => {
                       : "View and manage all courses in the system"}
                   </p>
                 </div>
-                <div className="flex gap-4">
+                <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto">
                   {isAdmin && (
                     <button
                       onClick={() => navigate("/admin/courses/deleted")}
-                      className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105"
+                      className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105 w-full sm:w-auto"
                       style={{
                         backgroundColor: darkMode ? "#111827" : "#DC2627",
                         border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
@@ -693,7 +693,7 @@ const CourseManagement: React.FC = () => {
                     {isAdmin && (
                     <button
                       onClick={() => navigate("/admin/courses/approved")}
-                      className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105"
+                      className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105 w-full sm:w-auto"
                       style={{
                         backgroundColor: darkMode ? "#111827" : "#1eb1cbff",
                         border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
@@ -712,7 +712,7 @@ const CourseManagement: React.FC = () => {
                           setSelectedTeachers([]);
                         }
                       }}
-                      className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105"
+                      className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105 w-full sm:w-auto"
                       style={{
                         backgroundColor: darkMode ? "#059669" : "#10b981",
                       }}
@@ -721,7 +721,7 @@ const CourseManagement: React.FC = () => {
                     </button>
                   )}
                   <button
-                    className="px-4 py-2 rounded-lg text-white flex items-center transition-all duration-200 hover:opacity-90 hover:scale-105"
+                    className="px-4 py-2 rounded-lg text-white flex items-center transition-all duration-200 hover:opacity-90 hover:scale-105 w-full justify-center sm:w-auto"
                     style={{ backgroundColor: darkMode ? "#4c1d95" : "#4f46e5" }}
                     onClick={fetchCourses}
                   >
