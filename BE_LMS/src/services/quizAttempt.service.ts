@@ -35,14 +35,6 @@ export const enrollQuiz = async ({
   const quiz = await QuizModel.findById(quizId).populate<{ courseId: ICourse }>('courseId');
   appAssert(quiz, NOT_FOUND, 'Quiz not found');
 
-  const existingSession = await SessionModel.findOne({
-    userId,
-    userAgent,
-    expiresAt: { $gt: Date.now() },
-  });
-
-  appAssert(!existingSession, FORBIDDEN, 'User already enrolled in this quiz');
-
   if (role === Role.STUDENT) {
     // Chỉ học sinh của khóa học mới được đăng ký làm bài quiz
     const isStudentOfCourse = await EnrollmentModel.findOne({
