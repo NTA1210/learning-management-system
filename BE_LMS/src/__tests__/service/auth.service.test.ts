@@ -74,6 +74,7 @@ import { sendMail } from '@/utils/sendMail';
 describe('Auth Service Unit Tests', () => {
   const mockUser = {
     username: 'user12345',
+    fullname: 'user12345',
     email: 'user12345@gmail.com',
     password: '12345678',
     confirmPassword: '12345678',
@@ -82,6 +83,7 @@ describe('Auth Service Unit Tests', () => {
   const mockUserDoc = {
     email: 'user12345@gmail.com',
     username: 'user12345',
+    fullname: 'user12345',
     role: Role.STUDENT,
     isVerified: false,
     omitPassword: jest.fn().mockReturnValue({
@@ -111,6 +113,7 @@ describe('Auth Service Unit Tests', () => {
 
       await createAccount({
         username: 'teacherUser',
+        fullname: 'Teacher User',
         email: 'teacher@fe.edu.vn',
         password: '123456',
       });
@@ -144,6 +147,7 @@ describe('Auth Service Unit Tests', () => {
       await expect(
         createAccount({
           username: 'anh',
+          fullname: 'anh',
           email: 'test@gmail.com',
           password: '123',
         })

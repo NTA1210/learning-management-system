@@ -39,7 +39,10 @@ export const registerHandler = catchErrors(async (req, res) => {
 
   const { user } = await createAccount(request);
 
-  return res.success(CREATED, user);
+  return res.success(CREATED, {
+    data: user,
+    message: 'Account created successfully, please verify your email',
+  });
 });
 
 export const loginHandler = catchErrors(async (req, res) => {
