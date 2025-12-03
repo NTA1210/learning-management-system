@@ -1,4 +1,6 @@
 import { Server, Socket } from 'socket.io';
+import { ChatRoomModel, MessageModel } from '@/models';
+import mongoose from 'mongoose';
 
 // Store active calls: callId -> Set of participant userIds
 const activeCalls = new Map<string, Set<string>>();
@@ -8,6 +10,72 @@ const userCalls = new Map<string, string>();
 
 // Store chatRoom's active call: chatRoomId -> callId
 const chatRoomCalls = new Map<string, string>();
+
+// Store call's chatRoomId: callId -> chatRoomId
+const callChatRooms = new Map<string, string>();
+
+// Helper function to send video call notification message
+const sendVideoCallNotification = async (
+  io: Server,
+  chatRoomId: string,
+  userId: string,
+  username: string,
+  userRole: string,
+  avatarUrl: string | undefined,
+  content: string
+) => {
+  try {
+    const chatRoom = await ChatRoomModel.findById(chatRoomId);
+    if (!chatRoom) return;
+
+    // Create system message
+    const message = await MessageModel.create({
+      chatRoomId,
+      senderId: userId,
+      content,
+      senderRole: userRole,
+      isNotification: true,
+    });
+
+    // Update chat room last message
+    chatRoom.lastMessage = {
+      id: message.id,
+      senderId: new mongoose.Types.ObjectId(userId),
+      content,
+      isNotification: true,
+      timestamp: new Date(),
+    };
+
+    await chatRoom.save();
+
+    const messageData = {
+      _id: message.id,
+      senderId: {
+        _id: userId,
+        username,
+        role: userRole,
+        avatar_url: avatarUrl,
+      },
+      content,
+      isNotification: true,
+      createdAt: message.createdAt,
+    };
+
+    // Emit to chat room
+    io.to(chatRoomId).emit('chatroom:new-message', {
+      chatRoomId,
+      message: messageData,
+    });
+
+    io.to(chatRoomId).emit('chatroom:update-chatroom', {
+      chatRoomId,
+      lastMessage: chatRoom.lastMessage,
+      unreadCounts: chatRoom.unreadCounts,
+    });
+  } catch (error) {
+    console.error('[VideoCall] Error sending notification:', error);
+  }
+};
 
 export const videoCallStart = async (io: Server, socket: Socket, data: any) => {
   try {
@@ -23,11 +91,23 @@ export const videoCallStart = async (io: Server, socket: Socket, data: any) => {
     activeCalls.set(callId, new Set([userId]));
     userCalls.set(userId, callId);
     chatRoomCalls.set(chatRoomId, callId);
+    callChatRooms.set(callId, chatRoomId);
 
     // Join a dedicated room for this call
     socket.join(callId);
 
     console.log(`[VideoCall] User ${userId} started call ${callId} in chatRoom ${chatRoomId}`);
+
+    // Send notification message to chat room
+    await sendVideoCallNotification(
+      io,
+      chatRoomId,
+      userId,
+      user.username,
+      user.role,
+      user.avatar_url,
+      `📹 ${user.username} started a video call`
+    );
 
     // Notify the caller that call started successfully
     socket.emit('videocall:call-started', {
@@ -79,6 +159,20 @@ export const videoCallJoin = async (io: Server, socket: Socket, data: any) => {
 
     console.log(`[VideoCall] User ${userId} joined call ${callId}`);
 
+    // Send notification message to chat room
+    const actualChatRoomId = chatRoomId || callChatRooms.get(callId);
+    if (actualChatRoomId) {
+      await sendVideoCallNotification(
+        io,
+        actualChatRoomId,
+        userId,
+        user.username,
+        user.role,
+        user.avatar_url,
+        `📞 ${user.username} joined the video call`
+      );
+    }
+
     // Notify new participant about existing participants
     socket.emit('videocall:existing-participants', {
       callId,
@@ -108,7 +202,7 @@ export const videoCallLeave = async (io: Server, socket: Socket, data: any) => {
 
     if (!userId) return;
 
-    handleUserLeaveCall(io, socket, userId, callId);
+    await handleUserLeaveCall(io, socket, userId, callId);
   } catch (error) {
     console.error('[VideoCall] Error in videoCallLeave:', error);
   }
@@ -215,13 +309,29 @@ export const videoCallEnd = async (io: Server, socket: Socket, data: any) => {
   try {
     const { callId } = data;
     const userId = socket.userId?.toString();
+    const user = socket.user;
 
     if (!userId) return;
 
     const call = activeCalls.get(callId);
     if (!call) return;
 
+    const chatRoomId = callChatRooms.get(callId);
+
     console.log(`[VideoCall] User ${userId} ending call ${callId}`);
+
+    // Send notification message to chat room
+    if (chatRoomId && user) {
+      await sendVideoCallNotification(
+        io,
+        chatRoomId,
+        userId,
+        user.username,
+        user.role,
+        user.avatar_url,
+        `📵 ${user.username} ended the video call`
+      );
+    }
 
     // Notify all participants that call has ended
     io.to(callId).emit('videocall:call-ended', {
@@ -238,12 +348,13 @@ export const videoCallEnd = async (io: Server, socket: Socket, data: any) => {
     activeCalls.delete(callId);
     
     // Remove from chatRoom tracking
-    for (const [chatRoomId, cId] of chatRoomCalls.entries()) {
+    for (const [crId, cId] of chatRoomCalls.entries()) {
       if (cId === callId) {
-        chatRoomCalls.delete(chatRoomId);
+        chatRoomCalls.delete(crId);
         break;
       }
     }
+    callChatRooms.delete(callId);
   } catch (error) {
     console.error('[VideoCall] Error in videoCallEnd:', error);
   }
@@ -273,12 +384,15 @@ export const videoCallReject = async (io: Server, socket: Socket, data: any) => 
 };
 
 // Helper function to handle user leaving a call
-const handleUserLeaveCall = (io: Server, socket: Socket, userId: string, callId?: string) => {
+const handleUserLeaveCall = async (io: Server, socket: Socket, userId: string, callId?: string) => {
   const actualCallId = callId || userCalls.get(userId);
   if (!actualCallId) return;
 
   const call = activeCalls.get(actualCallId);
   if (!call) return;
+
+  const user = socket.user;
+  const chatRoomId = callChatRooms.get(actualCallId);
 
   // Remove user from call
   call.delete(userId);
@@ -289,23 +403,50 @@ const handleUserLeaveCall = (io: Server, socket: Socket, userId: string, callId?
 
   console.log(`[VideoCall] User ${userId} left call ${actualCallId}`);
 
+  // Send notification message to chat room
+  if (chatRoomId && user) {
+    await sendVideoCallNotification(
+      io,
+      chatRoomId,
+      userId,
+      user.username,
+      user.role,
+      user.avatar_url,
+      `📴 ${user.username} left the video call`
+    );
+  }
+
   // Notify other participants
   socket.to(actualCallId).emit('videocall:peer-left', {
     callId: actualCallId,
     peerId: userId,
   });
 
-  // If no participants left, clean up the call
+  // If no participants left, clean up the call and send ended notification
   if (call.size === 0) {
     activeCalls.delete(actualCallId);
     
+    // Send call ended notification
+    if (chatRoomId && user) {
+      await sendVideoCallNotification(
+        io,
+        chatRoomId,
+        userId,
+        user.username,
+        user.role,
+        user.avatar_url,
+        `📵 Video call ended`
+      );
+    }
+    
     // Remove from chatRoom tracking
-    for (const [chatRoomId, cId] of chatRoomCalls.entries()) {
+    for (const [crId, cId] of chatRoomCalls.entries()) {
       if (cId === actualCallId) {
-        chatRoomCalls.delete(chatRoomId);
+        chatRoomCalls.delete(crId);
         break;
       }
     }
+    callChatRooms.delete(actualCallId);
     
     console.log(`[VideoCall] Call ${actualCallId} ended - no participants left`);
   }
@@ -345,12 +486,12 @@ export const getActiveCall = async (io: Server, socket: Socket, data: any) => {
 };
 
 // Handle disconnection
-export const handleVideoCallDisconnect = (io: Server, socket: Socket) => {
+export const handleVideoCallDisconnect = async (io: Server, socket: Socket) => {
   const userId = socket.userId?.toString();
   if (!userId) return;
 
   const callId = userCalls.get(userId);
   if (callId) {
-    handleUserLeaveCall(io, socket, userId, callId);
+    await handleUserLeaveCall(io, socket, userId, callId);
   }
 };

@@ -64,9 +64,11 @@ export const createChatroom = async (
   const chatRoom = await ChatRoomModel.create({
     courseId,
     name,
+    createdBy: userId,
     participants: [
       {
         userId,
+        username: user.username,
         role,
         avatarUrl: user.avatar_url,
         joinedAt: new Date(),
@@ -76,8 +78,10 @@ export const createChatroom = async (
       id: new mongoose.Types.ObjectId(),
       senderId: userId,
       content: `${user.username} has created the chat room`,
-      createdAt: new Date(),
+      isNotification: true,
+      timestamp: new Date(),
     },
+    seenBy: [userId],
     unreadCounts: {
       [userId.toString()]: 0,
     },
