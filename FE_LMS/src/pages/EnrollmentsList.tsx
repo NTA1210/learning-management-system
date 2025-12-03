@@ -271,9 +271,28 @@ const EnrollmentsListPage: React.FC = () => {
   const canUpdateEnrollment = (it: any) => {
     if (isAdmin) return true;
     if (isTeacher && user?._id) {
-      const courseId = it?.courseId?._id;
-      const ids = courseId ? courseTeachers[courseId] || [] : [];
-      return ids.includes(user._id);
+      const courseId = it?.courseId?._id || it?.courseId;
+      const cachedTeacherIds = courseId ? courseTeachers[courseId] || [] : [];
+      const inlineTeacherIds = Array.isArray(it?.courseId?.teacherIds)
+        ? (it.courseId.teacherIds as any[])
+            .map((t) => (typeof t === "string" ? t : t?._id))
+            .filter(Boolean)
+        : Array.isArray(it?.courseId?.teachers)
+        ? (it.courseId.teachers as any[])
+            .map((t) => t?._id)
+            .filter(Boolean)
+        : [];
+
+      const isCourseTeacher =
+        cachedTeacherIds.includes(user._id) || inlineTeacherIds.includes(user._id);
+
+      const respondedById =
+        typeof it?.respondedBy === "string"
+          ? it.respondedBy
+          : it?.respondedBy?._id;
+      const isResponsible = respondedById === user._id;
+
+      return isCourseTeacher || isResponsible;
     }
     return false;
   };
@@ -289,6 +308,15 @@ const EnrollmentsListPage: React.FC = () => {
             : it
         )
       );
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "Approve enrollment successfully",
+        showConfirmButton: false,
+        timer: 2000,
+      });
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || "Approve failed";
       const Swal = (await import("sweetalert2")).default;
