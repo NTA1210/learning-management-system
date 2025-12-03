@@ -487,10 +487,10 @@ export const getSubmissionStats = async ({
     const submittedCount = uniqueSubmittedStudents.size;
 
     const onTime = submissions.filter((s: any) => !s.isLate).length;
-    const late = submissions.filter((s: any) => s.isLate).length;
-    const graded = submissions.filter((s) => s.grade !== undefined);
-    const averageGrade = graded.length > 0 ? graded.reduce((sum, s) => sum + (s.grade ?? 0), 0) / graded.length : null;
-    return {
+   const late = submissions.filter((s: any) => s.isLate).length;
+   const graded = submissions.filter((s) => s.grade !== undefined);
+   const averageGrade = graded.length > 0 ? Math.round((graded.reduce((sum, s) => sum + (s.grade ?? 0), 0) / graded.length) *100) / 100 : null;
+   return {
           totalStudents,
           submissionRate: `${totalStudents ? ((submittedCount / totalStudents) * 100).toFixed(2) : 0}%`,
           onTimeRate: `${submissions.length ? ((onTime / submissions.length) * 100).toFixed(2) : 0}%`,
