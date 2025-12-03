@@ -85,5 +85,8 @@ export const isTeacherOfCourse = (course: ICourse, teacherId: mongoose.Types.Obj
   const isTeacherOfCourse = (course.teacherIds || []).some((id: mongoose.Types.ObjectId) =>
     id.equals(teacherId)
   );
+
   appAssert(isTeacherOfCourse, FORBIDDEN, 'You are not a teacher of this course');
+
+  return isTeacherOfCourse;
 };
