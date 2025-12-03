@@ -188,7 +188,7 @@ const StudentScheduleCalendar: React.FC<StudentScheduleCalendarProps> = ({
   ): AttendanceRecord | undefined => {
     return attendanceRecords.find((record) => {
       const recordCourseId =
-        typeof record.courseId === "object" ? record.courseId._id : record.courseId;
+        typeof record.courseId === "object" ? record?.courseId?._id : record?.courseId;
       const recordDate = parseISO(record.date);
       return recordCourseId === courseId && isSameDay(recordDate, date);
     });

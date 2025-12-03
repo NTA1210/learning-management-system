@@ -204,7 +204,8 @@ const MyCoursesPage: React.FC = () => {
                             ))}
                         </select>
                     </div>
-                    <select
+                    <div className="flex items-center gap-2">
+<select
                         value={pageLimit}
                         onChange={(e) => {
                             setCurrentPage(1);
@@ -221,6 +222,8 @@ const MyCoursesPage: React.FC = () => {
                             <option key={n} value={n}>{n}/page</option>
                         ))}
                     </select>
+                    </div>
+                    
                 </div>
 
                 {loading ? (

@@ -31,6 +31,8 @@ const CreateCourseForm: React.FC<Props> = ({
   presetTeacherId,
 }) => {
   const { user } = useAuth();
+  const isTeacher = user?.role === "teacher";
+  const teacherSpecialistIds = Array.isArray((user as any)?.specialistIds) ? (user as any).specialistIds : [];
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [teachers, setTeachers] = useState<User[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -100,7 +102,13 @@ const CreateCourseForm: React.FC<Props> = ({
         teacherIds: Array.from(new Set([presetTeacherId, ...prev.teacherIds])),
       }));
     }
-  }, [presetTeacherId]);
+    if (isTeacher && (user as any)?._id) {
+      setForm((prev) => ({
+        ...prev,
+        teacherIds: [ (user as any)._id ],
+      }));
+    }
+  }, [presetTeacherId, isTeacher, user]);
 
   // Dropdown state for teacher selector (mimic Calendar UI)
   const [showTeacherDropdown, setShowTeacherDropdown] =
@@ -238,7 +246,7 @@ const CreateCourseForm: React.FC<Props> = ({
         startDate: form.startDate,
         endDate: form.endDate,
         semesterId: form.semesterId || undefined,
-        teacherIds: form.teacherIds,
+        teacherIds: isTeacher && (user as any)?._id ? [ (user as any)._id ] : form.teacherIds,
         status: form.status as any,
         isPublished: form.isPublished,
         capacity: form.capacity,
@@ -366,7 +374,21 @@ const CreateCourseForm: React.FC<Props> = ({
             required
           >
             <option value="">Select subject</option>
-            {subjects.map((s) => (
+            {(
+              isTeacher && teacherSpecialistIds.length > 0
+                ? subjects.filter((s: any) => {
+                    const raw = Array.isArray(s?.specialistIds)
+                      ? s.specialistIds
+                      : Array.isArray(s?.specialists)
+                      ? (s.specialists || []).map((x: any) => x?._id).filter(Boolean)
+                      : [s?.specialistId || s?.specialist?._id].filter(Boolean);
+                    const ids = (Array.isArray(raw) ? raw : [])
+                      .map((x: any) => (typeof x === "string" ? x : x?._id))
+                      .filter(Boolean);
+                    return ids.some((id: any) => teacherSpecialistIds.includes(id));
+                  })
+                : subjects
+            ).map((s) => (
               <option key={s._id} value={s._id}>
                 {s.name || s.code}
               </option>
@@ -406,7 +428,7 @@ const CreateCourseForm: React.FC<Props> = ({
           style={{ position: "relative", minWidth: 320 }}
         >
           <div
-            onClick={() => setShowTeacherDropdown(!showTeacherDropdown)}
+            onClick={() => !isTeacher && setShowTeacherDropdown(!showTeacherDropdown)}
             style={{
               display: "flex",
               alignItems: "center",
@@ -612,7 +634,7 @@ const CreateCourseForm: React.FC<Props> = ({
                     return (
                       <div
                         key={t._id}
-                        onClick={() => toggleTeacher(t._id)}
+                        onClick={() => { if (!isTeacher) toggleTeacher(t._id); }}
                         style={{
                           display: "flex",
                           alignItems: "center",
