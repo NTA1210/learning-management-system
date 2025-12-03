@@ -119,6 +119,27 @@ const EnrollmentsListPage: React.FC = () => {
     });
   }, [items, debouncedSearch]);
 
+  const groupedCourses = useMemo(() => {
+    const map = new Map<string, {
+      courseId: string;
+      courseTitle: string;
+      courseDesc?: string;
+      enrollments: any[];
+    }>();
+    filtered.forEach((it: any) => {
+      const courseObj = it?.courseId;
+      const id = courseObj?._id || courseObj;
+      if (!id) return;
+      const title = courseObj?.title || "";
+      const desc = courseObj?.description;
+      if (!map.has(id)) {
+        map.set(id, { courseId: id, courseTitle: title, courseDesc: desc, enrollments: [] });
+      }
+      map.get(id)!.enrollments.push(it);
+    });
+    return Array.from(map.values());
+  }, [filtered]);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -920,142 +941,90 @@ const EnrollmentsListPage: React.FC = () => {
                 : "1px solid #e5e7eb",
             }}
           >
-            <div className="overflow-x-auto">
-              <table className="min-w-full">
-                <thead>
-                  <tr
-                    className="text-left text-sm"
+            <div className="space-y-6">
+              {groupedCourses.length === 0 ? (
+                <div
+                  className="px-4 py-6 text-center"
+                  style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
+                >
+                  Không có dữ liệu
+                </div>
+              ) : (
+                groupedCourses.map((group) => (
+                  <div
+                    key={group.courseId}
+                    className="rounded-lg border shadow"
                     style={{
-                      backgroundColor: darkMode ? "#111827" : "#f9fafb",
+                      backgroundColor: darkMode ? "#0b132b" : "#ffffff",
+                      borderColor: darkMode
+                        ? "rgba(255,255,255,0.08)"
+                        : "#e5e7eb",
                     }}
                   >
-                    <th className="px-4 py-3">Student</th>
-                    <th className="px-4 py-3">Course</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Method</th>
-                    <th className="px-4 py-3">Role</th>
-                    <th className="px-4 py-3">Progress</th>
-                    <th className="px-4 py-3">Created</th>
-                    <th className="px-4 py-3">Updated</th>
-                    <th className="px-4 py-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.length === 0 ? (
-                    <tr>
-                      <td
-                        className="px-4 py-6 text-center"
-                        colSpan={9}
-                        style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
-                      >
-                        Không có dữ liệu
-                      </td>
-                    </tr>
-                  ) : (
-                    filtered.map((it: any) => {
-                      const prog = it?.progress || {
-                        totalLessons: 0,
-                        completedLessons: 0,
-                      };
-                      const percent =
-                        prog.totalLessons > 0
-                          ? Math.round(
-                              (prog.completedLessons / prog.totalLessons) * 100
-                            )
-                          : 0;
-                      return (
-                        <tr
+                    <div
+                      className="px-4 py-3 border-b bg-blue-100"
+                      style={{
+                        borderColor: darkMode
+                          ? "rgba(255,255,255,0.08)"
+                          : "#e5e7eb",
+                      }}
+                    >
+                      <div className="font-semibold">{group.courseTitle}</div>
+                      {group.courseDesc && (
+                        <div
+                          className="text-sm"
+                          style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
+                        >
+                          {group.courseDesc}
+                        </div>
+                      )}
+                    </div>
+                    <div className="max-h-72 overflow-y-auto">
+                      {group.enrollments.map((it: any) => (
+                        <div
                           key={it._id}
-                          className="border-t"
+                          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 py-3 border-t"
                           style={{
                             borderColor: darkMode
                               ? "rgba(255,255,255,0.08)"
                               : "#e5e7eb",
                           }}
                         >
-                          <td className="px-4 py-3">
-                            <div className="font-medium">
-                              {it?.studentId?.fullname ||
-                                it?.studentId?.username}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className="font-medium truncate">
+                                {it?.studentId?.fullname || it?.studentId?.username}
+                              </div>
+                              {it?.role && (
+                                <span
+                                  className="px-2 py-0.5 rounded text-xs font-medium"
+                                  style={{
+                                    backgroundColor: darkMode
+                                      ? "rgba(99,102,241,0.2)"
+                                      : "rgba(99,102,241,0.1)",
+                                    color: darkMode ? "#a5b4fc" : "#4f46e5",
+                                    border: `1px solid ${darkMode ? "rgba(99,102,241,0.35)" : "rgba(99,102,241,0.25)"}`,
+                                  }}
+                                >
+                                  {it.role}
+                                </span>
+                              )}
                             </div>
                             <div
-                              className="text-sm"
-                              style={{
-                                color: darkMode ? "#9ca3af" : "#6b7280",
-                              }}
+                              className="text-sm truncate"
+                              style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
                             >
                               {it?.studentId?.email}
                             </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="font-medium">
-                              {it?.courseId?.title}
-                            </div>
-                            <div
-                              className="text-sm break-words"
-                              style={{
-                                color: darkMode ? "#9ca3af" : "#6b7280",
-                              }}
-                            >
-                              {it?.courseId?.description}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
+                          </div>
+                          <div className="flex items-center gap-3 flex-wrap">
                             <span
-                              className={`px-2 py-1 rounded-full text-xs ${statusColors(
-                                it?.status,
-                                darkMode
-                              )}`}
+                              className={`px-2 py-1 rounded-full text-xs ${statusColors(it?.status, darkMode)}`}
                             >
                               {it?.status}
                             </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm">{it?.method || "-"}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="text-sm">{it?.role || "-"}</span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="text-sm mb-1">
-                              {prog.completedLessons}/{prog.totalLessons}
-                            </div>
-                            <div
-                              className="h-2 rounded-full"
-                              style={{
-                                backgroundColor: darkMode
-                                  ? "#1f2937"
-                                  : "#e5e7eb",
-                              }}
-                            >
-                              <div
-                                className="h-2 rounded-full"
-                                style={{
-                                  width: `${percent}%`,
-                                  backgroundColor: darkMode
-                                    ? "#525fe1"
-                                    : "#525fe1",
-                                }}
-                              />
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="text-sm">
-                              {it?.createdAt
-                                ? new Date(it.createdAt).toLocaleString()
-                                : "-"}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="text-sm">
-                              {it?.updatedAt
-                                ? new Date(it.updatedAt).toLocaleString()
-                                : "-"}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
                             {user?.role === "student" ? null : (
-                              <div className="flex flex-wrap gap-3">
+                              <div className="flex gap-2">
                                 <button
                                   onClick={() => openApproveModal(it._id)}
                                   disabled={
@@ -1089,13 +1058,13 @@ const EnrollmentsListPage: React.FC = () => {
                                 </button>
                               </div>
                             )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3">
