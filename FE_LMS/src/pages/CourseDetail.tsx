@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Info } from "lucide-react";
 
@@ -94,6 +94,19 @@ export default function CourseDetail() {
     Array<{ _id: string; fullname?: string; username: string; email: string }>
   >([]);
   const [userId, setUserId] = useState("");
+  const [showStudentDropdown, setShowStudentDropdown] = useState(false);
+  const [studentSearchQuery, setStudentSearchQuery] = useState("");
+  const studentDropdownRef = useRef<HTMLDivElement | null>(null);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const filteredStudents = useMemo(() => {
+    if (!studentSearchQuery.trim()) return users;
+    const q = studentSearchQuery.toLowerCase();
+    return users.filter((u) => {
+      const name = (u.fullname || u.username || "").toLowerCase();
+      const email = (u.email || "").toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+  }, [users, studentSearchQuery]);
   const [completing, setCompleting] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [statsData, setStatsData] = useState<any>(null);
@@ -962,26 +975,171 @@ export default function CourseDetail() {
             </div>
 
             <div>
-              <label className="text-sm mb-1 block">Email Student</label>
-              <select
-                value={userId}
-                onChange={handleStudentSelect}
-                className="w-full px-3 py-2 rounded-lg"
-                style={{
-                  backgroundColor: isDarkMode ? "#1f2937" : "#ffffff",
-                  color: isDarkMode ? "#ffffff" : "#111827",
-                  border: isDarkMode
-                    ? "1px solid rgba(255,255,255,0.08)"
-                    : "1px solid #e5e7eb",
-                }}
-              >
-                <option value="">Select student</option>
-                {users.map((u) => (
-                  <option key={u._id} value={u._id}>
-                    {u.fullname || u.username} - {u.email}
-                  </option>
-                ))}
-              </select>
+              <label className="text-sm mb-1 block">Invite Students</label>
+              <div ref={studentDropdownRef} style={{ position: "relative" }}>
+                <div
+                  onClick={() => setShowStudentDropdown(!showStudentDropdown)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "8px 12px",
+                    borderRadius: 12,
+                    border: `2px solid ${isDarkMode ? "rgba(75,85,99,0.3)" : "#e5e7eb"}`,
+                    background: isDarkMode ? "#1f2937" : "white",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                    minHeight: 44,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0, color: isDarkMode ? "#e5e7eb" : "#111827" }}>
+                    {selectedStudentIds.length > 0 ? `${selectedStudentIds.length} selected` : "Select students..."}
+                  </div>
+                  <i
+                    className={`bi bi-chevron-${showStudentDropdown ? "up" : "down"}`}
+                    style={{ color: isDarkMode ? "#9ca3af" : "#64748b", marginLeft: "auto" }}
+                  />
+                </div>
+
+                {showStudentDropdown && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "calc(100% + 8px)",
+                      left: 0,
+                      right: 0,
+                      background: isDarkMode ? "#1f2937" : "white",
+                      borderRadius: 12,
+                      border: `1px solid ${isDarkMode ? "#374151" : "#e5e7eb"}`,
+                      boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
+                      zIndex: 1000,
+                      maxHeight: 360,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div style={{ padding: 12, borderBottom: `1px solid ${isDarkMode ? "#374151" : "#e5e7eb"}` }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          padding: "8px 12px",
+                          borderRadius: 8,
+                          background: isDarkMode ? "#374151" : "#f1f5f9",
+                        }}
+                      >
+                        <i className="bi bi-search" style={{ color: isDarkMode ? "#9ca3af" : "#64748b" }} />
+                        <input
+                          type="text"
+                          placeholder="Search students..."
+                          value={studentSearchQuery}
+                          onChange={(e) => setStudentSearchQuery(e.target.value)}
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            outline: "none",
+                            width: "100%",
+                            color: isDarkMode ? "#f1f5f9" : "#1e293b",
+                            fontSize: 14,
+                          }}
+                        />
+                        {studentSearchQuery && (
+                          <i
+                            className="bi bi-x-circle-fill"
+                            style={{ color: isDarkMode ? "#6b7280" : "#9ca3af", cursor: "pointer" }}
+                            onClick={() => setStudentSearchQuery("")}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ maxHeight: 280, overflowY: "auto" }}>
+                      {filteredStudents.length === 0 ? (
+                        <div style={{ padding: 24, textAlign: "center", color: isDarkMode ? "#9ca3af" : "#64748b" }}>
+                          <i className="bi bi-person-x" style={{ fontSize: 24, marginBottom: 8, display: "block" }} />
+                          No students found
+                        </div>
+                      ) : (
+                        filteredStudents.map((u) => {
+                          const selected = selectedStudentIds.includes(u._id);
+                          return (
+                            <div
+                              key={u._id}
+                              onClick={() => {
+                                setSelectedStudentIds((prev) =>
+                                  selected ? prev.filter((id) => id !== u._id) : [...prev, u._id]
+                                );
+                                if (!selected && u.email) addInviteEmail(u.email);
+                              }}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 12,
+                                padding: "10px 12px",
+                                cursor: "pointer",
+                                background: selected
+                                  ? isDarkMode
+                                    ? "rgba(16,185,129,0.12)"
+                                    : "rgba(16,185,129,0.08)"
+                                  : "transparent",
+                                borderLeft: selected ? "3px solid #10b981" : "3px solid transparent",
+                                transition: "all 0.12s",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: "50%",
+                                  background: selected
+                                    ? "linear-gradient(135deg,#10b981,#059669)"
+                                    : isDarkMode
+                                    ? "#374151"
+                                    : "#e2e8f0",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  color: selected ? "white" : isDarkMode ? "#9ca3af" : "#64748b",
+                                  fontWeight: 600,
+                                  fontSize: 14,
+                                }}
+                              >
+                                {(u.fullname || u.username || "U").substring(0, 2).toUpperCase()}
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: 500, fontSize: 13, color: isDarkMode ? "#f1f5f9" : "#1e293b" }}>
+                                  {u.fullname || u.username}
+                                </div>
+                                <div style={{ fontSize: 11, color: isDarkMode ? "#6b7280" : "#94a3b8", marginTop: 2 }}>
+                                  {u.email}
+                                </div>
+                              </div>
+                              {selected && <i className="bi bi-check-circle-fill" style={{ color: "#10b981", fontSize: 16 }} />}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: 12, borderTop: `1px solid ${isDarkMode ? "#374151" : "#e5e7eb"}` }}>
+                      <button
+                        onClick={() => {
+                          selectedStudentIds.forEach((id) => {
+                            const s = users.find((x) => x._id === id);
+                            if (s?.email) addInviteEmail(s.email);
+                          });
+                          setSelectedStudentIds([]);
+                          setShowStudentDropdown(false);
+                        }}
+                        disabled={selectedStudentIds.length === 0}
+                        className="px-3 py-1 rounded-lg text-sm bg-[#525fe1] text-white disabled:opacity-50"
+                      >
+                        Add Selected
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
             {inviteEmails.length > 0 && (
               <div
