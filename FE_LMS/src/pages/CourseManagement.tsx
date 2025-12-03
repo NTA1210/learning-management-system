@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
-import { courseService, enrollmentService, subjectService } from "../services";
+import { authService, courseService, enrollmentService, subjectService, specialistService } from "../services";
 import { userService } from "../services/userService";
 import type { Course } from "../types/course";
 import type { CourseFilters } from "../services/courseService";
@@ -61,8 +61,12 @@ const CourseManagement: React.FC = () => {
       endDate: string;
     }>
   >([]);
+        const localSpec = localStorage.getItem('lms:studentSpecialistIds');// Assuming this key, user mentioned STUDENT_SPECIALIST_KEY
+                      console.log(localSpec);
+  const [specialists, setSpecialists] = useState<Array<{ _id: string; name: string }>>([]);
   const [subjects, setSubjects] = useState<Array<{ _id: string; name: string; specialistIds?: string[] }>>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState(searchParams.get("subjectId") ?? "");
+  const [selectedSpecialistId, setSelectedSpecialistId] = useState(searchParams.get("specialistId") ?? "");
   const [selectedSemesterId, setSelectedSemesterId] = useState(searchParams.get("semesterId") ?? "");
   const [selectedTeacherId, setSelectedTeacherId] = useState(searchParams.get("teacherId") ?? "");
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -104,6 +108,9 @@ const CourseManagement: React.FC = () => {
   function closeModal() {
     setModalAnim("leave");
   }
+  useEffect(() => {
+    authService.getCurrentUser();
+  }, []);
 
   useEffect(() => {
     if (modalAnim === "leave") {
@@ -123,16 +130,18 @@ const CourseManagement: React.FC = () => {
     if (isTeacher && user?._id) {
       setCurrentTeacherId(user._id);
     }
+
   }, [isTeacher, user]);
+  console.log("isTeacher", isTeacher);
   const isStudent = user?.role === "student";
   const canCreate = isAdmin || isTeacher;
   // Check if teacher can edit a specific course
   const canTeacherEditCourse = (course: Course) => {
     if (isAdmin) return true;
     if (isTeacher && currentTeacherId) {
-      const ids = Array.isArray(course.teachers)
+      const ids = Array.isArray(course?.teachers)
         ? course.teachers.map((t) => t._id)
-        : Array.isArray((course as any).teacherIds)
+        : Array.isArray((course as any)?.teacherIds)
         ? (course as any).teacherIds
             .map((t: any) => (typeof t === "string" ? t : t?._id))
             .filter(Boolean)
@@ -241,6 +250,15 @@ const CourseManagement: React.FC = () => {
     })();
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const { specialists } = await specialistService.getAllSpecialists({ limit: 100 });
+        setSpecialists(specialists);
+      } catch {}
+    })();
+  }, []);
+
   // Fetch teachers list from users API (role = teacher)
   const fetchTeachers = async () => {
     try {
@@ -305,6 +323,7 @@ const CourseManagement: React.FC = () => {
       const filters: CourseFilters = {
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
         ...(selectedSubjectId && { subjectId: selectedSubjectId }),
+        ...(selectedSpecialistId && { specialistId: selectedSpecialistId }),
         ...(selectedSemesterId && { semesterId: selectedSemesterId }),
         ...(selectedTeacherId && { teacherId: selectedTeacherId }),
         page: currentPage,
@@ -367,6 +386,7 @@ const CourseManagement: React.FC = () => {
       console.error(e);
       setEnrollments([]);
       setEnrollTotal(0);
+
     } finally {
       setEnrollLoading(false);
     }
@@ -497,19 +517,20 @@ const CourseManagement: React.FC = () => {
   useEffect(() => {
     fetchCourses();
     // eslint-disable-next-line
-  }, [currentPage, pageLimit, sortOption, debouncedSearchTerm, selectedSubjectId, selectedSemesterId, selectedTeacherId, darkMode]);
+  }, [currentPage, pageLimit, sortOption, debouncedSearchTerm, selectedSubjectId, selectedSpecialistId, selectedSemesterId, selectedTeacherId, darkMode]);
 
   useEffect(() => {
     const params: Record<string, string> = {};
     if (debouncedSearchTerm) params.search = debouncedSearchTerm;
     if (sortOption) params.sort = sortOption;
     if (selectedSubjectId) params.subjectId = selectedSubjectId;
+    if (selectedSpecialistId) params.specialistId = selectedSpecialistId;
     if (selectedSemesterId) params.semesterId = selectedSemesterId;
     if (selectedTeacherId) params.teacherId = selectedTeacherId;
     params.page = String(currentPage);
     params.limit = String(pageLimit);
     setSearchParams(params);
-  }, [debouncedSearchTerm, sortOption, selectedSubjectId, selectedSemesterId, selectedTeacherId, currentPage, pageLimit, setSearchParams]);
+  }, [debouncedSearchTerm, sortOption, selectedSubjectId, selectedSpecialistId, selectedSemesterId, selectedTeacherId, currentPage, pageLimit, setSearchParams]);
   console.log("totalPage", totalCourses)
   return (
     <>
@@ -708,6 +729,64 @@ const CourseManagement: React.FC = () => {
                 >
                   <Search size={20} />
                 </button>
+                <div className="relative flex items-center">
+                  <button
+                    onClick={() => {
+                    
+                      if (localSpec) {
+                        if (selectedSpecialistId === localSpec) {
+                           setSelectedSpecialistId("");
+                        } else {
+                           setSelectedSpecialistId(localSpec);
+                        }
+                        setCurrentPage(1);
+                      } else {
+                         showToastInfo("No specialist found in local storage");
+                      }
+                    }}
+                    className={`px-4 py-2 rounded-lg border transition-colors duration-200 shadow-sm font-semibold text-sm ${
+                      selectedSpecialistId && selectedSpecialistId === localStorage.getItem("lms:studentSpecialistIds")
+                        ? "bg-indigo-600 text-white border-indigo-600"
+                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                    }`}
+                    style={
+                      !(selectedSpecialistId && selectedSpecialistId === localStorage.getItem("lms:studentSpecialistIds"))
+                        ? {
+                            background: darkMode ? "#152632" : "#ffffff",
+                            color: darkMode ? "#ffffff" : "#111827",
+                            borderColor: darkMode ? "#334155" : "#e5e7eb",
+                          }
+                        : {}
+                    }
+                  >
+                    My Specialist
+                  </button>
+                </div>
+                <div className="relative">
+                  <select
+                    value={selectedSpecialistId}
+                    onChange={(e) => { setSelectedSpecialistId(e.target.value); setCurrentPage(1); }}
+                    className="appearance-none rounded-lg px-4 py-2 pr-10 border focus:outline-none focus:ring-2 transition-colors duration-200 shadow-sm"
+                    style={{
+                      width: 150,
+                      fontWeight: 600,
+                      background: darkMode ? "#152632" : "#ffffff",
+                      color: darkMode ? "#ffffff" : "#111827",
+                      borderColor: darkMode ? "#334155" : "#e5e7eb",
+                      boxShadow: darkMode ? "0 1px 2px rgba(0,0,0,0.25)" : "0 1px 2px rgba(0,0,0,0.06)",
+                    }}
+                  >
+                    <option value="">All Specialists</option>
+                    {specialists.map((s) => (
+                      <option key={s._id} value={s._id}>{s.name}</option>
+                    ))}
+                  </select>
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }} aria-hidden="true">
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.062l-4.24 4.24a.75.75 0 01-1.06 0L5.25 8.29a.75.75 0 01-.02-1.08z" clipRule="evenodd" />
+                    </svg>
+                  </span>
+                </div>
                 <div className="relative">
                   <select
                     value={selectedSubjectId}
@@ -733,6 +812,7 @@ const CourseManagement: React.FC = () => {
                     </svg>
                   </span>
                 </div>
+
                 <div className="relative">
                   <select
                     value={selectedSemesterId}
