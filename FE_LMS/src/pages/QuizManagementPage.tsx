@@ -60,7 +60,19 @@ export default function QuizManagementPage() {
     if (exporting) return;
     setShowExportModal(false);
     setExportSubjectId("");
+    setExportSubjectSearch(""); // Reset search
   };
+
+  // Search states for Import/Export modals
+  const [importSubjectSearch, setImportSubjectSearch] = useState("");
+  const [debouncedImportSearch, setDebouncedImportSearch] = useState("");
+  const [importSubjectList, setImportSubjectList] = useState<Subject[]>([]);
+  const [isSearchingImport, setIsSearchingImport] = useState(false);
+
+  const [exportSubjectSearch, setExportSubjectSearch] = useState("");
+  const [debouncedExportSearch, setDebouncedExportSearch] = useState("");
+  const [exportSubjectList, setExportSubjectList] = useState<Subject[]>([]);
+  const [isSearchingExport, setIsSearchingExport] = useState(false);
   // Refs for file inputs for each question
   const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
@@ -158,6 +170,8 @@ export default function QuizManagementPage() {
       try {
         const result = await subjectService.getAllSubjects({ limit: 1000 });
         setAllSubjects(result.data || []);
+        setImportSubjectList(result.data || []);
+        setExportSubjectList(result.data || []);
       } catch (error) {
         console.error("Error fetching all subjects:", error);
       }
@@ -172,7 +186,69 @@ export default function QuizManagementPage() {
     return () => clearTimeout(timer);
   }, [subjectSearch]);
 
-  // Filter subjects based on search
+  // Debounce import search (500ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedImportSearch(importSubjectSearch);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [importSubjectSearch]);
+
+  // Server-side search for Import
+  useEffect(() => {
+    const searchSubjects = async () => {
+      setIsSearchingImport(true);
+      try {
+        if (!debouncedImportSearch.trim()) {
+          setImportSubjectList(allSubjects);
+        } else {
+          const result = await subjectService.getAllSubjects({
+            search: debouncedImportSearch,
+            limit: 20
+          });
+          setImportSubjectList(result.data || []);
+        }
+      } catch (error) {
+        console.error("Error searching import subjects:", error);
+      } finally {
+        setIsSearchingImport(false);
+      }
+    };
+    searchSubjects();
+  }, [debouncedImportSearch, allSubjects]);
+
+  // Debounce export search (500ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedExportSearch(exportSubjectSearch);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [exportSubjectSearch]);
+
+  // Server-side search for Export
+  useEffect(() => {
+    const searchSubjects = async () => {
+      setIsSearchingExport(true);
+      try {
+        if (!debouncedExportSearch.trim()) {
+          setExportSubjectList(allSubjects);
+        } else {
+          const result = await subjectService.getAllSubjects({
+            search: debouncedExportSearch,
+            limit: 20
+          });
+          setExportSubjectList(result.data || []);
+        }
+      } catch (error) {
+        console.error("Error searching export subjects:", error);
+      } finally {
+        setIsSearchingExport(false);
+      }
+    };
+    searchSubjects();
+  }, [debouncedExportSearch, allSubjects]);
+
+  // Filter subjects based on search (for Create Question modal)
   const filteredSubjects = allSubjects.filter(subject => {
     if (!subjectSearch.trim()) return true;
     const searchLower = subjectSearch.toLowerCase();
@@ -604,6 +680,7 @@ export default function QuizManagementPage() {
       showNotification("Quiz questions imported successfully", "success");
       setShowImportModal(false);
       setImportSubjectId("");
+      setImportSubjectSearch(""); // Reset search
       setImportFile(null);
 
       // Navigate to quiz page và reload để fetch data mới
@@ -654,6 +731,7 @@ export default function QuizManagementPage() {
       showNotification("Exported quiz successfully", "success");
       setShowExportModal(false);
       setExportSubjectId("");
+      setExportSubjectSearch(""); // Reset search
     } catch (error) {
       console.error("Export quiz failed:", error);
       showNotification("Failed to export quiz", "error");
@@ -1299,20 +1377,38 @@ export default function QuizManagementPage() {
                       <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
                         Subject <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        value={importSubjectId}
-                        onChange={(e) => setImportSubjectId(e.target.value)}
-                        className="w-full px-4 py-2 rounded-lg border"
+                      <input
+                        type="text"
+                        placeholder="Search subject..."
+                        value={importSubjectSearch}
+                        onChange={(e) => setImportSubjectSearch(e.target.value)}
+                        className="w-full px-4 py-2 rounded-lg border mb-2"
                         style={{ backgroundColor: inputBg, borderColor: inputBorder, color: textColor }}
                         disabled={importing}
-                      >
-                        <option value="">Select subject</option>
-                        {subjects.map((subject) => (
-                          <option key={subject._id} value={subject._id}>
-                            {subject.code || subject.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
+                      <div className="max-h-48 overflow-y-auto border rounded-lg" style={{ borderColor: inputBorder }}>
+                        {isSearchingImport ? (
+                          <p className="p-3 text-sm text-center" style={{ color: labelColor }}>Searching...</p>
+                        ) : importSubjectList.length === 0 ? (
+                          <p className="p-3 text-sm text-center" style={{ color: labelColor }}>No subjects found</p>
+                        ) : (
+                          importSubjectList.map((subject) => (
+                            <div
+                              key={subject._id}
+                              onClick={() => !importing && setImportSubjectId(subject._id)}
+                              className={`px-4 py-2 cursor-pointer transition-colors ${importSubjectId === subject._id ? "font-semibold" : ""}`}
+                              style={{
+                                backgroundColor: importSubjectId === subject._id
+                                  ? (darkMode ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.1)")
+                                  : "transparent",
+                                color: textColor
+                              }}
+                            >
+                              {subject.code || subject.name}
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
 
                     <div>
@@ -1393,21 +1489,39 @@ export default function QuizManagementPage() {
                       <label className="block text-sm font-semibold mb-2" style={{ color: labelColor }}>
                         Subject <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        value={exportSubjectId}
-                        onChange={(e) => setExportSubjectId(e.target.value)}
-                        className="w-full px-4 py-2 rounded-lg border"
+                      <input
+                        type="text"
+                        placeholder="Search subject..."
+                        value={exportSubjectSearch}
+                        onChange={(e) => setExportSubjectSearch(e.target.value)}
+                        className="w-full px-4 py-2 rounded-lg border mb-2"
                         style={{ backgroundColor: inputBg, borderColor: inputBorder, color: textColor }}
                         disabled={exporting}
-                      >
-                        <option value="">Select subject</option>
-                        {subjects.map((subject) => (
-                          <option key={subject._id} value={subject._id}>
-                            {subject.code ? `${subject.code} · ` : ""}
-                            {subject.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
+                      <div className="max-h-48 overflow-y-auto border rounded-lg" style={{ borderColor: inputBorder }}>
+                        {isSearchingExport ? (
+                          <p className="p-3 text-sm text-center" style={{ color: labelColor }}>Searching...</p>
+                        ) : exportSubjectList.length === 0 ? (
+                          <p className="p-3 text-sm text-center" style={{ color: labelColor }}>No subjects found</p>
+                        ) : (
+                          exportSubjectList.map((subject) => (
+                            <div
+                              key={subject._id}
+                              onClick={() => !exporting && setExportSubjectId(subject._id)}
+                              className={`px-4 py-2 cursor-pointer transition-colors ${exportSubjectId === subject._id ? "font-semibold" : ""}`}
+                              style={{
+                                backgroundColor: exportSubjectId === subject._id
+                                  ? (darkMode ? "rgba(99,102,241,0.2)" : "rgba(99,102,241,0.1)")
+                                  : "transparent",
+                                color: textColor
+                              }}
+                            >
+                              {subject.code ? `${subject.code} · ` : ""}
+                              {subject.name}
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
                     <p className="text-sm" style={{ color: labelColor }}>
                       Choose a subject to download its questions as an XML file.
