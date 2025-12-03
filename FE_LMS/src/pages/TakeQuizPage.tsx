@@ -330,6 +330,13 @@ export default function TakeQuizPage() {
       }
 
       // If not in cache or cache invalid, get from API
+      // For students, we don't want to call this API (it's for teachers/admins).
+      // Students should rely on the enroll flow or local cache.
+      if (user?.role === "student") {
+        setLoadingCompletedAttempt(false);
+        return;
+      }
+
       const attempts = await quizAttemptService.getAttemptsByQuiz(quizId);
 
       // Find submitted attempt for current user
