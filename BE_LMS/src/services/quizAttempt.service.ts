@@ -46,11 +46,7 @@ export const enrollQuiz = async ({
   }
 
   if (role === Role.TEACHER) {
-    appAssert(
-      isTeacherOfCourse(quiz.courseId, userId),
-      BAD_REQUEST,
-      'You are not a teacher of this course'
-    );
+    isTeacherOfCourse(quiz.courseId, userId);
   }
 
   // Kiem tra mat khau
@@ -456,11 +452,7 @@ export const getQuizAttemptById = async (
   }
 
   if (role === Role.TEACHER) {
-    appAssert(
-      isTeacherOfCourse(quiz.courseId, userId),
-      BAD_REQUEST,
-      'You are not a teacher of this course'
-    );
+    isTeacherOfCourse(quiz.courseId, userId);
   }
 
   return quizAttempt;
@@ -537,11 +529,7 @@ export const updateQuizAttemptScore = async (
   if (role === Role.TEACHER) {
     const course = quizAttemptPopulated.quizId.courseId as unknown as ICourse;
 
-    appAssert(
-      isTeacherOfCourse(course, userId),
-      BAD_REQUEST,
-      'You are not a teacher of this course'
-    );
+    isTeacherOfCourse(course, userId);
   }
 
   quizAttempt.score = score;
