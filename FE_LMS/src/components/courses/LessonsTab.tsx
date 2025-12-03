@@ -5,10 +5,14 @@ import axios from "axios";
 import { httpClient } from "../../utils/http";
 import type { Lesson } from "../../types/lesson";
 import SimpleLessonCard from "./SimpleLessonCard";
+import { useAuth } from "../../hooks/useAuth";
+import LessonFormModal from "../lessons/LessonFormModal";
+import type { LessonFormValues } from "../../types/lesson";
 
 interface LessonsTabProps {
   courseId: string;
   darkMode: boolean;
+  courseTitle?: string;
 }
 
 interface ApiResponse {
@@ -25,8 +29,13 @@ interface ApiResponse {
   };
 }
 
-const LessonsTab: React.FC<LessonsTabProps> = ({ courseId, darkMode }) => {
+const LessonsTab: React.FC<LessonsTabProps> = ({
+  courseId,
+  darkMode,
+  courseTitle,
+}) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -35,11 +44,18 @@ const LessonsTab: React.FC<LessonsTabProps> = ({ courseId, darkMode }) => {
   const [hasNext, setHasNext] = useState(false);
   const [hasPrev, setHasPrev] = useState(false);
   const [currentPageState, setCurrentPageState] = useState(1);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const itemsPerPage = 5;
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fetchingRef = useRef<boolean>(false);
+
+  const [modalState, setModalState] = useState<{ mode: "create" } | null>(null);
+
+  const isAdmin = user?.role === "admin";
+  const isTeacher = user?.role === "teacher";
+  const canCreate = isAdmin || isTeacher;
 
   useEffect(() => {
     // Reset to page 1 when courseId changes
@@ -229,7 +245,61 @@ const LessonsTab: React.FC<LessonsTabProps> = ({ courseId, darkMode }) => {
     if (courseId) {
       fetchLessons();
     }
-  }, [courseId, currentPageState, searchTerm]);
+  }, [courseId, currentPageState, searchTerm, refreshTrigger]);
+
+  const handleCreate = () => setModalState({ mode: "create" });
+  const closeModal = () => setModalState(null);
+
+  const handleModalSubmit = async (values: LessonFormValues) => {
+    try {
+      const payload: any = {
+        courseId: values.courseId,
+        title: values.title,
+      };
+      if (values.content) payload.content = values.content;
+      if (values.durationMinutes > 0)
+        payload.durationMinutes = values.durationMinutes;
+
+      await httpClient.post("/lessons", payload, { withCredentials: true });
+
+      // Show success message
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: "Lesson created successfully",
+        confirmButtonColor: darkMode ? "#4c1d95" : "#4f46e5",
+        background: darkMode ? "#1f2937" : "#ffffff",
+        color: darkMode ? "#ffffff" : "#1e293b",
+      });
+
+      closeModal();
+      // Refresh lessons
+      setCurrentPageState(1);
+      // Trigger a re-fetch by clearing and setting search term or just calling fetchLessons logic if extracted
+      // Since fetchLessons is inside useEffect, we can trigger it by changing a dependency or extracting it.
+      // But here fetchLessons is defined inside useEffect.
+      // A simple way to force refresh is to toggle a dummy state or just rely on the fact that we might want to reload the page or
+      // ideally, we should extract fetchLessons outside.
+      // For now, let's just reload the window or navigate to the same page, but that's not ideal.
+      // Better: Extract fetchLessons or use a refresh trigger.
+      // Let's add a refresh trigger state.
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (err: any) {
+      console.error("Error creating lesson:", err);
+      const message =
+        err.response?.data?.message || err.message || "Failed to create lesson";
+      const Swal = (await import("sweetalert2")).default;
+      await Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: message,
+        confirmButtonColor: darkMode ? "#4c1d95" : "#4f46e5",
+        background: darkMode ? "#1f2937" : "#ffffff",
+        color: darkMode ? "#ffffff" : "#1e293b",
+      });
+    }
+  };
 
   const handleNavigate = (lessonId: string) => {
     navigate(`/materials/${lessonId}`);
@@ -301,6 +371,18 @@ const LessonsTab: React.FC<LessonsTabProps> = ({ courseId, darkMode }) => {
             }}
           />
         </div>
+        {canCreate && (
+          <button
+            onClick={handleCreate}
+            className="px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap"
+            style={{
+              backgroundColor: darkMode ? "#4c1d95" : "#4f46e5",
+              color: "#ffffff",
+            }}
+          >
+            + Create Lesson
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -393,6 +475,23 @@ const LessonsTab: React.FC<LessonsTabProps> = ({ courseId, darkMode }) => {
           </div>
         </>
       )}
+
+      <LessonFormModal
+        darkMode={darkMode}
+        isOpen={Boolean(modalState)}
+        mode="create"
+        courses={[{ _id: courseId, title: courseTitle || "Current Course" }]}
+        initialValues={{
+          courseId: courseId,
+          title: "",
+          content: "",
+          order: 0,
+          durationMinutes: 0,
+          publishedAt: "",
+        }}
+        onClose={closeModal}
+        onSubmit={handleModalSubmit}
+      />
     </div>
   );
 };
