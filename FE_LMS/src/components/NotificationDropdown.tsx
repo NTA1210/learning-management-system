@@ -474,10 +474,11 @@ export default function NotificationDropdown({
       {isOpen && (
         <div
           className={classNames(
-            "absolute right-0 mt-3 w-96 shadow-2xl rounded-2xl border border-slate-200/30 overflow-hidden z-[120] transition-all duration-200 ease-out origin-top-right notification-dropdown-panel",
+            "fixed sm:absolute left-2 right-2 sm:left-auto sm:right-0 mt-3 sm:w-96 shadow-2xl rounded-2xl border border-slate-200/30 overflow-hidden z-[120] transition-all duration-200 ease-out sm:origin-top-right notification-dropdown-panel",
             dropdownTheme,
             "data-[state=open]:scale-100 data-[state=open]:opacity-100"
           )}
+          style={{ top: 'calc(100% + 0.75rem)', maxWidth: 'calc(100vw - 1rem)' }}
           data-state={isOpen ? "open" : "closed"}
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200/30">

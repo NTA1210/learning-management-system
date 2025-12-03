@@ -26,7 +26,7 @@ export const listMajors = async ({
     // Build filter query
     const filter: any = {};
 
-    // Search by title or description (text search)
+    // Search by name or description (text search)
     if (search) {
         filter.$or = [
             {name: {$regex: search, $options: "i"}},

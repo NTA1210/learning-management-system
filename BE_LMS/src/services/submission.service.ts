@@ -174,12 +174,11 @@ export const getSubmissionById = async (
   //nếu teacher
   else if (requesterRole === Role.TEACHER) {
     const assignment = submission.assignmentId as any;
-    const courseRef = assignment?.courseId;
-    appAssert(courseRef, NOT_FOUND, "Course not found for this assignment");
+    const courseId = assignment?.courseId;
+    appAssert(courseId, NOT_FOUND, "Course not found for this assignment");
 
     await ensureTeacherAccessToCourse({
-      course: courseRef,
-      courseId: (courseRef as any)?._id || courseRef,
+      courseId,
       userId: requesterId,
       userRole: requesterRole,
     });
@@ -468,18 +467,33 @@ export const getSubmissionStats = async ({
       status: EnrollmentStatus.APPROVED
     });
 
-    const submissions = await SubmissionModel.find({ assignmentId });
+    //lấy ds studentIds đang enrolled 
+    const enrolledStudents = await EnrollmentModel.find({
+      courseId: assignment.courseId._id,
+      status: EnrollmentStatus.APPROVED
+    }).select('studentId');
+    
+    const enrolledStudentIds = enrolledStudents.map(e => e.studentId.toString());
 
-    const submittedCount = submissions.length;
+    //chỉ lấy submissions từ students vẫn còn enrolled
+    const allSubmissions = await SubmissionModel.find({ assignmentId });
+    const submissions = allSubmissions.filter((s: any) => 
+      enrolledStudentIds.includes(s.studentId.toString())
+    );
+
+    const uniqueSubmittedStudents = new Set(
+      submissions.map((s: any) => s.studentId.toString())
+    );
+    const submittedCount = uniqueSubmittedStudents.size;
 
     const onTime = submissions.filter((s: any) => !s.isLate).length;
-    const late = submissions.filter((s: any) => s.isLate).length;
-    const graded = submissions.filter((s) => s.grade !== undefined);
-    const averageGrade = graded.length > 0 ? graded.reduce((sum, s) => sum + (s.grade ?? 0), 0) / graded.length : null;
-    return {
+   const late = submissions.filter((s: any) => s.isLate).length;
+   const graded = submissions.filter((s) => s.grade !== undefined);
+   const averageGrade = graded.length > 0 ? Math.round((graded.reduce((sum, s) => sum + (s.grade ?? 0), 0) / graded.length) *100) / 100 : null;
+   return {
           totalStudents,
           submissionRate: `${totalStudents ? ((submittedCount / totalStudents) * 100).toFixed(2) : 0}%`,
-          onTimeRate: `${submittedCount ? ((onTime / submittedCount) * 100).toFixed(2) : 0}%`,
+          onTimeRate: `${submissions.length ? ((onTime / submissions.length) * 100).toFixed(2) : 0}%`,
           averageGrade,
         };
 };

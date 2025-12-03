@@ -14,8 +14,6 @@ export type CreateBlogParams = z.infer<typeof createBlogSchema>;
 export const getBlogsSchema = listParamsSchema;
 export type GetBlogsParams = z.infer<typeof getBlogsSchema>;
 
-export const slugSchema = z
-  .string()
-  .min(1, 'Slug is required');
+export const slugSchema = z.string().min(1, 'Slug is required');
 
 export const blogIdSchema = z.string().length(24, 'Invalid blog ID');

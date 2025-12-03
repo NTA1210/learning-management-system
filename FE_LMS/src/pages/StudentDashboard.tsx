@@ -775,11 +775,11 @@ export default function StudentDashboard() {
               
               {/* Carousel Container */}
               <div className="relative">
-                {/* Previous Button */}
+                {/* Previous Button - hidden on mobile */}
                 {courseCarouselIndex > 0 && (
                   <button
                     onClick={handlePrevCourse}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110 hidden sm:block"
                     style={{
                       backgroundColor: darkMode ? '#4f46e5' : '#6366f1',
                       color: '#ffffff'
@@ -791,12 +791,12 @@ export default function StudentDashboard() {
                   </button>
                 )}
 
-                {/* Next Button */}
+                {/* Next Button - hidden on mobile */}
                 {(courseCarouselIndex < enrolledCourses.length - VISIBLE_COURSES || hasMoreCourses) && (
                   <button
                     onClick={handleNextCourse}
                     disabled={coursesLoading}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110 disabled:opacity-50"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110 disabled:opacity-50 hidden sm:block"
                     style={{
                       backgroundColor: darkMode ? '#4f46e5' : '#6366f1',
                       color: '#ffffff'
@@ -815,11 +815,14 @@ export default function StudentDashboard() {
                   </button>
                 )}
 
-                {/* Courses Grid/Carousel */}
-                <div className="overflow-hidden px-2">
+                {/* Courses Grid/Carousel - scrollable on mobile */}
+                <div className="overflow-x-auto sm:overflow-hidden px-2 pb-2 -mx-2 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                   <div 
-                    className="flex transition-all duration-500 ease-out gap-6"
-                    style={{ transform: `translateX(-${courseCarouselIndex * (100 / VISIBLE_COURSES + 2)}%)` }}
+                    className="flex gap-4 sm:gap-6"
+                    style={{ 
+                      transform: `translateX(-${courseCarouselIndex * (100 / VISIBLE_COURSES + 2)}%)`,
+                      transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+                    }}
                   >
                     {loading ? (
                       [1, 2, 3].map((i) => (
@@ -827,7 +830,9 @@ export default function StudentDashboard() {
                           key={i}
                           className="flex-shrink-0 rounded-2xl shadow-lg overflow-hidden"
                           style={{
-                            width: `calc(${100 / VISIBLE_COURSES}% - 16px)`,
+                            width: 'calc(85vw - 32px)',
+                            minWidth: '260px',
+                            maxWidth: '320px',
                             backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
                             border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                           }}
@@ -852,7 +857,9 @@ export default function StudentDashboard() {
                           key={course._id}
                           className="flex-shrink-0 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden cursor-pointer"
                           style={{
-                            width: `calc(${100 / VISIBLE_COURSES}% - 16px)`,
+                            width: 'calc(85vw - 32px)',
+                            minWidth: '260px',
+                            maxWidth: '320px',
                             backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
                             border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                             backdropFilter: 'blur(10px)'
@@ -965,11 +972,11 @@ export default function StudentDashboard() {
 
                 {/* Carousel Container */}
                 <div className="relative">
-                  {/* Previous Button */}
+                  {/* Previous Button - hidden on mobile */}
                   {availableCarouselIndex > 0 && (
                     <button
                       onClick={handlePrevAvailable}
-                      className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110 hidden sm:block"
                       style={{
                         backgroundColor: darkMode ? '#16a34a' : '#22c55e',
                         color: '#ffffff'
@@ -981,12 +988,12 @@ export default function StudentDashboard() {
                     </button>
                   )}
 
-                  {/* Next Button */}
+                  {/* Next Button - hidden on mobile */}
                   {(availableCarouselIndex < availableCourses.length - VISIBLE_COURSES || hasMoreAvailable) && (
                     <button
                       onClick={handleNextAvailable}
                       disabled={availableLoading}
-                      className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110 disabled:opacity-50"
+                      className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 p-2 rounded-full shadow-lg transition-all hover:scale-110 disabled:opacity-50 hidden sm:block"
                       style={{
                         backgroundColor: darkMode ? '#16a34a' : '#22c55e',
                         color: '#ffffff'
@@ -1005,11 +1012,14 @@ export default function StudentDashboard() {
                     </button>
                   )}
 
-                  {/* Courses Carousel */}
-                  <div className="overflow-hidden px-2">
+                  {/* Courses Carousel - scrollable on mobile */}
+                  <div className="overflow-x-auto sm:overflow-hidden px-2 pb-2 -mx-2 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                     <div
-                      className="flex transition-all duration-500 ease-out gap-6"
-                      style={{ transform: `translateX(-${availableCarouselIndex * (100 / VISIBLE_COURSES + 2)}%)` }}
+                      className="flex gap-4 sm:gap-6"
+                      style={{ 
+                        transform: `translateX(-${availableCarouselIndex * (100 / VISIBLE_COURSES + 2)}%)`,
+                        transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)'
+                      }}
                     >
                       {availableLoading && availableCourses.length === 0 ? (
                         [1, 2, 3].map((i) => (
@@ -1017,7 +1027,9 @@ export default function StudentDashboard() {
                             key={i}
                             className="flex-shrink-0 rounded-2xl shadow-lg overflow-hidden"
                             style={{
-                              width: `calc(${100 / VISIBLE_COURSES}% - 16px)`,
+                              width: 'calc(85vw - 32px)',
+                              minWidth: '260px',
+                              maxWidth: '320px',
                               backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
                               border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                             }}
@@ -1042,7 +1054,9 @@ export default function StudentDashboard() {
                             key={course._id}
                             className="flex-shrink-0 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden cursor-pointer"
                             style={{
-                              width: `calc(${100 / VISIBLE_COURSES}% - 16px)`,
+                              width: 'calc(85vw - 32px)',
+                              minWidth: '260px',
+                              maxWidth: '320px',
                               backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
                               border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                               backdropFilter: 'blur(10px)'

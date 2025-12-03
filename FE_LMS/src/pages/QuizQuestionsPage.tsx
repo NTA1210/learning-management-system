@@ -204,12 +204,32 @@ export default function QuizQuestionsPage() {
     });
   };
 
-  const handleSelectNewImages = (event: React.ChangeEvent<HTMLInputElement>) => {
-    // Snapshot editing currently doesn't support uploading NEW images easily via this flow
-    // because quizService.updateQuestionById expects JSON, not FormData.
-    // For now, we can show a warning or just ignore.
-    // Or we could try to support it if backend supported base64, but let's keep it simple.
-    showSwalError("Uploading new images is not supported in Quiz Snapshot mode yet.");
+  const handleSelectNewImages = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!quizId || !editForm) return;
+
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    try {
+      // Convert FileList to File array
+      const fileArray = Array.from(files);
+
+      // Upload images
+      const uploadedImages = await quizService.uploadQuestionImages(quizId, fileArray);
+
+      // Add uploaded images to editForm
+      setEditForm({
+        ...editForm,
+        existingImages: [...(editForm.existingImages || []), ...uploadedImages],
+      });
+
+      // Clear input so user can select same file again if needed
+      if (newImageInputRef.current) {
+        newImageInputRef.current.value = '';
+      }
+    } catch (err: any) {
+      await showSwalError(err?.response?.data?.message || err?.message || "Failed to upload images");
+    }
   };
 
   const handleRemoveNewImage = (index: number) => {

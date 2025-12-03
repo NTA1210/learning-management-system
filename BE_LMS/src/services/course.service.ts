@@ -81,6 +81,7 @@ export type ListCoursesParams = {
   from?: Date; // Date range start for createdAt filtering
   to?: Date; // Date range end for createdAt filtering
   subjectId?: string; // ✅ NEW: Filter by subject instead of specialist
+  specialistId?: string; // ✅ NEW: Filter by specialist/specialization
   semesterId?: string; // ✅ NEW: Filter by semester
   teacherId?: string;
   isPublished?: boolean;
@@ -111,6 +112,7 @@ export const listCourses = async ({
   from,
   to,
   subjectId,
+  specialistId,
   semesterId,
   teacherId,
   isPublished,
@@ -141,9 +143,12 @@ export const listCourses = async ({
     `Invalid sort field. Allowed: ${allowedSortFields.join(', ')}`
   );
 
-  // ❌ FIX: Validate subjectId/teacherId if provided
+  // ❌ FIX: Validate subjectId/specialistId/teacherId if provided
   if (subjectId) {
     appAssert(subjectId.match(/^[0-9a-fA-F]{24}$/), BAD_REQUEST, 'Invalid subject ID format');
+  }
+  if (specialistId) {
+    appAssert(specialistId.match(/^[0-9a-fA-F]{24}$/), BAD_REQUEST, 'Invalid specialist ID format');
   }
   if (teacherId) {
     appAssert(teacherId.match(/^[0-9a-fA-F]{24}$/), BAD_REQUEST, 'Invalid teacher ID format');
@@ -201,6 +206,29 @@ export const listCourses = async ({
     filter.subjectId = subjectId;
   }
 
+  // ✅ NEW: Filter by specialist ID (through subject's specialistIds)
+  if (specialistId) {
+
+
+    // Find all subjects that have this specialist
+    const subjectsWithSpecialist = await SubjectModel.find({
+      specialistIds: specialistId,
+    }).select('_id name specialistIds');
+
+
+    const subjectIds = subjectsWithSpecialist.map((s) => s._id);
+
+
+    if (subjectIds.length > 0) {
+      filter.subjectId = { $in: subjectIds };
+
+    } else {
+      // No subjects found with this specialist, return empty result
+      filter.subjectId = null; // This will match no courses
+
+    }
+  }
+
   // ✅ NEW: Filter by semester ID
   if (semesterId) {
     filter.semesterId = semesterId;
@@ -256,6 +284,9 @@ export const listCourses = async ({
   const sort: any = {};
   sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
+  // ✅ DEBUG: Log final filter before query
+
+
   // Execute query with pagination
   const [courses, total] = await Promise.all([
     CourseModel.find(filter)
@@ -277,6 +308,7 @@ export const listCourses = async ({
     CourseModel.countDocuments(filter),
   ]);
 
+
   // Calculate pagination metadata
   const totalPages = Math.ceil(total / limit);
   const hasNextPage = page < totalPages;
@@ -286,10 +318,10 @@ export const listCourses = async ({
   const coursesWithTeacherFlag = courses.map((course) => {
     const isTeacherOfCourse = userId
       ? course.teacherIds.some(
-          (teacherId: any) =>
-            teacherId._id?.toString() === userId.toString() ||
-            teacherId.toString() === userId.toString()
-        )
+        (teacherId: any) =>
+          teacherId._id?.toString() === userId.toString() ||
+          teacherId.toString() === userId.toString()
+      )
       : false;
 
     return {
@@ -338,10 +370,10 @@ export const getCourseById = async (courseId: string, userId?: Types.ObjectId) =
   // ✅ Add isTeacherOfCourse field
   const isTeacherOfCourse = userId
     ? (course.teacherIds as any[]).some(
-        (teacherId: any) =>
-          teacherId._id?.toString() === userId.toString() ||
-          teacherId.toString() === userId.toString()
-      )
+      (teacherId: any) =>
+        teacherId._id?.toString() === userId.toString() ||
+        teacherId.toString() === userId.toString()
+    )
     : false;
 
   return {
@@ -1183,6 +1215,7 @@ export const getMyCourses = async ({
     search,
     slug,
     subjectId,
+    specialistId,
     semesterId,
     isPublished,
     status,
@@ -1214,7 +1247,7 @@ export const getMyCourses = async ({
     // Admin: See all (no extra filter needed on _id/owner)
   }
 
-  // 2. Common filters (Search, Subject, Semester, Status, Published)
+  // 2. Common filters (Search, Subject, Specialist, Semester, Status, Published)
   if (search) {
     filter.$and = filter.$and || [];
     filter.$and.push({
@@ -1232,6 +1265,27 @@ export const getMyCourses = async ({
   }
 
   if (subjectId) filter.subjectId = subjectId;
+
+  // Filter by specialist ID (through subject's specialistIds)
+  if (specialistId) {
+
+
+    // Find all subjects that have this specialist
+    const subjectsWithSpecialist = await SubjectModel.find({
+      specialistIds: specialistId,
+    }).select('_id name specialistIds');
+
+    const subjectIds = subjectsWithSpecialist.map((s) => s._id);
+
+    if (subjectIds.length > 0) {
+      filter.subjectId = { $in: subjectIds };
+    } else {
+      // No subjects found with this specialist, return empty result
+      filter.subjectId = null; // This will match no courses
+
+    }
+  }
+
   if (semesterId) filter.semesterId = semesterId;
 
   // Allow filtering by status/published for My Courses (even for students/teachers)
@@ -1802,11 +1856,11 @@ export const completeCourse = async (
       enrollmentId: s._id,
       student: s.student
         ? {
-            _id: s.student._id,
-            username: s.student.username,
-            fullname: s.student.fullname,
-            avatar_url: s.student.avatar_url,
-          }
+          _id: s.student._id,
+          username: s.student.username,
+          fullname: s.student.fullname,
+          avatar_url: s.student.avatar_url,
+        }
         : null,
       progress: {
         lessons: {
@@ -1907,32 +1961,32 @@ export const completeCourse = async (
   const totalStudents = studentsOut.length;
   const averageFinalGrade = totalStudents
     ? Math.round((studentsOut.reduce((acc, x) => acc + x.finalGrade, 0) / totalStudents) * 100) /
-      100
+    100
     : 0;
   const droppedCount = studentsOut.filter((s) => s.status === EnrollmentStatus.DROPPED).length;
   const passCount = studentsOut.filter((s) => s.status !== EnrollmentStatus.DROPPED).length;
   const averageAttendance = totalStudents
     ? Math.round(
-        (studentsOut.reduce(
-          (acc, x) => acc + x.progress.attendance.present / (x.progress.attendance.total || 1),
-          0
-        ) /
-          totalStudents) *
-          100
-      )
+      (studentsOut.reduce(
+        (acc, x) => acc + x.progress.attendance.present / (x.progress.attendance.total || 1),
+        0
+      ) /
+        totalStudents) *
+      100
+    )
     : 0;
   const averageQuizScore = totalStudents
     ? Math.round(
-        (studentsOut.reduce((acc, x) => acc + (x.progress.quizzes.score || 0), 0) / totalStudents) *
-          100
-      ) / 100
+      (studentsOut.reduce((acc, x) => acc + (x.progress.quizzes.score || 0), 0) / totalStudents) *
+      100
+    ) / 100
     : 0;
   const averageAssignmentScore = totalStudents
     ? Math.round(
-        (studentsOut.reduce((acc, x) => acc + (x.progress.assignments.score || 0), 0) /
-          totalStudents) *
-          100
-      ) / 100
+      (studentsOut.reduce((acc, x) => acc + (x.progress.assignments.score || 0), 0) /
+        totalStudents) *
+      100
+    ) / 100
     : 0;
 
   const summary = {
@@ -2052,11 +2106,11 @@ export const getCourseStatistics = async (
     enrollmentId: enrollment._id,
     student: enrollment.studentId
       ? {
-          _id: enrollment.studentId._id,
-          username: enrollment.studentId.username,
-          fullname: enrollment.studentId.fullname,
-          avatar_url: enrollment.studentId.avatar_url,
-        }
+        _id: enrollment.studentId._id,
+        username: enrollment.studentId.username,
+        fullname: enrollment.studentId.fullname,
+        avatar_url: enrollment.studentId.avatar_url,
+      }
       : null,
     progress: {
       lessons: {
@@ -2065,8 +2119,8 @@ export const getCourseStatistics = async (
         percent:
           enrollment.progress?.totalLessons > 0
             ? Math.round(
-                (enrollment.progress.completedLessons / enrollment.progress.totalLessons) * 100
-              )
+              (enrollment.progress.completedLessons / enrollment.progress.totalLessons) * 100
+            )
             : 0,
       },
       quizzes: {

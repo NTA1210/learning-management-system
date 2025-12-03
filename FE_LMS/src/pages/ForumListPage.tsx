@@ -8,7 +8,7 @@ import { courseService } from "../services";
 import AttachmentPreview from "../components/AttachmentPreview";
 import { forumService, type ForumResponse, type ForumType } from "../services/forumService";
 import { Edit3, Eye, Loader2, RefreshCcw, Trash2, X, User } from "lucide-react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import MarkdownComposer from "../components/MarkdownComposer";
 import MarkdownContent from "../components/MarkdownContent";
@@ -33,6 +33,7 @@ const ForumListPage: React.FC = () => {
   const { darkMode } = useTheme();
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const locationState = (location.state as ForumListLocationState | null) ?? null;
   const locationCourseId = locationState?.preselectedCourseId ?? "";
@@ -128,26 +129,6 @@ const ForumListPage: React.FC = () => {
     forum: null,
     loading: false,
     error: null,
-  });
-
-  const [createModal, setCreateModal] = useState<{
-    open: boolean;
-    title: string;
-    description: string;
-    forumType: ForumType;
-    isActive: boolean;
-    submitting: boolean;
-    error?: string | null;
-    file: File | null;
-  }>({
-    open: false,
-    title: "",
-    description: "",
-    forumType: "discussion",
-    isActive: true,
-    submitting: false,
-    error: null,
-    file: null,
   });
 
 
@@ -342,37 +323,6 @@ const ForumListPage: React.FC = () => {
       file: null,
     });
 
-  const openCreateModal = () => {
-    if (!canManage) return;
-    if (!selectedCourseId) {
-      toast.error("Select a course before creating a post.");
-      return;
-    }
-    setCreateModal((prev) => ({
-      ...prev,
-      open: true,
-      title: "",
-      description: "",
-      forumType: "discussion",
-      isActive: true,
-      submitting: false,
-      error: null,
-      file: null,
-    }));
-  };
-
-  const closeCreateModal = () =>
-    setCreateModal({
-      open: false,
-      title: "",
-      description: "",
-      forumType: "discussion",
-      isActive: true,
-      submitting: false,
-      error: null,
-      file: null,
-    });
-
   const handleUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editModal.forum) return;
@@ -397,35 +347,18 @@ const ForumListPage: React.FC = () => {
     }
   };
 
-  const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!selectedCourseId) {
-      setCreateModal((prev) => ({ ...prev, error: "Please choose a course first." }));
+  const handleCreateForumFromList = () => {
+    if (!selectedCourseId || !selectedCourse) {
+      toast.error("Please select a course first.");
       return;
     }
-    if (!createModal.title.trim() || !createModal.description.trim()) {
-      setCreateModal((prev) => ({ ...prev, error: "Title and content are both required." }));
-      return;
-    }
-    try {
-      setCreateModal((prev) => ({ ...prev, submitting: true, error: null }));
-      await forumService.createForum(
-        {
-          courseId: selectedCourseId,
-          title: createModal.title.trim(),
-          description: createModal.description.trim(),
-          forumType: createModal.forumType,
-          isActive: createModal.isActive,
-        },
-        createModal.file || undefined
-      );
-      toast.success("Forum post created.");
-      closeCreateModal();
-      refreshForums();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to create forum post";
-      setCreateModal((prev) => ({ ...prev, submitting: false, error: message }));
-    }
+    const courseTitle = selectedCourse.title ?? "Course";
+    navigate("/forum", {
+      state: {
+        preselectedCourseId: selectedCourseId,
+        preselectedCourseTitle: courseTitle,
+      },
+    });
   };
 
   const openDeleteModal = (forum: ForumResponse) => {
@@ -483,7 +416,14 @@ const ForumListPage: React.FC = () => {
 
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
-
+                <button
+                  type="button"
+                  onClick={handleCreateForumFromList}
+                  disabled={!selectedCourseId}
+                  className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
+                >
+                  Create Forum Post
+                </button>
                 <button
                   type="button"
                   onClick={refreshForums}
@@ -768,12 +708,12 @@ const ForumListPage: React.FC = () => {
                                   {forumTitle}
                                 </h4>
                               </Link>
-                              <p className={`text-sm mt-2 line-clamp-3 ${hasBackgroundImage
+                              <div className={`text-sm mt-2 line-clamp-3 ${hasBackgroundImage
                                 ? "text-white/90 drop-shadow"
                                 : "text-slate-500"
                                 }`}>
-                                {forum.description}
-                              </p>
+                                <MarkdownContent content={forum.description} />
+                              </div>
                             </div>
                             <div className="absolute top-0 right-0">
                               <span
@@ -857,147 +797,6 @@ const ForumListPage: React.FC = () => {
         </main>
       </div>
 
-      {createModal.open && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
-          <div
-            className={`max-w-4xl w-full rounded-3xl p-6 md:p-8 relative ${darkMode ? "bg-slate-950 text-slate-100" : "bg-white text-slate-900"
-              }`}
-          >
-            <button className="absolute top-5 right-5" onClick={closeCreateModal}>
-              <X className="w-5 h-5" />
-            </button>
-            <form className="grid gap-6 md:grid-cols-2" onSubmit={handleCreate}>
-              <div className="space-y-5">
-                <div >
-                  <p className="text-2xl uppercase tracking-wide text-indigo-400 font-semibold">Create post</p>
-                  <h3 className="text-2xl font-semibold mt-1">Share resources or questions</h3>
-                  {selectedCourse && (
-                    <p className="text-sm text-slate-500 mt-1">
-                      Posting to <span className="font-medium">{selectedCourse.title}</span>
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Title</label>
-                  <input
-                    type="text"
-                    className={`w-full rounded-2xl border px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
-                      }`}
-                    placeholder="Example: UI design materials"
-                    value={createModal.title}
-                    onChange={(event) => setCreateModal((prev) => ({ ...prev, title: event.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Content editor</label>
-                  <MarkdownComposer
-                    value={createModal.description}
-                    onChange={(next) => setCreateModal((prev) => ({ ...prev, description: next }))}
-                    placeholder="Share context, add bullet lists, or embed resources using Markdown shortcuts."
-                    darkMode={darkMode}
-                    attachment={createModal.file}
-                    onAttachmentChange={(file) => setCreateModal((prev) => ({ ...prev, file }))}
-                    attachmentAccept={attachmentAcceptTypes}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Topic type</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {(["discussion", "announcement"] as ForumType[]).map((type) => {
-                      const isActive = createModal.forumType === type;
-                      return (
-                        <button
-                          key={type}
-                          type="button"
-                          onClick={() => setCreateModal((prev) => ({ ...prev, forumType: type }))}
-                          className={`text-left p-4 rounded-2xl border transition ${isActive
-                            ? "border-indigo-400 bg-indigo-50 dark:bg-indigo-500/20"
-                            : darkMode
-                              ? "border-slate-700 hover:border-slate-500"
-                              : "border-slate-200 hover:border-slate-300"
-                            }`}
-                        >
-                          <p className="font-semibold">{forumTypeLabels[type]}</p>
-                          <p className="text-xs text-slate-500 mt-1">
-                            {type === "discussion"
-                              ? "Perfect for open questions or resource sharing."
-                              : "Use for important, single-source announcements."}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                <label className="flex items-center gap-3 text-sm">
-                  <input
-                    type="checkbox"
-                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                    checked={createModal.isActive}
-                    onChange={(event) => setCreateModal((prev) => ({ ...prev, isActive: event.target.checked }))}
-                  />
-                  Allow everyone in the course to participate (active)
-                </label>
-                {createModal.error && <p className="text-sm text-rose-500">{createModal.error}</p>}
-                <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-                  <button
-                    type="submit"
-                    className="inline-flex items-center justify-center rounded-2xl bg-indigo-600 px-5 py-2.5 text-white font-semibold hover:bg-indigo-500 disabled:opacity-50"
-                    disabled={createModal.submitting}
-                  >
-                    {createModal.submitting && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                    Publish post
-                  </button>
-                  <button
-                    type="button"
-                    onClick={closeCreateModal}
-                    className="rounded-2xl border px-5 py-2.5 font-semibold border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-              <div
-                className={`rounded-2xl border px-4 py-5 h-full ${darkMode ? "bg-slate-900 border-slate-800" : "bg-slate-50 border-slate-200"
-                  }`}
-              >
-                <p className="text-2xl uppercase tracking-wide text-indigo-400 font-semibold mb-2">Live preview</p>
-                <h4 className="text-xl font-semibold mb-3">What learners will see</h4>
-                <div
-                  className={`rounded-2xl border px-4 py-6 min-h-[220px] overflow-auto ${darkMode ? "border-slate-700 bg-slate-800/40" : "border-slate-200 bg-slate-50"
-                    }`}
-                >
-                  {createModal.title && (
-                    <h5 className="text-lg font-semibold mb-3">
-                      {createModal.title}
-                    </h5>
-                  )}
-                  {createModal.description ? (
-                    <div className="prose max-w-none dark:prose-invert">
-                      <MarkdownContent content={createModal.description} onImageClick={() => { }} />
-                    </div>
-                  ) : (
-                    <p className={`text-sm ${darkMode ? "text-slate-400" : "text-slate-500"}`}>
-                      Start typing to preview your Markdown formatting.
-                    </p>
-                  )}
-                  {createModal.file && (
-                    <div className="mt-4">
-                      <AttachmentPreview
-                        files={[URL.createObjectURL(createModal.file)]}
-                        size="sm"
-                        onImageClick={() => { }}
-                        caption={createModal.file.name}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {detailModal.forum && (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4">
           <div
@@ -1011,7 +810,9 @@ const ForumListPage: React.FC = () => {
               {forumTypeLabels[detailModal.forum.forumType]}
             </p>
             <h3 className="text-2xl font-semibold mb-2">{detailModal.forum.title}</h3>
-            <p className="text-sm text-slate-500 mb-4">{detailModal.forum.description}</p>
+            <div className="text-sm text-slate-500 mb-4">
+              <MarkdownContent content={detailModal.forum.description} />
+            </div>
             <AttachmentPreview
               files={detailModal.forum.key}
               size="sm"

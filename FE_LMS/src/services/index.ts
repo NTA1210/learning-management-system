@@ -22,6 +22,7 @@ export * from './assignmentService';
 export * from './submissionService';
 export * from './announcementService';
 export * from './notificationService';
+export { webRTCService } from './webrtcService';
 
 // storage keys
 const USER_STORAGE_KEY = 'lms:user';

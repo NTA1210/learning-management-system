@@ -19,6 +19,7 @@ export interface RegisterRequest {
   password: string;
   username: string;
   confirmPassword: string;
+  fullname: string;
 }
 
 export interface AuthMeta {

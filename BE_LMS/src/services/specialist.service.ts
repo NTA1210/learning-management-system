@@ -61,7 +61,7 @@ export const listSpecialists = async ({
         filter.updatedAt = updatedAt;
     }
 
-    // Search by title or description (text search)
+    // Search by name or description (text search)
     if (search) {
         filter.$or = [
             {name: {$regex: search, $options: "i"}},
@@ -217,8 +217,8 @@ export const deleteSpecialistBySlug = async (slug: string) => {
 
     // Check if any teachers and courses are using this specialist
     const [teachersUsingSpecialist, coursesUsingSpecialist] = await Promise.all([
-        UserModel.countDocuments({role: Role.TEACHER, specialistIds: {$in: specialist.id}}),
-        CourseModel.countDocuments({specialistIds: {$in: specialist.id}}),
+        UserModel.countDocuments({role: Role.TEACHER, specialistIds: {$in: [specialist.id]}}),
+        CourseModel.countDocuments({specialistIds: {$in: [specialist.id]}}),
     ]);
     appAssert(
         teachersUsingSpecialist === 0 && coursesUsingSpecialist === 0,

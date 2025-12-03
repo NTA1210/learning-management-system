@@ -206,6 +206,9 @@ const CourseManagement: React.FC = () => {
           e?.response?.data?.message ||
           "You are already enrolled in this course.";
         await showToastInfo(message);
+      }
+      else if (status === 400) {
+        await showToastInfo(e?.response?.data?.message || "Enroll failed");
       } else {
         console.error(e);
       }
@@ -604,10 +607,10 @@ const CourseManagement: React.FC = () => {
             backgroundColor: darkMode ? "#1f2937" : "#f0f0f0",
           }}
         >
-          <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 mt-16">
+          <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 sm:mt-16 mt-36">
             <div className="max-w-7xl mx-auto">
               {/* Header */}
-              <div className="flex justify-between items-center mb-6">
+              <div className="flex justify-between items-center mb-6 flex-col  sm:flex-row">
                 <div>
                   <h1
                     className="text-3xl font-bold mb-2"

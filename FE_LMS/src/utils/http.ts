@@ -58,8 +58,7 @@ const refreshToken = async (): Promise<void> => {
     console.log("refresh token");
 
     const result = await axios.post<RefreshTokenResponse>(
-      `http://localhost:4004/auth/refresh
-`,
+      `${import.meta.env.VITE_BASE_API}/auth/refresh`,
       {},
       { withCredentials: true }
     );

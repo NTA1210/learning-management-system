@@ -84,7 +84,7 @@ export const listForumsOfACourse = async ({
     title,
     description,
     forumType,
-    isActive = true,
+    isActive,
     isArchived,
     createdBy,
     createdAt,
@@ -98,7 +98,7 @@ export const listForumsOfACourse = async ({
     // Course ID is required
     appAssert(courseId, NOT_FOUND, "Course ID is required");
     filter.courseId = courseId;
-
+    console.log(isActive)
     // Search by title or description (text search)
     if (search) {
         filter.$or = [
@@ -146,8 +146,7 @@ export const listForumsOfACourse = async ({
     const sort: any = {};
     sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
-    console.log("Forum filter:", filter);
-
+    console.log("FOTLERS:", filter);
     // Execute query with pagination
     const [forums, total] = await Promise.all([
         ForumModel.find(filter)
@@ -236,16 +235,45 @@ export const createForum = async (
  *
  * @param forumId - The ID of the forum
  * @param data - Partial forum data to update
+ * @param authorId - ID of the user performing the update
+ * @param role - Role of the user performing the update
  * @param files - Optional files to upload
  * @returns Updated forum
  */
 export const updateForumById = async (
     forumId: string,
     data: Partial<IForum>,
+    authorId: string,
+    role: Role,
     files?: Express.Multer.File | Express.Multer.File[]
 ) => {
     const forum = await ForumModel.findById(forumId);
     appAssert(forum, NOT_FOUND, "Forum not found");
+
+    switch (role) {
+        case Role.ADMIN:
+            // Allow update
+            break;
+        case Role.TEACHER:
+            // Check if the teacher is teaching the course
+            const isTeacherInCourse = await CourseModel.exists({
+                _id: forum.courseId,
+                teacherIds: authorId,
+            });
+            appAssert(isTeacherInCourse, FORBIDDEN, "You don't have permission to update forums not in your course");
+            break;
+        default:
+            // Check if a student is attempting to edit unwanted fields
+            if (data.forumType !== undefined && data.forumType !== forum.forumType) {
+                appAssert(false, FORBIDDEN, "You don't have permission to do this");
+            }
+            // Check if user is the author
+            appAssert(
+                forum.createdBy?.toString() === authorId,
+                FORBIDDEN,
+                "You can only edit your own forums"
+            );
+    }
 
     // Update basic data
     Object.assign(forum, data);
@@ -471,7 +499,8 @@ export const updateForumPostById = async (
     postId: string,
     authorId: string,
     data: Partial<IForumPost>,
-    files?: Express.Multer.File | Express.Multer.File[]
+    role: Role,
+    files?: Express.Multer.File | Express.Multer.File[],
 ) => {
     // Verify forum exists
     const forum = await ForumModel.findById(forumId);
@@ -480,12 +509,30 @@ export const updateForumPostById = async (
     const post = await ForumPostModel.findOne({_id: postId, forumId});
     appAssert(post, NOT_FOUND, "Post not found");
 
-    // Check if user is the author (authorization check - might be done in controller/middleware)
-    appAssert(
-        post.authorId.toString() === authorId,
-        FORBIDDEN,
-        "You can only edit your own posts"
-    );
+    switch (role) {
+        case Role.ADMIN:
+            // Allow update
+            break;
+        case Role.TEACHER:
+            // Check if the teacher is teaching the course
+            const isTeacherInCourse = await CourseModel.exists({
+                _id: forum.courseId,
+                teacherIds: authorId,
+            });
+            appAssert(isTeacherInCourse, FORBIDDEN, "You don't have permission to update posts not in your course");
+            break;
+        default:
+            // Check if a student is attempting to pin their posts
+            if (data.pinned !== undefined && data.pinned !== post.pinned) {
+                appAssert(false, FORBIDDEN, "You don't have permission to pin posts");
+            }
+            // Check if user is the author
+            appAssert(
+                post.authorId.toString() === authorId,
+                FORBIDDEN,
+                "You can only edit your own posts"
+            );
+    }
 
     Object.assign(post, data);
     await post.save();
@@ -712,6 +759,7 @@ export const updateForumReplyById = async (
     replyId: string,
     authorId: string,
     data: Partial<IForumReply>,
+    role: Role,
     files?: Express.Multer.File | Express.Multer.File[]
 ) => {
     // Verify post exists
@@ -724,12 +772,26 @@ export const updateForumReplyById = async (
     const reply = await ForumReplyModel.findOne({_id: replyId, postId});
     appAssert(reply, NOT_FOUND, "Reply not found");
 
-    // Check if user is the author
-    appAssert(
-        reply.authorId.toString() === authorId,
-        FORBIDDEN,
-        "You can only edit your own replies"
-    );
+    switch (role) {
+        case Role.ADMIN:
+            // Allow update
+            break;
+        case Role.TEACHER:
+            // Check if the teacher is teaching the course
+            const isTeacherInCourse = await CourseModel.exists({
+                _id: forum.courseId,
+                teacherIds: authorId,
+            });
+            appAssert(isTeacherInCourse, FORBIDDEN, "You don't have permission to update replies not in your course");
+            break;
+        default:
+            // Check if user is the author
+            appAssert(
+                forum.createdBy?.toString() === authorId,
+                FORBIDDEN,
+                "You can only edit your own replies"
+            );
+    }
 
     Object.assign(reply, data);
     await reply.save();

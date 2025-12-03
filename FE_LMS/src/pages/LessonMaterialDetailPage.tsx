@@ -1406,7 +1406,7 @@ const LessonMaterialDetailPage: React.FC = () => {
         >
           <div
             ref={popupRef} /* ADDED */
-            className="relative rounded-lg overflow-hidden flex flex-col"
+            className="relative rounded-lg overflow-hidden flex flex-col w-full sm:w-auto"
             style={{
               backgroundColor: darkMode ? "#1f2937" : "#ffffff",
               boxShadow:
@@ -1424,7 +1424,7 @@ const LessonMaterialDetailPage: React.FC = () => {
           >
             {/* Modal Header */}
             <div
-              className="flex items-center justify-between p-4 border-b"
+              className="flex items-center justify-between p-3 sm:p-4 border-b"
               style={{
                 borderColor: darkMode
                   ? "rgba(75, 85, 99, 0.3)"
@@ -1435,7 +1435,7 @@ const LessonMaterialDetailPage: React.FC = () => {
                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
               }}
             >
-              <div className="flex-1 min-w-0">
+              <div className="flex-1 min-w-0 mr-2">
                 <h3
                   className="text-xl font-semibold truncate"
                   style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
@@ -1455,7 +1455,7 @@ const LessonMaterialDetailPage: React.FC = () => {
                     </p>
                   )}
               </div>
-              <div className="flex items-center gap-2 ml-4">
+              <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                 <button
                   onClick={() => setViewerMinimized(true)}
                   className="p-2 rounded-lg transition-all duration-200 hover:shadow-lg"
@@ -1518,10 +1518,10 @@ const LessonMaterialDetailPage: React.FC = () => {
               )}
             </div>
 
-            {/* Resize Handle - Horizontal (Right Edge) */}
+            {/* Resize Handle - Horizontal (Right Edge) - hidden on mobile */}
             <div
               onMouseDown={(e) => handleResizeStart(e, "horizontal")}
-              className="absolute top-0 right-0 h-full w-3 cursor-ew-resize flex items-center justify-center"
+              className="absolute top-0 right-0 h-full w-3 cursor-ew-resize items-center justify-center hidden sm:flex"
               style={{
                 backgroundColor: "transparent",
               }}
@@ -1537,10 +1537,10 @@ const LessonMaterialDetailPage: React.FC = () => {
               />
             </div>
 
-            {/* Resize Handle - Vertical (Bottom Edge) */}
+            {/* Resize Handle - Vertical (Bottom Edge) - hidden on mobile */}
             <div
               onMouseDown={(e) => handleResizeStart(e, "vertical")}
-              className="absolute bottom-0 left-0 w-full h-3 cursor-ns-resize flex items-center justify-center"
+              className="absolute bottom-0 left-0 w-full h-3 cursor-ns-resize items-center justify-center hidden sm:flex"
               style={{
                 backgroundColor: "transparent",
               }}

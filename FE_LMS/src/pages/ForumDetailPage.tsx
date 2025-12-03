@@ -113,6 +113,7 @@ const ForumDetailPage: React.FC = () => {
   const [lightboxImage, setLightboxImage] = useState<{ src: string; alt?: string } | null>(null);
   const heroRef = useRef<HTMLElement | null>(null);
   const [showStickyHeader, setShowStickyHeader] = useState(false);
+  const [pinningPostId, setPinningPostId] = useState<string | null>(null);
 
   const fetchForum = useCallback(async () => {
     if (!forumId) return;
@@ -304,6 +305,28 @@ const ForumDetailPage: React.FC = () => {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to delete post";
       setDeleteModal((prev) => ({ ...prev, loading: false, error: message }));
+    }
+  };
+
+  const handleTogglePinPost = async (post: ForumPost) => {
+    if (!canPin || !forumId) return;
+    try {
+      setPinningPostId(post._id);
+      await forumService.updateForumPost(forumId, post._id, {
+        title: post.title,
+        content: post.content,
+        pinned: !post.pinned,
+      });
+      setToast({
+        type: "success",
+        message: post.pinned ? "Post unpinned." : "Post pinned.",
+      });
+      fetchPosts();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to update pinned status";
+      setToast({ type: "error", message });
+    } finally {
+      setPinningPostId(null);
     }
   };
 
@@ -508,12 +531,12 @@ const ForumDetailPage: React.FC = () => {
                                 }`}>
                                 {forum.title}
                               </h1>
-                              <p className={`mt-3 ${hasBackgroundImage
+                              <div className={`mt-3 ${hasBackgroundImage
                                 ? "text-white/90 drop-shadow"
                                 : "text-slate-500 dark:text-slate-300"
                                 }`}>
-                                {forum.description}
-                              </p>
+                                <MarkdownContent content={forum.description} />
+                              </div>
                             </div>
                             <div className="flex items-center gap-3 text-xs font-semibold">
                               <span
@@ -607,15 +630,6 @@ const ForumDetailPage: React.FC = () => {
                     ) : (
                       <div className="space-y-4">
                         {orderedPosts.map((post) => {
-                          // Debug logging
-                          console.log('Post data:', post);
-                          console.log('Post author:', post.author);
-                          console.log('Author exists?', !!post.author);
-                          if (post.author) {
-                            console.log('Author fullname:', post.author.fullname);
-                            console.log('Author username:', post.author.username);
-                          }
-
                           return (
                             <div
                               key={post._id}
@@ -694,6 +708,27 @@ const ForumDetailPage: React.FC = () => {
                                 </div>
                               </Link>
                               <div className="mt-3 flex items-center gap-2 justify-end">
+                                {canPin && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handleTogglePinPost(post);
+                                    }}
+                                    className={`h-9 w-9 rounded-full border flex items-center justify-center transition ${post.pinned
+                                      ? "border-amber-300 text-amber-600 bg-amber-50 hover:bg-amber-100 dark:border-amber-500/50 dark:text-amber-300 dark:bg-amber-500/10 dark:hover:bg-amber-500/20"
+                                      : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                                      }`}
+                                    title={post.pinned ? "Unpin post" : "Pin post"}
+                                    disabled={pinningPostId === post._id}
+                                  >
+                                    {pinningPostId === post._id ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <Pin className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                )}
                                 {canManagePosts && (
                                   <>
                                     <button
@@ -878,15 +913,6 @@ const ForumDetailPage: React.FC = () => {
                   onChange={(event) => setEditModal((prev) => ({ ...prev, content: event.target.value }))}
                 ></textarea>
               </div>
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                  checked={editModal.pinned}
-                  onChange={(event) => setEditModal((prev) => ({ ...prev, pinned: event.target.checked }))}
-                />
-                <span className="text-sm">Pinned</span>
-              </label>
               {editModal.error && <p className="text-sm text-rose-500">{editModal.error}</p>}
               <div className="flex justify-end gap-3">
                 <button

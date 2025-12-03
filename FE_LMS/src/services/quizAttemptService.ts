@@ -191,6 +191,15 @@ export const quizAttemptService = {
   },
 
   /**
+   * Regrade/Recalculate scores for an attempt
+   * PUT /quiz-attempts/:attemptId/re-grade
+   */
+  regradeAttempt: async (attemptId: string): Promise<QuizAttempt> => {
+    const response = await http.put<QuizAttempt>(`/quiz-attempts/${attemptId}/re-grade`, {});
+    return response.data;
+  },
+
+  /**
    * Submit regrade for an attempt
    * POST /quiz-attempts/:attemptId/re-grade
    */

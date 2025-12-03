@@ -2,6 +2,7 @@
 // import { useAuthStore } from '../../stores/authStore';
 
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useChatRoomStore } from "../../../stores/chatRoomStore";
 import type { ChatRoom } from "../../../context/ChatRoomContext";
 import { useTheme } from "../../../hooks/useTheme";
@@ -17,6 +18,7 @@ const ChatRoomItem = ({
   const [user, setUser] = useState(null);
   const { darkMode } = useTheme();
   const { selectedChatRoom, setSelectedChatRoom } = useChatRoomStore();
+  const navigate = useNavigate();
 
   let displayTime = "";
 
@@ -68,6 +70,8 @@ const ChatRoomItem = ({
       onClick={() => {
         if (isSelected) {
           setSelectedChatRoom(null);
+          // Update URL to remove the room ID
+          navigate('/chat-rooms', { replace: true });
         } else {
           setSelectedChatRoom({
             chatRoomId,
@@ -77,6 +81,8 @@ const ChatRoomItem = ({
             lastMessage,
             unreadCounts,
           });
+          // Update URL to reflect the selected room
+          navigate(`/chat-rooms/${chatRoomId}`, { replace: true });
         }
       }}
     >

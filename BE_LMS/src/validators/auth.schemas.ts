@@ -23,6 +23,7 @@ export const loginSchema = z.object({
 export const registerSchema = loginSchema
   .extend({
     username: usernameSchema,
+    fullname: z.string().min(1, 'Full name is required').max(255, 'Full name is too long'),
     confirmPassword: passwordSchema,
   })
   .refine((data) => data.password === data.confirmPassword, {
