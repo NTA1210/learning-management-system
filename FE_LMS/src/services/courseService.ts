@@ -39,6 +39,7 @@ export interface CourseFilters {
   teacherId?: string;
   code?: string;
   subjectId?: string;
+  specialistId?: string;
   semesterId?: string;
   isPublished?: boolean;
   onlyDeleted?: boolean;
@@ -85,6 +86,7 @@ export const courseService = {
     if (filters?.teacherId) params.append("teacherId", filters.teacherId);
     if (filters?.code) params.append("code", filters.code);
     if (filters?.subjectId) params.append("subjectId", filters.subjectId);
+    if (filters?.specialistId) params.append("specialistId", filters.specialistId);
     if (filters?.semesterId) params.append("semesterId", filters.semesterId);
     if (filters?.isPublished !== undefined) params.append("isPublished", String(filters.isPublished));
     if (filters?.onlyDeleted) params.append("onlyDeleted", "true");
