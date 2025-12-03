@@ -1,14 +1,14 @@
 // Course Controller Unit Tests
-import { Request, Response } from "express";
-import mongoose from "mongoose";
-import { Role } from "@/types";
-import { CourseStatus } from "@/types/course.type";
+import { Request, Response } from 'express';
+import mongoose from 'mongoose';
+import { Role } from '@/types';
+import { CourseStatus } from '@/types/course.type';
 
 // Set longer timeout for setup (MongoMemoryServer can be slow)
 jest.setTimeout(60000);
 
 // Mock all services before importing controller
-jest.mock("@/services/course.service", () => ({
+jest.mock('@/services/course.service', () => ({
   listCourses: jest.fn(),
   getCourseById: jest.fn(),
   getCourseBySlug: jest.fn(),
@@ -24,7 +24,7 @@ jest.mock("@/services/course.service", () => ({
 }));
 
 // Mock Zod schemas
-jest.mock("@/validators/course.schemas", () => ({
+jest.mock('@/validators/course.schemas', () => ({
   listCoursesSchema: {
     parse: jest.fn(),
   },
@@ -56,11 +56,11 @@ import {
   getQuizzesHandler,
   completeCourseHandler,
   getCourseStatisticsHandler,
-} from "@/controller/course.controller";
-import * as courseService from "@/services/course.service";
-import * as courseSchemas from "@/validators/course.schemas";
+} from '@/controller/course.controller';
+import * as courseService from '@/services/course.service';
+import * as courseSchemas from '@/validators/course.schemas';
 
-describe("📚 Course Controller Unit Tests", () => {
+describe('📚 Course Controller Unit Tests', () => {
   let mockReq: Partial<Request>;
   let mockRes: any;
   let mockNext: jest.Mock;
@@ -86,11 +86,11 @@ describe("📚 Course Controller Unit Tests", () => {
   // ====================================
   // LIST COURSES TESTS
   // ====================================
-  describe("listCoursesHandler", () => {
-    it("should list courses with pagination", async () => {
+  describe('listCoursesHandler', () => {
+    it('should list courses with pagination', async () => {
       const mockCourses = [
-        { _id: "1", title: "Course 1", status: CourseStatus.DRAFT },
-        { _id: "2", title: "Course 2", status: CourseStatus.ONGOING },
+        { _id: '1', title: 'Course 1', status: CourseStatus.DRAFT },
+        { _id: '2', title: 'Course 2', status: CourseStatus.ONGOING },
       ];
       const mockPagination = { page: 1, limit: 10, total: 2, totalPages: 1 };
 
@@ -126,16 +126,16 @@ describe("📚 Course Controller Unit Tests", () => {
       });
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: mockCourses,
-        message: "Courses retrieved successfully",
+        message: 'Courses retrieved successfully',
         pagination: mockPagination,
       });
     });
 
-    it("should filter courses by search term", async () => {
+    it('should filter courses by search term', async () => {
       (courseSchemas.listCoursesSchema.parse as jest.Mock).mockReturnValue({
         page: 1,
         limit: 10,
-        search: "Programming",
+        search: 'Programming',
       });
       (courseService.listCourses as jest.Mock).mockResolvedValue({
         courses: [],
@@ -145,11 +145,11 @@ describe("📚 Course Controller Unit Tests", () => {
       await listCoursesHandler(mockReq as Request, mockRes as Response, mockNext);
 
       expect(courseService.listCourses).toHaveBeenCalledWith(
-        expect.objectContaining({ search: "Programming" })
+        expect.objectContaining({ search: 'Programming' })
       );
     });
 
-    it("should filter by subject ID", async () => {
+    it('should filter by subject ID', async () => {
       const subjectId = new mongoose.Types.ObjectId().toString();
       (courseSchemas.listCoursesSchema.parse as jest.Mock).mockReturnValue({
         page: 1,
@@ -168,7 +168,7 @@ describe("📚 Course Controller Unit Tests", () => {
       );
     });
 
-    it("should handle includeDeleted parameter for admin", async () => {
+    it('should handle includeDeleted parameter for admin', async () => {
       (courseSchemas.listCoursesSchema.parse as jest.Mock).mockReturnValue({
         page: 1,
         limit: 10,
@@ -186,8 +186,8 @@ describe("📚 Course Controller Unit Tests", () => {
       );
     });
 
-    it("should handle service errors", async () => {
-      const error = new Error("Service error");
+    it('should handle service errors', async () => {
+      const error = new Error('Service error');
       (courseSchemas.listCoursesSchema.parse as jest.Mock).mockReturnValue({
         page: 1,
         limit: 10,
@@ -199,10 +199,10 @@ describe("📚 Course Controller Unit Tests", () => {
       expect(mockNext).toHaveBeenCalledWith(error);
     });
 
-    it("should pass userId to service for isTeacherOfCourse calculation", async () => {
+    it('should pass userId to service for isTeacherOfCourse calculation', async () => {
       const mockCourses = [
-        { _id: "1", title: "Course 1", isTeacherOfCourse: true },
-        { _id: "2", title: "Course 2", isTeacherOfCourse: false },
+        { _id: '1', title: 'Course 1', isTeacherOfCourse: true },
+        { _id: '2', title: 'Course 2', isTeacherOfCourse: false },
       ];
       const mockPagination = { page: 1, limit: 10, total: 2, totalPages: 1 };
 
@@ -231,7 +231,7 @@ describe("📚 Course Controller Unit Tests", () => {
       // Verify response includes courses with isTeacherOfCourse field
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: mockCourses,
-        message: "Courses retrieved successfully",
+        message: 'Courses retrieved successfully',
         pagination: mockPagination,
       });
     });
@@ -240,10 +240,10 @@ describe("📚 Course Controller Unit Tests", () => {
   // ====================================
   // GET COURSE BY ID TESTS
   // ====================================
-  describe("getCourseByIdHandler", () => {
-    it("should get course by ID successfully", async () => {
+  describe('getCourseByIdHandler', () => {
+    it('should get course by ID successfully', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
-      const mockCourse = { _id: courseId, title: "Test Course" };
+      const mockCourse = { _id: courseId, title: 'Test Course' };
 
       mockReq.params = { id: courseId };
       (courseSchemas.courseIdSchema.parse as jest.Mock).mockReturnValue(courseId);
@@ -254,13 +254,13 @@ describe("📚 Course Controller Unit Tests", () => {
       expect(courseService.getCourseById).toHaveBeenCalledWith(courseId, mockReq.userId);
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: mockCourse,
-        message: "Course retrieved successfully",
+        message: 'Course retrieved successfully',
       });
     });
 
-    it("should handle invalid course ID", async () => {
-      mockReq.params = { id: "invalid" };
-      const error = new Error("Invalid course ID format");
+    it('should handle invalid course ID', async () => {
+      mockReq.params = { id: 'invalid' };
+      const error = new Error('Invalid course ID format');
       (courseSchemas.courseIdSchema.parse as jest.Mock).mockImplementation(() => {
         throw error;
       });
@@ -270,10 +270,10 @@ describe("📚 Course Controller Unit Tests", () => {
       expect(mockNext).toHaveBeenCalledWith(error);
     });
 
-    it("should handle course not found", async () => {
+    it('should handle course not found', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       mockReq.params = { id: courseId };
-      const error = new Error("Course not found");
+      const error = new Error('Course not found');
       (courseSchemas.courseIdSchema.parse as jest.Mock).mockReturnValue(courseId);
       (courseService.getCourseById as jest.Mock).mockRejectedValue(error);
 
@@ -286,20 +286,23 @@ describe("📚 Course Controller Unit Tests", () => {
   // ====================================
   // CREATE COURSE TESTS
   // ====================================
-  describe("createCourseHandler", () => {
-    it("should create course successfully", async () => {
+  describe('createCourseHandler', () => {
+    it('should create course successfully', async () => {
       const courseData = {
-        title: "New Course",
+        title: 'New Course',
         subjectId: new mongoose.Types.ObjectId().toString(),
         teacherIds: [new mongoose.Types.ObjectId().toString()],
-        startDate: new Date("2025-01-01"),
-        endDate: new Date("2025-06-01"),
+        startDate: new Date('2025-01-01'),
+        endDate: new Date('2025-06-01'),
       };
-      const mockCreatedCourse = { _id: "1", ...courseData };
+      const mockCreatedCourse = { _id: '1', ...courseData };
 
       mockReq.body = courseData;
       (courseSchemas.createCourseSchema.parse as jest.Mock).mockReturnValue(courseData);
-      (courseService.createCourse as jest.Mock).mockResolvedValue({ course: mockCreatedCourse, warnings: [] });
+      (courseService.createCourse as jest.Mock).mockResolvedValue({
+        course: mockCreatedCourse,
+        warnings: [],
+      });
 
       await createCourseHandler(mockReq as Request, mockRes as Response, mockNext);
 
@@ -310,42 +313,41 @@ describe("📚 Course Controller Unit Tests", () => {
       );
       expect(mockRes.success).toHaveBeenCalledWith(201, {
         data: mockCreatedCourse,
-        message: "Course created successfully",
+        message: 'Course created successfully',
       });
     });
 
-    it("should create course with logo file", async () => {
+    it('should create course with logo file', async () => {
       const courseData = {
-        title: "New Course",
+        title: 'New Course',
         subjectId: new mongoose.Types.ObjectId().toString(),
         teacherIds: [new mongoose.Types.ObjectId().toString()],
-        startDate: new Date("2025-01-01"),
-        endDate: new Date("2025-06-01"),
+        startDate: new Date('2025-01-01'),
+        endDate: new Date('2025-06-01'),
       };
       const logoFile = {
-        filename: "logo.png",
-        mimetype: "image/png",
-        buffer: Buffer.from("test"),
+        filename: 'logo.png',
+        mimetype: 'image/png',
+        buffer: Buffer.from('test'),
       } as Express.Multer.File;
-      const mockCreatedCourse = { _id: "1", ...courseData, logo: "http://test.com/logo.png" };
+      const mockCreatedCourse = { _id: '1', ...courseData, logo: 'http://test.com/logo.png' };
 
       mockReq.body = courseData;
       mockReq.file = logoFile;
       (courseSchemas.createCourseSchema.parse as jest.Mock).mockReturnValue(courseData);
-      (courseService.createCourse as jest.Mock).mockResolvedValue({ course: mockCreatedCourse, warnings: [] });
+      (courseService.createCourse as jest.Mock).mockResolvedValue({
+        course: mockCreatedCourse,
+        warnings: [],
+      });
 
       await createCourseHandler(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(courseService.createCourse).toHaveBeenCalledWith(
-        courseData,
-        mockReq.userId,
-        logoFile
-      );
+      expect(courseService.createCourse).toHaveBeenCalledWith(courseData, mockReq.userId, logoFile);
     });
 
-    it("should handle validation errors", async () => {
-      mockReq.body = { title: "" }; // Invalid data
-      const validationError = new Error("Validation failed");
+    it('should handle validation errors', async () => {
+      mockReq.body = { title: '' }; // Invalid data
+      const validationError = new Error('Validation failed');
       (courseSchemas.createCourseSchema.parse as jest.Mock).mockImplementation(() => {
         throw validationError;
       });
@@ -355,16 +357,16 @@ describe("📚 Course Controller Unit Tests", () => {
       expect(mockNext).toHaveBeenCalledWith(validationError);
     });
 
-    it("should handle service errors", async () => {
+    it('should handle service errors', async () => {
       const courseData = {
-        title: "New Course",
+        title: 'New Course',
         subjectId: new mongoose.Types.ObjectId().toString(),
         teacherIds: [new mongoose.Types.ObjectId().toString()],
-        startDate: new Date("2025-01-01"),
-        endDate: new Date("2025-06-01"),
+        startDate: new Date('2025-01-01'),
+        endDate: new Date('2025-06-01'),
       };
       mockReq.body = courseData;
-      const error = new Error("Service error");
+      const error = new Error('Service error');
       (courseSchemas.createCourseSchema.parse as jest.Mock).mockReturnValue(courseData);
       (courseService.createCourse as jest.Mock).mockRejectedValue(error);
 
@@ -373,77 +375,80 @@ describe("📚 Course Controller Unit Tests", () => {
       expect(mockNext).toHaveBeenCalledWith(error);
     });
 
-    it("should include warnings in response when service returns warnings", async () => {
+    it('should include warnings in response when service returns warnings', async () => {
       const courseData = {
-        title: "New Course",
+        title: 'New Course',
         subjectId: new mongoose.Types.ObjectId().toString(),
         teacherIds: [new mongoose.Types.ObjectId().toString()],
-        startDate: new Date("2025-01-01"),
-        endDate: new Date("2025-06-01"),
+        startDate: new Date('2025-01-01'),
+        endDate: new Date('2025-06-01'),
       };
-      const mockCreatedCourse = { _id: "1", ...courseData };
-      const warnings = ["Failed to send notifications: Network error"];
+      const mockCreatedCourse = { _id: '1', ...courseData };
+      const warnings = ['Failed to send notifications: Network error'];
 
       mockReq.body = courseData;
       (courseSchemas.createCourseSchema.parse as jest.Mock).mockReturnValue(courseData);
       (courseService.createCourse as jest.Mock).mockResolvedValue({
         course: mockCreatedCourse,
-        warnings
+        warnings,
       });
 
       await createCourseHandler(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockRes.success).toHaveBeenCalledWith(201, {
         data: mockCreatedCourse,
-        message: "Course created successfully",
+        message: 'Course created successfully',
         warnings,
       });
     });
 
-    it("should not include warnings field when warnings array is empty", async () => {
+    it('should not include warnings field when warnings array is empty', async () => {
       const courseData = {
-        title: "New Course",
+        title: 'New Course',
         subjectId: new mongoose.Types.ObjectId().toString(),
         teacherIds: [new mongoose.Types.ObjectId().toString()],
-        startDate: new Date("2025-01-01"),
-        endDate: new Date("2025-06-01"),
+        startDate: new Date('2025-01-01'),
+        endDate: new Date('2025-06-01'),
       };
-      const mockCreatedCourse = { _id: "1", ...courseData };
+      const mockCreatedCourse = { _id: '1', ...courseData };
 
       mockReq.body = courseData;
       (courseSchemas.createCourseSchema.parse as jest.Mock).mockReturnValue(courseData);
       (courseService.createCourse as jest.Mock).mockResolvedValue({
         course: mockCreatedCourse,
-        warnings: []
+        warnings: [],
       });
 
       await createCourseHandler(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockRes.success).toHaveBeenCalledWith(201, {
         data: mockCreatedCourse,
-        message: "Course created successfully",
+        message: 'Course created successfully',
         // No warnings field should be present
       });
       // Verify warnings field is not in the response
       const responseCall = (mockRes.success as jest.Mock).mock.calls[0][1];
-      expect(responseCall).not.toHaveProperty("warnings");
+      expect(responseCall).not.toHaveProperty('warnings');
     });
   });
 
   // ====================================
   // UPDATE COURSE TESTS
   // ====================================
-  describe("updateCourseHandler", () => {
-    it("should update course successfully", async () => {
+  describe('updateCourseHandler', () => {
+    it('should update course successfully', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
-      const updateData = { title: "Updated Course" };
+      const updateData = { title: 'Updated Course' };
       const mockUpdatedCourse = { _id: courseId, ...updateData };
 
       mockReq.params = { id: courseId };
       mockReq.body = updateData;
       (courseSchemas.courseIdSchema.parse as jest.Mock).mockReturnValue(courseId);
       (courseSchemas.updateCourseSchema.parse as jest.Mock).mockReturnValue(updateData);
-      (courseService.updateCourse as jest.Mock).mockResolvedValue({ course: mockUpdatedCourse, warnings: [] });
+      (courseService.updateCourse as jest.Mock).mockResolvedValue({
+        course: mockUpdatedCourse,
+        warnings: [],
+      });
 
       await updateCourseHandler(mockReq as Request, mockRes as Response, mockNext);
 
@@ -455,26 +460,33 @@ describe("📚 Course Controller Unit Tests", () => {
       );
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: mockUpdatedCourse,
-        message: "Course updated successfully",
+        message: 'Course updated successfully',
       });
     });
 
-    it("should update course with logo file", async () => {
+    it('should update course with logo file', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
-      const updateData = { title: "Updated Course" };
+      const updateData = { title: 'Updated Course' };
       const logoFile = {
-        filename: "new-logo.png",
-        mimetype: "image/png",
-        buffer: Buffer.from("test"),
+        filename: 'new-logo.png',
+        mimetype: 'image/png',
+        buffer: Buffer.from('test'),
       } as Express.Multer.File;
-      const mockUpdatedCourse = { _id: courseId, ...updateData, logo: "http://test.com/new-logo.png" };
+      const mockUpdatedCourse = {
+        _id: courseId,
+        ...updateData,
+        logo: 'http://test.com/new-logo.png',
+      };
 
       mockReq.params = { id: courseId };
       mockReq.body = updateData;
       mockReq.file = logoFile;
       (courseSchemas.courseIdSchema.parse as jest.Mock).mockReturnValue(courseId);
       (courseSchemas.updateCourseSchema.parse as jest.Mock).mockReturnValue(updateData);
-      (courseService.updateCourse as jest.Mock).mockResolvedValue({ course: mockUpdatedCourse, warnings: [] });
+      (courseService.updateCourse as jest.Mock).mockResolvedValue({
+        course: mockUpdatedCourse,
+        warnings: [],
+      });
 
       await updateCourseHandler(mockReq as Request, mockRes as Response, mockNext);
 
@@ -486,9 +498,9 @@ describe("📚 Course Controller Unit Tests", () => {
       );
     });
 
-    it("should handle partial update", async () => {
+    it('should handle partial update', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
-      const updateData = { description: "Updated description" };
+      const updateData = { description: 'Updated description' };
 
       mockReq.params = { id: courseId };
       mockReq.body = updateData;
@@ -509,9 +521,9 @@ describe("📚 Course Controller Unit Tests", () => {
       );
     });
 
-    it("should handle authorization errors", async () => {
+    it('should handle authorization errors', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
-      const updateData = { title: "Updated Course" };
+      const updateData = { title: 'Updated Course' };
       mockReq.params = { id: courseId };
       mockReq.body = updateData;
       mockReq.role = Role.STUDENT; // Student cannot update
@@ -525,11 +537,11 @@ describe("📚 Course Controller Unit Tests", () => {
       expect(mockNext).toHaveBeenCalledWith(error);
     });
 
-    it("should include warnings in response when service returns warnings", async () => {
+    it('should include warnings in response when service returns warnings', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
-      const updateData = { title: "Updated Course" };
+      const updateData = { title: 'Updated Course' };
       const mockUpdatedCourse = { _id: courseId, ...updateData };
-      const warnings = ["Failed to send notification to some teachers"];
+      const warnings = ['Failed to send notification to some teachers'];
 
       mockReq.params = { id: courseId };
       mockReq.body = updateData;
@@ -537,21 +549,21 @@ describe("📚 Course Controller Unit Tests", () => {
       (courseSchemas.updateCourseSchema.parse as jest.Mock).mockReturnValue(updateData);
       (courseService.updateCourse as jest.Mock).mockResolvedValue({
         course: mockUpdatedCourse,
-        warnings
+        warnings,
       });
 
       await updateCourseHandler(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: mockUpdatedCourse,
-        message: "Course updated successfully",
+        message: 'Course updated successfully',
         warnings,
       });
     });
 
-    it("should not include warnings field when warnings array is empty", async () => {
+    it('should not include warnings field when warnings array is empty', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
-      const updateData = { title: "Updated Course" };
+      const updateData = { title: 'Updated Course' };
       const mockUpdatedCourse = { _id: courseId, ...updateData };
 
       mockReq.params = { id: courseId };
@@ -560,29 +572,29 @@ describe("📚 Course Controller Unit Tests", () => {
       (courseSchemas.updateCourseSchema.parse as jest.Mock).mockReturnValue(updateData);
       (courseService.updateCourse as jest.Mock).mockResolvedValue({
         course: mockUpdatedCourse,
-        warnings: []
+        warnings: [],
       });
 
       await updateCourseHandler(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: mockUpdatedCourse,
-        message: "Course updated successfully",
+        message: 'Course updated successfully',
       });
       // Verify warnings field is not in the response
       const responseCall = (mockRes.success as jest.Mock).mock.calls[0][1];
-      expect(responseCall).not.toHaveProperty("warnings");
+      expect(responseCall).not.toHaveProperty('warnings');
     });
   });
 
   // ====================================
   // DELETE COURSE TESTS
   // ====================================
-  describe("deleteCourseHandler", () => {
-    it("should soft delete course successfully", async () => {
+  describe('deleteCourseHandler', () => {
+    it('should soft delete course successfully', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       const mockResult = {
-        message: "Course deleted successfully",
+        message: 'Course deleted successfully',
         deletedAt: new Date(),
         deletedBy: mockReq.userId,
       };
@@ -600,10 +612,10 @@ describe("📚 Course Controller Unit Tests", () => {
       });
     });
 
-    it("should handle course not found", async () => {
+    it('should handle course not found', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       mockReq.params = { id: courseId };
-      const error = new Error("Course not found or already deleted");
+      const error = new Error('Course not found or already deleted');
       (courseSchemas.courseIdSchema.parse as jest.Mock).mockReturnValue(courseId);
       (courseService.deleteCourse as jest.Mock).mockRejectedValue(error);
 
@@ -612,10 +624,10 @@ describe("📚 Course Controller Unit Tests", () => {
       expect(mockNext).toHaveBeenCalledWith(error);
     });
 
-    it("should handle ongoing course deletion error", async () => {
+    it('should handle ongoing course deletion error', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       mockReq.params = { id: courseId };
-      const error = new Error("Cannot delete an ongoing course");
+      const error = new Error('Cannot delete an ongoing course');
       (courseSchemas.courseIdSchema.parse as jest.Mock).mockReturnValue(courseId);
       (courseService.deleteCourse as jest.Mock).mockRejectedValue(error);
 
@@ -628,12 +640,12 @@ describe("📚 Course Controller Unit Tests", () => {
   // ====================================
   // RESTORE COURSE TESTS
   // ====================================
-  describe("restoreCourseHandler", () => {
-    it("should restore deleted course successfully", async () => {
+  describe('restoreCourseHandler', () => {
+    it('should restore deleted course successfully', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       const mockResult = {
-        message: "Course restored successfully",
-        course: { _id: courseId, title: "Restored Course", isDeleted: false },
+        message: 'Course restored successfully',
+        course: { _id: courseId, title: 'Restored Course', isDeleted: false },
       };
 
       mockReq.params = { id: courseId };
@@ -649,11 +661,11 @@ describe("📚 Course Controller Unit Tests", () => {
       });
     });
 
-    it("should handle non-admin restore attempt", async () => {
+    it('should handle non-admin restore attempt', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       mockReq.params = { id: courseId };
       mockReq.role = Role.TEACHER; // Teacher cannot restore
-      const error = new Error("Only administrators can restore deleted courses");
+      const error = new Error('Only administrators can restore deleted courses');
       (courseSchemas.courseIdSchema.parse as jest.Mock).mockReturnValue(courseId);
       (courseService.restoreCourse as jest.Mock).mockRejectedValue(error);
 
@@ -662,10 +674,10 @@ describe("📚 Course Controller Unit Tests", () => {
       expect(mockNext).toHaveBeenCalledWith(error);
     });
 
-    it("should handle deleted course not found", async () => {
+    it('should handle deleted course not found', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       mockReq.params = { id: courseId };
-      const error = new Error("Deleted course not found");
+      const error = new Error('Deleted course not found');
       (courseSchemas.courseIdSchema.parse as jest.Mock).mockReturnValue(courseId);
       (courseService.restoreCourse as jest.Mock).mockRejectedValue(error);
 
@@ -678,12 +690,12 @@ describe("📚 Course Controller Unit Tests", () => {
   // ====================================
   // PERMANENT DELETE COURSE TESTS
   // ====================================
-  describe("permanentDeleteCourseHandler", () => {
-    it("should permanently delete course successfully", async () => {
+  describe('permanentDeleteCourseHandler', () => {
+    it('should permanently delete course successfully', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       const mockResult = {
-        message: "Course permanently deleted successfully",
-        warning: "This action cannot be undone",
+        message: 'Course permanently deleted successfully',
+        warning: 'This action cannot be undone',
         deletedCourseId: courseId,
       };
 
@@ -693,10 +705,7 @@ describe("📚 Course Controller Unit Tests", () => {
 
       await permanentDeleteCourseHandler(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(courseService.permanentDeleteCourse).toHaveBeenCalledWith(
-        courseId,
-        mockReq.userId
-      );
+      expect(courseService.permanentDeleteCourse).toHaveBeenCalledWith(courseId, mockReq.userId);
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: null,
         message: mockResult.message,
@@ -705,11 +714,11 @@ describe("📚 Course Controller Unit Tests", () => {
       });
     });
 
-    it("should handle non-admin permanent delete attempt", async () => {
+    it('should handle non-admin permanent delete attempt', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       mockReq.params = { id: courseId };
       mockReq.role = Role.TEACHER; // Teacher cannot permanently delete
-      const error = new Error("Only administrators can permanently delete courses");
+      const error = new Error('Only administrators can permanently delete courses');
       (courseSchemas.courseIdSchema.parse as jest.Mock).mockReturnValue(courseId);
       (courseService.permanentDeleteCourse as jest.Mock).mockRejectedValue(error);
 
@@ -718,10 +727,10 @@ describe("📚 Course Controller Unit Tests", () => {
       expect(mockNext).toHaveBeenCalledWith(error);
     });
 
-    it("should handle course not in recycle bin", async () => {
+    it('should handle course not in recycle bin', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       mockReq.params = { id: courseId };
-      const error = new Error("Course not found in recycle bin");
+      const error = new Error('Course not found in recycle bin');
       (courseSchemas.courseIdSchema.parse as jest.Mock).mockReturnValue(courseId);
       (courseService.permanentDeleteCourse as jest.Mock).mockRejectedValue(error);
 
@@ -730,12 +739,10 @@ describe("📚 Course Controller Unit Tests", () => {
       expect(mockNext).toHaveBeenCalledWith(error);
     });
 
-    it("should handle course with enrollments", async () => {
+    it('should handle course with enrollments', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       mockReq.params = { id: courseId };
-      const error = new Error(
-        "Cannot permanently delete course with 3 enrollment(s)"
-      );
+      const error = new Error('Cannot permanently delete course with 3 enrollment(s)');
       (courseSchemas.courseIdSchema.parse as jest.Mock).mockReturnValue(courseId);
       (courseService.permanentDeleteCourse as jest.Mock).mockRejectedValue(error);
 
@@ -748,9 +755,9 @@ describe("📚 Course Controller Unit Tests", () => {
   // ====================================
   // GET MY COURSES TESTS
   // ====================================
-  describe("getMyCoursesHandler", () => {
-    it("should get my courses successfully", async () => {
-      const mockCourses = [{ _id: "1", title: "My Course" }];
+  describe('getMyCoursesHandler', () => {
+    it('should get my courses successfully', async () => {
+      const mockCourses = [{ _id: '1', title: 'My Course' }];
       const mockPagination = { page: 1, limit: 10, total: 1, totalPages: 1 };
 
       (courseSchemas.listCoursesSchema.parse as jest.Mock).mockReturnValue({
@@ -771,13 +778,13 @@ describe("📚 Course Controller Unit Tests", () => {
       });
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: mockCourses,
-        message: "My courses retrieved successfully",
+        message: 'My courses retrieved successfully',
         pagination: mockPagination,
       });
     });
 
-    it("should handle service errors", async () => {
-      const error = new Error("Service error");
+    it('should handle service errors', async () => {
+      const error = new Error('Service error');
       (courseSchemas.listCoursesSchema.parse as jest.Mock).mockReturnValue({
         page: 1,
         limit: 10,
@@ -793,24 +800,24 @@ describe("📚 Course Controller Unit Tests", () => {
   // ====================================
   // GET COURSE BY SLUG TESTS
   // ====================================
-  describe("getCourseBySlugHandler", () => {
-    it("should get course by slug successfully", async () => {
-      const mockCourse = { _id: "1", title: "Test Course", slug: "test-course" };
-      mockReq.params = { slug: "test-course" };
+  describe('getCourseBySlugHandler', () => {
+    it('should get course by slug successfully', async () => {
+      const mockCourse = { _id: '1', title: 'Test Course', slug: 'test-course' };
+      mockReq.params = { slug: 'test-course' };
       (courseService.getCourseBySlug as jest.Mock).mockResolvedValue(mockCourse);
 
       await getCourseBySlugHandler(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(courseService.getCourseBySlug).toHaveBeenCalledWith("test-course");
+      expect(courseService.getCourseBySlug).toHaveBeenCalledWith('test-course');
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: mockCourse,
-        message: "Course retrieved successfully",
+        message: 'Course retrieved successfully',
       });
     });
 
-    it("should handle course not found", async () => {
-      mockReq.params = { slug: "non-existent" };
-      const error = new Error("Course not found");
+    it('should handle course not found', async () => {
+      mockReq.params = { slug: 'non-existent' };
+      const error = new Error('Course not found');
       (courseService.getCourseBySlug as jest.Mock).mockRejectedValue(error);
 
       await getCourseBySlugHandler(mockReq as Request, mockRes as Response, mockNext);
@@ -822,14 +829,14 @@ describe("📚 Course Controller Unit Tests", () => {
   // ====================================
   // GET QUIZZES TESTS
   // ====================================
-  describe("getQuizzesHandler", () => {
-    it("should get quizzes successfully", async () => {
+  describe('getQuizzesHandler', () => {
+    it('should get quizzes successfully', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
-      const mockQuizzes = [{ _id: "1", title: "Quiz 1" }];
+      const mockQuizzes = [{ _id: '1', title: 'Quiz 1' }];
       const mockPagination = { page: 1, limit: 10, total: 1 };
 
       mockReq.params = { courseId };
-      mockReq.query = { page: "1", limit: "10" };
+      mockReq.query = { page: '1', limit: '10' };
       (courseSchemas.getQuizzesSchema.parse as jest.Mock).mockReturnValue({
         courseId,
         page: 1,
@@ -846,15 +853,15 @@ describe("📚 Course Controller Unit Tests", () => {
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: mockQuizzes,
         pagination: mockPagination,
-        message: "Quizzes retrieved successfully",
+        message: 'Quizzes retrieved successfully',
       });
     });
 
-    it("should handle service errors", async () => {
+    it('should handle service errors', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       mockReq.params = { courseId };
       mockReq.query = {};
-      const error = new Error("Service error");
+      const error = new Error('Service error');
       (courseSchemas.getQuizzesSchema.parse as jest.Mock).mockReturnValue({ courseId });
       (courseService.getQuizzes as jest.Mock).mockRejectedValue(error);
 
@@ -867,8 +874,8 @@ describe("📚 Course Controller Unit Tests", () => {
   // ====================================
   // COMPLETE COURSE TESTS
   // ====================================
-  describe("completeCourseHandler", () => {
-    it("should complete course successfully", async () => {
+  describe('completeCourseHandler', () => {
+    it('should complete course successfully', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       const mockData = { completed: true, statistics: {} };
 
@@ -878,17 +885,16 @@ describe("📚 Course Controller Unit Tests", () => {
 
       await completeCourseHandler(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(courseService.completeCourse).toHaveBeenCalledWith(courseId);
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: mockData,
-        message: "Course completed successfully",
+        message: 'Course completed successfully',
       });
     });
 
-    it("should handle service errors", async () => {
+    it('should handle service errors', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       mockReq.params = { courseId };
-      const error = new Error("Cannot complete course");
+      const error = new Error('Cannot complete course');
       (courseSchemas.courseIdSchema.parse as jest.Mock).mockReturnValue(courseId);
       (courseService.completeCourse as jest.Mock).mockRejectedValue(error);
 
@@ -901,8 +907,8 @@ describe("📚 Course Controller Unit Tests", () => {
   // ====================================
   // GET COURSE STATISTICS TESTS
   // ====================================
-  describe("getCourseStatisticsHandler", () => {
-    it("should get course statistics successfully", async () => {
+  describe('getCourseStatisticsHandler', () => {
+    it('should get course statistics successfully', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       const mockData = { statistics: { totalStudents: 10, avgScore: 85 } };
 
@@ -919,13 +925,13 @@ describe("📚 Course Controller Unit Tests", () => {
       );
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: mockData,
-        message: "Course statistics retrieved successfully",
+        message: 'Course statistics retrieved successfully',
       });
     });
 
-    it("should handle no statistics available", async () => {
+    it('should handle no statistics available', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
-      const mockData = { statistics: null, message: "No statistics available" };
+      const mockData = { statistics: null, message: 'No statistics available' };
 
       mockReq.params = { courseId };
       (courseSchemas.courseIdSchema.parse as jest.Mock).mockReturnValue(courseId);
@@ -935,14 +941,14 @@ describe("📚 Course Controller Unit Tests", () => {
 
       expect(mockRes.success).toHaveBeenCalledWith(200, {
         data: mockData,
-        message: "No statistics available",
+        message: 'No statistics available',
       });
     });
 
-    it("should handle service errors", async () => {
+    it('should handle service errors', async () => {
       const courseId = new mongoose.Types.ObjectId().toString();
       mockReq.params = { courseId };
-      const error = new Error("Service error");
+      const error = new Error('Service error');
       (courseSchemas.courseIdSchema.parse as jest.Mock).mockReturnValue(courseId);
       (courseService.getCourseStatistics as jest.Mock).mockRejectedValue(error);
 
@@ -955,8 +961,8 @@ describe("📚 Course Controller Unit Tests", () => {
   // ====================================
   // ERROR HANDLING TESTS
   // ====================================
-  describe("Error Handling", () => {
-    it("should handle missing userId in request", async () => {
+  describe('Error Handling', () => {
+    it('should handle missing userId in request', async () => {
       mockReq.userId = undefined;
       mockReq.role = undefined;
       (courseSchemas.listCoursesSchema.parse as jest.Mock).mockReturnValue({
@@ -976,7 +982,7 @@ describe("📚 Course Controller Unit Tests", () => {
       );
     });
 
-    it("should handle missing role in request", async () => {
+    it('should handle missing role in request', async () => {
       mockReq.role = undefined;
       (courseSchemas.listCoursesSchema.parse as jest.Mock).mockReturnValue({
         page: 1,
@@ -995,4 +1001,3 @@ describe("📚 Course Controller Unit Tests", () => {
     });
   });
 });
-
