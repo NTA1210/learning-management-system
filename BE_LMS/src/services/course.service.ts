@@ -534,9 +534,10 @@ export const createCourse = async (
   let finalStatus = data.status || CourseStatus.DRAFT;
 
   if (!isAdmin) {
-    // Teacher CANNOT publish course immediately - cần admin approve
-    // Force isPublished = false regardless of input
+    // ✅ TEACHER RULE: Teacher CANNOT publish course immediately - cần admin approve
+    // Force isPublished = false AND status = DRAFT regardless of input
     finalIsPublished = false;
+    finalStatus = CourseStatus.DRAFT;
   } else {
     // ✅ AUTO PUBLISH: Admin tạo course thì luôn publish
     finalIsPublished = true;
@@ -673,12 +674,8 @@ export const updateCourse = async (
   });
   appAssert(course, NOT_FOUND, 'Course not found');
 
-  // ❌ FIX: Cannot update completed course
-  appAssert(
-    course.status !== CourseStatus.COMPLETED,
-    BAD_REQUEST,
-    'Cannot update a completed course'
-  );
+  // ✅ UPDATED: Allow updating COMPLETED courses
+  // Teachers may need to update grades, course info, or statistics after course completion
 
   // Check if user is a teacher of this course or admin
   const user = await UserModel.findById(userId);
@@ -836,18 +833,39 @@ export const updateCourse = async (
     }
   }
 
-  // ✅ YÊU CẦU 2: Only Admin can approve/publish courses
-  // Teacher không thể tự publish course của mình
+  // ✅ TEACHER RESTRICTION: Only Admin can approve/publish courses
+  // Teacher CANNOT change isPublished OR status fields
   // Prepare update data
   const updateData: any = { ...data };
 
-  // ✅ FIX: Teacher CANNOT change isPublished field at all
-  // - Cannot publish (set true)
-  // - Cannot unpublish (set false) if already published by admin
-  if (!isAdmin && data.isPublished !== undefined) {
-    // Teacher tries to change isPublished field
-    delete updateData.isPublished;
-    // Note: Only admin can control publish status
+  if (!isAdmin) {
+    // ✅ FIX: Teacher CANNOT change isPublished field at all
+    // - Cannot publish (set true)
+    // - Cannot unpublish (set false) if already published by admin
+    if (data.isPublished !== undefined) {
+      delete updateData.isPublished;
+      // Note: Only admin can control publish status
+    }
+
+    // ✅ TEACHER STATUS RULES: Limited status transitions
+    if (data.status !== undefined) {
+      const currentStatus = course.status;
+      const newStatus = data.status;
+
+      // Teacher CAN ONLY: ONGOING → COMPLETED (mark course as finished)
+      const isAllowedTransition =
+        currentStatus === CourseStatus.ONGOING && newStatus === CourseStatus.COMPLETED;
+
+      if (!isAllowedTransition) {
+        // Block all other transitions:
+        // - DRAFT → ONGOING (only admin can approve)
+        // - COMPLETED → ONGOING (cannot rollback)
+        // - COMPLETED → DRAFT (cannot rollback)
+        // - Any other invalid transition
+        delete updateData.status;
+        // Note: Teacher can only complete ONGOING courses
+      }
+    }
   }
 
   // ✅ AUTO STATUS: When admin approves (publishes) a DRAFT course, auto change to ONGOING
