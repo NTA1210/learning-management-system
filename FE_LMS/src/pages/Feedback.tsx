@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { ChevronDown, Search, X } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { useTheme } from "../hooks/useTheme";
@@ -36,6 +37,11 @@ export default function Feedback() {
 	const [teachers, setTeachers] = useState<User[]>([]);
 	const [loadingTeachers, setLoadingTeachers] = useState(false);
 	const [teacherError, setTeacherError] = useState<string | null>(null);
+	const [isTeacherModalOpen, setIsTeacherModalOpen] = useState(false);
+	const [teacherSearchTerm, setTeacherSearchTerm] = useState("");
+	const [highlightedTeacherIndex, setHighlightedTeacherIndex] = useState(-1);
+	const teacherModalRef = useRef<HTMLDivElement>(null);
+	const teacherSearchInputRef = useRef<HTMLInputElement>(null);
 	const [form, setForm] = useState<FeedbackFormState>({
 		type: "system",
 		rating: 5,
@@ -95,6 +101,71 @@ export default function Feedback() {
 
 		void fetchTeachers();
 	}, [form.type, teachers.length, loadingTeachers]);
+
+	// Filter teachers based on search term
+	const filteredTeachers = useMemo(() => {
+		if (!teacherSearchTerm.trim()) return teachers;
+		const searchLower = teacherSearchTerm.toLowerCase();
+		return teachers.filter(
+			(t) =>
+				(t.fullname || "").toLowerCase().includes(searchLower) ||
+				(t.username || "").toLowerCase().includes(searchLower) ||
+				(t.email || "").toLowerCase().includes(searchLower)
+		);
+	}, [teachers, teacherSearchTerm]);
+
+	// Focus search input when modal opens
+	useEffect(() => {
+		if (isTeacherModalOpen) {
+			setTimeout(() => {
+				teacherSearchInputRef.current?.focus();
+			}, 100);
+		}
+	}, [isTeacherModalOpen]);
+
+	// Handle keyboard navigation
+	useEffect(() => {
+		if (!isTeacherModalOpen) return;
+
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === "ArrowDown") {
+				e.preventDefault();
+				setHighlightedTeacherIndex((prev) =>
+					prev < filteredTeachers.length - 1 ? prev + 1 : prev
+				);
+			} else if (e.key === "ArrowUp") {
+				e.preventDefault();
+				setHighlightedTeacherIndex((prev) => (prev > 0 ? prev - 1 : -1));
+			} else if (e.key === "Enter" && highlightedTeacherIndex >= 0) {
+				e.preventDefault();
+				const teacher = filteredTeachers[highlightedTeacherIndex];
+				if (teacher) {
+					setForm((f) => ({ ...f, targetId: teacher._id }));
+					setIsTeacherModalOpen(false);
+					setTeacherSearchTerm("");
+					setHighlightedTeacherIndex(-1);
+				}
+			} else if (e.key === "Escape") {
+				setIsTeacherModalOpen(false);
+				setTeacherSearchTerm("");
+				setHighlightedTeacherIndex(-1);
+			}
+		};
+
+		window.addEventListener("keydown", handleKeyDown);
+		return () => window.removeEventListener("keydown", handleKeyDown);
+	}, [isTeacherModalOpen, filteredTeachers, highlightedTeacherIndex]);
+
+	const handleCloseTeacherModal = () => {
+		setIsTeacherModalOpen(false);
+		setTeacherSearchTerm("");
+		setHighlightedTeacherIndex(-1);
+	};
+
+	const handleSelectTeacher = (teacherId: string) => {
+		setForm((f) => ({ ...f, targetId: teacherId }));
+		handleCloseTeacherModal();
+	};
 
 	if (isAdmin) {
 		return null;
@@ -224,8 +295,9 @@ export default function Feedback() {
 	};
 
 	return (
-		<div
-			className="flex h-screen overflow-hidden relative"
+		<>
+			<div
+				className="flex h-screen overflow-hidden relative"
 			style={{
 				backgroundColor: darkMode ? "#0b1220" : "#f5f7fb",
 				color: darkMode ? "#e5e7eb" : "#1f2937"
@@ -404,30 +476,49 @@ export default function Feedback() {
 							{form.type === "teacher" && (
 								<div className="fade-in-up" style={{ animationDelay: "140ms" }}>
 									<label className="block text-sm font-medium mb-1">Teacher</label>
-									<select
-										value={form.targetId || ""}
-										onChange={(e) =>
-											setForm((f) => ({
-												...f,
-												targetId: e.target.value || undefined
-											}))
-										}
+									<button
+										type="button"
+										onClick={() => !loadingTeachers && setIsTeacherModalOpen(true)}
 										disabled={loadingTeachers}
-										className="w-full rounded-xl px-3 py-2 outline-none transition-colors"
+										className="w-full rounded-xl px-3 py-2 outline-none transition-colors text-left flex items-center justify-between"
 										style={{
 											backgroundColor: darkMode ? "#0f172a" : "#f9fafb",
-											border: "1px solid rgba(148,163,184,0.25)"
+											border: "1px solid rgba(148,163,184,0.25)",
+											color: darkMode ? "#ffffff" : "#000000",
+											cursor: loadingTeachers ? "not-allowed" : "pointer",
+											opacity: loadingTeachers ? 0.6 : 1
 										}}
 									>
-										<option value="">
-											{loadingTeachers ? "Loading teachers..." : "Select a teacher"}
-										</option>
-										{teachers.map((t) => (
-											<option key={t._id} value={t._id}>
-												{t.fullname || t.username}
-											</option>
-										))}
-									</select>
+										<span style={{ color: form.targetId ? (darkMode ? "#ffffff" : "#000000") : (darkMode ? "#64748b" : "#94a3b8") }}>
+											{loadingTeachers
+												? "Loading teachers..."
+												: form.targetId
+												? teachers.find((t) => t._id === form.targetId)?.fullname ||
+												  teachers.find((t) => t._id === form.targetId)?.username ||
+												  "Select a teacher"
+												: "Select a teacher"}
+										</span>
+										<div className="flex items-center gap-2">
+											{form.targetId && !loadingTeachers && (
+												<button
+													type="button"
+													onClick={(e) => {
+														e.stopPropagation();
+														setForm((f) => ({ ...f, targetId: undefined }));
+														setTeacherSearchTerm("");
+													}}
+													className="p-0.5 rounded hover:bg-opacity-20"
+													style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+												>
+													<X size={14} />
+												</button>
+											)}
+											<ChevronDown
+												size={16}
+												style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+											/>
+										</div>
+									</button>
 									{teacherError && (
 										<p className="mt-1 text-xs" style={{ color: "#ef4444" }}>
 											{teacherError}
@@ -652,6 +743,206 @@ export default function Feedback() {
 				</div>
 			</main>
 		</div>
+
+		{/* Teacher Selection Modal */}
+		{isTeacherModalOpen && (
+			<div
+				className="fixed inset-0 z-50 flex items-center justify-center p-4"
+				style={{ backgroundColor: "rgba(0, 0, 0, 0.5)", backdropFilter: "blur(4px)" }}
+				onClick={handleCloseTeacherModal}
+			>
+				<div
+					ref={teacherModalRef}
+					className="w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden"
+					style={{
+						backgroundColor: darkMode ? "rgba(15, 23, 42, 0.98)" : "#ffffff",
+						borderColor: darkMode ? "rgba(148, 163, 184, 0.3)" : "rgba(148, 163, 184, 0.2)",
+						maxHeight: "80vh",
+						display: "flex",
+						flexDirection: "column"
+					}}
+					onClick={(e) => e.stopPropagation()}
+				>
+					{/* Modal Header */}
+					<div
+						className="flex items-center justify-between p-4 border-b"
+						style={{
+							borderColor: darkMode ? "rgba(148, 163, 184, 0.25)" : "rgba(148, 163, 184, 0.25)"
+						}}
+					>
+						<h3
+							className="text-lg font-semibold"
+							style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
+						>
+							Select a Teacher
+						</h3>
+						<button
+							type="button"
+							onClick={handleCloseTeacherModal}
+							className="p-1.5 rounded-lg hover:bg-opacity-20 transition-colors"
+							style={{
+								color: darkMode ? "#94a3b8" : "#64748b",
+								backgroundColor: darkMode ? "rgba(148, 163, 184, 0.1)" : "rgba(148, 163, 184, 0.1)"
+							}}
+						>
+							<X size={20} />
+						</button>
+					</div>
+
+					{/* Search Input */}
+					<div
+						className="p-4 border-b"
+						style={{
+							borderColor: darkMode ? "rgba(148, 163, 184, 0.25)" : "rgba(148, 163, 184, 0.25)",
+							backgroundColor: darkMode ? "rgba(15, 23, 42, 0.5)" : "#f9fafb"
+						}}
+					>
+						<div className="relative">
+							<Search
+								size={18}
+								className="absolute left-3 top-1/2 transform -translate-y-1/2"
+								style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+							/>
+							<input
+								ref={teacherSearchInputRef}
+								type="text"
+								value={teacherSearchTerm}
+								onChange={(e) => {
+									setTeacherSearchTerm(e.target.value);
+									setHighlightedTeacherIndex(-1);
+								}}
+								placeholder="Search by name, username, or email..."
+								className="w-full pl-10 pr-4 py-3 rounded-xl border text-sm outline-none transition-shadow focus:shadow-lg"
+								style={{
+									backgroundColor: darkMode ? "rgba(15, 23, 42, 0.8)" : "#ffffff",
+									borderColor: darkMode ? "rgba(148, 163, 184, 0.25)" : "rgba(148, 163, 184, 0.25)",
+									color: darkMode ? "#ffffff" : "#000000"
+								}}
+							/>
+						</div>
+					</div>
+
+					{/* Teachers List */}
+					<div
+						className="flex-1 overflow-y-auto p-2"
+						style={{ maxHeight: "calc(80vh - 140px)" }}
+					>
+						{loadingTeachers ? (
+							<div
+								className="flex items-center justify-center py-12"
+								style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+							>
+								<span className="text-sm">Loading teachers...</span>
+							</div>
+						) : filteredTeachers.length === 0 ? (
+							<div
+								className="flex flex-col items-center justify-center py-12 px-4"
+								style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+							>
+								<Search size={48} className="mb-3 opacity-50" />
+								<p className="text-sm font-medium">
+									{teacherSearchTerm ? "No teachers found" : "No teachers available"}
+								</p>
+								{teacherSearchTerm && (
+									<p className="text-xs mt-1 opacity-75">
+										Try a different search term
+									</p>
+								)}
+							</div>
+						) : (
+							<div className="space-y-1">
+								{filteredTeachers.map((teacher, index) => {
+									const displayName = teacher.fullname || teacher.username || "Unknown";
+									const isSelected = teacher._id === form.targetId;
+									const isHighlighted = highlightedTeacherIndex === index;
+
+									return (
+										<button
+											key={teacher._id}
+											type="button"
+											onClick={() => handleSelectTeacher(teacher._id)}
+											className="w-full px-4 py-3 rounded-xl text-left transition-all"
+											style={{
+												backgroundColor: isSelected
+													? darkMode
+														? "rgba(99, 102, 241, 0.3)"
+														: "rgba(99, 102, 241, 0.1)"
+													: isHighlighted
+													? darkMode
+														? "rgba(75, 85, 99, 0.3)"
+														: "#f3f4f6"
+													: "transparent",
+												color: darkMode ? "#ffffff" : "#1f2937",
+												border: isSelected
+													? darkMode
+														? "1px solid rgba(99, 102, 241, 0.5)"
+														: "1px solid rgba(99, 102, 241, 0.3)"
+													: "1px solid transparent"
+											}}
+											onMouseEnter={() => setHighlightedTeacherIndex(index)}
+										>
+											<div className="flex items-center justify-between">
+												<div className="flex-1 min-w-0">
+													<p className="font-medium text-sm truncate">{displayName}</p>
+													{teacher.email && (
+														<p
+															className="text-xs mt-0.5 truncate"
+															style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+														>
+															{teacher.email}
+														</p>
+													)}
+													{teacher.username && teacher.username !== displayName && (
+														<p
+															className="text-xs mt-0.5 truncate"
+															style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+														>
+															@{teacher.username}
+														</p>
+													)}
+												</div>
+												{isSelected && (
+													<div
+														className="ml-3 flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center"
+														style={{
+															backgroundColor: darkMode
+																? "rgba(99, 102, 241, 0.5)"
+																: "rgba(99, 102, 241, 0.2)"
+														}}
+													>
+														<div
+															className="w-2 h-2 rounded-full"
+															style={{
+																backgroundColor: darkMode ? "#a5b4fc" : "#6366f1"
+															}}
+														/>
+													</div>
+												)}
+											</div>
+										</button>
+									);
+								})}
+							</div>
+						)}
+					</div>
+
+					{/* Modal Footer */}
+					{filteredTeachers.length > 0 && (
+						<div
+							className="p-3 border-t text-xs text-center"
+							style={{
+								borderColor: darkMode ? "rgba(148, 163, 184, 0.25)" : "rgba(148, 163, 184, 0.25)",
+								color: darkMode ? "#94a3b8" : "#64748b"
+							}}
+						>
+							{filteredTeachers.length} {filteredTeachers.length === 1 ? "teacher" : "teachers"} found
+							{teacherSearchTerm && ` matching "${teacherSearchTerm}"`}
+						</div>
+					)}
+				</div>
+			</div>
+		)}
+		</>
 	);
 }
 
