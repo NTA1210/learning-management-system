@@ -45,7 +45,7 @@ jest.mock('@/utils/jwt', () => ({
   }),
 }));
 
-import { CONFLICT, NOT_FOUND, OK, UNAUTHORIZED } from '@/constants/http';
+import { CONFLICT, CREATED, NOT_FOUND, OK, UNAUTHORIZED } from '@/constants/http';
 // ------------------------//----------------------------------
 import {
   loginHandler,
@@ -128,7 +128,10 @@ describe('Auth Controller Unit Tests', () => {
       expect(createAccount).toHaveBeenCalledWith(mockUser);
 
       // ✅ validate res.success được gọi
-      expect(mockRes.success).toHaveBeenCalledWith(expect.any(Number), mockUser);
+      expect(mockRes.success).toHaveBeenCalledWith(CREATED, {
+        data: mockUser,
+        message: 'Account created successfully, please verify your email',
+      });
     });
 
     it('should throw error if validation fails', async () => {
