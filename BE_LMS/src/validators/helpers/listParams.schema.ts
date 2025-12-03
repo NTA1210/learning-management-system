@@ -11,7 +11,7 @@ export const listParamsSchema = z.object({
       return Number.isFinite(num) && num > 0 ? num : 1;
     }),
   limit: z
-    .string()
+    .union([z.string(), z.number()])
     .optional()
     .transform((val) => {
       const num = Number(val);
