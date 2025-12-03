@@ -85,8 +85,9 @@ const CourseSchema = new mongoose.Schema<ICourse>(
 );
 
 //indexes
-// ✅ FIX: Removed unique constraint - one subject can have multiple courses
-CourseSchema.index({ semesterId: 1, subjectId: 1 }, { unique: true });
+// ✅ UPDATED: Removed unique constraint to allow multiple courses per subject per semester
+// This enables creating multiple class sections (e.g., Math 101 - Section A, Math 101 - Section B)
+CourseSchema.index({ semesterId: 1, subjectId: 1 });
 CourseSchema.index({ isPublished: 1, createdAt: -1 });
 CourseSchema.index({ teacherIds: 1, isPublished: 1, createdAt: -1 });
 CourseSchema.index({ slug: 1 }, { unique: true });
