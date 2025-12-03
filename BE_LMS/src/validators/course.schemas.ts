@@ -26,6 +26,7 @@ export const listCoursesSchema = z
     from: datePreprocess.optional(), // Date range start with validation
     to: datePreprocess.optional(), // Date range end with validation
     subjectId: z.string().regex(objectIdRegex, 'Invalid subject ID format').optional(), // Filter by subject ID
+    specialistId: z.string().regex(objectIdRegex, 'Invalid specialist ID format').optional(), // Filter by specialist ID
     semesterId: z.string().regex(objectIdRegex, 'Invalid semester ID format').optional(), // Filter by semester ID
     teacherId: z.string().regex(objectIdRegex, 'Invalid teacher ID format').optional(), // Filter by teacher ID
     isPublished: z
