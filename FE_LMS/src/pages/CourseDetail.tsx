@@ -317,6 +317,16 @@ export default function CourseDetail() {
       if (res.isConfirmed) setActiveTab("static");
       return;
     }
+    const Swal = (await import("sweetalert2")).default;
+    const res = await Swal.fire({
+      title: "Confirm complete course",
+      html: "<div style='font-size:14px;opacity:0.8'>Completing will generate statistics and mark the course as completed.</div>",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Confirm",
+      cancelButtonText: "Cancel",
+    });
+    if (!res.isConfirmed) return;
     await handleCompleteCourse();
   };
   useEffect(() => {

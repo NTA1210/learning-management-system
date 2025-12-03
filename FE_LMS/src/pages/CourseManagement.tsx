@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
 import { authService, courseService, enrollmentService, subjectService, specialistService } from "../services";
@@ -34,7 +34,6 @@ const CourseManagement: React.FC = () => {
     { _id: string; username: string; email: string }[]
   >([]);
   const [selectedTeachers, setSelectedTeachers] = useState<string[]>([]);
-  const [teacherSearchTerm, setTeacherSearchTerm] = useState("");
   const [categorySearchTerm, setCategorySearchTerm] = useState("");
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [currentTeacherId, setCurrentTeacherId] = useState<string | null>(null);
@@ -61,8 +60,8 @@ const CourseManagement: React.FC = () => {
       endDate: string;
     }>
   >([]);
-        const localSpec = localStorage.getItem('lms:studentSpecialistIds');// Assuming this key, user mentioned STUDENT_SPECIALIST_KEY
-                      console.log(localSpec);
+     
+                    
   const [specialists, setSpecialists] = useState<Array<{ _id: string; name: string }>>([]);
   const [subjects, setSubjects] = useState<Array<{ _id: string; name: string; specialistIds?: string[] }>>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState(searchParams.get("subjectId") ?? "");
@@ -104,6 +103,36 @@ const CourseManagement: React.FC = () => {
   const [sortOption, setSortOption] = useState<
     "name_asc" | "name_desc" | "date_asc" | "date_desc"
   >((searchParams.get("sort") as any) || "date_desc");
+
+  // Teacher Search State for Edit Modal
+  const [teacherSearchQuery, setTeacherSearchQuery] = useState<string>("");
+  const [showTeacherDropdown, setShowTeacherDropdown] = useState<boolean>(false);
+  const teacherDropdownRef = useRef<HTMLDivElement | null>(null);
+  const [mouseDownOnBackdrop, setMouseDownOnBackdrop] = useState(false);
+
+  const filteredTeachers = React.useMemo(() => {
+    if (!teacherSearchQuery.trim()) return availableTeachers;
+    const q = teacherSearchQuery.toLowerCase();
+    return availableTeachers.filter((t) => {
+      const name = (t.username || "").toLowerCase();
+      const email = (t.email || "").toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+  }, [availableTeachers, teacherSearchQuery]);
+
+  // Click outside handler for teacher dropdown
+  useEffect(() => {
+    const handler = (ev: MouseEvent) => {
+      if (
+        teacherDropdownRef.current &&
+        !teacherDropdownRef.current.contains(ev.target as Node)
+      ) {
+        setShowTeacherDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   function closeModal() {
     setModalAnim("leave");
@@ -328,6 +357,7 @@ const CourseManagement: React.FC = () => {
         ...(selectedTeacherId && { teacherId: selectedTeacherId }),
         page: currentPage,
         limit: pageLimit,
+        isPublished:true,
         ...(isName ? { sortBy: "title" } : {}),
         ...(order ? { sortOrder: order } : {}),
       };
@@ -420,6 +450,8 @@ const CourseManagement: React.FC = () => {
       setDeleteTargetId(null);
     }
   };
+  const localSpec = localStorage.getItem("lms:studentSpecialistIds");
+  const localSpecId = (localSpec || "").replace(/[\[\]"]/g, "");
 
   const handleEdit = (course: Course) => {
     setEditingCourse(course);
@@ -658,6 +690,18 @@ const CourseManagement: React.FC = () => {
                       List Deleted
                     </button>
                   )}
+                    {isAdmin && (
+                    <button
+                      onClick={() => navigate("/admin/courses/approved")}
+                      className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105"
+                      style={{
+                        backgroundColor: darkMode ? "#111827" : "#1eb1cbff",
+                        border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
+                      }}
+                    >
+                      Approve Courses
+                    </button>
+                  )}
                   {canCreate && (
                     <button
                       onClick={() => {
@@ -730,37 +774,39 @@ const CourseManagement: React.FC = () => {
                   <Search size={20} />
                 </button>
                 <div className="relative flex items-center">
+                  {isAdmin ? null :(
                   <button
                     onClick={() => {
-                    
-                      if (localSpec) {
-                        if (selectedSpecialistId === localSpec) {
-                           setSelectedSpecialistId("");
+
+                      if (localSpecId) {
+                        if (selectedSpecialistId === localSpecId) {
+                          setSelectedSpecialistId("");
                         } else {
-                           setSelectedSpecialistId(localSpec);
+                          setSelectedSpecialistId(localSpecId);
                         }
                         setCurrentPage(1);
                       } else {
-                         showToastInfo("No specialist found in local storage");
+                        showToastInfo("No specialist found in local storage");
                       }
                     }}
-                    className={`px-4 py-2 rounded-lg border transition-colors duration-200 shadow-sm font-semibold text-sm ${
-                      selectedSpecialistId && selectedSpecialistId === localStorage.getItem("lms:studentSpecialistIds")
+                    className={`px-4 py-2 rounded-lg border transition-colors duration-200 shadow-sm font-semibold text-sm ${selectedSpecialistId && selectedSpecialistId === localSpecId
                         ? "bg-indigo-600 text-white border-indigo-600"
                         : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                    }`}
+                      }`}
                     style={
-                      !(selectedSpecialistId && selectedSpecialistId === localStorage.getItem("lms:studentSpecialistIds"))
+                      !(selectedSpecialistId && selectedSpecialistId === localSpecId)
                         ? {
-                            background: darkMode ? "#152632" : "#ffffff",
-                            color: darkMode ? "#ffffff" : "#111827",
-                            borderColor: darkMode ? "#334155" : "#e5e7eb",
-                          }
+                          background: darkMode ? "#152632" : "#ffffff",
+                          color: darkMode ? "#ffffff" : "#111827",
+                          borderColor: darkMode ? "#334155" : "#e5e7eb",
+                        }
                         : {}
                     }
                   >
                     My Specialist
                   </button>
+              )}
+             
                 </div>
                 <div className="relative">
                   <select
@@ -1345,16 +1391,27 @@ const CourseManagement: React.FC = () => {
                 ? "modal-fade-leave"
                 : ""
             }`}
-            onClick={(e) => {
+            onClick={() => {
+               // Handled by onMouseUp
+            }}
+            onMouseDown={(e) => {
               if (e.target === e.currentTarget) {
+                setMouseDownOnBackdrop(true);
+              } else {
+                setMouseDownOnBackdrop(false);
+              }
+            }}
+            onMouseUp={(e) => {
+              if (mouseDownOnBackdrop && e.target === e.currentTarget) {
                 setShowCreateModal(false);
                 setCategorySearchTerm("");
                 setShowCategoryDropdown(false);
               }
+              setMouseDownOnBackdrop(false);
             }}
           >
             <div
-              className="w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl"
+              className="w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
               style={{
                 backgroundColor: darkMode ? "#0b132b" : "#ffffff",
                 border: "1px solid rgba(255,255,255,0.08)",
@@ -1419,13 +1476,24 @@ const CourseManagement: React.FC = () => {
               backdropFilter: "blur(2px)",
               animation: "fadeIn 0.3s ease-out",
             }}
-            onClick={(e) => {
+            onClick={() => {
+               // Handled by onMouseUp
+            }}
+            onMouseDown={(e) => {
               if (e.target === e.currentTarget) {
+                setMouseDownOnBackdrop(true);
+              } else {
+                setMouseDownOnBackdrop(false);
+              }
+            }}
+            onMouseUp={(e) => {
+              if (mouseDownOnBackdrop && e.target === e.currentTarget) {
                 setShowEditModal(false);
                 setEditingCourse(null);
                 setCategorySearchTerm("");
                 setShowCategoryDropdown(false);
               }
+              setMouseDownOnBackdrop(false);
             }}
           >
             <div
@@ -1464,7 +1532,337 @@ const CourseManagement: React.FC = () => {
                       required
                     />
                   </div>
+                  <div className="col-span-2">
+                    <label className="block mb-2 font-semibold">
+                      Select Teachers * ({isTeacher && user?._id ? 1 : selectedTeachers.length} selected)
+                      {isTeacher && (
+                        <span className="text-sm text-blue-500 ml-2">
+                          (You are automatically assigned as the teacher)
+                        </span>
+                      )}
+                    </label>
+                    <div
+                      ref={teacherDropdownRef}
+                      style={{ position: "relative", minWidth: 320 }}
+                    >
+                      <div
+                        onClick={() => !isTeacher && setShowTeacherDropdown(!showTeacherDropdown)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 12,
+                          padding: "8px 12px",
+                          borderRadius: 12,
+                          border: `2px solid ${showTeacherDropdown
+                              ? "#10b981"
+                              : darkMode
+                                ? "rgba(75,85,99,0.3)"
+                                : "#e5e7eb"
+                            }`,
+                          background: darkMode ? "#1f2937" : "white",
+                          cursor: isTeacher ? "default" : "pointer",
+                          transition: "all 0.2s",
+                          boxSizing: "border-box",
+                          minHeight: 44,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 8,
+                            alignItems: "center",
+                            overflow: "hidden",
+                            flex: 1,
+                            minWidth: 0,
+                          }}
+                        >
+                          {selectedTeachers.length > 0 ? (
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: 8,
+                                alignItems: "center",
+                                overflow: "hidden",
+                              }}
+                            >
+                              {selectedTeachers.slice(0, 3).map((id) => {
+                                const t = availableTeachers.find((x) => x._id === id);
+                                if (!t) return null;
+                                return (
+                                  <div
+                                    key={id}
+                                    title={t.username}
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 6,
+                                    }}
+                                  >
+                                    {(t as any).avatar_url ? (
+                                      <img
+                                        src={(t as any).avatar_url}
+                                        alt={t.username}
+                                        style={{
+                                          width: 28,
+                                          height: 28,
+                                          borderRadius: "50%",
+                                          objectFit: "cover",
+                                        }}
+                                      />
+                                    ) : (
+                                      <div
+                                        style={{
+                                          width: 28,
+                                          height: 28,
+                                          borderRadius: "50%",
+                                          background: darkMode ? "#374151" : "#f1f5f9",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          color: darkMode ? "#9ca3af" : "#64748b",
+                                          fontSize: 12,
+                                          fontWeight: 600,
+                                        }}
+                                      >
+                                        {(t.username || "T")
+                                          .substring(0, 2)
+                                          .toUpperCase()}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              {selectedTeachers.length > 3 && (
+                                <div
+                                  style={{
+                                    fontSize: 12,
+                                    color: darkMode ? "#9ca3af" : "#374151",
+                                  }}
+                                >
+                                  +{selectedTeachers.length - 3}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div style={{ color: darkMode ? "#9ca3af" : "#64748b" }}>
+                              {isTeacher ? `${user?.username} (You)` : "Select teachers..."}
+                            </div>
+                          )}
+                        </div>
+                        {!isTeacher && (
+                          <i
+                            className={`bi bi-chevron-${showTeacherDropdown ? "up" : "down"}`}
+                            style={{
+                              color: darkMode ? "#9ca3af" : "#64748b",
+                              marginLeft: "auto",
+                            }}
+                          />
+                        )}
+                      </div>
 
+                      {showTeacherDropdown && !isTeacher && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "calc(100% + 8px)",
+                            left: 0,
+                            right: 0,
+                            background: darkMode ? "#1f2937" : "white",
+                            borderRadius: 12,
+                            border: `1px solid ${darkMode ? "#374151" : "#e5e7eb"}`,
+                            boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
+                            zIndex: 1000,
+                            maxHeight: 360,
+                            overflow: "hidden",
+                          }}
+                        >
+                          <div
+                            style={{
+                              padding: 12,
+                              borderBottom: `1px solid ${darkMode ? "#374151" : "#e5e7eb"}`,
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                padding: "8px 12px",
+                                borderRadius: 8,
+                                background: darkMode ? "#374151" : "#f1f5f9",
+                              }}
+                            >
+                              <i
+                                className="bi bi-search"
+                                style={{ color: darkMode ? "#9ca3af" : "#64748b" }}
+                              />
+                              <input
+                                type="text"
+                                placeholder="Search teachers..."
+                                value={teacherSearchQuery}
+                                onChange={(e) => setTeacherSearchQuery(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                                style={{
+                                  border: "none",
+                                  background: "transparent",
+                                  outline: "none",
+                                  width: "100%",
+                                  color: darkMode ? "#f1f5f9" : "#1e293b",
+                                  fontSize: 14,
+                                }}
+                              />
+                              {teacherSearchQuery && (
+                                <i
+                                  className="bi bi-x-circle-fill"
+                                  style={{
+                                    color: darkMode ? "#6b7280" : "#9ca3af",
+                                    cursor: "pointer",
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setTeacherSearchQuery("");
+                                  }}
+                                />
+                              )}
+                            </div>
+                          </div>
+
+                          <div style={{ maxHeight: 280, overflowY: "auto" }}>
+                            {filteredTeachers.length === 0 ? (
+                              <div
+                                style={{
+                                  padding: 24,
+                                  textAlign: "center",
+                                  color: darkMode ? "#9ca3af" : "#64748b",
+                                }}
+                              >
+                                <i
+                                  className="bi bi-person-x"
+                                  style={{
+                                    fontSize: 24,
+                                    marginBottom: 8,
+                                    display: "block",
+                                  }}
+                                />
+                                No teachers found
+                              </div>
+                            ) : (
+                              filteredTeachers.map((teacher) => {
+                                const selected = selectedTeachers.includes(teacher._id);
+                                return (
+                                  <div
+                                    key={teacher._id}
+                                    onClick={() => {
+                                      setSelectedTeachers((prev) => {
+                                        const exists = prev.includes(teacher._id);
+                                        return exists ? prev.filter(id => id !== teacher._id) : [...prev, teacher._id];
+                                      });
+                                    }}
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 12,
+                                      padding: "10px 12px",
+                                      cursor: "pointer",
+                                      background: selected
+                                        ? darkMode
+                                          ? "rgba(16,185,129,0.12)"
+                                          : "rgba(16,185,129,0.08)"
+                                        : "transparent",
+                                      borderLeft: selected
+                                        ? "3px solid #10b981"
+                                        : "3px solid transparent",
+                                      transition: "all 0.12s",
+                                    }}
+                                  >
+                                    {(teacher as any).avatar_url ? (
+                                      <img
+                                        src={(teacher as any).avatar_url}
+                                        alt={teacher.username}
+                                        style={{
+                                          width: 40,
+                                          height: 40,
+                                          borderRadius: "50%",
+                                          objectFit: "cover",
+                                          border: selected
+                                            ? "2px solid #10b981"
+                                            : `2px solid ${darkMode ? "#374151" : "#e2e8f0"
+                                            }`,
+                                        }}
+                                      />
+                                    ) : (
+                                      <div
+                                        style={{
+                                          width: 40,
+                                          height: 40,
+                                          borderRadius: "50%",
+                                          background: selected
+                                            ? "linear-gradient(135deg,#10b981,#059669)"
+                                            : darkMode
+                                              ? "#374151"
+                                              : "#e2e8f0",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          color: selected
+                                            ? "white"
+                                            : darkMode
+                                              ? "#9ca3af"
+                                              : "#64748b",
+                                          fontWeight: 600,
+                                          fontSize: 14,
+                                        }}
+                                      >
+                                        {(teacher.username || "T")
+                                          .substring(0, 2)
+                                          .toUpperCase()}
+                                      </div>
+                                    )}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div
+                                        style={{
+                                          fontWeight: 500,
+                                          fontSize: 13,
+                                          color: darkMode ? "#f1f5f9" : "#1e293b",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 6,
+                                        }}
+                                      >
+                                        {teacher.username}
+                                      </div>
+                                      <div
+                                        style={{
+                                          fontSize: 11,
+                                          color: darkMode ? "#6b7280" : "#94a3b8",
+                                          marginTop: 2,
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 6,
+                                        }}
+                                      >
+                                        <i
+                                          className="bi bi-envelope"
+                                          style={{ fontSize: 10 }}
+                                        />
+                                        {(teacher as any).email || ""}
+                                      </div>
+                                    </div>
+                                    {selected && (
+                                      <i
+                                        className="bi bi-check-circle-fill"
+                                        style={{ color: "#10b981", fontSize: 16 }}
+                                      />
+                                    )}
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <div>
                     <label className="block mb-2 font-semibold">Capacity</label>
                     <input
@@ -1562,160 +1960,7 @@ const CourseManagement: React.FC = () => {
                     }}
                   />
                 </div>
-                <div className="col-span-2">
-                  <label className="block mb-2 font-semibold">
-                    Select Teachers * (
-                    {isTeacher && user?._id ? 1 : selectedTeachers.length}{" "}
-                    selected)
-                    {isTeacher && (
-                      <span className="text-sm text-blue-500 ml-2">
-                        (You are automatically assigned as the teacher)
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder={
-                      isTeacher
-                        ? `${user?.username} (You)`
-                        : "Search teachers..."
-                    }
-                    value={teacherSearchTerm}
-                    onChange={(e) => setTeacherSearchTerm(e.target.value)}
-                    disabled={isTeacher}
-                    style={{
-                      backgroundColor: darkMode
-                        ? "rgba(55, 65, 81, 0.8)"
-                        : "#ffffff",
-                      borderColor: darkMode
-                        ? "rgba(75, 85, 99, 0.3)"
-                        : "#e5e7eb",
-                      color: darkMode ? "#ffffff" : "#000000",
-                    }}
-                  />
-                  <div
-                    className="max-h-40 overflow-y-auto border rounded transition-colors duration-300"
-                    style={{
-                      backgroundColor: darkMode
-                        ? "rgba(55, 65, 81, 0.8)"
-                        : "#ffffff",
-                      borderColor: darkMode
-                        ? "rgba(75, 85, 99, 0.3)"
-                        : "#e5e7eb",
-                    }}
-                  >
-                    {(isTeacher
-                      ? // For teachers, only show themselves (get ID from state)
-                        availableTeachers.filter(
-                          (teacher) => teacher._id === currentTeacherId
-                        )
-                      : // For admins, show all teachers with search filter
-                        availableTeachers.filter(
-                          (teacher) =>
-                            teacher.username
-                              .toLowerCase()
-                              .includes(teacherSearchTerm.toLowerCase()) ||
-                            teacher.email
-                              .toLowerCase()
-                              .includes(teacherSearchTerm.toLowerCase())
-                        )
-                    ).map((teacher) => (
-                      <div
-                        key={teacher._id}
-                        className="flex items-center p-2 cursor-pointer transition-all duration-300 hover:scale-[1.02]"
-                        style={{
-                          backgroundColor: selectedTeachers.includes(
-                            teacher._id
-                          )
-                            ? darkMode
-                              ? "rgba(99, 102, 241, 0.2)"
-                              : "#eef2ff"
-                            : "transparent",
-                          borderRadius: "8px",
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!selectedTeachers.includes(teacher._id)) {
-                            e.currentTarget.style.backgroundColor = darkMode
-                              ? "rgba(75, 85, 99, 0.3)"
-                              : "#f3f4f6";
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!selectedTeachers.includes(teacher._id)) {
-                            e.currentTarget.style.backgroundColor =
-                              "transparent";
-                          }
-                        }}
-                        onClick={() => {
-                          if (selectedTeachers.includes(teacher._id)) {
-                            setSelectedTeachers(
-                              selectedTeachers.filter(
-                                (id) => id !== teacher._id
-                              )
-                            );
-                          } else {
-                            setSelectedTeachers([
-                              ...selectedTeachers,
-                              teacher._id,
-                            ]);
-                          }
-                        }}
-                      >
-                        <div className="mr-3 flex items-center">
-                          <div
-                            className="w-4 h-4 border-2 rounded transition-all duration-200 flex items-center justify-center"
-                            style={{
-                              borderColor: selectedTeachers.includes(
-                                teacher._id
-                              )
-                                ? darkMode
-                                  ? "#a5b4fc"
-                                  : "#4f46e5"
-                                : darkMode
-                                ? "rgba(75, 85, 99, 0.5)"
-                                : "#d1d5db",
-                              backgroundColor: selectedTeachers.includes(
-                                teacher._id
-                              )
-                                ? darkMode
-                                  ? "#6366f1"
-                                  : "#4f46e5"
-                                : "transparent",
-                            }}
-                          >
-                            {selectedTeachers.includes(teacher._id) && (
-                              <svg
-                                className="w-3 h-3 text-white"
-                                fill="currentColor"
-                                viewBox="0 0 20 20"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                            )}
-                          </div>
-                        </div>
-                        <span
-                          className="flex-1 transition-colors duration-200"
-                          style={{
-                            color: selectedTeachers.includes(teacher._id)
-                              ? darkMode
-                                ? "#a5b4fc"
-                                : "#4f46e5"
-                              : darkMode
-                              ? "#ffffff"
-                              : "#000000",
-                          }}
-                        >
-                          {teacher.username} ({teacher.email})
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+             
                 <div className="flex items-center col-span-2">
                   <input
                     type="checkbox"
