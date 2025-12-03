@@ -4,7 +4,6 @@ import { Eye, ShieldOff, RefreshCw } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { useTheme } from "../hooks/useTheme";
-import { useAuth } from "../hooks/useAuth";
 import { quizAttemptService } from "../services";
 import type { QuizAttemptSummary, GetQuizAttemptsParams } from "../types/quizAttemptGrading";
 import Swal from "sweetalert2";
@@ -13,8 +12,6 @@ export default function QuizAttemptsPage() {
     const { quizId } = useParams<{ quizId: string }>();
     const navigate = useNavigate();
     const { darkMode } = useTheme();
-    const { user } = useAuth();
-    const isStudent = user?.role === 'student';
 
     const [attempts, setAttempts] = useState<QuizAttemptSummary[]>([]);
     const [loading, setLoading] = useState(true);
@@ -101,16 +98,7 @@ export default function QuizAttemptsPage() {
             };
             const response = await quizAttemptService.getQuizAttemptsForGrading(quizId, params);
 
-            const response = await quizAttemptService.getQuizAttemptsForGrading(quizId, params);
-
-            let data = response.data || [];
-            if (isStudent) {
-                data = data.filter(a => {
-                    const sId = typeof a.student === 'string' ? a.student : a.student?._id;
-                    return sId === user?._id;
-                });
-            }
-            setAttempts(data);
+            setAttempts(response.data || []);
             if (response.pagination) {
                 setTotalPages(response.pagination.totalPages);
                 setTotal(response.pagination.total);
@@ -286,7 +274,7 @@ export default function QuizAttemptsPage() {
                                                             )}
                                                         </td>
                                                         <td className="p-4">
-                                                            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getStatusBadgeColor(attempt.status)}`}>
+                                                            <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusBadgeColor(attempt.status)}`}>
                                                                 {attempt.status === 'in_progress' ? 'In Progress' : attempt.status}
                                                             </span>
                                                         </td>

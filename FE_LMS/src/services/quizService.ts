@@ -270,11 +270,11 @@ export const quizService = {
         }
         : {
           ...q,
-          // CRITICAL: Reset ALL flags for unchanged questions to prevent backend errors
-          // Backend may have stale flags (isNewQuestion: true) from previous operations
+          // ONLY reset isDirty and isNewQuestion to prevent backend errors
+          // PRESERVE isDeleted and isExternal to maintain question state
           isDirty: false,
           isNewQuestion: false,
-          isDeleted: false,
+          // DO NOT reset isDeleted or isExternal - keep original values
         };
     });
 

@@ -146,7 +146,7 @@ export default function QuizQuestionsPage() {
     if (!editForm) return;
     setEditForm({
       ...editForm,
-      [field]: value, // Allow string for points to support decimals during editing
+      [field]: field === "points" ? Number(value) : value,
     });
   };
 
@@ -252,9 +252,9 @@ export default function QuizQuestionsPage() {
       const updatedQuiz = await quizService.deleteQuestionById(quizId, snapshotId);
       setQuiz(updatedQuiz);
       await showSwalSuccess("Question removed.");
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to delete snapshot question:", err);
-      await showSwalError(err?.response?.data?.message || "Failed to remove question.");
+      await showSwalError("Failed to remove question.");
     } finally {
       setDeletingId(null);
     }
@@ -314,7 +314,7 @@ export default function QuizQuestionsPage() {
 
       const updatedQuiz = await quizService.updateQuestionById(quizId, snapshotId, {
         text: trimmedText,
-        points: Number(editForm.points) || 0,
+        points: editForm.points,
         explanation: editForm.explanation?.trim() || undefined,
         options: cleanedOptions,
         correctOptions: editForm.correctFlags.map((flag) => (flag ? 1 : 0)),
@@ -325,9 +325,9 @@ export default function QuizQuestionsPage() {
       setQuiz(updatedQuiz);
       await showSwalSuccess("Question updated.");
       closeEditModal();
-    } catch (err: any) {
+    } catch (err) {
       console.error("Failed to update snapshot question:", err);
-      await showSwalError(err?.response?.data?.message || "Failed to update question. Please try again.");
+      await showSwalError("Failed to update question. Please try again.");
     } finally {
       setSavingEdit(false);
     }
@@ -350,7 +350,7 @@ export default function QuizQuestionsPage() {
             />
 
             {quiz?.description && (
-              <p className="text-sm mb-6 md:ml-[80px]" style={{ color: "var(--muted-text)" }}>
+              <p className="text-sm mb-6 md:ml-[50px]" style={{ color: "var(--muted-text)" }}>
                 {quiz.description}
               </p>
             )}
@@ -377,13 +377,13 @@ export default function QuizQuestionsPage() {
               <>
                 {questions.length === 0 ? (
                   <div
-                    className="rounded-lg p-8 text-center md:ml-[80px]"
+                    className="rounded-lg p-8 text-center md:ml-[50px]"
                     style={{ backgroundColor: "var(--card-surface)", border: "1px solid var(--card-border)" }}
                   >
                     <p style={{ color: "var(--muted-text)" }}>No questions available.</p>
                   </div>
                 ) : (
-                  <div className="space-y-4 md:ml-[80px]">
+                  <div className="space-y-4 md:ml-[50px]">
                     {questions.map((question, index) => (
                       <div
                         key={question.id || index}

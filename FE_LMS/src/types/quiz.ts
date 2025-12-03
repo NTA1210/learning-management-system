@@ -2,7 +2,7 @@ import type { QuizQuestionImage } from "../services";
 
 export type EditFormState = {
   text: string;
-  points: number | string;
+  points: number;
   options: string[];
   correctFlags: boolean[];
   explanation: string;

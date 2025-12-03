@@ -90,7 +90,7 @@ export function EditQuestionModal({
                 </label>
                 <input
                   type="number"
-                  step="any"
+                  min={1}
                   value={editForm.points}
                   onChange={(e) => onInputChange("points", e.target.value)}
                   className="w-full rounded-lg border px-3 py-2"

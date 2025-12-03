@@ -350,7 +350,7 @@ export default function TakeQuizPage() {
           const attemptDetail = await quizAttemptService.getQuizAttempt(userAttempt._id);
           const latestAttempt = applyAttemptSnapshot(attemptDetail);
 
-          if (latestAttempt && latestAttempt.status === "submitted") {
+          if (latestAttempt && ["submitted", "graded", "regraded"].includes(latestAttempt.status)) {
             // Restore answers
             if (Array.isArray(latestAttempt.answers)) {
               const restored = mapAnswersFromAttempt(latestAttempt.answers);
@@ -486,7 +486,7 @@ export default function TakeQuizPage() {
           persistAttemptState(quizAttemptId, toAnswerPayloads(latestAttempt.answers));
         }
 
-        if (latestAttempt.status === "submitted") {
+        if (["submitted", "graded", "regraded"].includes(latestAttempt.status)) {
           console.log("Loading submitted attempt, deriving result...", latestAttempt);
           const derived = deriveResultFromAttempt(
             latestAttempt,
