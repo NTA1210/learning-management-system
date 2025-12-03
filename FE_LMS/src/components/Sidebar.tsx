@@ -685,20 +685,7 @@ export default function Sidebar({
                         </button>
                       </div>
                       {mobileCoursesOpen && (
-                        <div className="space-y-1 pl-9">
-                          <Link
-                            to="/curriculum"
-                            onClick={onClose}
-                            className="block px-3 py-2 text-sm rounded-lg"
-                            style={{
-                              color: darkMode ? "#e2e8f0" : "#0f172a",
-                              backgroundColor: darkMode
-                                ? "rgba(148,163,184,0.1)"
-                                : "#f8fafc",
-                            }}
-                          >
-                            Curriculum
-                          </Link>
+                        <div className="pl-9 space-y-1">
                           <Link
                             to="/assignments"
                             onClick={onClose}
@@ -977,16 +964,6 @@ export default function Sidebar({
                             transition: "max-height 300ms ease",
                           }}
                         >
-                          <Link
-                            to="/curriculum"
-                            className="flex items-center w-full px-3 py-2 text-sm rounded-md hover:bg-gray-100/20"
-                            style={{ color: darkMode ? "#9ca3af" : "#374151" }}
-                          >
-                            <span className="whitespace-nowrap">
-                              Curriculum
-                            </span>
-                          </Link>
-
                           <Link
                             to="/assignments"
                             className="flex items-center w-full px-3 py-2 text-sm rounded-md hover:bg-gray-100/20"

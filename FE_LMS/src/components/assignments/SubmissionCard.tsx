@@ -200,8 +200,8 @@ const SubmissionCard: React.FC<SubmissionCardProps> = ({
         >
           <Star size={14} />
           {submission.grade !== undefined && submission.grade !== null
-            ? "Re-Grade"
-            : "Grade"}
+            ? "Grade"
+            : "Re-Grade"}
         </button>
       </div>
     </div>
