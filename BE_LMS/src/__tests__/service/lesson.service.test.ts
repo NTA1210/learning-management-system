@@ -102,7 +102,7 @@ describe("📚 Lesson Service Unit Tests", () => {
       (CourseModel.findById as jest.Mock).mockResolvedValue(course);
       (LessonModel.exists as jest.Mock).mockResolvedValue(null);
       (LessonModel.create as jest.Mock).mockResolvedValue(lesson);
-      
+
       const mockQuery = {
         populate: jest.fn().mockReturnThis(),
         lean: jest.fn().mockResolvedValue(lesson),
@@ -135,7 +135,7 @@ describe("📚 Lesson Service Unit Tests", () => {
       (CourseModel.findById as jest.Mock).mockResolvedValue(courseWithTeacher);
       (LessonModel.exists as jest.Mock).mockResolvedValue(null);
       (LessonModel.create as jest.Mock).mockResolvedValue(lesson);
-      
+
       const mockQuery = {
         populate: jest.fn().mockReturnThis(),
         lean: jest.fn().mockResolvedValue(lesson),
@@ -393,7 +393,7 @@ describe("📚 Lesson Service Unit Tests", () => {
       };
       (LessonModel.find as jest.Mock).mockReturnValue(mockQuery);
       (LessonModel.countDocuments as jest.Mock).mockResolvedValue(1);
-      
+
       // Mock enrollment for student - select returns array when awaited
       const mockEnrollmentQuery = {
         select: jest.fn().mockResolvedValue([
@@ -428,7 +428,7 @@ describe("📚 Lesson Service Unit Tests", () => {
       );
     });
 
-    it.skip("should filter lessons by content", async () => {
+    it("should filter lessons by content", async () => {
       const mockQuery = {
         populate: jest.fn().mockReturnThis(),
         sort: jest.fn().mockReturnThis(),
@@ -571,7 +571,7 @@ describe("📚 Lesson Service Unit Tests", () => {
       ).rejects.toThrow("Not instructor of this course");
     });
 
-    it.skip("should filter lessons by publishedAt date", async () => {
+    it("should filter lessons by publishedAt date", async () => {
       const publishedDate = new Date("2024-03-01");
       const mockQuery = {
         populate: jest.fn().mockReturnThis(),
@@ -614,7 +614,7 @@ describe("📚 Lesson Service Unit Tests", () => {
       expect(result.lessons[0].accessReason).toBe("not_enrolled");
     });
 
-    it.skip("should filter lessons by order", async () => {
+    it("should filter lessons by order", async () => {
       const mockQuery = {
         populate: jest.fn().mockReturnThis(),
         sort: jest.fn().mockReturnThis(),
@@ -632,7 +632,7 @@ describe("📚 Lesson Service Unit Tests", () => {
       );
     });
 
-    it.skip("should filter lessons by durationMinutes", async () => {
+    it("should filter lessons by durationMinutes", async () => {
       const mockQuery = {
         populate: jest.fn().mockReturnThis(),
         sort: jest.fn().mockReturnThis(),
@@ -650,7 +650,7 @@ describe("📚 Lesson Service Unit Tests", () => {
       );
     });
 
-    it.skip("should use full-text search when search query provided", async () => {
+    it("should use full-text search when search query provided", async () => {
       const mockQuery = {
         populate: jest.fn().mockReturnThis(),
         sort: jest.fn().mockReturnThis(),
