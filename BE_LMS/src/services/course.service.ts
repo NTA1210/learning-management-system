@@ -208,17 +208,25 @@ export const listCourses = async ({
 
   // ✅ NEW: Filter by specialist ID (through subject's specialistIds)
   if (specialistId) {
+    console.log('🔍 Filter by specialistId:', specialistId);
+
     // Find all subjects that have this specialist
     const subjectsWithSpecialist = await SubjectModel.find({
       specialistIds: specialistId,
-    }).select('_id');
+    }).select('_id name specialistIds');
+
+    console.log('📚 Found subjects with this specialist:', subjectsWithSpecialist);
+
     const subjectIds = subjectsWithSpecialist.map((s) => s._id);
+    console.log('📋 Subject IDs to filter:', subjectIds);
 
     if (subjectIds.length > 0) {
       filter.subjectId = { $in: subjectIds };
+      console.log('✅ Filter applied - subjectId:', filter.subjectId);
     } else {
       // No subjects found with this specialist, return empty result
       filter.subjectId = null; // This will match no courses
+      console.log('❌ No subjects found with this specialist');
     }
   }
 
@@ -277,6 +285,9 @@ export const listCourses = async ({
   const sort: any = {};
   sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
+  // ✅ DEBUG: Log final filter before query
+  console.log('🎯 Final filter object:', JSON.stringify(filter, null, 2));
+
   // Execute query with pagination
   const [courses, total] = await Promise.all([
     CourseModel.find(filter)
@@ -297,6 +308,16 @@ export const listCourses = async ({
       .lean(),
     CourseModel.countDocuments(filter),
   ]);
+
+  // ✅ DEBUG: Log query results
+  console.log(`📊 Found ${total} courses, returning ${courses.length} courses`);
+  console.log('📝 Course titles and their subject IDs:');
+  courses.forEach((c: any, idx: number) => {
+    console.log(`  ${idx + 1}. "${c.title}" - SubjectID: ${c.subjectId?._id || c.subjectId}`);
+    if (c.subjectId?.specialistIds) {
+      console.log(`     Specialists: ${c.subjectId.specialistIds.map((s: any) => s._id || s).join(', ')}`);
+    }
+  });
 
   // Calculate pagination metadata
   const totalPages = Math.ceil(total / limit);
@@ -1257,10 +1278,13 @@ export const getMyCourses = async ({
 
   // Filter by specialist ID (through subject's specialistIds)
   if (specialistId) {
+
+
     // Find all subjects that have this specialist
     const subjectsWithSpecialist = await SubjectModel.find({
       specialistIds: specialistId,
-    }).select('_id');
+    }).select('_id name specialistIds');
+
     const subjectIds = subjectsWithSpecialist.map((s) => s._id);
 
     if (subjectIds.length > 0) {
@@ -1268,6 +1292,7 @@ export const getMyCourses = async ({
     } else {
       // No subjects found with this specialist, return empty result
       filter.subjectId = null; // This will match no courses
+
     }
   }
 
