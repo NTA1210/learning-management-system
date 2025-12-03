@@ -19,6 +19,7 @@ const defaultValues: LessonFormValues = {
   order: 0,
   durationMinutes: 0,
   publishedAt: "",
+  isPublished: false,
 };
 
 const LessonFormModal: React.FC<LessonFormModalProps> = ({
@@ -196,6 +197,41 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
                 placeholder="Enter duration in minutes"
               />
             </div>
+          </div>
+
+          <div className="mb-6">
+            <label className="flex items-center space-x-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={values.isPublished}
+                onChange={(e) =>
+                  setValues((prev) => ({
+                    ...prev,
+                    isPublished: e.target.checked,
+                  }))
+                }
+                className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 transition-colors"
+                style={{
+                  backgroundColor: darkMode
+                    ? "rgba(55, 65, 81, 0.8)"
+                    : "#ffffff",
+                  borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+                }}
+              />
+              <span
+                className="text-sm font-medium"
+                style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
+              >
+                Publish this lesson immediately
+              </span>
+            </label>
+            <p
+              className="text-xs mt-1 ml-8"
+              style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
+            >
+              If unchecked, the lesson will be saved as a draft and hidden from
+              students.
+            </p>
           </div>
 
           <div className="flex justify-end gap-3 px-1">

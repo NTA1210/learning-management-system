@@ -30,5 +30,6 @@ export interface LessonFormValues {
   order: number;
   durationMinutes: number;
   publishedAt: string;
+  isPublished: boolean;
 }
 
