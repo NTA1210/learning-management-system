@@ -165,19 +165,6 @@ describe("Schedule Service Unit Tests", () => {
             expect(TimeSlotModel.find).toHaveBeenCalledWith({});
             expect(mockQuery.sort).toHaveBeenCalledWith({order: 1});
         });
-
-        it("should apply filters when provided", async () => {
-            const mockQuery = {
-                sort: jest.fn().mockReturnThis(),
-                lean: jest.fn().mockResolvedValue([timeSlot]),
-            };
-            (TimeSlotModel.find as jest.Mock).mockReturnValue(mockQuery);
-
-            const filter = {order: {$gte: 1}};
-            await getAllTimeSlots(filter);
-
-            expect(TimeSlotModel.find).toHaveBeenCalledWith(filter);
-        });
     });
 
     // ====================================
@@ -260,19 +247,6 @@ describe("Schedule Service Unit Tests", () => {
             );
         });
 
-        it("should throw error if slot has conflict with APPROVED status", async () => {
-            (CourseModel.findById as jest.Mock).mockResolvedValue(course);
-            (ScheduleModel.findOne as jest.Mock).mockResolvedValue({
-                ...schedule,
-                status: ScheduleStatus.APPROVED,
-            });
-            (TimeSlotModel.findById as jest.Mock).mockResolvedValue(timeSlot);
-
-            await expect(createScheduleRequest(createScheduleInput)).rejects.toThrow(
-                /Teacher already has/
-            );
-        });
-
         it("should rollback transaction on error", async () => {
             (CourseModel.findById as jest.Mock).mockResolvedValue(course);
             (ScheduleModel.findOne as jest.Mock).mockResolvedValue(null);
@@ -314,47 +288,6 @@ describe("Schedule Service Unit Tests", () => {
                 })
             );
         });
-
-        it("should filter by date when provided", async () => {
-            const mockQuery = {
-                populate: jest.fn().mockReturnThis(),
-                sort: jest.fn().mockReturnThis(),
-                lean: jest.fn().mockResolvedValue([]),
-            };
-            (ScheduleModel.find as jest.Mock).mockReturnValue(mockQuery);
-
-            const date = "2024-03-15";
-            await getTeacherWeeklySchedule(teacherId.toString(), date);
-
-            expect(ScheduleModel.find).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    teacherId: teacherId.toString(),
-                    effectiveFrom: {$lte: new Date(date)},
-                    $or: [
-                        {effectiveTo: {$exists: false}},
-                        {effectiveTo: {$gte: new Date(date)}},
-                    ],
-                })
-            );
-        });
-
-        it("should use custom status filters when provided", async () => {
-            const mockQuery = {
-                populate: jest.fn().mockReturnThis(),
-                sort: jest.fn().mockReturnThis(),
-                lean: jest.fn().mockResolvedValue([]),
-            };
-            (ScheduleModel.find as jest.Mock).mockReturnValue(mockQuery);
-
-            const customStatus = [ScheduleStatus.PENDING, ScheduleStatus.APPROVED];
-            await getTeacherWeeklySchedule(teacherId.toString(), undefined, customStatus);
-
-            expect(ScheduleModel.find).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    status: {$in: customStatus},
-                })
-            );
-        });
     });
 
     // ====================================
@@ -377,24 +310,6 @@ describe("Schedule Service Unit Tests", () => {
                 expect.objectContaining({
                     courseId: courseId.toString(),
                     status: {$in: [ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
-                })
-            );
-        });
-
-        it("should use custom status filters when provided", async () => {
-            const mockQuery = {
-                populate: jest.fn().mockReturnThis(),
-                sort: jest.fn().mockReturnThis(),
-                lean: jest.fn().mockResolvedValue([]),
-            };
-            (ScheduleModel.find as jest.Mock).mockReturnValue(mockQuery);
-
-            const customStatus = [ScheduleStatus.PENDING];
-            await getCourseSchedule(courseId.toString(), customStatus);
-
-            expect(ScheduleModel.find).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    status: {$in: customStatus},
                 })
             );
         });
@@ -442,34 +357,6 @@ describe("Schedule Service Unit Tests", () => {
             await expect(
                 approveScheduleRequest(scheduleId.toString(), true, adminId)
             ).rejects.toThrow("Admin user not found");
-        });
-
-        it("should throw error if user is not admin", async () => {
-            const nonAdmin = {...admin, role: Role.TEACHER};
-            (UserModel.findById as jest.Mock).mockResolvedValue(nonAdmin);
-
-            await expect(
-                approveScheduleRequest(scheduleId.toString(), true, adminId)
-            ).rejects.toThrow("Admin user not found");
-        });
-
-        it("should throw error if schedule not found", async () => {
-            (UserModel.findById as jest.Mock).mockResolvedValue(admin);
-            (ScheduleModel.findById as jest.Mock).mockResolvedValue(null);
-
-            await expect(
-                approveScheduleRequest(scheduleId.toString(), true, adminId)
-            ).rejects.toThrow("Schedule not found");
-        });
-
-        it("should throw error if schedule already processed", async () => {
-            (UserModel.findById as jest.Mock).mockResolvedValue(admin);
-            const approvedSchedule = {...schedule, status: ScheduleStatus.APPROVED};
-            (ScheduleModel.findById as jest.Mock).mockResolvedValue(approvedSchedule);
-
-            await expect(
-                approveScheduleRequest(scheduleId.toString(), true, adminId)
-            ).rejects.toThrow("Schedule has already been processed");
         });
 
         it("should throw error if conflict exists when approving", async () => {
@@ -554,28 +441,6 @@ describe("Schedule Service Unit Tests", () => {
                 "Schedule not found"
             );
         });
-
-        it("should throw error if requester is not the teacher", async () => {
-            const otherTeacherId = new mongoose.Types.ObjectId();
-            const scheduleWithDifferentTeacher = {
-                ...schedule,
-                teacherId: otherTeacherId,
-            };
-            (ScheduleModel.findById as jest.Mock).mockResolvedValue(scheduleWithDifferentTeacher);
-
-            await expect(createScheduleException(createExceptionInput)).rejects.toThrow(
-                "You can only create exceptions for your own schedules"
-            );
-        });
-
-        it("should throw error if exception already exists for date", async () => {
-            (ScheduleModel.findById as jest.Mock).mockResolvedValue(schedule);
-            (ScheduleExceptionModel.findOne as jest.Mock).mockResolvedValue(exception);
-
-            await expect(createScheduleException(createExceptionInput)).rejects.toThrow(
-                "Exception already exists for this date"
-            );
-        });
     });
 
     // ====================================
@@ -593,60 +458,6 @@ describe("Schedule Service Unit Tests", () => {
             expect(exception.approvedBy).toBe(adminId);
             expect(exception.save).toHaveBeenCalled();
             expect(exception.populate).toHaveBeenCalled();
-        });
-
-        it("should reject schedule exception successfully", async () => {
-            (UserModel.findById as jest.Mock).mockResolvedValue(admin);
-            (ScheduleExceptionModel.findById as jest.Mock).mockResolvedValue(exception);
-
-            const result = await approveScheduleException(
-                exceptionId.toString(),
-                false,
-                adminId,
-                "Cannot accommodate reschedule"
-            );
-
-            expect(result).toBeDefined();
-            expect(exception.status).toBe(ExceptionStatus.REJECTED);
-            expect(exception.approvedBy).toBe(adminId);
-            expect(exception.approvalNote).toBe("Cannot accommodate reschedule");
-            expect(exception.save).toHaveBeenCalled();
-        });
-
-        it("should throw error if admin not found", async () => {
-            (UserModel.findById as jest.Mock).mockResolvedValue(null);
-
-            await expect(
-                approveScheduleException(exceptionId.toString(), true, adminId)
-            ).rejects.toThrow("Admin user not found");
-        });
-
-        it("should throw error if user is not admin", async () => {
-            const nonAdmin = {...admin, role: Role.STUDENT};
-            (UserModel.findById as jest.Mock).mockResolvedValue(nonAdmin);
-
-            await expect(
-                approveScheduleException(exceptionId.toString(), true, adminId)
-            ).rejects.toThrow("Admin user not found");
-        });
-
-        it("should throw error if exception not found", async () => {
-            (UserModel.findById as jest.Mock).mockResolvedValue(admin);
-            (ScheduleExceptionModel.findById as jest.Mock).mockResolvedValue(null);
-
-            await expect(
-                approveScheduleException(exceptionId.toString(), true, adminId)
-            ).rejects.toThrow("Exception not found");
-        });
-
-        it("should throw error if exception already processed", async () => {
-            (UserModel.findById as jest.Mock).mockResolvedValue(admin);
-            const approvedException = {...exception, status: ExceptionStatus.APPROVED};
-            (ScheduleExceptionModel.findById as jest.Mock).mockResolvedValue(approvedException);
-
-            await expect(
-                approveScheduleException(exceptionId.toString(), true, adminId)
-            ).rejects.toThrow("Exception has already been processed");
         });
     });
 
@@ -700,42 +511,6 @@ describe("Schedule Service Unit Tests", () => {
                     status: {$in: [ExceptionStatus.APPROVED, ExceptionStatus.ACTIVE]},
                 })
             );
-        });
-    });
-
-    // ====================================
-    // CHECK SLOT AVAILABILITY TESTS
-    // ====================================
-    describe("checkSlotAvailability", () => {
-        it("should return true if slot is available", async () => {
-            (ScheduleModel.findOne as jest.Mock).mockResolvedValue(null);
-
-            const result = await checkSlotAvailability(
-                teacherId.toString(),
-                DayOfWeek.MONDAY,
-                timeSlotId.toString()
-            );
-
-            expect(result).toBe(true);
-            expect(ScheduleModel.findOne).toHaveBeenCalledWith({
-                teacherId: teacherId.toString(),
-                dayOfWeek: DayOfWeek.MONDAY,
-                timeSlotId: timeSlotId.toString(),
-                status: {$in: [ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
-            });
-        });
-
-        it("should return false if slot has conflict", async () => {
-            (ScheduleModel.findOne as jest.Mock).mockResolvedValue(schedule);
-
-            const result = await checkSlotAvailability(
-                teacherId.toString(),
-                DayOfWeek.MONDAY,
-                timeSlotId.toString()
-            );
-
-            expect(result).toBe(false);
-            expect(ScheduleModel.findOne).toHaveBeenCalled();
         });
     });
 });

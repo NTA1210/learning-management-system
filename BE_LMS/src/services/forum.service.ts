@@ -5,7 +5,7 @@ import {ListParams} from "@/types/dto";
 import {ForumType} from "@/types/forum.type";
 import {IForum, IForumPost, IForumReply, Role} from "@/types";
 import mongoose from "mongoose";
-import {CourseModel} from "@/models";
+import {CourseModel, EnrollmentModel} from "@/models";
 import {prefixForumFile, prefixForumPostFile, prefixForumReplyFile} from "@/utils/filePrefix";
 import {createEntityWithFiles, updateEntityWithFiles} from "@/utils/entityFileUpload";
 
@@ -146,7 +146,6 @@ export const listForumsOfACourse = async ({
     const sort: any = {};
     sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
-    console.log("FOTLERS:", filter);
     // Execute query with pagination
     const [forums, total] = await Promise.all([
         ForumModel.find(filter)
@@ -188,6 +187,7 @@ export const getForumById = async (forumId: string) => {
 
 export const createForum = async (
     data: Omit<IForum, keyof mongoose.Document<mongoose.Types.ObjectId>>,
+    role: Role,
     file?: Express.Multer.File | Express.Multer.File[]
 ) => {
     // Validate courseId exists
@@ -195,6 +195,32 @@ export const createForum = async (
     const courseId = await CourseModel.findById(data.courseId);
     appAssert(courseId, NOT_FOUND, "Course ID not found");
     appAssert(data.title, NOT_FOUND, "Forum title is required");
+
+    switch (role) {
+        case Role.ADMIN:
+            // Allow creation
+            break;
+        case Role.TEACHER:
+            // Check if the teacher is teaching the course
+            const isTeacherInCourse = await CourseModel.exists({
+                _id: data.courseId,
+                teacherIds: data.createdBy,
+            });
+            appAssert(isTeacherInCourse, FORBIDDEN, "You don't have permission to create forums not in your course");
+            break;
+        default:
+            // Check if student is attempting to create an announcement forum, or they are posting in a course they don't belong to
+            appAssert(data.forumType === ForumType.DISCUSSION,
+                FORBIDDEN,
+                "You don't have permission to create this type of forum"
+            );
+            const isStudentInCourse = await EnrollmentModel.exists({
+                courseId: data.courseId,
+                studentId: data.createdBy,
+            });
+            appAssert(isStudentInCourse, FORBIDDEN, "You don't have permission to create forums in courses you don't belong to");
+            break;
+    }
 
     // Use the helper to handle create → upload → update pattern
     return await createEntityWithFiles({
@@ -273,6 +299,7 @@ export const updateForumById = async (
                 FORBIDDEN,
                 "You can only edit your own forums"
             );
+            break;
     }
 
     // Update basic data
@@ -330,6 +357,7 @@ export const deleteForumById = async (forumId: string, authorId: mongoose.Types.
                 FORBIDDEN,
                 "You can only delete your own forums"
             );
+            break;
     }
 
     return ForumModel.deleteOne({_id: forumId});
@@ -446,6 +474,7 @@ export const getForumPostById = async (forumId: string, postId: string) => {
 
 export const createForumPost = async (
     data: Omit<IForumPost, keyof mongoose.Document<mongoose.Types.ObjectId>>,
+    role: Role,
     file?: Express.Multer.File | Express.Multer.File[]
 ) => {
     // Verify forum exists
@@ -457,8 +486,26 @@ export const createForumPost = async (
     appAssert(!forum.isArchived, FORBIDDEN, "Cannot post in an archived forum");
 
     // If forum is ANNOUNCEMENT type, only allow certain users (teachers/admins) to post
-    // This check should be done in the controller based on user role
-    appAssert(forum.forumType === ForumType.DISCUSSION, FORBIDDEN, "You don't have permission to post in this forum");
+    switch (role) {
+        case Role.ADMIN:
+            // Allow creation
+            break;
+        case Role.TEACHER:
+            // Check if the teacher is teaching the course
+            const isTeacherInCourse = await CourseModel.exists({
+                _id: forum.courseId,
+                teacherIds: data.authorId,
+            });
+            appAssert(isTeacherInCourse, FORBIDDEN, "You don't have permission to create posts not in your course");
+            break;
+        default:
+            // Check if a student is attempting to post in an announcement forum
+            appAssert(forum.forumType === ForumType.DISCUSSION,
+                FORBIDDEN,
+                "You don't have permission to post in this forum"
+            );
+            break;
+    }
 
     appAssert(data.content, NOT_FOUND, "Post content is required");
 
@@ -532,6 +579,7 @@ export const updateForumPostById = async (
                 FORBIDDEN,
                 "You can only edit your own posts"
             );
+            break;
     }
 
     Object.assign(post, data);
@@ -589,6 +637,7 @@ export const deleteForumPostById = async (
                 FORBIDDEN,
                 "You can only delete your own posts"
             );
+            break;
     }
 
     // Delete all replies associated with this post
@@ -696,6 +745,7 @@ export const getForumReplyById = async (postId: string, replyId: string) => {
 
 export const createForumReply = async (
     data: Omit<IForumReply, keyof mongoose.Document<mongoose.Types.ObjectId>>,
+    role: Role,
     file?: Express.Multer.File | Express.Multer.File[]
 ) => {
     // Verify post exists
@@ -707,6 +757,27 @@ export const createForumReply = async (
     appAssert(forum, NOT_FOUND, "Forum not found");
     appAssert(forum.isActive, FORBIDDEN, "Cannot reply in an inactive forum");
     appAssert(!forum.isArchived, FORBIDDEN, "Cannot reply in an archived forum");
+
+    switch (role) {
+        case Role.ADMIN:
+            // Allow creation
+            break;
+        case Role.TEACHER:
+            // Check if the teacher is teaching the course
+            const isTeacherInCourse = await CourseModel.exists({
+                _id: forum.courseId,
+                teacherIds: data.authorId,
+            });
+            appAssert(isTeacherInCourse, FORBIDDEN, "You don't have permission to reply to posts not in your course");
+            break;
+        default:
+            // Check if a student is attempting to reply in an announcement forum
+            appAssert(forum.forumType === ForumType.DISCUSSION,
+                FORBIDDEN,
+                "You don't have permission to reply in this forum"
+            );
+            break;
+    }
 
     // If parentReplyId is provided, verify it exists
     if (data.parentReplyId) {
@@ -791,6 +862,7 @@ export const updateForumReplyById = async (
                 FORBIDDEN,
                 "You can only edit your own replies"
             );
+            break;
     }
 
     Object.assign(reply, data);
@@ -851,6 +923,7 @@ export const deleteForumReplyById = async (
                 FORBIDDEN,
                 "You can only delete your own replies"
             );
+            break;
     }
 
     // Delete nested replies

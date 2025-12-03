@@ -78,6 +78,7 @@ export const createForumHandler = catchErrors(async (req, res) => {
     const data = createForumSchema.parse(parseFormData(req.body));
     // Get user ID from authenticated user
     const userId = req.userId;
+    const role = req.role;
 
     let file: Express.Multer.File | Express.Multer.File[] | undefined;
 
@@ -93,7 +94,7 @@ export const createForumHandler = catchErrors(async (req, res) => {
         ...data,
         courseId: data.courseId as unknown as mongoose.Types.ObjectId,
         createdBy: userId,
-    }, file);
+    }, role, file);
 
     return res.success(CREATED, {
         message: "Forum created successfully",
@@ -186,6 +187,7 @@ export const createForumPostHandler = catchErrors(async (req, res) => {
 
     // Get user ID from authenticated user
     const userId = req.userId;
+    const role = req.role;
 
     let file: Express.Multer.File | Express.Multer.File[] | undefined;
 
@@ -201,7 +203,7 @@ export const createForumPostHandler = catchErrors(async (req, res) => {
         ...data,
         forumId: forumId as unknown as mongoose.Types.ObjectId,
         authorId: userId,
-    }, file);
+    }, role, file);
 
     return res.success(CREATED, {
         message: "Post created successfully",
@@ -314,7 +316,7 @@ export const createForumReplyHandler = catchErrors(async (req, res) => {
         postId: postId as unknown as mongoose.Types.ObjectId,
         authorId: userId,
         parentReplyId: data.parentReplyId as unknown as mongoose.Types.ObjectId,
-    }, file);
+    }, role, file);
 
     return res.success(CREATED, {
         message: "Reply created successfully",
