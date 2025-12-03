@@ -22,6 +22,7 @@ import {
 import MarkdownContent from "../components/MarkdownContent";
 import MarkdownComposer from "../components/MarkdownComposer";
 import AttachmentPreview from "../components/AttachmentPreview";
+import toastLib from "react-hot-toast";
 
 type SidebarRole = "admin" | "teacher" | "student";
 
@@ -215,7 +216,9 @@ const ForumDetailPage: React.FC = () => {
     event.preventDefault();
     if (!forumId) return;
     if (!createModal.title.trim() || !createModal.content.trim()) {
-      setCreateModal((prev) => ({ ...prev, error: "Please provide both a title and content." }));
+      const msg = "Please provide both a title and content.";
+      setCreateModal((prev) => ({ ...prev, error: msg }));
+      toastLib.error(msg);
       return;
     }
 
@@ -230,13 +233,46 @@ const ForumDetailPage: React.FC = () => {
         },
         createModal.file || undefined
       );
-      setToast({ type: "success", message: "Post published successfully." });
+      const successMsg = "Post published successfully.";
+      setToast({ type: "success", message: successMsg });
+      toastLib.success(successMsg);
       resetCreateForm();
       fetchForum();
       fetchPosts();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to create post";
-      setCreateModal((prev) => ({ ...prev, submitting: false, error: message }));
+    } catch (err: any) {
+      const apiData = err?.response?.data;
+      const apiMessage: string | undefined = apiData?.message;
+      const fieldErrors: Array<{ path?: string | string[]; message?: string }> =
+        apiData?.errors ?? [];
+
+      let finalMessage = apiMessage || "Unable to create post";
+
+      if (fieldErrors.length > 0) {
+        fieldErrors.forEach((e) => {
+          const path =
+            Array.isArray(e.path) && e.path.length > 0
+              ? e.path.join(".")
+              : typeof e.path === "string"
+              ? e.path
+              : "";
+          const msg = e.message || apiMessage || "Invalid input";
+          toastLib.error(path ? `${path}: ${msg}` : msg);
+        });
+        finalMessage =
+          apiMessage ||
+          fieldErrors.map((e) => e.message).filter(Boolean).join(", ") ||
+          finalMessage;
+      } else if (apiMessage) {
+        toastLib.error(apiMessage);
+        finalMessage = apiMessage;
+      } else if (err instanceof Error && err.message) {
+        toastLib.error(err.message);
+        finalMessage = err.message;
+      } else {
+        toastLib.error(finalMessage);
+      }
+
+      setCreateModal((prev) => ({ ...prev, submitting: false, error: finalMessage }));
     }
   };
 
@@ -410,7 +446,7 @@ const ForumDetailPage: React.FC = () => {
                       className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
                     >
                       <PlusCircle className="w-4 h-4" />
-                      Create post
+                      Create post 
                     </button>
                   )}
                 </div>
@@ -728,7 +764,53 @@ const ForumDetailPage: React.FC = () => {
 
                             {/* Buttons: Pin, Edit, Delete */}
                             <div className="mt-3 flex items-center gap-2 justify-end">
-                              {/* ... giữ nguyên phần button */}
+                              {canPin && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleTogglePinPost(post);
+                                  }}
+                                  className={`h-9 w-9 rounded-full border flex items-center justify-center transition ${post.pinned
+                                    ? "border-amber-300 text-amber-600 bg-amber-50 hover:bg-amber-100 dark:border-amber-500/50 dark:text-amber-300 dark:bg-amber-500/10 dark:hover:bg-amber-500/20"
+                                    : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                                    }`}
+                                  title={post.pinned ? "Unpin post" : "Pin post"}
+                                  disabled={pinningPostId === post._id}
+                                >
+                                  {pinningPostId === post._id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Pin className="w-4 h-4" />
+                                  )}
+                                </button>
+                              )}
+                              {canManagePosts && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      openEditPost(post);
+                                    }}
+                                    className="h-9 w-9 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 flex items-center justify-center"
+                                    title="Edit post"
+                                  >
+                                    <Edit3 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      openDeletePostModal(post);
+                                    }}
+                                    className="h-9 w-9 rounded-full border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10 flex items-center justify-center"
+                                    title="Delete post"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -833,8 +915,6 @@ const ForumDetailPage: React.FC = () => {
                   attachmentAccept={attachmentAcceptTypes}
                 />
               </div>
-              {createModal.error && <p className="text-sm text-rose-500">{createModal.error}</p>}
-
               <div className="flex justify-end gap-3">
                 <button
                   type="button"

@@ -40,9 +40,7 @@ const ForumPostDetailPage: React.FC = () => {
   const [replyContent, setReplyContent] = useState("");
   const [replyFile, setReplyFile] = useState<File | null>(null);
   const [replySubmitting, setReplySubmitting] = useState(false);
-  const [replyError, setReplyError] = useState<string | null>(null);
   const [replyTarget, setReplyTarget] = useState<{ replyId: string | null; displayName?: string } | null>(null);
-  const [replyManagementError, setReplyManagementError] = useState<string | null>(null);
   const [deletingReplyId, setDeletingReplyId] = useState<string | null>(null);
   const [editingReply, setEditingReply] = useState<{ replyId: string; content: string } | null>(null);
   const [editSaving, setEditSaving] = useState(false);
@@ -151,7 +149,7 @@ const ForumPostDetailPage: React.FC = () => {
     event.preventDefault();
     if (!forumId || !postId || !post) return;
     if (!replyContent.trim()) {
-      setReplyError("Please enter your reply before posting.");
+      toast.error("Please enter your reply before posting.");
       return;
     }
     try {
@@ -167,17 +165,45 @@ const ForumPostDetailPage: React.FC = () => {
       );
       setReplyContent("");
       setReplyFile(null);
-      setReplyError(null);
       if (replyTarget?.replyId) {
         setExpandedChildGroups((prev) => ({ ...prev, [replyTarget.replyId as string]: true }));
       }
       setRepliesExpanded(true);
       setReplyTarget(null);
-      fetchPost();
-      fetchReplies();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to add reply";
-      setReplyError(message);
+      await Promise.all([fetchPost(), fetchReplies()]);
+      toast.success("Reply added successfully.");
+    } catch (err: any) {
+      const apiData = err?.response?.data;
+      const apiMessage: string | undefined = apiData?.message;
+      const fieldErrors: Array<{ path?: string | string[]; message?: string }> =
+        apiData?.errors ?? [];
+
+      let finalMessage = apiMessage || "Unable to add reply";
+
+      if (fieldErrors.length > 0) {
+        fieldErrors.forEach((e) => {
+          const path =
+            Array.isArray(e.path) && e.path.length > 0
+              ? e.path.join(".")
+              : typeof e.path === "string"
+              ? e.path
+              : "";
+          const msg = e.message || apiMessage || "Invalid input";
+          toast.error(path ? `${path}: ${msg}` : msg);
+        });
+        finalMessage =
+          apiMessage ||
+          fieldErrors.map((e) => e.message).filter(Boolean).join(", ") ||
+          finalMessage;
+      } else if (apiMessage) {
+        toast.error(apiMessage);
+        finalMessage = apiMessage;
+      } else if (err instanceof Error && err.message) {
+        toast.error(err.message);
+        finalMessage = err.message;
+      } else {
+        toast.error(finalMessage);
+      }
     } finally {
       setReplySubmitting(false);
     }
@@ -249,19 +275,42 @@ const ForumPostDetailPage: React.FC = () => {
       toast.success("Reply updated successfully.");
       await Promise.all([fetchPost(), fetchReplies()]);
     } catch (err: any) {
-      let message = "Unable to update reply";
+      const apiData = err?.response?.data;
+      const apiMessage: string | undefined = apiData?.message;
+      const fieldErrors: Array<{ path?: string | string[]; message?: string }> =
+        apiData?.errors ?? [];
 
-      // Check for authorization errors (403 or specific message)
-      if (err?.response?.status === 403 || err?.message?.toLowerCase().includes("permission") || err?.message?.toLowerCase().includes("not allowed")) {
-        message = "You can only edit your own replies";
-      } else if (err?.response?.data?.message) {
-        message = err.response.data.message;
-      } else if (err instanceof Error) {
-        message = err.message;
+      let finalMessage = apiMessage || "Unable to update reply";
+
+      if (fieldErrors.length > 0) {
+        fieldErrors.forEach((e) => {
+          const path =
+            Array.isArray(e.path) && e.path.length > 0
+              ? e.path.join(".")
+              : typeof e.path === "string"
+              ? e.path
+              : "";
+          const msg = e.message || apiMessage || "Invalid input";
+          toast.error(path ? `${path}: ${msg}` : msg);
+        });
+        finalMessage =
+          apiMessage ||
+          fieldErrors.map((e) => e.message).filter(Boolean).join(", ") ||
+          finalMessage;
+      } else if (err?.response?.status === 403 || err?.message?.toLowerCase().includes("permission") || err?.message?.toLowerCase().includes("not allowed")) {
+        finalMessage = "You can only edit your own replies";
+        toast.error(finalMessage);
+      } else if (apiMessage) {
+        toast.error(apiMessage);
+        finalMessage = apiMessage;
+      } else if (err instanceof Error && err.message) {
+        toast.error(err.message);
+        finalMessage = err.message;
+      } else {
+        toast.error(finalMessage);
       }
 
-      toast.error(message);
-      setEditError(message);
+      setEditError(finalMessage);
     } finally {
       setEditSaving(false);
     }
@@ -270,7 +319,6 @@ const ForumPostDetailPage: React.FC = () => {
   const handleDeleteReply = async (replyId: string) => {
     if (!forumId || !postId) return;
     try {
-      setReplyManagementError(null);
       setDeletingReplyId(replyId);
       await forumService.deleteReply(forumId, postId, replyId);
       if (editingReply?.replyId === replyId) {
@@ -280,19 +328,40 @@ const ForumPostDetailPage: React.FC = () => {
       toast.success("Reply deleted successfully.");
       await Promise.all([fetchPost(), fetchReplies()]);
     } catch (err: any) {
-      let message = "Unable to delete reply";
+      const apiData = err?.response?.data;
+      const apiMessage: string | undefined = apiData?.message;
+      const fieldErrors: Array<{ path?: string | string[]; message?: string }> =
+        apiData?.errors ?? [];
 
-      // Check for authorization errors (403 or specific message)
-      if (err?.response?.status === 403 || err?.message?.toLowerCase().includes("permission") || err?.message?.toLowerCase().includes("not allowed")) {
-        message = "You can only delete your own replies";
-      } else if (err?.response?.data?.message) {
-        message = err.response.data.message;
-      } else if (err instanceof Error) {
-        message = err.message;
+      let finalMessage = apiMessage || "Unable to delete reply";
+
+      if (fieldErrors.length > 0) {
+        fieldErrors.forEach((e) => {
+          const path =
+            Array.isArray(e.path) && e.path.length > 0
+              ? e.path.join(".")
+              : typeof e.path === "string"
+              ? e.path
+              : "";
+          const msg = e.message || apiMessage || "Invalid input";
+          toast.error(path ? `${path}: ${msg}` : msg);
+        });
+        finalMessage =
+          apiMessage ||
+          fieldErrors.map((e) => e.message).filter(Boolean).join(", ") ||
+          finalMessage;
+      } else if (err?.response?.status === 403 || err?.message?.toLowerCase().includes("permission") || err?.message?.toLowerCase().includes("not allowed")) {
+        finalMessage = "You can only delete your own replies";
+        toast.error(finalMessage);
+      } else if (apiMessage) {
+        toast.error(apiMessage);
+        finalMessage = apiMessage;
+      } else if (err instanceof Error && err.message) {
+        toast.error(err.message);
+        finalMessage = err.message;
+      } else {
+        toast.error(finalMessage);
       }
-
-      toast.error(message);
-      setReplyManagementError(message);
     } finally {
       setDeletingReplyId(null);
     }
@@ -334,22 +403,44 @@ const ForumPostDetailPage: React.FC = () => {
       setIsEditingPost(false);
       fetchPost();
     } catch (err: any) {
-      let message = "Unable to update post";
+      const apiData = err?.response?.data;
+      const apiMessage: string | undefined = apiData?.message;
+      const fieldErrors: Array<{ path?: string | string[]; message?: string }> =
+        apiData?.errors ?? [];
 
-      // Authorization / permission errors: show specific toast
-      if (
+      let finalMessage = apiMessage || "Unable to update post";
+
+      if (fieldErrors.length > 0) {
+        fieldErrors.forEach((e) => {
+          const path =
+            Array.isArray(e.path) && e.path.length > 0
+              ? e.path.join(".")
+              : typeof e.path === "string"
+              ? e.path
+              : "";
+          const msg = e.message || apiMessage || "Invalid input";
+          toast.error(path ? `${path}: ${msg}` : msg);
+        });
+        finalMessage =
+          apiMessage ||
+          fieldErrors.map((e) => e.message).filter(Boolean).join(", ") ||
+          finalMessage;
+      } else if (
         err?.response?.status === 403 ||
         err?.message?.toLowerCase?.().includes("permission") ||
         err?.message?.toLowerCase?.().includes("not allowed")
       ) {
-        message = "You can only edit your own posts";
-      } else if (err?.response?.data?.message) {
-        message = err.response.data.message;
-      } else if (err instanceof Error) {
-        message = err.message;
+        finalMessage = "You can only edit your own posts";
+        toast.error(finalMessage);
+      } else if (apiMessage) {
+        toast.error(apiMessage);
+        finalMessage = apiMessage;
+      } else if (err instanceof Error && err.message) {
+        toast.error(err.message);
+        finalMessage = err.message;
+      } else {
+        toast.error(finalMessage);
       }
-
-      toast.error(message);
     } finally {
       setPostSaving(false);
     }
@@ -796,7 +887,6 @@ const ForumPostDetailPage: React.FC = () => {
                   value={replyContent}
                   onChange={(next) => {
                     setReplyContent(next);
-                    setReplyError(null);
                   }}
                   placeholder="Share your thoughts..."
                   darkMode={darkMode}
@@ -844,6 +934,29 @@ const ForumPostDetailPage: React.FC = () => {
                 {replyCount}
               </span>
             </div>
+
+            {/* --- REPLIES LIST --- */}
+            {repliesLoading ? (
+              <div className="flex items-center gap-3 text-slate-400 dark:text-white py-8">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Loading replies...</span>
+              </div>
+            ) : repliesError ? (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-700 dark:bg-rose-900/20 dark:border-rose-800 dark:text-rose-200">
+                <p className="font-semibold mb-2">Unable to load replies</p>
+                <p className="text-sm">{repliesError}</p>
+              </div>
+            ) : nestedReplies.length > 0 ? (
+              <div className="space-y-4">
+                {nestedReplies.map((reply) => renderReplyItem(reply, 0))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-slate-400 dark:text-white">
+                <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p className="text-sm font-semibold">No replies yet</p>
+                <p className="text-xs mt-1">Be the first to reply!</p>
+              </div>
+            )}
           </div>
         </section>
       ) : null}
