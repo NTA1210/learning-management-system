@@ -102,7 +102,7 @@ export const updateLessonService = async (id: string, data: Partial<CreateLesson
 
 /**
  * Yêu cầu nghiệp vụ: Liệt kê danh sách bài học với lọc/tìm kiếm/phan trang.
- * - STUDENT chỉ thấy bài đã publish (publishedAt != null) thuộc các course đã ghi danh hoặc bài đã publish công khai.
+ * - STUDENT chỉ thấy bài đã publish (isPublished = true) thuộc các course đã ghi danh hoặc bài đã publish công khai.
  * - TEACHER thấy bài của course mình dạy và cả bài đã publish.
  * - ADMIN thấy tất cả.
  * - Hỗ trợ full-text search theo title, content.
@@ -259,16 +259,24 @@ export const getLessons = async (query: any, userId: mongoose.Types.ObjectId, us
         status: 'approved'
       });
 
-      if (enrollment) {
-        hasAccess = true;
-        accessReason = 'enrolled';
-      } else if (lesson.publishedAt) {
-        hasAccess = true;
-        accessReason = 'published';
-      } else {
+      // 1) Không enroll → không được xem dù bài publish hay không
+      if (!enrollment) {
         hasAccess = false;
         accessReason = 'not_enrolled';
+        return { ...lesson, hasAccess, accessReason };
       }
+
+      // 2) Đã enroll nhưng bài chưa publish → vẫn không được xem
+      if (!lesson.isPublished) {
+        hasAccess = false;
+        accessReason = 'not_published';
+        return { ...lesson, hasAccess, accessReason };
+      }
+
+      // 3) Đã enroll + bài publish → OK
+      hasAccess = true;
+      accessReason = 'enrolled_and_published';
+
     }
 
     return {
