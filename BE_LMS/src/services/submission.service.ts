@@ -174,12 +174,11 @@ export const getSubmissionById = async (
   //nếu teacher
   else if (requesterRole === Role.TEACHER) {
     const assignment = submission.assignmentId as any;
-    const courseRef = assignment?.courseId;
-    appAssert(courseRef, NOT_FOUND, "Course not found for this assignment");
+    const courseId = assignment?.courseId;
+    appAssert(courseId, NOT_FOUND, "Course not found for this assignment");
 
     await ensureTeacherAccessToCourse({
-      course: courseRef,
-      courseId: (courseRef as any)?._id || courseRef,
+      courseId,
       userId: requesterId,
       userRole: requesterRole,
     });
