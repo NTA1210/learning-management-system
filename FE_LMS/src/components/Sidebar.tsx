@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { authService } from "../services";
 import { useUnreadChat } from "../hooks/useUnreadChat";
 import { useSidebar } from "../context/SidebarContext";
+import { useSocketContext } from "../context/SocketContext";
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -490,6 +491,7 @@ export default function Sidebar({
   const [settingsHeight, setSettingsHeight] = useState(0);
   const [coursesHeight, setCoursesHeight] = useState(0);
   const [mobileCoursesOpen, setMobileCoursesOpen] = useState(false);
+  const { disconnectSocket } = useSocketContext();
 
   const [storedUser, setStoredUser] = useState<null | {
     _id?: string;
@@ -645,7 +647,7 @@ export default function Sidebar({
                         <Link
                           to="/courses"
                           onClick={onClose}
-                          className="flex items-center gap-3 flex-1 px-3 py-2 text-sm font-medium transition-colors rounded-xl"
+                          className="flex items-center flex-1 gap-3 px-3 py-2 text-sm font-medium transition-colors rounded-xl"
                           style={{
                             backgroundColor: darkMode
                               ? "rgba(71,85,105,0.3)"
@@ -659,7 +661,7 @@ export default function Sidebar({
                         <button
                           type="button"
                           onClick={() => setMobileCoursesOpen((prev) => !prev)}
-                          className="ml-2 p-2 rounded-lg hover:bg-gray-200/40"
+                          className="p-2 ml-2 rounded-lg hover:bg-gray-200/40"
                           style={{
                             color: darkMode ? "#cbd5f5" : "#4b5563",
                           }}
@@ -683,7 +685,7 @@ export default function Sidebar({
                         </button>
                       </div>
                       {mobileCoursesOpen && (
-                        <div className="pl-9 space-y-1">
+                        <div className="space-y-1 pl-9">
                           <Link
                             to="/curriculum"
                             onClick={onClose}
@@ -933,7 +935,7 @@ export default function Sidebar({
                         {isExpanded && (
                           <button
                             onClick={() => toggleSubmenu("courses")}
-                            className="p-2 text-sm rounded-md hover:bg-gray-600/20 ml-1"
+                            className="p-2 ml-1 text-sm rounded-md hover:bg-gray-600/20"
                             style={{
                               color: darkMode ? "#9ca3af" : "#374151",
                             }}
@@ -980,7 +982,9 @@ export default function Sidebar({
                             className="flex items-center w-full px-3 py-2 text-sm rounded-md hover:bg-gray-100/20"
                             style={{ color: darkMode ? "#9ca3af" : "#374151" }}
                           >
-                            <span className="whitespace-nowrap">Curriculum</span>
+                            <span className="whitespace-nowrap">
+                              Curriculum
+                            </span>
                           </Link>
 
                           <Link
@@ -1285,11 +1289,12 @@ export default function Sidebar({
           </div>
           {/* Logout button - visible when expanded */}
           {isExpanded && (
-            <div className="mt-auto p-3 border-t border-gray-200/50 flex-shrink-0">
+            <div className="flex-shrink-0 p-3 mt-auto border-t border-gray-200/50">
               <button
                 onClick={async () => {
                   try {
                     await authService.logout();
+                    disconnectSocket(); // hủy socket
                   } catch (error) {
                     console.error("Logout failed", error);
                   }
