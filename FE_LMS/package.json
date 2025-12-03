@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "build:server": "tsc -p tsconfig.node.json",
-    "start:prod": "node dist-server/server.js"
+    "start:prod": "node dist-server/server.js",
+    "postbuild": "ts-node scripts/generate-sitemap.ts"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.6",
