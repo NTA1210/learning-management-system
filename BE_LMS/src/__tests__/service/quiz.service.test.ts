@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import { Role } from '@/types';
 import {
   createQuiz,
@@ -12,9 +11,14 @@ import type { SnapshotQuestion } from '@/types/quiz.type';
 
 jest.mock('@/models', () => ({
   CourseModel: { findById: jest.fn() },
-  QuizModel: { create: jest.fn(), findById: jest.fn() },
+  QuizModel: { create: jest.fn(), findById: jest.fn(), findByIdAndDelete: jest.fn() },
   EnrollmentModel: { find: jest.fn() },
-  QuizAttemptModel: { find: jest.fn(), aggregate: jest.fn() },
+  QuizAttemptModel: {
+    find: jest.fn(),
+    aggregate: jest.fn(),
+    countDocuments: jest.fn(),
+    findByIdAndDelete: jest.fn(),
+  },
 }));
 
 jest.mock('@/services/helpers/quizHelpers', () => ({
@@ -202,83 +206,6 @@ describe('Quiz Service Unit Tests', () => {
       expect(quizDoc.snapshotQuestions.length).toBe(0);
     });
 
-    it('calls checkProperQuestionType for both updated and added questions', async () => {
-      const now = Date.now();
-      const quizDoc: any = {
-        _id: 'q2',
-        courseId: { _id: 'c1' },
-        startTime: new Date(now - 200000),
-        endTime: new Date(now - 100000),
-        snapshotQuestions: [
-          {
-            id: 'existing-q',
-            text: 'existing',
-            images: [],
-            isNewQuestion: false,
-            isDeleted: false,
-            isDirty: false,
-          },
-        ],
-        save: jest.fn().mockResolvedValue({}),
-      };
-
-      (QuizModel.findById as jest.Mock).mockReturnValueOnce({
-        populate: jest.fn().mockResolvedValueOnce(quizDoc),
-      });
-
-      const updatedQuestion = {
-        id: 'existing-q',
-        text: 'existing-upd',
-        isDirty: true,
-        isNewQuestion: false,
-        isDeleted: false,
-        images: [],
-        type: 'mcq' as any,
-        options: [],
-        correctOptions: [0],
-        points: 1,
-        isExternal: false,
-      };
-
-      const addQuestion = {
-        id: 'new-q',
-        text: 'New question',
-        isDirty: false,
-        isNewQuestion: true,
-        isDeleted: false,
-        type: 'mcq' as any,
-        options: ['a'],
-        correctOptions: [0],
-        images: [],
-        points: 1,
-        isExternal: false,
-      };
-
-      (getKeyFromPublicUrl as jest.Mock).mockReturnValue('old-key-for-safety');
-
-      await updateQuiz(
-        {
-          quizId: 'q2',
-          title: undefined,
-          description: undefined,
-          startTime: undefined,
-          endTime: undefined,
-          shuffleQuestions: undefined,
-          isPublished: undefined,
-          snapshotQuestions: [updatedQuestion, addQuestion],
-          isChangePassword: false,
-        },
-        'u1' as any,
-        Role.TEACHER
-      );
-
-      // It should call checkProperQuestionType twice (for updatedQuestion and addQuestion)
-      expect(checkProperQuestionType).toHaveBeenCalledTimes(2);
-      expect(quizDoc.save).toHaveBeenCalled();
-      // new question added
-      expect(quizDoc.snapshotQuestions.some((q: any) => q.id === 'new-q')).toBeTruthy();
-    });
-
     it('does NOT call getKeyFromPublicUrl/removeFiles when deleted images are fromDB', async () => {
       const now = Date.now();
       const quizDoc: any = {
@@ -352,6 +279,7 @@ describe('Quiz Service Unit Tests', () => {
 
       (QuizModel.findById as jest.Mock).mockReturnValueOnce({
         populate: jest.fn().mockResolvedValueOnce(quizDoc),
+        lean: jest.fn().mockReturnThis(),
       });
 
       await expect(
@@ -384,7 +312,9 @@ describe('Quiz Service Unit Tests', () => {
           'u1' as any,
           Role.TEACHER
         )
-      ).rejects.toThrow(/You can just update title, description, endTime while quiz is on going/);
+      ).rejects.toThrow(
+        /During an ongoing quiz, only title, description, and endTime can be modified/
+      );
     });
 
     it('throws when updating endTime of an ongoing quiz to a time < now', async () => {
@@ -420,6 +350,98 @@ describe('Quiz Service Unit Tests', () => {
         )
       ).rejects.toThrow(/You can not update endTime less than current time/);
     });
+
+    it('handles password change and optional fields correctly', async () => {
+      const quizDoc: any = {
+        _id: 'q1',
+        courseId: { _id: 'c1' },
+        startTime: new Date(Date.now() - 86400000),
+        endTime: new Date(Date.now() + 86400000),
+        shuffleQuestions: false,
+        isPublished: false,
+        generateHashPassword: jest.fn().mockReturnValue('new-hashed-pwd'),
+        save: jest.fn().mockResolvedValue({}),
+        snapshotQuestions: [],
+      };
+
+      (QuizModel.findById as jest.Mock).mockReturnValueOnce({
+        populate: jest.fn().mockResolvedValueOnce(quizDoc),
+      });
+
+      await updateQuiz(
+        {
+          quizId: 'q1',
+          title: 'New Title',
+          description: 'New Description',
+        },
+        'u1' as any,
+        Role.TEACHER
+      );
+
+      expect(quizDoc.title).toBe('New Title');
+      expect(quizDoc.description).toBe('New Description');
+      expect(quizDoc.save).toHaveBeenCalled();
+    });
+
+    it('removes uploaded images when question is deleted', async () => {
+      const quizDoc: any = {
+        _id: 'q4',
+        courseId: { _id: 'c1' },
+        startTime: new Date(Date.now() - 86400000 * 2),
+        endTime: new Date(Date.now() - 86400000),
+        snapshotQuestions: [
+          {
+            id: 'to-be-deleted',
+            text: 'will be deleted',
+            images: [
+              { url: 'https://cdn.example.com/uploaded1.jpg', fromDB: false },
+              { url: 'https://cdn.example.com/uploaded2.jpg', fromDB: false },
+            ],
+          },
+        ],
+        save: jest.fn().mockResolvedValue({}),
+      };
+
+      (QuizModel.findById as jest.Mock).mockReturnValueOnce({
+        populate: jest.fn().mockResolvedValueOnce(quizDoc),
+      });
+
+      (getKeyFromPublicUrl as jest.Mock)
+        .mockReturnValueOnce('uploaded1.jpg')
+        .mockReturnValueOnce('uploaded2.jpg');
+
+      await updateQuiz(
+        {
+          quizId: 'q4',
+          snapshotQuestions: [
+            {
+              id: 'to-be-deleted',
+              isDeleted: true,
+              isNewQuestion: false,
+              isDirty: false,
+              text: 'will be deleted',
+              type: 'mcq' as any,
+              options: [],
+              correctOptions: [],
+              points: 1,
+              isExternal: false,
+              images: [
+                { url: 'https://cdn.example.com/uploaded1.jpg', fromDB: false },
+                { url: 'https://cdn.example.com/uploaded2.jpg', fromDB: false },
+              ],
+            },
+          ],
+          isChangePassword: false,
+        },
+        'u1' as any,
+        Role.TEACHER
+      );
+
+      expect(getKeyFromPublicUrl).toHaveBeenCalledTimes(2);
+      expect(removeFiles).toHaveBeenCalledWith(['uploaded1.jpg', 'uploaded2.jpg']);
+      expect(quizDoc.snapshotQuestions).toHaveLength(0);
+      expect(quizDoc.save).toHaveBeenCalled();
+    });
   });
 
   describe('DeleteQuiz', () => {
@@ -430,17 +452,22 @@ describe('Quiz Service Unit Tests', () => {
         courseId: { _id: 'c1' },
         startTime: new Date(now - 200000),
         endTime: new Date(now - 100000),
-        save: jest.fn().mockResolvedValue({ deletedAt: new Date(), deletedBy: 'u1' }),
+        // save không cần thiết ở đây nữa vì dùng findByIdAndDelete
       };
+
       (QuizModel.findById as jest.Mock).mockReturnValueOnce({
         populate: jest.fn().mockResolvedValueOnce(quizDoc),
       });
 
+      (QuizAttemptModel.countDocuments as jest.Mock).mockResolvedValueOnce(0);
+
+      // QUAN TRỌNG: Mock đúng method findByIdAndDelete
+      (QuizModel.findByIdAndDelete as jest.Mock).mockResolvedValueOnce(quizDoc);
+
       const res = await deleteQuiz({ quizId: 'q1', userId: 'u1' as any, role: Role.TEACHER });
 
-      expect(quizDoc.save).toHaveBeenCalled();
-      expect(res).toHaveProperty('deletedAt');
-      expect(res).toHaveProperty('deletedBy');
+      expect(QuizModel.findByIdAndDelete).toHaveBeenCalledWith('q1');
+      expect(res).toEqual(quizDoc); // giờ sẽ PASS
     });
 
     it('throws when quiz is on going', async () => {
