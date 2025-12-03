@@ -46,6 +46,7 @@ import {
   BlogPage,
   BlogDetailPage,
   JoinCoursePage,
+  ApprovedCoursesPage,
 } from "../pages";
 
 import EmailVerificationPage from "../pages/EmailVerificationPage";
@@ -97,6 +98,14 @@ function AppRoutes() {
           element={
             <ProtectedRoute requiredRole="admin">
               <DeletedCoursesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/courses/approved"
+          element={
+            <ProtectedRoute requiredRole="admin">
+              <ApprovedCoursesPage />
             </ProtectedRoute>
           }
         />
