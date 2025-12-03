@@ -64,7 +64,7 @@ export const listSpecialists = async ({
     // Search by title or description (text search)
     if (search) {
         filter.$or = [
-            {title: {$regex: search, $options: "i"}},
+            {name: {$regex: search, $options: "i"}},
             {description: {$regex: search, $options: "i"}},
         ];
     }
@@ -154,7 +154,7 @@ export const updateSpecialistById = async (
 
     // If updating major, check if the major exists
     if (data.majorId && data.majorId.toString() !== specialist.majorId.toString()) {
-        const majorExists = await SpecialistModel.findById(data.majorId);
+        const majorExists = await MajorModel.findById(data.majorId);
         appAssert(majorExists, NOT_FOUND, "Major not found");
     }
 

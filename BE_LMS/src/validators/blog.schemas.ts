@@ -16,7 +16,6 @@ export type GetBlogsParams = z.infer<typeof getBlogsSchema>;
 
 export const slugSchema = z
   .string()
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/i)
   .min(1, 'Slug is required');
 
 export const blogIdSchema = z.string().length(24, 'Invalid blog ID');
