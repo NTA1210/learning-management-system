@@ -436,17 +436,17 @@ const EnrollmentsListPage: React.FC = () => {
       <Navbar />
       <Sidebar />
       <div className="max-w-[1600px] mt-[100px] mx-auto px-4 sm:pl-[93px] py-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <h1
             className="text-2xl font-semibold"
             style={{ color: darkMode ? "#ffffff" : "#111827" }}
           >
             Enrollments
           </h1>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => setShowCreateModal(true)}
-              className="bg-[#525fe1] text-white px-4 py-2 rounded-lg hover:opacity-90"
+              className="bg-[#525fe1] text-white px-4 py-2 rounded-lg hover:opacity-90 w-full sm:w-auto"
             >
               Create Enrollment
             </button>
@@ -454,7 +454,7 @@ const EnrollmentsListPage: React.FC = () => {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by student or course"
-              className="px-3 py-2 rounded-lg outline-none"
+              className="px-3 py-2 rounded-lg outline-none w-full sm:w-64"
               style={{
                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                 color: darkMode ? "#ffffff" : "#111827",
@@ -469,7 +469,7 @@ const EnrollmentsListPage: React.FC = () => {
                 setPage(1);
                 setStatus(e.target.value as Status | "");
               }}
-              className="px-3 py-2 rounded-lg"
+              className="px-3 py-2 rounded-lg w-full sm:w-auto"
               style={{
                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                 color: darkMode ? "#ffffff" : "#111827",
@@ -490,7 +490,7 @@ const EnrollmentsListPage: React.FC = () => {
                 setPage(1);
                 setLimit(Number(e.target.value));
               }}
-              className="px-3 py-2 rounded-lg"
+              className="px-3 py-2 rounded-lg w-full sm:w-auto"
               style={{
                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                 color: darkMode ? "#ffffff" : "#111827",
@@ -507,7 +507,7 @@ const EnrollmentsListPage: React.FC = () => {
             </select>
             <button
               onClick={handleReload}
-              className="px-4 py-2 rounded-lg"
+              className="px-4 py-2 rounded-lg w-full sm:w-auto"
               style={{
                 backgroundColor: darkMode ? "#111827" : "#ffffff",
                 border: darkMode
@@ -892,7 +892,7 @@ const EnrollmentsListPage: React.FC = () => {
                 : "1px solid #e5e7eb",
             }}
           >
-            <div className="">
+            <div className="overflow-x-auto">
               <table className="min-w-full">
                 <thead>
                   <tr
@@ -1027,7 +1027,7 @@ const EnrollmentsListPage: React.FC = () => {
                           </td>
                           <td className="px-4 py-3">
                             {user?.role === "student" ? null : (
-                              <div className="flex gap-3">
+                              <div className="flex flex-wrap gap-3">
                                 <button
                                   onClick={() => openApproveModal(it._id)}
                                   disabled={
@@ -1070,7 +1070,7 @@ const EnrollmentsListPage: React.FC = () => {
               </table>
             </div>
 
-            <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3">
               <div
                 className="text-sm"
                 style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
