@@ -9,6 +9,9 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, ".env.local") });
 dotenv.config({ path: path.resolve(__dirname, ".env.production") });
 const app = express();
+// Serve robots & sitemap trước khi prerender
+app.use("/robots.txt", express.static(path.join(__dirname, "public", "robots.txt")));
+app.use("/sitemap.xml", express.static(path.join(__dirname, "public", "sitemap.xml")));
 // --- Prerender setup ---
 const PRERENDER_SERVICE_URL = process.env.PRERENDER_SERVICE_URL;
 prerender.set("prerenderServiceUrl", PRERENDER_SERVICE_URL);
