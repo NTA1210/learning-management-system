@@ -213,7 +213,8 @@ const ForumListPage: React.FC = () => {
     }
     try {
       setForumsLoading(true);
-      const data = await forumService.getForums({ courseId: selectedCourseId, isActive: true });
+      // Load all forums (both active and inactive) for the selected course
+      const data = await forumService.getForums({ courseId: selectedCourseId });
       setForums(data);
       setForumsError(null);
     } catch (error) {
@@ -394,7 +395,8 @@ const ForumListPage: React.FC = () => {
 
   const pageBackground = {
     backgroundColor: darkMode ? "#0f172a" : "#f8fafc",
-    color: darkMode ? "#e2e8f0" : "#0f172a",
+    // Default text color: white in dark mode, slate-900 in light mode
+    color: darkMode ? "#ffffff" : "#0f172a",
   };
 
   const panelStyles = darkMode
@@ -741,11 +743,28 @@ const ForumListPage: React.FC = () => {
                           )}
 
                           <div className="flex flex-wrap items-center justify-between gap-3 pt-12">
-                            <div className={`text-xs ${hasBackgroundImage
-                              ? "text-white/80"
-                              : "text-slate-400"
-                              }`}>
-                              Updated: {forum.updatedAt ? new Date(forum.updatedAt).toLocaleString() : "Awaiting update"}
+                            <div
+                              className={`flex items-center gap-3 text-xs ${hasBackgroundImage
+                                ? "text-white/80"
+                                : "text-slate-400"
+                                }`}
+                            >
+                              <span>
+                                Updated:{" "}
+                                {forum.updatedAt ? new Date(forum.updatedAt).toLocaleString() : "Awaiting update"}
+                              </span>
+                              <span
+                                className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold ${forum.isActive
+                                  ? hasBackgroundImage
+                                    ? "bg-emerald-500/90 text-white backdrop-blur-sm"
+                                    : "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200"
+                                  : hasBackgroundImage
+                                    ? "bg-rose-500/90 text-white backdrop-blur-sm"
+                                    : "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200"
+                                  }`}
+                              >
+                                {forum.isActive ? "Active" : "Inactive"}
+                              </span>
                             </div>
                             <div className="flex gap-2 shrink-0">
                               <Link

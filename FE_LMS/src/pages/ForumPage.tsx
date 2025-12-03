@@ -201,7 +201,8 @@ const ForumPage: React.FC = () => {
 
   const containerStyles = {
     backgroundColor: darkMode ? "#0f172a" : "#f8fafc",
-    color: darkMode ? "#e2e8f0" : "#0f172a",
+    // Default text color: white in dark mode, slate-900 in light mode
+    color: darkMode ? "#ffffff" : "#0f172a",
   };
 
   const panelStyles = darkMode
