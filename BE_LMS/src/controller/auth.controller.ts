@@ -4,6 +4,7 @@ import {
   createAccount,
   loginUser,
   refreshUserAccessToken,
+  resendVerifyEmail,
   resetPassword,
   sendPasswordResetEmail,
   verifyEmail,
@@ -117,5 +118,15 @@ export const resetPasswordHandler = catchErrors(async (req, res) => {
 
   return clearAuthCookies(res).success(OK, {
     message: 'Password reset successfully',
+  });
+});
+
+export const resendVerifyEmailHandler = catchErrors(async (req, res) => {
+  const email = emailSchema.parse(req.body.email);
+  await resendVerifyEmail(email);
+
+  return res.success(OK, {
+    message: 'Verification email sent successfully',
+    info: 'Check your email to verify your account',
   });
 });

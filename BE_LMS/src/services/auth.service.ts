@@ -2,6 +2,7 @@ import { Role } from '@/types';
 import { APP_ORIGIN } from '../constants/env';
 import {
   CONFLICT,
+  FORBIDDEN,
   INTERNAL_SERVER_ERROR,
   NOT_FOUND,
   TOO_MANY_REQUESTS,
@@ -89,6 +90,14 @@ export const loginUser = async ({ email, password, userAgent }: LoginParams) => 
   //validate the password from request
   const isValidatePassword = await user.comparePassword(password);
   appAssert(isValidatePassword, UNAUTHORIZED, 'Invalid email or password');
+
+  const existingSession = await SessionModel.findOne({
+    userId: user._id,
+    userAgent,
+    expiresAt: { $gt: Date.now() },
+  });
+
+  appAssert(!existingSession, FORBIDDEN, 'User already logged in');
 
   //create session
   const session = await SessionModel.create({
@@ -235,4 +244,36 @@ export const resetPassword = async ({ verificationCode, password }: ResetPasswor
   return {
     user: updatedUser.omitPassword(),
   };
+};
+
+export const resendVerifyEmail = async (email: string) => {
+  //get the user by email
+  const user = await UserModel.findOne({ email });
+  appAssert(user, NOT_FOUND, 'User with this email does not exist');
+
+  //check email rate limit
+  const fiveMinAgo = fiveMinutesAgo();
+  const count = await VerificationCodeModel.countDocuments({
+    userId: user._id,
+    type: VerificationCodeType.VERIFY_EMAIL,
+    createdAt: { $gt: fiveMinAgo },
+  });
+  appAssert(count <= 1, TOO_MANY_REQUESTS, 'Too many requests. Please try again later.');
+
+  //create verification code
+  const verificationCode = await VerificationCodeModel.create({
+    userId: user._id,
+    type: VerificationCodeType.VERIFY_EMAIL,
+    email: user.email,
+    expiresAt: onYearFromNow(),
+  });
+  //send verification email
+  const url = `${APP_ORIGIN}/auth/verify-email/${verificationCode._id}`;
+  const { data, error } = await sendMail({
+    to: user.email,
+    ...getVerifyEmailTemplate(url),
+  });
+  appAssert(!error, INTERNAL_SERVER_ERROR, `${error?.name} - ${error?.message}`);
+  //return success message
+  return { url, emailId: data?.id };
 };

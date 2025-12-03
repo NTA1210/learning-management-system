@@ -1,8 +1,8 @@
-import z from "zod";
-import { NOT_FOUND, OK } from "../constants/http";
-import SessionModel from "../models/session.model";
-import { catchErrors } from "../utils/asyncHandler";
-import appAssert from "../utils/appAssert";
+import z from 'zod';
+import { NOT_FOUND, OK } from '../constants/http';
+import SessionModel from '../models/session.model';
+import { catchErrors } from '../utils/asyncHandler';
+import appAssert from '../utils/appAssert';
 
 export const getSessionHandler = catchErrors(async (req, res) => {
   const sessions = await SessionModel.find(
@@ -37,9 +37,17 @@ export const deleteSessionHandler = catchErrors(async (req, res) => {
     _id: sessionId,
     userId: req?.userId,
   });
-  appAssert(deletedSession, NOT_FOUND, "Session not found");
+  appAssert(deletedSession, NOT_FOUND, 'Session not found');
 
   return res.success(OK, {
-    message: "Session deleted successfully",
+    message: 'Session deleted successfully',
+  });
+});
+
+export const deleteAllSessionOfUserHandler = catchErrors(async (req, res) => {
+  const userId = z.string().length(24, 'Invalid user id').parse(req.params.userId);
+  await SessionModel.deleteMany({ userId });
+  return res.success(OK, {
+    message: 'All sessions deleted successfully',
   });
 });
