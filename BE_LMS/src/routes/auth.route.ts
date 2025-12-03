@@ -4,6 +4,7 @@ import {
   logoutHandler,
   refreshHandler,
   registerHandler,
+  resendVerifyEmailHandler,
   resetPasswordHandler,
   sendPasswordResetHandler,
   verifyEmailHandler,
@@ -20,6 +21,7 @@ appRoutes.post('/refresh', refreshHandler);
 appRoutes.get('/email/verify/:code', verifyEmailHandler);
 appRoutes.post('/password/forgot', sendPasswordResetHandler);
 appRoutes.post('/password/reset', resetPasswordHandler);
+appRoutes.post('/auth/resend-verify-email', resendVerifyEmailHandler);
 
 export const authRoutes = appRoutes;
 
