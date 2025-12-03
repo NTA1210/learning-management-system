@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import axios, {
   AxiosError,
   type AxiosInstance,
@@ -50,6 +51,19 @@ const processQueue = (error: unknown | null) => {
 };
 
 // ============================
+// --- LOGOUT HANDLER ---------
+// ============================
+
+const forceLogout = () => {
+  console.log("Force logout: refresh token failed with 401");
+  localStorage.clear();
+  // Redirect to login page
+  if (window.location.pathname !== "/login") {
+    window.location.href = "/login";
+  }
+};
+
+// ============================
 // --- REFRESH TOKEN API ------
 // ============================
 
@@ -67,12 +81,16 @@ const refreshToken = async (): Promise<void> => {
 
     if ((result.data as any).success !== true) {
       console.log("Refresh token failed");
-      localStorage.clear();
+      forceLogout();
       throw new Error("Refresh token failed");
     }
 
     processQueue(null);
-  } catch (error) {
+  } catch (error: any) {
+    // If refresh token request returns 401, force logout
+    if (error?.response?.status === 401) {
+      forceLogout();
+    }
     processQueue(error);
     throw error;
   }
@@ -85,8 +103,11 @@ const refreshToken = async (): Promise<void> => {
 const getNewToken = async (): Promise<void> => {
   if (!isRefreshing) {
     isRefreshing = true;
-    await refreshToken();
-    isRefreshing = false;
+    try {
+      await refreshToken();
+    } finally {
+      isRefreshing = false;
+    }
     return;
   }
 
@@ -114,6 +135,11 @@ httpClient.interceptors.response.use(
       _retry?: boolean;
     };
 
+    // If no config, just reject
+    if (!originalRequest) {
+      return Promise.reject(error);
+    }
+
     // Skip token refresh for auth endpoints (login, register, etc.)
     const isAuthEndpoint =
       originalRequest?.url?.includes("/auth/login") ||
@@ -125,7 +151,7 @@ httpClient.interceptors.response.use(
       !originalRequest._retry &&
       !isAuthEndpoint;
 
-    console.log(shouldRenewToken);
+    console.log("shouldRenewToken:", shouldRenewToken, "url:", originalRequest?.url);
 
     if (shouldRenewToken) {
       originalRequest._retry = true;
