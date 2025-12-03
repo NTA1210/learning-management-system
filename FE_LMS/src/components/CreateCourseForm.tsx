@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import http, { httpClient } from "../utils/http";
 import { subjectService, courseService } from "../services";
 import { userService } from "../services/userService";
+import { useAuth } from "../hooks/useAuth";
 
 import type { User } from "../types/auth";
 import type { Subject } from "../types/subject";
@@ -29,6 +30,7 @@ const CreateCourseForm: React.FC<Props> = ({
   onCreated,
   presetTeacherId,
 }) => {
+  const { user } = useAuth();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [teachers, setTeachers] = useState<User[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -105,6 +107,7 @@ const CreateCourseForm: React.FC<Props> = ({
     useState<boolean>(false);
   const [teacherSearchQuery, setTeacherSearchQuery] = useState<string>("");
   const teacherDropdownRef = useRef<HTMLDivElement | null>(null);
+  const [dateErrors, setDateErrors] = useState<{ startDate: string; endDate: string }>({ startDate: "", endDate: "" });
 
   const filteredTeachers = useMemo(() => {
     if (!teacherSearchQuery.trim()) return teachers;
@@ -156,7 +159,6 @@ const CreateCourseForm: React.FC<Props> = ({
         .map((x: any) => (typeof x === "string" ? x : x?._id))
         .filter((id: any) => typeof id === "string" && id);
       setCurrentSpecialistIds(specIds);
-      console.log("specIds", specIds);
       void (async () => {
         try {
           const params: any = { role: "teacher", specialistIds: specIds };
@@ -171,6 +173,31 @@ const CreateCourseForm: React.FC<Props> = ({
         } catch (_e) {}
       })();
     }
+    const nextSemesterId = name === "semesterId" ? value : form.semesterId;
+    const nextStartDate = name === "startDate" ? value : form.startDate;
+    const nextEndDate = name === "endDate" ? value : form.endDate;
+    const sem = semesters.find((s) => s._id === nextSemesterId);
+    if (!sem) {
+      setDateErrors({ startDate: "", endDate: "" });
+      return;
+    }
+    const semStart = new Date(sem.startDate);
+    const semEnd = new Date(sem.endDate);
+    let startError = "";
+    let endError = "";
+    if (nextStartDate) {
+      const start = new Date(nextStartDate);
+      if (start < semStart || start > semEnd) {
+        startError = "Start Date must be within the selected semester";
+      }
+    }
+    if (nextEndDate) {
+      const end = new Date(nextEndDate);
+      if (end < semStart || end > semEnd) {
+        endError = "End Date must be within the selected semester";
+      }
+    }
+    setDateErrors({ startDate: startError, endDate: endError });
   };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -270,7 +297,33 @@ const CreateCourseForm: React.FC<Props> = ({
           {successMsg}
         </div>
       )}
-
+      <div className="mb-6">
+        <label
+          className="block text-sm font-medium mb-2"
+          style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
+        >
+          Semester
+        </label>
+        <select
+          name="semesterId"
+          value={form.semesterId}
+          onChange={handleChange}
+          className="w-full px-4 py-2 rounded-lg border"
+          style={{
+            backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
+            borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
+            color: darkMode ? "#ffffff" : "#000000",
+          }}
+          required
+        >
+          <option value="">Select semester</option>
+          {semesters.map((s) => (
+            <option key={s._id} value={s._id}>
+              {s.name} ({s.year})
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div>
           <label
@@ -686,6 +739,11 @@ const CreateCourseForm: React.FC<Props> = ({
               color: darkMode ? "#ffffff" : "#000000",
             }}
           />
+          {dateErrors.startDate && (
+            <div className="text-xs mt-1" style={{ color: "#ef4444" }}>
+              {dateErrors.startDate}
+            </div>
+          )}
         </div>
         <div>
           <label
@@ -706,6 +764,11 @@ const CreateCourseForm: React.FC<Props> = ({
               color: darkMode ? "#ffffff" : "#000000",
             }}
           />
+          {dateErrors.endDate && (
+            <div className="text-xs mt-1" style={{ color: "#ef4444" }}>
+              {dateErrors.endDate}
+            </div>
+          )}
         </div>
         <div>
           <label
@@ -751,60 +814,21 @@ const CreateCourseForm: React.FC<Props> = ({
         />
       </div>
 
-      <div className="mb-6">
-        <label
-          className="block text-sm font-medium mb-2"
-          style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
-        >
-          Semester
-        </label>
-        <select
-          name="semesterId"
-          value={form.semesterId}
-          onChange={handleChange}
-          className="w-full px-4 py-2 rounded-lg border"
-          style={{
-            backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
-            borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
-            color: darkMode ? "#ffffff" : "#000000",
-          }}
-          required
-        >
-          <option value="">Select semester</option>
-          {semesters.map((s) => (
-            <option key={s._id} value={s._id}>
-              {s.name} ({s.year})
-            </option>
-          ))}
-        </select>
-      </div>
+
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div>
-          <label className="block text-sm mb-1">Status</label>
-          <select
-            name="status"
-            value={form.status}
-            onChange={handleChange}
-            className="w-full px-3 py-2 rounded border"
-          >
-            {statuses.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
         <div className="flex items-center gap-6">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              name="isPublished"
-              checked={form.isPublished}
-              onChange={handleChange}
-            />
-            <span>Is published</span>
-          </label>
+          {user?.role === "teacher" ? null : (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="isPublished"
+                checked={form.isPublished}
+                onChange={handleChange}
+              />
+              <span>Is published</span>
+            </label>
+          )}
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"

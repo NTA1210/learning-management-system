@@ -698,6 +698,7 @@ export default function CourseDetail() {
                                 </>
                               )}
                               {course.createdAt && (
+                                // <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full sm:w-auto">
                                 <div className="flex justify-between">
                                   <span className="opacity-70">Created:</span>
                                   <span className="text-right truncate max-w-[180px]">
@@ -864,13 +865,12 @@ export default function CourseDetail() {
       <div className="fixed bottom-4 left-0 right-0 pointer-events-none">
         <div className="max-w-[1200px] mx-auto px-4">
           <div
-            className="pointer-events-auto rounded-xl shadow-lg border flex items-center justify-between px-4 py-3"
+            className="pointer-events-auto rounded-xl shadow-lg border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-0 px-4 py-3"
             style={{
               backgroundColor: isDarkMode ? "#111827" : "#ffffff",
               borderColor: isDarkMode ? "rgba(255,255,255,0.08)" : "#e5e7eb",
             }}
           >
-            {/* Show Complete button for admins or for teachers who are assigned to this course */}
             {(() => {
               const role = user?.role as string | undefined;
               const showForTeacher =
@@ -881,7 +881,7 @@ export default function CourseDetail() {
                 <button
                   onClick={handleCompleteButtonClick}
                   disabled={completing || !course?._id}
-                  className="bg-[#65e69b] text-white font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
+                  className="bg-[#65e69b] text-white font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50 w-full sm:w-auto"
                 >
                   {course?.status === "completed"
                     ? "Completed"
@@ -897,7 +897,7 @@ export default function CourseDetail() {
                 <button
                   onClick={openInviteModal}
                   disabled={!course?._id}
-                  className="bg-[#525fe1] text-white font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
+                  className="bg-[#525fe1] text-white font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50 w-full sm:w-auto"
                 >
                   Invite Students
                 </button>
@@ -905,7 +905,7 @@ export default function CourseDetail() {
 
               <button
                 onClick={handleViewForumList}
-                className="bg-[#525fe1] text-white font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
+                className="bg-[#525fe1] text-white font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50 w-full sm:w-auto"
               >
                 View Forums
               </button>
@@ -913,7 +913,7 @@ export default function CourseDetail() {
               <button
                 onClick={handleCreateForumPost}
                 disabled={!course?._id}
-                className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
+                className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50 w-full sm:w-auto"
               >
                 Create Forum Post
               </button>
@@ -921,14 +921,14 @@ export default function CourseDetail() {
                 <button
                   onClick={handleEnroll}
                   disabled={enrolling}
-                  className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50"
+                  className="bg-[#ffcf59] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition disabled:opacity-50 w-full sm:w-auto"
                 >
                   {enrolling ? "Enrolling..." : "Enroll"}
                 </button>
               )}
               <button
                 onClick={() => navigate(-1)}
-                className="bg-[#eaedff] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition"
+                className="bg-[#eaedff] text-[#1c1c1c] font-semibold px-4 py-2 rounded-lg hover:scale-105 transition w-full sm:w-auto"
               >
                 Back
               </button>
