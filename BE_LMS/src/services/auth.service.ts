@@ -91,12 +91,14 @@ export const loginUser = async ({ email, password, userAgent }: LoginParams) => 
   const isValidatePassword = await user.comparePassword(password);
   appAssert(isValidatePassword, UNAUTHORIZED, 'Invalid email or password');
 
-  const existingSession = await SessionModel.findOne({
-    userId: user._id,
-    expiresAt: { $gt: Date.now() },
-  });
+  if (user.role === Role.STUDENT) {
+    const existingSession = await SessionModel.findOne({
+      userId: user._id,
+      expiresAt: { $gt: Date.now() },
+    });
 
-  appAssert(!existingSession, FORBIDDEN, 'User already enrolled in this quiz');
+    appAssert(!existingSession, FORBIDDEN, 'You are already logged in, please logout first');
+  }
 
   //create session
   const session = await SessionModel.create({
