@@ -25,7 +25,7 @@ const BlogDetailPage: React.FC = () => {
         setBlog(response.data);
       } catch (err) {
         console.error("Failed to fetch blog detail", err);
-        navigate("/blog"); // Redirect on error
+        navigate("/blogs"); // Redirect on error
       } finally {
         setLoading(false);
       }

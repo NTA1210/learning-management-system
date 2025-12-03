@@ -30,7 +30,9 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
   onClose,
   onSubmit,
 }) => {
-  const [values, setValues] = useState<LessonFormValues>(initialValues || defaultValues);
+  const [values, setValues] = useState<LessonFormValues>(
+    initialValues || defaultValues
+  );
 
   useEffect(() => {
     setValues(initialValues || defaultValues);
@@ -74,23 +76,34 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
     >
       <div
         className="w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto"
-        style={{ backgroundColor: darkMode ? "#0b132b" : "#ffffff", border: "1px solid rgba(255,255,255,0.08)" }}
+        style={{
+          backgroundColor: darkMode ? "#0b132b" : "#ffffff",
+          border: "1px solid rgba(255,255,255,0.08)",
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         <div
           className="flex items-center justify-between px-6 py-4 sticky top-0"
           style={{
-            borderBottom: darkMode ? "1px solid rgba(255,255,255,0.06)" : "1px solid #eee",
+            borderBottom: darkMode
+              ? "1px solid rgba(255,255,255,0.06)"
+              : "1px solid #eee",
             backgroundColor: darkMode ? "#0b132b" : "#ffffff",
           }}
         >
-          <h3 className="text-xl font-semibold" style={{ color: darkMode ? "#ffffff" : "#111827" }}>
+          <h3
+            className="text-xl font-semibold"
+            style={{ color: darkMode ? "#ffffff" : "#111827" }}
+          >
             {modalTitle}
           </h3>
           <button
             onClick={onClose}
             className="px-3 py-1 rounded-lg text-sm"
-            style={{ backgroundColor: darkMode ? "#1f2937" : "#f3f4f6", color: darkMode ? "#e5e7eb" : "#111827" }}
+            style={{
+              backgroundColor: darkMode ? "#1f2937" : "#f3f4f6",
+              color: darkMode ? "#e5e7eb" : "#111827",
+            }}
           >
             Close
           </button>
@@ -104,22 +117,31 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
                 options={courses}
                 placeholder="Select a course"
                 darkMode={darkMode}
-                onChange={(courseId) => setValues((prev) => ({ ...prev, courseId }))}
+                onChange={(courseId) =>
+                  setValues((prev) => ({ ...prev, courseId }))
+                }
                 required
                 label="Course"
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
+              >
                 Title *
               </label>
               <input
                 type="text"
                 value={values.title}
-                onChange={(e) => setValues((prev) => ({ ...prev, title: e.target.value }))}
+                onChange={(e) =>
+                  setValues((prev) => ({ ...prev, title: e.target.value }))
+                }
                 className="w-full px-4 py-2 rounded-lg border"
                 style={{
-                  backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
+                  backgroundColor: darkMode
+                    ? "rgba(55, 65, 81, 0.8)"
+                    : "#ffffff",
                   borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
                   color: darkMode ? "#ffffff" : "#000000",
                 }}
@@ -128,15 +150,22 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
+              >
                 Content
               </label>
               <textarea
                 value={values.content}
-                onChange={(e) => setValues((prev) => ({ ...prev, content: e.target.value }))}
+                onChange={(e) =>
+                  setValues((prev) => ({ ...prev, content: e.target.value }))
+                }
                 className="w-full px-4 py-2 rounded-lg border h-32"
                 style={{
-                  backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
+                  backgroundColor: darkMode
+                    ? "rgba(55, 65, 81, 0.8)"
+                    : "#ffffff",
                   borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
                   color: darkMode ? "#ffffff" : "#000000",
                 }}
@@ -144,16 +173,23 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: darkMode ? "#cbd5e1" : "#374151" }}>
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: darkMode ? "#cbd5e1" : "#374151" }}
+              >
                 Duration (minutes)
               </label>
               <input
                 type="text"
                 value={displayValue(values.durationMinutes)}
-                onChange={(e) => numberInputHandler("durationMinutes")(e.target.value)}
+                onChange={(e) =>
+                  numberInputHandler("durationMinutes")(e.target.value)
+                }
                 className="w-full px-4 py-2 rounded-lg border"
                 style={{
-                  backgroundColor: darkMode ? "rgba(55, 65, 81, 0.8)" : "#ffffff",
+                  backgroundColor: darkMode
+                    ? "rgba(55, 65, 81, 0.8)"
+                    : "#ffffff",
                   borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
                   color: darkMode ? "#ffffff" : "#000000",
                 }}
@@ -167,7 +203,10 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
               type="button"
               onClick={onClose}
               className="px-4 py-2 rounded-lg"
-              style={{ backgroundColor: darkMode ? "#1f2937" : "#e5e7eb", color: darkMode ? "#e5e7eb" : "#111827" }}
+              style={{
+                backgroundColor: darkMode ? "#1f2937" : "#e5e7eb",
+                color: darkMode ? "#e5e7eb" : "#111827",
+              }}
             >
               Cancel
             </button>
@@ -176,10 +215,12 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
               className="px-5 py-2 rounded-lg text-white font-medium transition-all duration-200"
               style={{ backgroundColor: darkMode ? "#4c1d95" : "#4f46e5" }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? "#5b21b6" : "#4338ca";
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                  darkMode ? "#5b21b6" : "#4338ca";
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.backgroundColor = darkMode ? "#4c1d95" : "#4f46e5";
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                  darkMode ? "#4c1d95" : "#4f46e5";
               }}
             >
               {submitLabel}
@@ -192,4 +233,3 @@ const LessonFormModal: React.FC<LessonFormModalProps> = ({
 };
 
 export default LessonFormModal;
-

@@ -525,7 +525,7 @@ export default function CourseDetail() {
                         style={{ color: isDarkMode ? "#9ca3af" : "#6b7280" }}
                       />
                       <div
-                        className="fixed left-1/2 top-1/2 w-[500px] max-h-[600px] overflow-y-auto p-6 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none"
+                        className="fixed left-1/2 top-1/2 w-[90vw] max-w-[950px] max-h-[85vh] overflow-y-auto p-6 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none"
                         style={{
                           backgroundColor: isDarkMode ? "#0b132b" : "#ffffff",
                           border: `1px solid ${
@@ -534,7 +534,7 @@ export default function CourseDetail() {
                           transform: "translate(-50%, -50%)",
                         }}
                       >
-                        <div className="grid grid-cols-3 gap-6 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 items-start text-sm">
                           {/* Instructors */}
                           <div>
                             <h2
@@ -597,39 +597,52 @@ export default function CourseDetail() {
                               Subject Detail
                             </h2>
                             {subject ? (
-                              <div className="space-y-1.5">
-                                <div className="flex gap-2 text-xs">
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-xs">
                                   <span className="opacity-70">Name:</span>
-                                  <span>{subject.name}</span>
+                                  <span className="text-right truncate max-w-[180px]">
+                                    {subject.name}
+                                  </span>
                                 </div>
                                 {subject.description && (
-                                  <p
-                                    className="text-xs line-clamp-2"
-                                    style={{
-                                      color: isDarkMode ? "#cbd5e1" : "#4b5563",
-                                    }}
-                                  >
-                                    {subject.description}
-                                  </p>
+                                  <div className="flex justify-between text-xs">
+                                    <span className="opacity-70 shrink-0 mr-2">
+                                      Desc:
+                                    </span>
+                                    <p
+                                      className="text-right line-clamp-2"
+                                      style={{
+                                        color: isDarkMode
+                                          ? "#cbd5e1"
+                                          : "#4b5563",
+                                      }}
+                                    >
+                                      {subject.description}
+                                    </p>
+                                  </div>
                                 )}
                                 {subject.code && (
-                                  <div className="flex gap-2 text-xs">
+                                  <div className="flex justify-between text-xs">
                                     <span className="opacity-70">Code:</span>
-                                    <span>{subject.code}</span>
+                                    <span className="text-right truncate max-w-[180px]">
+                                      {subject.code}
+                                    </span>
                                   </div>
                                 )}
                                 {subject.slug && (
-                                  <div className="flex gap-2 text-xs">
+                                  <div className="flex justify-between text-xs">
                                     <span className="opacity-70">Slug:</span>
-                                    <span className="truncate">
+                                    <span className="text-right truncate max-w-[180px]">
                                       {subject.slug}
                                     </span>
                                   </div>
                                 )}
                                 {typeof subject.credits === "number" && (
-                                  <div className="flex gap-2 text-xs">
+                                  <div className="flex justify-between text-xs">
                                     <span className="opacity-70">Credits:</span>
-                                    <span>{subject.credits}</span>
+                                    <span className="text-right truncate max-w-[180px]">
+                                      {subject.credits}
+                                    </span>
                                   </div>
                                 )}
                               </div>
@@ -655,22 +668,29 @@ export default function CourseDetail() {
                             >
                               Info
                             </h2>
-                            <div className="space-y-1.5 text-xs">
+                            <div className="space-y-2 text-xs">
                               {course.createdBy && (
-                                <div className="flex flex-col gap-1">
-                                  <span className="opacity-70">
-                                    Created By:
-                                  </span>
-                                  <span>{course.createdBy.username}</span>
-                                  <span className="opacity-70">
-                                    {course.createdBy.email}
-                                  </span>
-                                </div>
+                                <>
+                                  <div className="flex justify-between">
+                                    <span className="opacity-70">
+                                      Created By:
+                                    </span>
+                                    <span className="text-right truncate max-w-[180px]">
+                                      {course.createdBy.username}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="opacity-70">Email:</span>
+                                    <span className="text-right truncate max-w-[180px]">
+                                      {course.createdBy.email}
+                                    </span>
+                                  </div>
+                                </>
                               )}
                               {course.createdAt && (
-                                <div className="flex gap-2">
+                                <div className="flex justify-between">
                                   <span className="opacity-70">Created:</span>
-                                  <span>
+                                  <span className="text-right truncate max-w-[180px]">
                                     {new Date(
                                       course.createdAt
                                     ).toLocaleDateString()}
@@ -678,22 +698,12 @@ export default function CourseDetail() {
                                 </div>
                               )}
                               {course.updatedAt && (
-                                <div className="flex gap-2">
+                                <div className="flex justify-between">
                                   <span className="opacity-70">Updated:</span>
-                                  <span>
+                                  <span className="text-right truncate max-w-[180px]">
                                     {new Date(
                                       course.updatedAt
                                     ).toLocaleDateString()}
-                                  </span>
-                                </div>
-                              )}
-                              {course.key && (
-                                <div className="flex flex-col gap-1">
-                                  <span className="opacity-70">
-                                    Storage Key:
-                                  </span>
-                                  <span className="truncate text-xs">
-                                    {course.key}
                                   </span>
                                 </div>
                               )}

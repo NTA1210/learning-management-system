@@ -23,7 +23,7 @@ export const listParamsSchema = z.object({
   createdAt: datePreprocess.optional(),
   updatedAt: datePreprocess.optional(),
 
-  sortBy: z.enum(['createdAt', 'title', 'updatedAt', 'name']).optional(),
+  sortBy: z.enum(['createdAt', 'title', 'name' , 'updatedAt']).optional(),
 
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 }) satisfies z.ZodType<ListParams>;
