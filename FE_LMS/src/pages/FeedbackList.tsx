@@ -123,9 +123,7 @@ export default function FeedbackList() {
     void fetchFeedbacks(1, activeFilter);
   };
 
-  const heroDescription = isStudent
-    ? "Xem lại toàn bộ phản hồi mà bạn đã gửi cho hệ thống."
-    : "Review the latest suggestions from learners and spot trends quickly.";
+ 
 
   const filteredFeedbacks = useMemo(() => {
     return feedbacks.filter((fb) => {
@@ -369,7 +367,7 @@ export default function FeedbackList() {
               </p>
               <h1 className="text-2xl sm:text-3xl font-bold mt-1">Feedback overview</h1>
               <p className="text-sm mt-1" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
-                {heroDescription}
+              Review the latest suggestions from learners and spot trends quickly.
               </p>
             </div>
               <div className="flex gap-3 flex-wrap justify-end items-center">

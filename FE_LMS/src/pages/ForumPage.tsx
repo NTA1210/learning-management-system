@@ -253,21 +253,24 @@ const ForumPage: React.FC = () => {
               <section className="space-y-6">
    
 
-<div className="sticky top-0 z-20">
-  <div
-    className={`rounded-2xl border px-4 py-3 shadow-lg flex items-center gap-3 ${
-      darkMode ? "bg-slate-900/80 border-slate-700/70 backdrop-blur" : "bg-white border-slate-200"
-    }`}
-  >
-    <Book className="w-4 h-4 text-indigo-500" /> 
-    <div className="min-w-0">
-      <p className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">Course</p>
-      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate">
-        {courseTitleDisplay || "Select a course to start"}
-      </p>
-    </div>
+              <div
+  className={`rounded-2xl border px-4 py-3 shadow-lg flex items-center gap-3 ${
+    darkMode ? "bg-slate-900/80 border-slate-700/70 backdrop-blur" : "bg-white border-slate-200"
+  }`}
+>
+  <Book className="w-4 h-4 text-indigo-500" /> 
+  <div className="min-w-0">
+    <p className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">Course</p>
+    <p
+      className={`text-sm font-semibold truncate ${
+        darkMode ? "text-white" : "text-slate-900"
+      }`}
+    >
+      {courseTitleDisplay || "Select a course to start"}
+    </p>
   </div>
 </div>
+
 
                 <div className={`rounded-2xl p-6 shadow-sm ${panelStyles}`} ref={createCardRef}>
                   
