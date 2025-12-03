@@ -44,43 +44,43 @@ function BlogCard({
     >
       {/* Admin Actions */}
       {isAdmin && (
-        <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <div className="absolute z-10 flex gap-2 transition-opacity opacity-0 top-4 right-4 group-hover:opacity-100">
           <button
             onClick={(e) => {
               e.preventDefault();
               onEdit(post);
             }}
-            className="p-2 rounded-full bg-blue-500 text-white hover:bg-blue-600 shadow-lg"
+            className="p-2 text-white bg-blue-500 rounded-full shadow-lg hover:bg-blue-600"
             title="Edit"
           >
-            <Edit2 className="h-4 w-4" />
+            <Edit2 className="w-4 h-4" />
           </button>
           <button
             onClick={(e) => {
               e.preventDefault();
               onDelete(post._id);
             }}
-            className="p-2 rounded-full bg-red-500 text-white hover:bg-red-600 shadow-lg"
+            className="p-2 text-white bg-red-500 rounded-full shadow-lg hover:bg-red-600"
             title="Delete"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {/* Image Section */}
       <div className="w-full md:w-5/12 shrink-0">
-        <div className="relative aspect-video w-full overflow-hidden rounded-xl">
+        <div className="relative w-full overflow-hidden aspect-video rounded-xl">
           <img
             src={post.thumbnailUrl}
             alt={post.title}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105"
           />
         </div>
       </div>
 
       {/* Content Section */}
-      <div className="flex flex-1 flex-col">
+      <div className="flex flex-col flex-1">
         {/* Category */}
         {post.category && (
           <div className="mb-3">
@@ -134,7 +134,7 @@ function BlogCard({
         />
 
         {/* Read More Button */}
-        <div className="mt-auto flex justify-end">
+        <div className="flex justify-end mt-auto">
           <Link
             to={`/blogs/${post.slug}`}
             className={`group/btn inline-flex items-center gap-1 text-sm font-medium transition-colors ${
@@ -174,7 +174,7 @@ function Pagination({
   if (totalPages <= 1) return null;
 
   return (
-    <div className="mt-12 flex items-center justify-center gap-4">
+    <div className="flex items-center justify-center gap-4 mt-12">
       <Link
         to={`${basePath}?pageNumber=${pageNumber - 1}&pageSize=${pageSize}`}
         className={`inline-flex items-center rounded-lg border px-4 py-2 text-sm font-medium transition ${
@@ -384,7 +384,7 @@ const BlogPage: React.FC = () => {
                   onClick={handleCreate}
                   className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-indigo-600 text-white font-medium shadow-lg shadow-indigo-500/30 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all"
                 >
-                  <Plus className="h-5 w-5" />
+                  <Plus className="w-5 h-5" />
                   Create Blog
                 </button>
               )}
@@ -393,7 +393,7 @@ const BlogPage: React.FC = () => {
             {/* Blog List */}
             {loading ? (
               <div className="flex justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+                <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
               </div>
             ) : items.length === 0 ? (
               <div
@@ -403,7 +403,7 @@ const BlogPage: React.FC = () => {
                     : "border-slate-300 bg-slate-50 text-slate-500"
                 }`}
               >
-                <i className="bi bi-journal-text mb-3 block text-2xl"></i>
+                <i className="block mb-3 text-2xl bi bi-journal-text"></i>
                 Hiện chưa có bài viết nào.
               </div>
             ) : (
