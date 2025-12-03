@@ -308,12 +308,6 @@ export const listCourses = async ({
     CourseModel.countDocuments(filter),
   ]);
 
-  courses.forEach((c: any, idx: number) => {
-
-    if (c.subjectId?.specialistIds) {
-
-    }
-  });
 
   // Calculate pagination metadata
   const totalPages = Math.ceil(total / limit);
