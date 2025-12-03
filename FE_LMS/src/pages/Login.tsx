@@ -103,28 +103,37 @@ const LoginPage: React.FC = () => {
   console.error("Login error:", err);
 
   let finalError: string | any[] = "Đăng nhập thất bại";
-  const maybeMessage =
-    err?.message ||
-    (Array.isArray(err?.errors)
-      ? err.errors.map((e: any) => e.message || String(e)).join(", ")
-      : undefined) ||
-    "Đăng nhập thất bại";
+  
+  // Check for axios error response first (backend error message)
+  const backendMessage = err?.response?.data?.message;
+  if (backendMessage) {
+    finalError = backendMessage;
+  } else {
+    const maybeMessage =
+      err?.message ||
+      (Array.isArray(err?.errors)
+        ? err.errors.map((e: any) => e.message || String(e)).join(", ")
+        : undefined) ||
+      "Đăng nhập thất bại";
 
-  // Nếu backend trả JSON dạng chuỗi → parse thành mảng
-  if (err.message && typeof err.message === "string") {
-    try {
-      const parsed = JSON.parse(err.message);
-      if (Array.isArray(parsed)) {
-        finalError = parsed as ErrorType[];
-      } else {
+    // Nếu backend trả JSON dạng chuỗi → parse thành mảng
+    if (err.message && typeof err.message === "string") {
+      try {
+        const parsed = JSON.parse(err.message);
+        if (Array.isArray(parsed)) {
+          finalError = parsed as ErrorType[];
+        } else {
+          finalError = maybeMessage;
+        }
+      } catch {
         finalError = maybeMessage;
       }
-    } catch {
+    } else {
       finalError = maybeMessage;
     }
   }
 
-  setError(finalError); // ← Dùng mảng hoặc chuỗi
+  setError(finalError);
 } finally {
   setLoading(false);
 }
