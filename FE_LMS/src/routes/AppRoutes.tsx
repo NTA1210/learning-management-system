@@ -39,13 +39,13 @@ import {
   ForumPostDetailPage,
   OnboardingPage,
   DeletedCoursesPage,
-  ApprovedCoursesPage,
   QuizAttemptsPage,
   GradeAttemptPage,
   CreateSemesterPage,
   ListSemestersPage,
   BlogPage,
   BlogDetailPage,
+  JoinCoursePage,
 } from "../pages";
 
 import EmailVerificationPage from "../pages/EmailVerificationPage";
@@ -100,11 +100,13 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-         <Route
-          path="/admin/courses/approved"
+
+        {/* Join Course via Invite Link */}
+        <Route
+          path="/courses/join"
           element={
-            <ProtectedRoute requiredRole="admin">
-              <ApprovedCoursesPage />
+            <ProtectedRoute>
+              <JoinCoursePage />
             </ProtectedRoute>
           }
         />
