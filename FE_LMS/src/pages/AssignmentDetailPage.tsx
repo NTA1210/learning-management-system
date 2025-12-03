@@ -98,6 +98,12 @@ const AssignmentDetailPage: React.FC = () => {
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [viewingFile, setViewingFile] = useState<{
+    url: string;
+    mimeType: string;
+    name: string;
+    size?: number;
+  } | null>(null);
 
   const [showSubmissionModal, setShowSubmissionModal] = useState(false);
   const [showViewSubmissionModal, setShowViewSubmissionModal] = useState(false);
@@ -357,22 +363,18 @@ const AssignmentDetailPage: React.FC = () => {
       const baseW =
         resizeStart.width || sizeRef.current.width || window.innerWidth * 0.9;
       const baseH =
-        resizeStart.height || sizeRef.current.height || window.innerHeight * 0.9;
+        resizeStart.height ||
+        sizeRef.current.height ||
+        window.innerHeight * 0.9;
 
       let w = sizeRef.current.width || baseW;
       let h = sizeRef.current.height || baseH;
 
       if (resizeMode === "horizontal") {
-        w = Math.max(
-          400,
-          Math.min(window.innerWidth - 40, baseW + deltaX)
-        );
+        w = Math.max(400, Math.min(window.innerWidth - 40, baseW + deltaX));
       }
       if (resizeMode === "vertical") {
-        h = Math.max(
-          300,
-          Math.min(window.innerHeight - 40, baseH + deltaY)
-        );
+        h = Math.max(300, Math.min(window.innerHeight - 40, baseH + deltaY));
       }
 
       sizeRef.current = { width: w, height: h };
@@ -486,7 +488,8 @@ const AssignmentDetailPage: React.FC = () => {
                 status: submissionData.status || statusData.status,
                 grade: submissionData.grade ?? statusData.grade,
                 feedback: submissionData.feedback ?? statusData.feedback,
-                submittedAt: submissionData.submittedAt || statusData.submittedAt,
+                submittedAt:
+                  submissionData.submittedAt || statusData.submittedAt,
               };
             } else {
               details = { ...statusData, _id: submissionId };
@@ -548,17 +551,14 @@ const AssignmentDetailPage: React.FC = () => {
           } catch {
             // ignore
           }
-          const submissionData = await fetchSubmissionDetailsById(
-            submissionId
-          );
+          const submissionData = await fetchSubmissionDetailsById(submissionId);
           if (submissionData) {
             details = {
               ...submissionData,
               status: submissionData.status || statusData.status,
               grade: submissionData.grade ?? statusData.grade,
               feedback: submissionData.feedback ?? statusData.feedback,
-              submittedAt:
-                submissionData.submittedAt || statusData.submittedAt,
+              submittedAt: submissionData.submittedAt || statusData.submittedAt,
             };
           } else {
             details = { ...statusData, _id: submissionId };
@@ -907,33 +907,25 @@ const AssignmentDetailPage: React.FC = () => {
       return {
         text: "Overdue",
         color: darkMode ? "#fca5a5" : "#dc2626",
-        bg: darkMode
-          ? "rgba(239, 68, 68, 0.2)"
-          : "rgba(239, 68, 68, 0.1)",
+        bg: darkMode ? "rgba(239, 68, 68, 0.2)" : "rgba(239, 68, 68, 0.1)",
       };
     } else if (daysUntilDue === 0) {
       return {
         text: "Due today",
         color: darkMode ? "#fbbf24" : "#d97706",
-        bg: darkMode
-          ? "rgba(251, 191, 36, 0.2)"
-          : "rgba(251, 191, 36, 0.1)",
+        bg: darkMode ? "rgba(251, 191, 36, 0.2)" : "rgba(251, 191, 36, 0.1)",
       };
     } else if (daysUntilDue <= 3) {
       return {
         text: `Due in ${daysUntilDue} day${daysUntilDue > 1 ? "s" : ""}`,
         color: darkMode ? "#fbbf24" : "#d97706",
-        bg: darkMode
-          ? "rgba(251, 191, 36, 0.2)"
-          : "rgba(251, 191, 36, 0.1)",
+        bg: darkMode ? "rgba(251, 191, 36, 0.2)" : "rgba(251, 191, 36, 0.1)",
       };
     } else {
       return {
         text: `Due in ${daysUntilDue} days`,
         color: darkMode ? "#86efac" : "#16a34a",
-        bg: darkMode
-          ? "rgba(34, 197, 94, 0.2)"
-          : "rgba(34, 197, 94, 0.1)",
+        bg: darkMode ? "rgba(34, 197, 94, 0.2)" : "rgba(34, 197, 94, 0.1)",
       };
     }
   };
@@ -1029,7 +1021,9 @@ const AssignmentDetailPage: React.FC = () => {
         clearFile();
         await fetchSubmissionStatus();
       } else {
-        throw new Error(response.data?.message || "Failed to submit assignment");
+        throw new Error(
+          response.data?.message || "Failed to submit assignment"
+        );
       }
     } catch (error) {
       console.error("Error submitting assignment:", error);
@@ -1077,6 +1071,7 @@ const AssignmentDetailPage: React.FC = () => {
     }
     setPopupSize({ width: 0, height: 0 });
     sizeRef.current = { width: 0, height: 0 };
+    setViewingFile(null);
   };
 
   const handleViewAssignmentFilePreview = async () => {
@@ -1084,6 +1079,13 @@ const AssignmentDetailPage: React.FC = () => {
       await showSwalError("Assignment file is not available for preview.");
       return;
     }
+
+    setViewingFile({
+      url: assignment.publicURL,
+      mimeType: assignment.fileMimeType,
+      name: assignment.fileOriginalName || "Assignment File",
+      size: assignment.fileSize,
+    });
 
     setIsViewerOpen(true);
     setViewerLoading(true);
@@ -1123,8 +1125,78 @@ const AssignmentDetailPage: React.FC = () => {
     }
   };
 
+  const handleViewSubmissionFile = async (submission: any) => {
+    try {
+      setLoadingAllSubmissions(true);
+      const response = await httpClient.get(`/submissions/${submission._id}`, {
+        withCredentials: true,
+      });
+      if (response.data?.success && response.data.data?.publicURL) {
+        const subData = response.data.data;
+        const mimeType = (subData.fileMimeType || "").toLowerCase();
+
+        setViewingFile({
+          url: subData.publicURL,
+          mimeType: mimeType || "application/octet-stream",
+          name:
+            subData.originalName ||
+            subData.fileOriginalName ||
+            "Submission File",
+          size: subData.size || subData.fileSize,
+        });
+
+        setIsViewerOpen(true);
+        setViewerLoading(true);
+
+        const isOfficeDoc =
+          mimeType.includes("word") ||
+          mimeType.includes("excel") ||
+          mimeType.includes("powerpoint") ||
+          mimeType.includes("presentation") ||
+          mimeType.includes("spreadsheet") ||
+          !!(subData.originalName || subData.fileOriginalName)?.match(
+            /\.(doc|docx|xls|xlsx|ppt|pptx)$/i
+          );
+
+        if (isOfficeDoc) {
+          setViewerObjectUrl(null);
+        } else {
+          const res = await fetch(subData.publicURL);
+          if (!res.ok) {
+            throw new Error(`Failed to fetch file: ${res.status}`);
+          }
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          if (viewerObjectUrl) {
+            URL.revokeObjectURL(viewerObjectUrl);
+          }
+          setViewerObjectUrl(url);
+        }
+      } else {
+        await showSwalError("Failed to get submission file URL");
+      }
+    } catch (error) {
+      console.error("Error viewing submission:", error);
+      await showSwalError("Failed to view submission file");
+    } finally {
+      setLoadingAllSubmissions(false);
+      setViewerLoading(false);
+    }
+  };
+
   const renderAssignmentViewerContent = () => {
-    if (!assignment || !assignment.fileMimeType) {
+    const file =
+      viewingFile ||
+      (assignment && assignment.fileMimeType
+        ? {
+            url: assignment.publicURL!,
+            mimeType: assignment.fileMimeType,
+            name: assignment.fileOriginalName || "Assignment",
+            size: assignment.fileSize,
+          }
+        : null);
+
+    if (!file) {
       return (
         <div className="flex flex-col items-center justify-center h-full p-8">
           <FileText
@@ -1157,34 +1229,41 @@ const AssignmentDetailPage: React.FC = () => {
       );
     }
 
-    const mimeType = assignment.fileMimeType.toLowerCase();
-    const baseUrl = assignment.publicURL!;
+    const mimeType = file.mimeType.toLowerCase();
+    const fileName = (file.name || "").toLowerCase();
+    const baseUrl = file.url;
     const srcUrl = viewerObjectUrl || baseUrl;
 
-    if (mimeType.includes("pdf")) {
+    if (mimeType.includes("pdf") || fileName.endsWith(".pdf")) {
       return (
         <iframe
           src={srcUrl}
           className="w-full h-full border-0"
-          title={assignment.fileOriginalName || "PDF Viewer"}
+          title={file.name || "PDF Viewer"}
           style={{ backgroundColor: "#fff" }}
         />
       );
     }
 
-    if (mimeType.startsWith("image/")) {
+    if (
+      mimeType.startsWith("image/") ||
+      /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(fileName)
+    ) {
       return (
         <div className="flex items-center justify-center p-4 h-full">
           <img
             src={srcUrl}
-            alt={assignment.fileOriginalName || "Image"}
+            alt={file.name || "Image"}
             className="max-w-full max-h-full object-contain"
           />
         </div>
       );
     }
 
-    if (mimeType.startsWith("video/")) {
+    if (
+      mimeType.startsWith("video/") ||
+      /\.(mp4|webm|ogg|mov)$/i.test(fileName)
+    ) {
       return (
         <div className="flex items-center justify-center p-4 h-full">
           <video src={srcUrl} controls className="max-w-full max-h-full">
@@ -1199,7 +1278,7 @@ const AssignmentDetailPage: React.FC = () => {
         <iframe
           src={srcUrl}
           className="w-full h-full border-0"
-          title={assignment.fileOriginalName || "Text Viewer"}
+          title={file.name || "Text Viewer"}
           style={{ backgroundColor: "#fff" }}
         />
       );
@@ -1211,7 +1290,7 @@ const AssignmentDetailPage: React.FC = () => {
       mimeType.includes("powerpoint") ||
       mimeType.includes("presentation") ||
       mimeType.includes("spreadsheet") ||
-      assignment.fileOriginalName?.match(/\.(doc|docx|xls|xlsx|ppt|pptx)$/i)
+      file.name?.match(/\.(doc|docx|xls|xlsx|ppt|pptx)$/i)
     ) {
       const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(
         baseUrl
@@ -1220,7 +1299,7 @@ const AssignmentDetailPage: React.FC = () => {
         <iframe
           src={viewerUrl}
           className="w-full h-full border-0"
-          title={assignment.fileOriginalName || "Document Viewer"}
+          title={file.name || "Document Viewer"}
           style={{ backgroundColor: "#fff" }}
         />
       );
@@ -1248,7 +1327,7 @@ const AssignmentDetailPage: React.FC = () => {
           Please download the file to view it.
         </p>
         <button
-          onClick={handleDownloadAssignmentFile}
+          onClick={() => window.open(file.url, "_blank")}
           className="px-4 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg flex items-center"
           style={{ backgroundColor: darkMode ? "#059669" : "#10b981" }}
         >
@@ -1278,7 +1357,7 @@ const AssignmentDetailPage: React.FC = () => {
             {/* Header */}
             <div className="mb-8">
               <button
-                onClick={() => navigate("/assignments")}
+                onClick={() => navigate(-1)}
                 className="flex items-center mb-4 text-sm hover:opacity-80 transition-opacity"
                 style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
               >
@@ -1675,7 +1754,8 @@ const AssignmentDetailPage: React.FC = () => {
                     <span
                       className="inline-flex items-center px-3 py-2 text-sm font-semibold rounded whitespace-nowrap"
                       style={{
-                        backgroundColor: getDueDateStatus(assignment.dueDate).bg,
+                        backgroundColor: getDueDateStatus(assignment.dueDate)
+                          .bg,
                         color: getDueDateStatus(assignment.dueDate).color,
                       }}
                     >
@@ -1698,7 +1778,7 @@ const AssignmentDetailPage: React.FC = () => {
       </div>
 
       {/* Assignment File Viewer Modal (resizable) */}
-      {isViewerOpen && assignment && (
+      {isViewerOpen && (viewingFile || assignment) && (
         <div
           className="fixed inset-0 z-[10000] flex items-center justify-center"
           style={{ backgroundColor: "rgba(0,0,0,0.75)" }}
@@ -1743,15 +1823,17 @@ const AssignmentDetailPage: React.FC = () => {
                   className="text-xl font-semibold truncate"
                   style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
                 >
-                  {assignment.fileOriginalName || "View Assignment"}
+                  {viewingFile?.name ||
+                    assignment?.fileOriginalName ||
+                    "View File"}
                 </h3>
-                {assignment.fileMimeType && (
+                {(viewingFile?.mimeType || assignment?.fileMimeType) && (
                   <p
                     className="text-xs mt-1 truncate"
                     style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
                   >
-                    {assignment.fileMimeType} •{" "}
-                    {formatFileSize(assignment.fileSize)}
+                    {viewingFile?.mimeType || assignment?.fileMimeType} •{" "}
+                    {formatFileSize(viewingFile?.size || assignment?.fileSize)}
                   </p>
                 )}
               </div>
@@ -1876,6 +1958,7 @@ const AssignmentDetailPage: React.FC = () => {
           setGradingGrade(submission.grade?.toString() || "");
           setGradingFeedback(submission.feedback || "");
         }}
+        onView={handleViewSubmissionFile}
         formatDate={formatDate}
       />
 

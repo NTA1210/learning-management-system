@@ -84,7 +84,7 @@ export const listForumsOfACourse = async ({
     title,
     description,
     forumType,
-    isActive = true,
+    isActive,
     isArchived,
     createdBy,
     createdAt,
@@ -98,7 +98,7 @@ export const listForumsOfACourse = async ({
     // Course ID is required
     appAssert(courseId, NOT_FOUND, "Course ID is required");
     filter.courseId = courseId;
-
+    console.log(isActive)
     // Search by title or description (text search)
     if (search) {
         filter.$or = [
@@ -146,8 +146,7 @@ export const listForumsOfACourse = async ({
     const sort: any = {};
     sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
-    console.log("Forum filter:", filter);
-
+    console.log("FOTLERS:", filter);
     // Execute query with pagination
     const [forums, total] = await Promise.all([
         ForumModel.find(filter)

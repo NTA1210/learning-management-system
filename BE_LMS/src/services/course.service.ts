@@ -81,6 +81,7 @@ export type ListCoursesParams = {
   from?: Date; // Date range start for createdAt filtering
   to?: Date; // Date range end for createdAt filtering
   subjectId?: string; // ✅ NEW: Filter by subject instead of specialist
+  specialistId?: string; // ✅ NEW: Filter by specialist/specialization
   semesterId?: string; // ✅ NEW: Filter by semester
   teacherId?: string;
   isPublished?: boolean;
@@ -111,6 +112,7 @@ export const listCourses = async ({
   from,
   to,
   subjectId,
+  specialistId,
   semesterId,
   teacherId,
   isPublished,
@@ -141,9 +143,12 @@ export const listCourses = async ({
     `Invalid sort field. Allowed: ${allowedSortFields.join(', ')}`
   );
 
-  // ❌ FIX: Validate subjectId/teacherId if provided
+  // ❌ FIX: Validate subjectId/specialistId/teacherId if provided
   if (subjectId) {
     appAssert(subjectId.match(/^[0-9a-fA-F]{24}$/), BAD_REQUEST, 'Invalid subject ID format');
+  }
+  if (specialistId) {
+    appAssert(specialistId.match(/^[0-9a-fA-F]{24}$/), BAD_REQUEST, 'Invalid specialist ID format');
   }
   if (teacherId) {
     appAssert(teacherId.match(/^[0-9a-fA-F]{24}$/), BAD_REQUEST, 'Invalid teacher ID format');
@@ -201,6 +206,29 @@ export const listCourses = async ({
     filter.subjectId = subjectId;
   }
 
+  // ✅ NEW: Filter by specialist ID (through subject's specialistIds)
+  if (specialistId) {
+
+
+    // Find all subjects that have this specialist
+    const subjectsWithSpecialist = await SubjectModel.find({
+      specialistIds: specialistId,
+    }).select('_id name specialistIds');
+
+
+    const subjectIds = subjectsWithSpecialist.map((s) => s._id);
+
+
+    if (subjectIds.length > 0) {
+      filter.subjectId = { $in: subjectIds };
+
+    } else {
+      // No subjects found with this specialist, return empty result
+      filter.subjectId = null; // This will match no courses
+
+    }
+  }
+
   // ✅ NEW: Filter by semester ID
   if (semesterId) {
     filter.semesterId = semesterId;
@@ -256,6 +284,9 @@ export const listCourses = async ({
   const sort: any = {};
   sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
 
+  // ✅ DEBUG: Log final filter before query
+
+
   // Execute query with pagination
   const [courses, total] = await Promise.all([
     CourseModel.find(filter)
@@ -277,6 +308,7 @@ export const listCourses = async ({
     CourseModel.countDocuments(filter),
   ]);
 
+
   // Calculate pagination metadata
   const totalPages = Math.ceil(total / limit);
   const hasNextPage = page < totalPages;
@@ -286,10 +318,10 @@ export const listCourses = async ({
   const coursesWithTeacherFlag = courses.map((course) => {
     const isTeacherOfCourse = userId
       ? course.teacherIds.some(
-          (teacherId: any) =>
-            teacherId._id?.toString() === userId.toString() ||
-            teacherId.toString() === userId.toString()
-        )
+        (teacherId: any) =>
+          teacherId._id?.toString() === userId.toString() ||
+          teacherId.toString() === userId.toString()
+      )
       : false;
 
     return {
@@ -338,10 +370,10 @@ export const getCourseById = async (courseId: string, userId?: Types.ObjectId) =
   // ✅ Add isTeacherOfCourse field
   const isTeacherOfCourse = userId
     ? (course.teacherIds as any[]).some(
-        (teacherId: any) =>
-          teacherId._id?.toString() === userId.toString() ||
-          teacherId.toString() === userId.toString()
-      )
+      (teacherId: any) =>
+        teacherId._id?.toString() === userId.toString() ||
+        teacherId.toString() === userId.toString()
+    )
     : false;
 
   return {
@@ -502,9 +534,10 @@ export const createCourse = async (
   let finalStatus = data.status || CourseStatus.DRAFT;
 
   if (!isAdmin) {
-    // Teacher CANNOT publish course immediately - cần admin approve
-    // Force isPublished = false regardless of input
+    // ✅ TEACHER RULE: Teacher CANNOT publish course immediately - cần admin approve
+    // Force isPublished = false AND status = DRAFT regardless of input
     finalIsPublished = false;
+    finalStatus = CourseStatus.DRAFT;
   } else {
     // ✅ AUTO PUBLISH: Admin tạo course thì luôn publish
     finalIsPublished = true;
@@ -641,12 +674,8 @@ export const updateCourse = async (
   });
   appAssert(course, NOT_FOUND, 'Course not found');
 
-  // ❌ FIX: Cannot update completed course
-  appAssert(
-    course.status !== CourseStatus.COMPLETED,
-    BAD_REQUEST,
-    'Cannot update a completed course'
-  );
+  // ✅ UPDATED: Allow updating COMPLETED courses
+  // Teachers may need to update grades, course info, or statistics after course completion
 
   // Check if user is a teacher of this course or admin
   const user = await UserModel.findById(userId);
@@ -804,18 +833,39 @@ export const updateCourse = async (
     }
   }
 
-  // ✅ YÊU CẦU 2: Only Admin can approve/publish courses
-  // Teacher không thể tự publish course của mình
+  // ✅ TEACHER RESTRICTION: Only Admin can approve/publish courses
+  // Teacher CANNOT change isPublished OR status fields
   // Prepare update data
   const updateData: any = { ...data };
 
-  // ✅ FIX: Teacher CANNOT change isPublished field at all
-  // - Cannot publish (set true)
-  // - Cannot unpublish (set false) if already published by admin
-  if (!isAdmin && data.isPublished !== undefined) {
-    // Teacher tries to change isPublished field
-    delete updateData.isPublished;
-    // Note: Only admin can control publish status
+  if (!isAdmin) {
+    // ✅ FIX: Teacher CANNOT change isPublished field at all
+    // - Cannot publish (set true)
+    // - Cannot unpublish (set false) if already published by admin
+    if (data.isPublished !== undefined) {
+      delete updateData.isPublished;
+      // Note: Only admin can control publish status
+    }
+
+    // ✅ TEACHER STATUS RULES: Limited status transitions
+    if (data.status !== undefined) {
+      const currentStatus = course.status;
+      const newStatus = data.status;
+
+      // Teacher CAN ONLY: ONGOING → COMPLETED (mark course as finished)
+      const isAllowedTransition =
+        currentStatus === CourseStatus.ONGOING && newStatus === CourseStatus.COMPLETED;
+
+      if (!isAllowedTransition) {
+        // Block all other transitions:
+        // - DRAFT → ONGOING (only admin can approve)
+        // - COMPLETED → ONGOING (cannot rollback)
+        // - COMPLETED → DRAFT (cannot rollback)
+        // - Any other invalid transition
+        delete updateData.status;
+        // Note: Teacher can only complete ONGOING courses
+      }
+    }
   }
 
   // ✅ AUTO STATUS: When admin approves (publishes) a DRAFT course, auto change to ONGOING
@@ -1183,6 +1233,7 @@ export const getMyCourses = async ({
     search,
     slug,
     subjectId,
+    specialistId,
     semesterId,
     isPublished,
     status,
@@ -1214,7 +1265,7 @@ export const getMyCourses = async ({
     // Admin: See all (no extra filter needed on _id/owner)
   }
 
-  // 2. Common filters (Search, Subject, Semester, Status, Published)
+  // 2. Common filters (Search, Subject, Specialist, Semester, Status, Published)
   if (search) {
     filter.$and = filter.$and || [];
     filter.$and.push({
@@ -1232,6 +1283,27 @@ export const getMyCourses = async ({
   }
 
   if (subjectId) filter.subjectId = subjectId;
+
+  // Filter by specialist ID (through subject's specialistIds)
+  if (specialistId) {
+
+
+    // Find all subjects that have this specialist
+    const subjectsWithSpecialist = await SubjectModel.find({
+      specialistIds: specialistId,
+    }).select('_id name specialistIds');
+
+    const subjectIds = subjectsWithSpecialist.map((s) => s._id);
+
+    if (subjectIds.length > 0) {
+      filter.subjectId = { $in: subjectIds };
+    } else {
+      // No subjects found with this specialist, return empty result
+      filter.subjectId = null; // This will match no courses
+
+    }
+  }
+
   if (semesterId) filter.semesterId = semesterId;
 
   // Allow filtering by status/published for My Courses (even for students/teachers)
@@ -1802,11 +1874,11 @@ export const completeCourse = async (
       enrollmentId: s._id,
       student: s.student
         ? {
-            _id: s.student._id,
-            username: s.student.username,
-            fullname: s.student.fullname,
-            avatar_url: s.student.avatar_url,
-          }
+          _id: s.student._id,
+          username: s.student.username,
+          fullname: s.student.fullname,
+          avatar_url: s.student.avatar_url,
+        }
         : null,
       progress: {
         lessons: {
@@ -1907,32 +1979,32 @@ export const completeCourse = async (
   const totalStudents = studentsOut.length;
   const averageFinalGrade = totalStudents
     ? Math.round((studentsOut.reduce((acc, x) => acc + x.finalGrade, 0) / totalStudents) * 100) /
-      100
+    100
     : 0;
   const droppedCount = studentsOut.filter((s) => s.status === EnrollmentStatus.DROPPED).length;
   const passCount = studentsOut.filter((s) => s.status !== EnrollmentStatus.DROPPED).length;
   const averageAttendance = totalStudents
     ? Math.round(
-        (studentsOut.reduce(
-          (acc, x) => acc + x.progress.attendance.present / (x.progress.attendance.total || 1),
-          0
-        ) /
-          totalStudents) *
-          100
-      )
+      (studentsOut.reduce(
+        (acc, x) => acc + x.progress.attendance.present / (x.progress.attendance.total || 1),
+        0
+      ) /
+        totalStudents) *
+      100
+    )
     : 0;
   const averageQuizScore = totalStudents
     ? Math.round(
-        (studentsOut.reduce((acc, x) => acc + (x.progress.quizzes.score || 0), 0) / totalStudents) *
-          100
-      ) / 100
+      (studentsOut.reduce((acc, x) => acc + (x.progress.quizzes.score || 0), 0) / totalStudents) *
+      100
+    ) / 100
     : 0;
   const averageAssignmentScore = totalStudents
     ? Math.round(
-        (studentsOut.reduce((acc, x) => acc + (x.progress.assignments.score || 0), 0) /
-          totalStudents) *
-          100
-      ) / 100
+      (studentsOut.reduce((acc, x) => acc + (x.progress.assignments.score || 0), 0) /
+        totalStudents) *
+      100
+    ) / 100
     : 0;
 
   const summary = {
@@ -2052,11 +2124,11 @@ export const getCourseStatistics = async (
     enrollmentId: enrollment._id,
     student: enrollment.studentId
       ? {
-          _id: enrollment.studentId._id,
-          username: enrollment.studentId.username,
-          fullname: enrollment.studentId.fullname,
-          avatar_url: enrollment.studentId.avatar_url,
-        }
+        _id: enrollment.studentId._id,
+        username: enrollment.studentId.username,
+        fullname: enrollment.studentId.fullname,
+        avatar_url: enrollment.studentId.avatar_url,
+      }
       : null,
     progress: {
       lessons: {
@@ -2065,8 +2137,8 @@ export const getCourseStatistics = async (
         percent:
           enrollment.progress?.totalLessons > 0
             ? Math.round(
-                (enrollment.progress.completedLessons / enrollment.progress.totalLessons) * 100
-              )
+              (enrollment.progress.completedLessons / enrollment.progress.totalLessons) * 100
+            )
             : 0,
       },
       quizzes: {

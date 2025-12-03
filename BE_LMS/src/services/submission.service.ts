@@ -174,12 +174,11 @@ export const getSubmissionById = async (
   //nếu teacher
   else if (requesterRole === Role.TEACHER) {
     const assignment = submission.assignmentId as any;
-    const courseRef = assignment?.courseId;
-    appAssert(courseRef, NOT_FOUND, "Course not found for this assignment");
+    const courseId = assignment?.courseId;
+    appAssert(courseId, NOT_FOUND, "Course not found for this assignment");
 
     await ensureTeacherAccessToCourse({
-      course: courseRef,
-      courseId: (courseRef as any)?._id || courseRef,
+      courseId,
       userId: requesterId,
       userRole: requesterRole,
     });
@@ -488,10 +487,10 @@ export const getSubmissionStats = async ({
     const submittedCount = uniqueSubmittedStudents.size;
 
     const onTime = submissions.filter((s: any) => !s.isLate).length;
-    const late = submissions.filter((s: any) => s.isLate).length;
-    const graded = submissions.filter((s) => s.grade !== undefined);
-    const averageGrade = graded.length > 0 ? graded.reduce((sum, s) => sum + (s.grade ?? 0), 0) / graded.length : null;
-    return {
+   const late = submissions.filter((s: any) => s.isLate).length;
+   const graded = submissions.filter((s) => s.grade !== undefined);
+   const averageGrade = graded.length > 0 ? Math.round((graded.reduce((sum, s) => sum + (s.grade ?? 0), 0) / graded.length) *100) / 100 : null;
+   return {
           totalStudents,
           submissionRate: `${totalStudents ? ((submittedCount / totalStudents) * 100).toFixed(2) : 0}%`,
           onTimeRate: `${submissions.length ? ((onTime / submissions.length) * 100).toFixed(2) : 0}%`,

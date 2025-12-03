@@ -1,63 +1,55 @@
-import { Role } from "@/types";
-import { APP_ORIGIN } from "../constants/env";
+import { Role } from '@/types';
+import { APP_ORIGIN } from '../constants/env';
 import {
   CONFLICT,
   INTERNAL_SERVER_ERROR,
   NOT_FOUND,
   TOO_MANY_REQUESTS,
   UNAUTHORIZED,
-} from "../constants/http";
-import VerificationCodeType from "../constants/verificationCode";
-import { UserModel, SessionModel, VerificationCodeModel } from "@/models";
-import appAssert from "../utils/appAssert";
-import { hashValue } from "../utils/bcrypt";
+} from '../constants/http';
+import VerificationCodeType from '../constants/verificationCode';
+import { UserModel, SessionModel, VerificationCodeModel } from '@/models';
+import appAssert from '../utils/appAssert';
+import { hashValue } from '../utils/bcrypt';
 import {
   fiveMinutesAgo,
   ONE_DAY_MS,
   oneHourFromNow,
   onYearFromNow,
   thirtyDaysFromNow,
-} from "../utils/date";
-import {
-  getPasswordResetTemplate,
-  getVerifyEmailTemplate,
-} from "../utils/emailTemplates";
-import {
-  RefreshTokenPayload,
-  refreshTokenSignOptions,
-  signToKen,
-  verifyToken,
-} from "@/utils/jwt";
-import { sendMail } from "../utils/sendMail";
+} from '../utils/date';
+import { getPasswordResetTemplate, getVerifyEmailTemplate } from '../utils/emailTemplates';
+import { RefreshTokenPayload, refreshTokenSignOptions, signToKen, verifyToken } from '@/utils/jwt';
+import { sendMail } from '../utils/sendMail';
 
 export type CreateAccountParams = {
   username: string;
   email: string;
   password: string;
   userAgent?: string;
+  fullname: string;
 };
 
 // Domain for teacher
-const TEACHER_EMAIL_DOMAIN = "@fe.edu.vn";
+const TEACHER_EMAIL_DOMAIN = '@fe.edu.vn';
 
 export const createAccount = async (data: CreateAccountParams) => {
   //verify existing user does not exist
   const existingUser = await UserModel.exists({ email: data.email });
   // if (existingUser) throw new Error("User already exists");
-  appAssert(!existingUser, CONFLICT, "Email already in use");
+  appAssert(!existingUser, CONFLICT, 'Email already in use');
   //check user name
   const usernameExists = await UserModel.exists({ username: data.username });
-  appAssert(!usernameExists, CONFLICT, "Username already in use");
+  appAssert(!usernameExists, CONFLICT, 'Username already in use');
 
-  const role = data.email.endsWith(TEACHER_EMAIL_DOMAIN)
-    ? Role.TEACHER
-    : Role.STUDENT;
+  const role = data.email.endsWith(TEACHER_EMAIL_DOMAIN) ? Role.TEACHER : Role.STUDENT;
 
   //create user
   const user = await UserModel.create({
     username: data.username,
     email: data.email,
     password: data.password,
+    fullname: data.fullname,
     role,
   });
   //create verification code
@@ -75,7 +67,7 @@ export const createAccount = async (data: CreateAccountParams) => {
     ...getVerifyEmailTemplate(url),
   });
 
-  appAssert(!error, INTERNAL_SERVER_ERROR, "Failed to send verification email");
+  appAssert(!error, INTERNAL_SERVER_ERROR, 'Failed to send verification email');
 
   return {
     user: user.omitPassword(),
@@ -88,19 +80,15 @@ export type LoginParams = {
   userAgent?: string;
 };
 
-export const loginUser = async ({
-  email,
-  password,
-  userAgent,
-}: LoginParams) => {
+export const loginUser = async ({ email, password, userAgent }: LoginParams) => {
   //get the user by email
   const user = await UserModel.findOne({ email });
-  appAssert(user, UNAUTHORIZED, "Invalid email or password");
+  appAssert(user, UNAUTHORIZED, 'Invalid email or password');
   //check wether user is verified
-  appAssert(user.isVerified, UNAUTHORIZED, "Email not verified");
+  appAssert(user.isVerified, UNAUTHORIZED, 'Email not verified');
   //validate the password from request
   const isValidatePassword = await user.comparePassword(password);
-  appAssert(isValidatePassword, UNAUTHORIZED, "Invalid email or password");
+  appAssert(isValidatePassword, UNAUTHORIZED, 'Invalid email or password');
 
   //create session
   const session = await SessionModel.create({
@@ -108,10 +96,7 @@ export const loginUser = async ({
     userAgent,
   });
   //sign access token & refresh token
-  const refreshToken = signToKen(
-    { sessionId: session._id },
-    refreshTokenSignOptions
-  );
+  const refreshToken = signToKen({ sessionId: session._id }, refreshTokenSignOptions);
 
   const accessToken = signToKen({
     userId: user._id,
@@ -132,19 +117,15 @@ export const refreshUserAccessToken = async (refreshToken: string) => {
     secret: refreshTokenSignOptions.secret,
   });
 
-  appAssert(payload, UNAUTHORIZED, "Invalid refresh token");
+  appAssert(payload, UNAUTHORIZED, 'Invalid refresh token');
 
   const session = await SessionModel.findById(payload.sessionId);
   const now = Date.now();
-  appAssert(
-    session && session.expiresAt.getTime() > now,
-    UNAUTHORIZED,
-    "Session expired"
-  );
+  appAssert(session && session.expiresAt.getTime() > now, UNAUTHORIZED, 'Session expired');
 
   //Get user
   const user = await UserModel.findById(session.userId);
-  appAssert(user, NOT_FOUND, "User not found");
+  appAssert(user, NOT_FOUND, 'User not found');
 
   //Refresh the token if it expires in less than 1 day
   const sessionNeedRefresh = session.expiresAt.getTime() - now <= ONE_DAY_MS;
@@ -174,7 +155,7 @@ export const verifyEmail = async (code: string) => {
     type: VerificationCodeType.VERIFY_EMAIL,
     expiresAt: { $gt: new Date() },
   });
-  appAssert(validCode, NOT_FOUND, "Invalid or expired verification code");
+  appAssert(validCode, NOT_FOUND, 'Invalid or expired verification code');
   //get user by id
   //update user verified true
   const updatedUser = await UserModel.findByIdAndUpdate(
@@ -184,7 +165,7 @@ export const verifyEmail = async (code: string) => {
     },
     { new: true }
   );
-  appAssert(updatedUser, INTERNAL_SERVER_ERROR, "Failed to verify email");
+  appAssert(updatedUser, INTERNAL_SERVER_ERROR, 'Failed to verify email');
   //delete verification code record
   await validCode.deleteOne();
   //return user
@@ -196,7 +177,7 @@ export const verifyEmail = async (code: string) => {
 export const sendPasswordResetEmail = async (email: string) => {
   //get the user by email
   const user = await UserModel.findOne({ email });
-  appAssert(user, NOT_FOUND, "User with this email does not exist");
+  appAssert(user, NOT_FOUND, 'User with this email does not exist');
   //check email rate limit
   const fiveMinAgo = fiveMinutesAgo();
   const count = await VerificationCodeModel.countDocuments({
@@ -204,11 +185,7 @@ export const sendPasswordResetEmail = async (email: string) => {
     type: VerificationCodeType.FORGOT_PASSWORD,
     createdAt: { $gt: fiveMinAgo },
   });
-  appAssert(
-    count <= 1,
-    TOO_MANY_REQUESTS,
-    "Too many requests. Please try again later."
-  );
+  appAssert(count <= 1, TOO_MANY_REQUESTS, 'Too many requests. Please try again later.');
   //create verification code
   const verificationCode = await VerificationCodeModel.create({
     userId: user._id,
@@ -224,11 +201,7 @@ export const sendPasswordResetEmail = async (email: string) => {
     to: user.email,
     ...getPasswordResetTemplate(url),
   });
-  appAssert(
-    data?.id,
-    INTERNAL_SERVER_ERROR,
-    `${error?.name} - ${error?.message}`
-  );
+  appAssert(data?.id, INTERNAL_SERVER_ERROR, `${error?.name} - ${error?.message}`);
   //return success message
   return { url, emailId: data?.id };
 };
@@ -237,24 +210,21 @@ type ResetPasswordParams = {
   verificationCode: string;
   password: string;
 };
-export const resetPassword = async ({
-  verificationCode,
-  password,
-}: ResetPasswordParams) => {
+export const resetPassword = async ({ verificationCode, password }: ResetPasswordParams) => {
   //get the verification code from db
   const validCode = await VerificationCodeModel.findOne({
     _id: verificationCode,
     type: VerificationCodeType.FORGOT_PASSWORD,
     expiresAt: { $gt: new Date() },
   });
-  appAssert(validCode, NOT_FOUND, "Invalid or expired verification code");
+  appAssert(validCode, NOT_FOUND, 'Invalid or expired verification code');
 
   //get user by id
   //update user password
   const updatedUser = await UserModel.findByIdAndUpdate(validCode.userId, {
     password: await hashValue(password),
   });
-  appAssert(updatedUser, INTERNAL_SERVER_ERROR, "Failed to reset password");
+  appAssert(updatedUser, INTERNAL_SERVER_ERROR, 'Failed to reset password');
 
   //delete verification code record
   await validCode.deleteOne();

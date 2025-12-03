@@ -128,7 +128,7 @@ export const updateQuiz = async (
     endTime,
     shuffleQuestions,
     isPublished,
-    snapshotQuestions,
+    snapshotQuestions = [],
     isChangePassword,
   }: UpdateQuiz,
   userId: mongoose.Types.ObjectId,
@@ -145,13 +145,21 @@ export const updateQuiz = async (
   //isOnGoing
   const isOnGoing = quiz.startTime.getTime() <= Date.now() && quiz.endTime.getTime() >= Date.now();
 
+  // Thay đoạn kiểm tra isOnGoing hiện tại bằng:
   if (isOnGoing) {
+    const hasQuestionChanges = snapshotQuestions && snapshotQuestions.length > 0;
+    const hasStartTimeChange =
+      startTime != null && startTime.getTime() !== quiz.startTime.getTime();
+    const hasShuffleChange = shuffleQuestions != null && shuffleQuestions !== quiz.shuffleQuestions;
+    const hasPublishChange = isPublished != null && isPublished !== quiz.isPublished;
+
+    const hasForbiddenChanges =
+      hasQuestionChanges || hasStartTimeChange || hasShuffleChange || hasPublishChange;
+
     appAssert(
-      (!snapshotQuestions || snapshotQuestions.length === 0) &&
-        shuffleQuestions === undefined &&
-        startTime === undefined,
+      !hasForbiddenChanges,
       BAD_REQUEST,
-      'You can just update title, description, endTime while quiz is on going'
+      'During an ongoing quiz, only title, description, and endTime can be modified'
     );
   }
 
@@ -171,9 +179,10 @@ export const updateQuiz = async (
   }
   const updated = snapshotQuestions.filter((q) => q.isDirty && !q.isNewQuestion && !q.isDeleted);
   const added = snapshotQuestions.filter((q) => q.isNewQuestion && !q.isDeleted);
-  const deleted = snapshotQuestions.filter((q) => q.isDeleted && !q.isNewQuestion);
+  const deleted = snapshotQuestions.filter((q) => q.isDeleted);
 
   for (const q of updated) {
+    // Check if question already exists
     const index = map.get(q.id);
     if (index === undefined) continue;
 
@@ -201,8 +210,9 @@ export const updateQuiz = async (
 
   // Add new questions
   if (added.length > 0) {
+    const setIds = new Set(added.map((q) => q.id));
     for (const q of added) {
-      const exists = quiz.snapshotQuestions.some((sq) => sq.id === q.id);
+      const exists = setIds.has(q.id);
       appAssert(!exists, BAD_REQUEST, `Question "${q.text}" already exists`);
       quiz.snapshotQuestions.push({
         ...q,

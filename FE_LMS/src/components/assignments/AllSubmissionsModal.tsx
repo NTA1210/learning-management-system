@@ -33,6 +33,7 @@ interface AllSubmissionsModalProps {
   onClose: () => void;
   onDownload: (submissionId: string) => void;
   onGrade: (submission: Submission) => void;
+  onView: (submission: Submission) => void;
   formatDate: (date: string) => string;
 }
 
@@ -44,6 +45,7 @@ const AllSubmissionsModal: React.FC<AllSubmissionsModalProps> = ({
   onClose,
   onDownload,
   onGrade,
+  onView,
   formatDate,
 }) => {
   const { darkMode } = useTheme();
@@ -53,9 +55,9 @@ const AllSubmissionsModal: React.FC<AllSubmissionsModalProps> = ({
   return (
     <div
       className="fixed inset-0 flex items-center justify-center p-4"
-      style={{ 
+      style={{
         backgroundColor: "rgba(0, 0, 0, 0.5)",
-        zIndex: 9999
+        zIndex: 9999,
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
@@ -66,18 +68,35 @@ const AllSubmissionsModal: React.FC<AllSubmissionsModalProps> = ({
       <div
         className="rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
         style={{
-          backgroundColor: darkMode ? "rgba(31, 41, 55, 0.95)" : "rgba(255, 255, 255, 0.95)",
-          border: darkMode ? "1px solid rgba(75, 85, 99, 0.3)" : "1px solid rgba(229, 231, 235, 0.5)",
+          backgroundColor: darkMode
+            ? "rgba(31, 41, 55, 0.95)"
+            : "rgba(255, 255, 255, 0.95)",
+          border: darkMode
+            ? "1px solid rgba(75, 85, 99, 0.3)"
+            : "1px solid rgba(229, 231, 235, 0.5)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b sticky top-0" style={{ 
-          backgroundColor: darkMode ? "rgba(31, 41, 55, 0.95)" : "rgba(255, 255, 255, 0.95)",
-          borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "rgba(229, 231, 235, 0.5)" 
-        }}>
+        <div
+          className="flex items-center justify-between p-6 border-b sticky top-0"
+          style={{
+            backgroundColor: darkMode
+              ? "rgba(31, 41, 55, 0.95)"
+              : "rgba(255, 255, 255, 0.95)",
+            borderColor: darkMode
+              ? "rgba(75, 85, 99, 0.3)"
+              : "rgba(229, 231, 235, 0.5)",
+          }}
+        >
           <div className="flex items-center gap-3">
-            <Users size={24} style={{ color: darkMode ? "#ffffff" : "#1f2937" }} />
-            <h2 className="text-xl font-semibold" style={{ color: darkMode ? "#ffffff" : "#1f2937" }}>
+            <Users
+              size={24}
+              style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
+            />
+            <h2
+              className="text-xl font-semibold"
+              style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
+            >
               All Submissions ({submissions.length})
             </h2>
           </div>
@@ -93,11 +112,16 @@ const AllSubmissionsModal: React.FC<AllSubmissionsModalProps> = ({
         <div className="p-6">
           {loading ? (
             <div className="flex justify-center items-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: darkMode ? "#6366f1" : "#4f46e5" }}></div>
+              <div
+                className="animate-spin rounded-full h-8 w-8 border-b-2"
+                style={{ borderColor: darkMode ? "#6366f1" : "#4f46e5" }}
+              ></div>
             </div>
           ) : submissions.length === 0 ? (
             <div className="text-center py-8">
-              <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>No submissions found for this assignment.</p>
+              <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                No submissions found for this assignment.
+              </p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -108,6 +132,7 @@ const AllSubmissionsModal: React.FC<AllSubmissionsModalProps> = ({
                   assignment={assignment}
                   onDownload={onDownload}
                   onGrade={onGrade}
+                  onView={onView}
                   formatDate={formatDate}
                 />
               ))}
@@ -120,4 +145,3 @@ const AllSubmissionsModal: React.FC<AllSubmissionsModalProps> = ({
 };
 
 export default AllSubmissionsModal;
-
