@@ -46,4 +46,5 @@ export { default as ListSemestersPage } from "./ListSemestersPage";
 export { default as BlogPage } from "./Blog";
 export { default as BlogDetailPage } from "./BlogDetailPage";
 export { default as ApprovedCoursesPage } from "./ApprovedCoursesPage";
+export { default as JoinCoursePage } from "./JoinCoursePage";
 
