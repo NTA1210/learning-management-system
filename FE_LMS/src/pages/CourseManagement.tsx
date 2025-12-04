@@ -683,7 +683,7 @@ const CourseManagement: React.FC = () => {
                       onClick={() => navigate("/admin/courses/deleted")}
                       className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105 w-full sm:w-auto"
                       style={{
-                        backgroundColor: darkMode ? "#111827" : "#DC2627",
+                        backgroundColor: darkMode ? "#DC2627" : "#DC2627",
                         border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
                       }}
                     >
@@ -695,7 +695,7 @@ const CourseManagement: React.FC = () => {
                       onClick={() => navigate("/admin/courses/approved")}
                       className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105 w-full sm:w-auto"
                       style={{
-                        backgroundColor: darkMode ? "#059669" : "#10b981",
+                        backgroundColor: darkMode ? "#2b7fff" : "#2b7fff",
                         border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
                       }}
                     >
