@@ -287,25 +287,25 @@ const ForumPage: React.FC = () => {
             {/* Sticky summary header for selected course when form scrolls out of view */}
             {showCreateSticky && (
               <div className="sticky top-0 z-20 mb-4">
-                <div
-                  className={`rounded-2xl border px-4 py-3 shadow-lg flex items-center gap-3 ${
+              <div
+  className={`rounded-2xl border px-4 py-3 shadow-lg flex items-center gap-3 ${
                     darkMode
                       ? "bg-slate-900/90 border-slate-700/80 backdrop-blur"
                       : "bg-white/95 border-slate-200 backdrop-blur"
-                  }`}
-                >
-                  <Book className="w-4 h-4 text-indigo-500" />
-                  <div className="min-w-0">
-                    <p className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">Course</p>
-                    <p
-                      className={`text-sm font-semibold truncate ${
-                        darkMode ? "text-white" : "text-slate-900"
-                      }`}
-                    >
-                      {courseTitleDisplay || "Select a course to start"}
-                    </p>
-                  </div>
-                </div>
+  }`}
+>
+  <Book className="w-4 h-4 text-indigo-500" /> 
+  <div className="min-w-0">
+    <p className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">Course</p>
+    <p
+      className={`text-sm font-semibold truncate ${
+        darkMode ? "text-white" : "text-slate-900"
+      }`}
+    >
+      {courseTitleDisplay || "Select a course to start"}
+    </p>
+  </div>
+</div>
               </div>
             )}
 

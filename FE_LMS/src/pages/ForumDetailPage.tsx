@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Clock3,
   RefreshCcw,
+  File as FileIcon,
 } from "lucide-react";
 import MarkdownContent from "../components/MarkdownContent";
 import MarkdownComposer from "../components/MarkdownComposer";
@@ -446,7 +447,7 @@ const ForumDetailPage: React.FC = () => {
                       className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
                     >
                       <PlusCircle className="w-4 h-4" />
-                      Create post 
+                      Create post
                     </button>
                   )}
                 </div>
@@ -619,6 +620,60 @@ const ForumDetailPage: React.FC = () => {
                     );
                   })()}
 
+                  {/* Forum Files Section */}
+                  {forum.key && forum.key.length > 0 && (
+                    <section
+                      className={`rounded-2xl p-6 shadow-sm ${darkMode ? "bg-slate-900/70 border border-slate-700/60" : "bg-white border border-slate-100"
+                        }`}
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-semibold" style={{ color: darkMode ? "#e5e7eb" : "#1e293b" }}>
+                          Forum Files ({forum.key.length})
+                        </h2>
+                      </div>
+                      <div className="flex gap-2 overflow-x-auto pb-2" style={{ maxHeight: "120px" }}>
+                        {forum.key.map((fileUrl, index) => {
+                          const extension = getFileExtension(fileUrl);
+                          const isImage = Boolean(extension) && imageExtensions.has(extension);
+                          const fileName = fileUrl.split("/").pop() || `File ${index + 1}`;
+                          
+                          return (
+                            <div
+                              key={`forum-file-${index}`}
+                              className="shrink-0 w-20 h-20 rounded-lg border overflow-hidden relative group cursor-pointer"
+                              style={{
+                                borderColor: darkMode ? "rgba(148, 163, 184, 0.3)" : "rgba(148, 163, 184, 0.3)",
+                                backgroundColor: darkMode ? "rgba(15, 23, 42, 0.5)" : "rgba(248, 250, 252, 0.8)"
+                              }}
+                              onClick={() => {
+                                if (isImage) {
+                                  handleImagePreview({ src: fileUrl, alt: fileName });
+                                } else {
+                                  window.open(fileUrl, "_blank", "noopener,noreferrer");
+                                }
+                              }}
+                            >
+                              {isImage ? (
+                                <img
+                                  src={fileUrl}
+                                  alt={fileName}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center p-2">
+                                  <FileIcon size={24} style={{ color: darkMode ? "#94a3b8" : "#64748b" }} />
+                                  <span className="text-[10px] truncate w-full text-center mt-1" style={{ color: darkMode ? "#94a3b8" : "#64748b" }}>
+                                    {extension.toUpperCase() || "FILE"}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  )}
+
                   <section
                     className={`rounded-2xl p-6 shadow-sm ${darkMode ? "bg-slate-900/70 border border-slate-700/60" : "bg-white border border-slate-100"
                       }`}
@@ -667,33 +722,33 @@ const ForumDetailPage: React.FC = () => {
                     ) : (
                       <div className="space-y-4">
                         {orderedPosts.map((post) => (
-                          <div
-                            key={post._id}
-                            className={`rounded-3xl p-5 shadow-sm border ${darkMode ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-100"
-                              }`}
-                          >
-                            <Link to={`/forums/${forumId}/posts/${post._id}`} className="block">
+                            <div
+                              key={post._id}
+                              className={`rounded-3xl p-5 shadow-sm border ${darkMode ? "bg-slate-900/50 border-slate-800" : "bg-white border-slate-100"
+                                }`}
+                            >
+                              <Link to={`/forums/${forumId}/posts/${post._id}`} className="block">
                               {/* Header: date, pinned, replies */}
                               <div className="flex flex-wrap items-center gap-3 text-xs">
                                 <span className={`font-semibold ${darkMode ? "text-slate-300" : "text-slate-500"}`}>
                                   {formatDate(post.createdAt)}
                                 </span>
-                                {post.pinned && (
-                                  <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold bg-amber-50 text-amber-700 text-[11px]">
-                                    Pinned
-                                  </span>
-                                )}
+                                  {post.pinned && (
+                                    <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold bg-amber-50 text-amber-700 text-[11px]">
+                                      Pinned
+                                    </span>
+                                  )}
                                 <span
                                   className={`ml-auto text-sm font-semibold ${darkMode ? "text-blue-300" : "text-blue-400"
                                     }`}
                                 >
                                   {post.replyCount ?? 0} replies
                                 </span>
-                              </div>
+                                </div>
 
                               {/* Content */}
-                              <div className="mt-3 flex flex-wrap gap-3 justify-between">
-                                <div className="space-y-2 flex-1 min-w-[200px]">
+                                <div className="mt-3 flex flex-wrap gap-3 justify-between">
+                                  <div className="space-y-2 flex-1 min-w-[200px]">
                                   <h3 className="text-3xl font-semibold cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
                                     {post.title}
                                   </h3>
@@ -701,118 +756,118 @@ const ForumDetailPage: React.FC = () => {
                                     className={`text-sm line-clamp-2 ${darkMode ? "text-slate-300" : "text-slate-600"
                                       }`}
                                   >
-                                    <MarkdownContent content={post.content} onImageClick={handleImagePreview} />
-                                  </div>
+                                      <MarkdownContent content={post.content} onImageClick={handleImagePreview} />
+                                    </div>
 
-                                  <AttachmentPreview
-                                    files={post.key}
-                                    size="sm"
-                                    onImageClick={handleImagePreview}
-                                    caption={post.title}
-                                  />
+                                    <AttachmentPreview
+                                      files={post.key}
+                                      size="sm"
+                                      onImageClick={handleImagePreview}
+                                      caption={post.title}
+                                    />
 
                                   {/* Author */}
-                                  {post.author ? (
-                                    <div className="flex items-center gap-2 mt-2">
-                                      <div
+                                    {post.author ? (
+                                      <div className="flex items-center gap-2 mt-2">
+                                        <div
                                         className={`h-8 w-8 rounded-xl bg-gradient-to-br from-indigo-500/15 to-sky-500/15 font-semibold flex items-center justify-center uppercase tracking-wide overflow-hidden text-[10px] ${darkMode ? "ring-1 ring-indigo-500/40 text-indigo-100" : "ring-1 ring-indigo-100 text-indigo-600"
-                                          }`}
-                                      >
-                                        {post.author.avatar_url ? (
-                                          <img
-                                            src={post.author.avatar_url}
-                                            alt={post.author.fullname || post.author.username || "User avatar"}
-                                            className="h-full w-full object-cover"
-                                          />
-                                        ) : (
-                                          (post.author.fullname || post.author.username || "U")
-                                            .split(/\s+/)
-                                            .map((segment) => segment[0]?.toUpperCase())
-                                            .slice(0, 2)
-                                            .join("") || "U"
-                                        )}
-                                      </div>
-                                      <div className="flex flex-col">
+                                            }`}
+                                        >
+                                          {post.author.avatar_url ? (
+                                            <img
+                                              src={post.author.avatar_url}
+                                              alt={post.author.fullname || post.author.username || "User avatar"}
+                                              className="h-full w-full object-cover"
+                                            />
+                                          ) : (
+                                            (post.author.fullname || post.author.username || "U")
+                                              .split(/\s+/)
+                                              .map((segment) => segment[0]?.toUpperCase())
+                                              .slice(0, 2)
+                                              .join("") || "U"
+                                          )}
+                                        </div>
+                                        <div className="flex flex-col">
                                         <p className={`text-xs font-semibold ${darkMode ? "text-slate-200" : "text-slate-700"}`}>
                                           {post.author.fullname || post.author.username || "Unknown User"}
-                                        </p>
-                                        {post.author.role && (
-                                          <p className={`text-[10px] capitalize ${darkMode ? "text-slate-400" : "text-slate-400"}`}>
-                                            {post.author.role}
                                           </p>
-                                        )}
+                                          {post.author.role && (
+                                          <p className={`text-[10px] capitalize ${darkMode ? "text-slate-400" : "text-slate-400"}`}>
+                                              {post.author.role}
+                                            </p>
+                                          )}
+                                        </div>
                                       </div>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center gap-2 mt-2">
-                                      <div
-                                        className={`h-8 w-8 rounded-xl bg-gradient-to-br from-slate-500/15 to-slate-500/15 text-slate-600 font-semibold flex items-center justify-center uppercase tracking-wide text-[10px] ${darkMode ? "ring-1 ring-slate-500/40 text-slate-100" : "ring-1 ring-slate-100"
-                                          }`}
-                                      >
-                                        ?
-                                      </div>
-                                      <div className="flex flex-col">
+                                    ) : (
+                                      <div className="flex items-center gap-2 mt-2">
+                                        <div
+                                          className={`h-8 w-8 rounded-xl bg-gradient-to-br from-slate-500/15 to-slate-500/15 text-slate-600 font-semibold flex items-center justify-center uppercase tracking-wide text-[10px] ${darkMode ? "ring-1 ring-slate-500/40 text-slate-100" : "ring-1 ring-slate-100"
+                                            }`}
+                                        >
+                                          ?
+                                        </div>
+                                        <div className="flex flex-col">
                                         <p className={`text-xs font-semibold ${darkMode ? "text-slate-200" : "text-slate-400"}`}>
-                                          Unknown User
-                                        </p>
+                                            Unknown User
+                                          </p>
+                                        </div>
                                       </div>
-                                    </div>
-                                  )}
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            </Link>
+                              </Link>
 
                             {/* Buttons: Pin, Edit, Delete */}
-                            <div className="mt-3 flex items-center gap-2 justify-end">
-                              {canPin && (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleTogglePinPost(post);
-                                  }}
-                                  className={`h-9 w-9 rounded-full border flex items-center justify-center transition ${post.pinned
-                                    ? "border-amber-300 text-amber-600 bg-amber-50 hover:bg-amber-100 dark:border-amber-500/50 dark:text-amber-300 dark:bg-amber-500/10 dark:hover:bg-amber-500/20"
-                                    : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
-                                    }`}
-                                  title={post.pinned ? "Unpin post" : "Pin post"}
-                                  disabled={pinningPostId === post._id}
-                                >
-                                  {pinningPostId === post._id ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <Pin className="w-4 h-4" />
-                                  )}
-                                </button>
-                              )}
-                              {canManagePosts && (
-                                <>
+                              <div className="mt-3 flex items-center gap-2 justify-end">
+                                {canPin && (
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.preventDefault();
-                                      openEditPost(post);
+                                      handleTogglePinPost(post);
                                     }}
-                                    className="h-9 w-9 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 flex items-center justify-center"
-                                    title="Edit post"
+                                    className={`h-9 w-9 rounded-full border flex items-center justify-center transition ${post.pinned
+                                      ? "border-amber-300 text-amber-600 bg-amber-50 hover:bg-amber-100 dark:border-amber-500/50 dark:text-amber-300 dark:bg-amber-500/10 dark:hover:bg-amber-500/20"
+                                      : "border-slate-200 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                                      }`}
+                                    title={post.pinned ? "Unpin post" : "Pin post"}
+                                    disabled={pinningPostId === post._id}
                                   >
-                                    <Edit3 className="w-4 h-4" />
+                                    {pinningPostId === post._id ? (
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <Pin className="w-4 h-4" />
+                                    )}
                                   </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      openDeletePostModal(post);
-                                    }}
-                                    className="h-9 w-9 rounded-full border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10 flex items-center justify-center"
-                                    title="Delete post"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </>
-                              )}
+                                )}
+                                {canManagePosts && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        openEditPost(post);
+                                      }}
+                                      className="h-9 w-9 rounded-full border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800 flex items-center justify-center"
+                                      title="Edit post"
+                                    >
+                                      <Edit3 className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        openDeletePostModal(post);
+                                      }}
+                                      className="h-9 w-9 rounded-full border border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-500/40 dark:text-rose-300 dark:hover:bg-rose-500/10 flex items-center justify-center"
+                                      title="Delete post"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                          </div>
                         ))}
                       </div>
 
