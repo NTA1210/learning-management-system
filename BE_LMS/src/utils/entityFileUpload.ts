@@ -181,7 +181,7 @@ export async function updateEntityWithFiles(
         : [await uploadFile(files, prefix)];
 
     // Step 3: Extract file keys
-    const fileKeys = uploadResults.map((result) => result.key);
+    const fileKeys = uploadResults.map((result) => result.publicUrl);
 
     // Step 4: Update entity
     await updateEntity(fileKeys);

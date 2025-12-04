@@ -1,6 +1,6 @@
 import {ForumModel, ForumPostModel, ForumReplyModel, UserModel} from "../models";
 import appAssert from "../utils/appAssert";
-import {CONFLICT, FORBIDDEN, NOT_FOUND} from "../constants/http";
+import {CONFLICT, FORBIDDEN, NOT_FOUND, UNPROCESSABLE_CONTENT} from "../constants/http";
 import {ListParams} from "@/types/dto";
 import {ForumType} from "@/types/forum.type";
 import {IForum, IForumPost, IForumReply, Role} from "@/types";
@@ -77,21 +77,21 @@ export const uploadForumFiles = async (
 };
 
 export const listForumsOfACourse = async ({
-    page = 1,
-    limit = 10,
-    search,
-    courseId,
-    title,
-    description,
-    forumType,
-    isActive,
-    isArchived,
-    createdBy,
-    createdAt,
-    updatedAt,
-    sortBy = "createdAt",
-    sortOrder = "desc",
-}: ListForumParams) => {
+                                              page = 1,
+                                              limit = 10,
+                                              search,
+                                              courseId,
+                                              title,
+                                              description,
+                                              forumType,
+                                              isActive,
+                                              isArchived,
+                                              createdBy,
+                                              createdAt,
+                                              updatedAt,
+                                              sortBy = "createdAt",
+                                              sortOrder = "desc",
+                                          }: ListForumParams) => {
     // Build filter query
     const filter: any = {};
 
@@ -194,7 +194,9 @@ export const createForum = async (
     appAssert(data.courseId, NOT_FOUND, "Course ID is required");
     const courseId = await CourseModel.findById(data.courseId);
     appAssert(courseId, NOT_FOUND, "Course ID not found");
+
     appAssert(data.title, NOT_FOUND, "Forum title is required");
+    appAssert(data.description, NOT_FOUND, "Forum description is required");
 
     switch (role) {
         case Role.ADMIN:
@@ -275,6 +277,13 @@ export const updateForumById = async (
 ) => {
     const forum = await ForumModel.findById(forumId);
     appAssert(forum, NOT_FOUND, "Forum not found");
+
+    if (data.title !== undefined) {
+        appAssert(data.title.length > 0, UNPROCESSABLE_CONTENT, "Cannot set empty title");
+    }
+    if (data.description !== undefined) {
+        appAssert(data.description.length > 0, UNPROCESSABLE_CONTENT, "Cannot set empty description");
+    }
 
     switch (role) {
         case Role.ADMIN:
@@ -366,19 +375,19 @@ export const deleteForumById = async (forumId: string, authorId: mongoose.Types.
 // ============= FORUM POST SERVICES =============
 
 export const listPostsInForum = async ({
-    page = 1,
-    limit = 10,
-    search,
-    forumId,
-    authorId,
-    title,
-    content,
-    pinned,
-    createdAt,
-    updatedAt,
-    sortBy = "createdAt",
-    sortOrder = "desc",
-}: ListForumPostParams) => {
+                                           page = 1,
+                                           limit = 10,
+                                           search,
+                                           forumId,
+                                           authorId,
+                                           title,
+                                           content,
+                                           pinned,
+                                           createdAt,
+                                           updatedAt,
+                                           sortBy = "createdAt",
+                                           sortOrder = "desc",
+                                       }: ListForumPostParams) => {
     // Build filter query
     const filter: any = {};
 
@@ -485,6 +494,9 @@ export const createForumPost = async (
     appAssert(forum.isActive, FORBIDDEN, "Cannot post in an inactive forum");
     appAssert(!forum.isArchived, FORBIDDEN, "Cannot post in an archived forum");
 
+    appAssert(data.title, NOT_FOUND, "Post title is required");
+    appAssert(data.content, NOT_FOUND, "Post content is required");
+
     // If forum is ANNOUNCEMENT type, only allow certain users (teachers/admins) to post
     switch (role) {
         case Role.ADMIN:
@@ -506,8 +518,6 @@ export const createForumPost = async (
             );
             break;
     }
-
-    appAssert(data.content, NOT_FOUND, "Post content is required");
 
     // Use the helper to handle create → upload → update pattern
     return await createEntityWithFiles({
@@ -555,6 +565,13 @@ export const updateForumPostById = async (
 
     const post = await ForumPostModel.findOne({_id: postId, forumId});
     appAssert(post, NOT_FOUND, "Post not found");
+
+    if (data.title !== undefined) {
+        appAssert(data.title.length > 0, UNPROCESSABLE_CONTENT, "Cannot set empty title");
+    }
+    if (data.content !== undefined) {
+        appAssert(data.content.length > 0, UNPROCESSABLE_CONTENT, "Cannot set empty content");
+    }
 
     switch (role) {
         case Role.ADMIN:
@@ -649,17 +666,17 @@ export const deleteForumPostById = async (
 // ============= FORUM REPLY SERVICES =============
 
 export const listRepliesInPost = async ({
-    page = 1,
-    limit = 20,
-    search,
-    postId,
-    authorId,
-    parentReplyId,
-    createdAt,
-    updatedAt,
-    sortBy = "createdAt",
-    sortOrder = "asc",
-}: ListForumReplyParams) => {
+                                            page = 1,
+                                            limit = 20,
+                                            search,
+                                            postId,
+                                            authorId,
+                                            parentReplyId,
+                                            createdAt,
+                                            updatedAt,
+                                            sortBy = "createdAt",
+                                            sortOrder = "asc",
+                                        }: ListForumReplyParams) => {
     // Build filter query
     const filter: any = {};
 
@@ -758,6 +775,8 @@ export const createForumReply = async (
     appAssert(forum.isActive, FORBIDDEN, "Cannot reply in an inactive forum");
     appAssert(!forum.isArchived, FORBIDDEN, "Cannot reply in an archived forum");
 
+    appAssert(data.content, NOT_FOUND, "Reply content is required");
+
     switch (role) {
         case Role.ADMIN:
             // Allow creation
@@ -787,8 +806,6 @@ export const createForumReply = async (
         });
         appAssert(parentReply, NOT_FOUND, "Parent reply not found");
     }
-
-    appAssert(data.content, NOT_FOUND, "Reply content is required");
 
     // Use the helper to handle create → upload → update pattern
     const reply = await createEntityWithFiles({
@@ -858,11 +875,23 @@ export const updateForumReplyById = async (
         default:
             // Check if user is the author
             appAssert(
-                forum.createdBy?.toString() === authorId,
+                reply.authorId.toString() === authorId,
                 FORBIDDEN,
                 "You can only edit your own replies"
             );
             break;
+    }
+
+    if (data.content !== undefined && data.content.length === 0) {
+        // Delete nested replies
+        const children = await ForumReplyModel.deleteMany({parentReplyId: replyId});
+
+        // Decrement reply count in post
+        await ForumPostModel.findByIdAndUpdate(postId, {
+            $inc: {replyCount: -(children.deletedCount + 1)},
+        });
+
+        return ForumReplyModel.deleteOne({_id: replyId});
     }
 
     Object.assign(reply, data);
