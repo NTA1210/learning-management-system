@@ -48,7 +48,7 @@ export const createQuiz = async (
   role: Role
 ): Promise<IQuiz> => {
   const course = await CourseModel.findOne({
-    courseId,
+    _id: courseId,
     status: CourseStatus.ONGOING,
   });
   appAssert(course, NOT_FOUND, 'Course not found');

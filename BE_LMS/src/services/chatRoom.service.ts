@@ -1,6 +1,7 @@
 import { NOT_FOUND } from '@/constants/http';
 import { ChatRoomModel, CourseModel, UserModel } from '@/models';
 import { Role } from '@/types';
+import { CourseStatus } from '@/types/course.type';
 import appAssert from '@/utils/appAssert';
 import { CreateChatroomParams } from '@/validators/chatroom.schemas';
 import mongoose from 'mongoose';
@@ -43,7 +44,10 @@ export const createChatroom = async (
 ) => {
   const { courseId, name } = params;
 
-  const course = await CourseModel.findById(courseId);
+  const course = await CourseModel.findOne({
+    _id: courseId,
+    status: CourseStatus.ONGOING,
+  });
   appAssert(course, NOT_FOUND, 'Course not found');
 
   const chatroom = await ChatRoomModel.findOne({
