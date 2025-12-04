@@ -46,7 +46,7 @@ const SubmissionCard: React.FC<SubmissionCardProps> = ({
 
   return (
     <div
-      className="p-4 rounded-lg border"
+      className="p-4 border rounded-lg"
       style={{
         backgroundColor: darkMode ? "rgba(55, 65, 81, 0.5)" : "#f9fafb",
         borderColor: darkMode ? "rgba(75, 85, 99, 0.3)" : "#e5e7eb",
@@ -55,13 +55,13 @@ const SubmissionCard: React.FC<SubmissionCardProps> = ({
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <h3
-            className="font-semibold mb-1"
+            className="mb-1 font-semibold"
             style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
           >
             {student.fullname || student.email || "Unknown Student"}
           </h3>
           <p
-            className="text-sm mb-2"
+            className="mb-2 text-sm"
             style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
           >
             {student.email}
@@ -128,7 +128,7 @@ const SubmissionCard: React.FC<SubmissionCardProps> = ({
             Grade:
           </span>
           <span
-            className="text-sm font-semibold ml-2"
+            className="ml-2 text-sm font-semibold"
             style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
           >
             {submission.grade} / {assignment?.maxScore || 10}
@@ -138,7 +138,7 @@ const SubmissionCard: React.FC<SubmissionCardProps> = ({
 
       {submission.feedback && (
         <div
-          className="mb-3 p-2 rounded"
+          className="p-2 mb-3 rounded"
           style={{
             backgroundColor: darkMode ? "rgba(31, 41, 55, 0.5)" : "#f3f4f6",
           }}
@@ -200,8 +200,8 @@ const SubmissionCard: React.FC<SubmissionCardProps> = ({
         >
           <Star size={14} />
           {submission.grade !== undefined && submission.grade !== null
-            ? "Grade"
-            : "Re-Grade"}
+            ? "Re-Grade"
+            : "Grade"}
         </button>
       </div>
     </div>
