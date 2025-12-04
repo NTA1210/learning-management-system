@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
+import toast from "react-hot-toast";
 import { Send, X, Pause, Play, Loader2, Mic } from "lucide-react";
 import { useTheme } from "../../hooks/useTheme";
 
