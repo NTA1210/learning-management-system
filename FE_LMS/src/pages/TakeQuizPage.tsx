@@ -425,7 +425,7 @@ export default function TakeQuizPage() {
       } catch (error) {
         console.error("Failed to fetch quiz:", error);
         const message = getErrorMessage(error, "Failed to load quiz");
-        alert(message);
+        toast.error(message);
         navigate(courseId ? `/quizz/${courseId}` : "/quizz", { replace: true });
       } finally {
         setLoading(false);
@@ -733,7 +733,7 @@ export default function TakeQuizPage() {
           clearPersistedAttempt();
           setQuizAttemptId(null);
         }
-        alert(message);
+        toast.error(message);
       } finally {
         setSubmitting(false);
       }

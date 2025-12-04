@@ -535,7 +535,7 @@ const UserBioPage: React.FC = () => {
       setSessions(sessions.filter(s => s._id !== sessionId));
     } catch (err: any) {
       console.error('Failed to delete session:', err);
-      alert(err?.message || 'Failed to delete session');
+      toast.error(err?.message || 'Failed to delete session');
     } finally {
       setDeletingSessionId(null);
     }

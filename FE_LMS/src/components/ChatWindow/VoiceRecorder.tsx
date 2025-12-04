@@ -182,7 +182,7 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
       console.error("Error accessing microphone:", error);
       hasStartedRef.current = false;
       setIsInitializing(false);
-      alert("Could not access microphone. Please check permissions.");
+      toast.error("Could not access microphone. Please check permissions.");
       onCancel();
     }
   }, [startVisualization, onCancel]);

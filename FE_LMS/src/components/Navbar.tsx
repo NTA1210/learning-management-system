@@ -84,7 +84,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
       setIsDropdownOpen(false);
     } catch (error) {
       console.error("Failed to switch account", error);
-      alert(
+      toast.error(
         "Unable to switch accounts. Please verify the password and try again."
       );
     } finally {
