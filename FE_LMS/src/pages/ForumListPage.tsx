@@ -7,7 +7,7 @@ import type { Course } from "../types/course";
 import { courseService } from "../services";
 import AttachmentPreview from "../components/AttachmentPreview";
 import { forumService, type ForumResponse, type ForumType } from "../services/forumService";
-import { Edit3, Eye, Loader2, RefreshCcw, Trash2, X, User } from "lucide-react";
+import { Edit3, Eye, Loader2, RefreshCcw, Trash2, X, User, File as FileIcon } from "lucide-react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import MarkdownComposer from "../components/MarkdownComposer";
@@ -854,7 +854,7 @@ const ForumListPage: React.FC = () => {
       {editModal.open && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
           <div
-            className={`max-w-lg w-full rounded-2xl p-6 h-[650px] relative ${darkMode ? "bg-slate-900 text-slate-100" : "bg-white text-slate-900"
+            className={`max-w-lg w-full rounded-2xl p-6 relative ${darkMode ? "bg-slate-900 text-slate-100" : "bg-white text-slate-900"
               }`}
           >
             <button className="absolute top-4 right-4" onClick={closeEditModal}>
@@ -891,53 +891,98 @@ const ForumListPage: React.FC = () => {
                   attachmentAccept={attachmentAcceptTypes}
                 />
                 {(editModal.existingFiles.length > 0 || editModal.newFiles.length > 0) && (
-                  <div className="mt-3 space-y-2">
-                    {/* Existing files */}
-                    {editModal.existingFiles.length > 0 && (
-                      <div>
-                        <p className="text-xs mb-2" style={{ color: darkMode ? "#94a3b8" : "#64748b" }}>
-                          Existing files:
-                        </p>
-                        <AttachmentPreview
-                          files={editModal.existingFiles}
-                          size='xs'
-                          onImageClick={handleAttachmentPreview}
-                        />
-                      </div>
-                    )}
-                    {/* New files */}
-                    {editModal.newFiles.length > 0 && (
-                      <div>
-                        <p className="text-xs mb-2" style={{ color: darkMode ? "#94a3b8" : "#64748b" }}>
-                          New files to add:
-                        </p>
-                        <div className="space-y-2">
-                          {editModal.newFiles.map((file, index) => (
-                            <div key={index} className="relative">
-                              <AttachmentPreview
-                                files={[URL.createObjectURL(file)]}
-                                size="sm"
-                                onImageClick={handleAttachmentPreview}
-                                caption={file.name}
+                  <div className="mt-3">
+                    <p className="text-xs mb-2" style={{ color: darkMode ? "#94a3b8" : "#64748b" }}>
+                      Files ({editModal.existingFiles.length + editModal.newFiles.length}):
+                    </p>
+                    <div className="flex gap-2 overflow-x-auto pb-2" style={{ maxHeight: "120px" }}>
+                      {/* Existing files */}
+                      {editModal.existingFiles.map((fileUrl, index) => {
+                        const extension = getFileExtension(fileUrl);
+                        const isImage = Boolean(extension) && imageExtensions.has(extension);
+                        const fileName = fileUrl.split("/").pop() || `File ${index + 1}`;
+                        
+                        return (
+                          <div
+                            key={`existing-${index}`}
+                            className="shrink-0 w-20 h-20 rounded-lg border overflow-hidden relative group"
+                            style={{
+                              borderColor: darkMode ? "rgba(148, 163, 184, 0.3)" : "rgba(148, 163, 184, 0.3)",
+                              backgroundColor: darkMode ? "rgba(15, 23, 42, 0.5)" : "rgba(248, 250, 252, 0.8)"
+                            }}
+                          >
+                            {isImage ? (
+                              <img
+                                src={fileUrl}
+                                alt={fileName}
+                                className="w-full h-full object-cover cursor-pointer"
+                                onClick={() => handleAttachmentPreview({ src: fileUrl, alt: fileName })}
                               />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditModal((prev) => ({
-                                    ...prev,
-                                    newFiles: prev.newFiles.filter((_, i) => i !== index),
-                                  }));
-                                }}
-                                className="absolute top-1 right-1 p-1 rounded-full bg-red-500/80 text-white hover:bg-red-600 transition-colors"
-                                style={{ zIndex: 10 }}
+                            ) : (
+                              <div
+                                className="w-full h-full flex flex-col items-center justify-center p-2 cursor-pointer"
+                                onClick={() => window.open(fileUrl, "_blank")}
                               >
-                                <X size={14} />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                                <FileIcon size={24} style={{ color: darkMode ? "#94a3b8" : "#64748b" }} />
+                                <span className="text-[10px] truncate w-full text-center mt-1" style={{ color: darkMode ? "#94a3b8" : "#64748b" }}>
+                                  {extension.toUpperCase() || "FILE"}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {/* New files */}
+                      {editModal.newFiles.map((file, index) => {
+                        const fileUrl = URL.createObjectURL(file);
+                        const extension = getFileExtension(file.name);
+                        const isImage = Boolean(extension) && imageExtensions.has(extension);
+                        
+                        return (
+                          <div
+                            key={`new-${index}`}
+                            className="shrink-0 w-20 h-20 rounded-lg border overflow-hidden relative group"
+                            style={{
+                              borderColor: darkMode ? "rgba(99, 102, 241, 0.5)" : "rgba(99, 102, 241, 0.3)",
+                              backgroundColor: darkMode ? "rgba(99, 102, 241, 0.1)" : "rgba(99, 102, 241, 0.05)"
+                            }}
+                          >
+                            {isImage ? (
+                              <img
+                                src={fileUrl}
+                                alt={file.name}
+                                className="w-full h-full object-cover cursor-pointer"
+                                onClick={() => handleAttachmentPreview({ src: fileUrl, alt: file.name })}
+                              />
+                            ) : (
+                              <div
+                                className="w-full h-full flex flex-col items-center justify-center p-2 cursor-pointer"
+                                onClick={() => handleAttachmentPreview({ src: fileUrl, alt: file.name })}
+                              >
+                                <FileIcon size={24} style={{ color: darkMode ? "#94a3b8" : "#64748b" }} />
+                                <span className="text-[10px] truncate w-full text-center mt-1" style={{ color: darkMode ? "#94a3b8" : "#64748b" }}>
+                                  {extension.toUpperCase() || "FILE"}
+                                </span>
+                              </div>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditModal((prev) => ({
+                                  ...prev,
+                                  newFiles: prev.newFiles.filter((_, i) => i !== index),
+                                }));
+                              }}
+                              className="absolute top-1 right-1 p-0.5 rounded-full bg-red-500/90 text-white hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                              style={{ zIndex: 10 }}
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
