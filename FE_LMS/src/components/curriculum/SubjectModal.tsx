@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { useTheme } from "../../hooks/useTheme";
 import { Search } from "lucide-react";
 
@@ -66,7 +67,7 @@ const SubjectModal: React.FC<SubjectModalProps> = ({
     e.preventDefault();
     // Validate specialist selection
     if (!formData.specialistId) {
-      alert("Please select a specialist");
+      toast.error("Please select a specialist");
       return;
     }
     onSubmit(e);

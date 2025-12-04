@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import toast from "react-hot-toast";
 import { useParams, useNavigate } from "react-router-dom";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
@@ -130,7 +131,7 @@ const LessonMaterialDetailPage: React.FC = () => {
         },
       });
     } catch {
-      alert(scrubMessage(message));
+      toast.error(scrubMessage(message));
     }
   };
 
@@ -195,7 +196,7 @@ const LessonMaterialDetailPage: React.FC = () => {
         },
       });
     } catch {
-      alert(scrubMessage(message));
+      toast.success(scrubMessage(message));
     }
   };
 

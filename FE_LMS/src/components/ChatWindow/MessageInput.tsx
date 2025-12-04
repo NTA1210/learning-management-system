@@ -1,5 +1,6 @@
 import { Send, Plus, ThumbsUp, MapPin, X, Smile, Image, Paperclip, Bold, Italic, Underline, Strikethrough, List, ListOrdered, Link, Code, Quote, Type, Trash2, Upload, File as FileIcon, Mic } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
+import toast from "react-hot-toast";
 import { useChatRoomStore } from "../../stores/chatRoomStore";
 import { useSocketContext } from "../../context/SocketContext";
 import AttachMenu from "./components/AttachMenu";
@@ -171,7 +172,7 @@ const MessageInput: React.FC = () => {
 
   const handleSendLocation = () => {
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser");
+      toast.error("Geolocation is not supported by your browser");
       return;
     }
 
@@ -193,7 +194,7 @@ const MessageInput: React.FC = () => {
       },
       (error) => {
         console.error("Error getting location:", error);
-        alert("Unable to get your location. Please check your permissions.");
+        toast.error("Unable to get your location. Please check your permissions.");
       }
     );
   };

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../hooks/useTheme";
 import { useAuth } from "../hooks/useAuth";
@@ -78,7 +79,7 @@ const AssignmentPage: React.FC = () => {
         },
       });
     } catch {
-      alert(scrubMessage(message));
+      toast.error(scrubMessage(message));
     }
   };
 
@@ -127,7 +128,7 @@ const AssignmentPage: React.FC = () => {
         },
       });
     } catch {
-      alert(scrubMessage(message));
+      toast.success(scrubMessage(message));
     }
   };
 
