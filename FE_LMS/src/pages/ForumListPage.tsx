@@ -106,7 +106,8 @@ const ForumListPage: React.FC = () => {
     isActive: boolean;
     saving: boolean;
     error?: string | null;
-    file: File | null;
+    existingFiles: string[];
+    newFiles: File[];
   }>({
     open: false,
     forum: null,
@@ -116,7 +117,8 @@ const ForumListPage: React.FC = () => {
     isActive: true,
     saving: false,
     error: null,
-    file: null,
+    existingFiles: [],
+    newFiles: [],
   });
 
   const [deleteModal, setDeleteModal] = useState<{
@@ -307,7 +309,8 @@ const ForumListPage: React.FC = () => {
       isActive: forum.isActive,
       saving: false,
       error: null,
-      file: null,
+      existingFiles: forum.key || [],
+      newFiles: [],
     });
   };
 
@@ -321,7 +324,8 @@ const ForumListPage: React.FC = () => {
       isActive: true,
       saving: false,
       error: null,
-      file: null,
+      existingFiles: [],
+      newFiles: [],
     });
 
   const handleUpdate = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -337,7 +341,7 @@ const ForumListPage: React.FC = () => {
           forumType: editModal.forumType,
           isActive: editModal.isActive,
         },
-        editModal.file || undefined
+        editModal.newFiles.length > 0 ? editModal.newFiles : undefined
       );
       toast.success("Forum updated successfully.");
       closeEditModal();
@@ -850,19 +854,19 @@ const ForumListPage: React.FC = () => {
       {editModal.open && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
           <div
-            className={`max-w-lg w-full rounded-2xl p-6 relative ${darkMode ? "bg-slate-900 text-slate-100" : "bg-white text-slate-900"
+            className={`max-w-lg w-full rounded-2xl p-6 h-[650px] relative ${darkMode ? "bg-slate-900 text-slate-100" : "bg-white text-slate-900"
               }`}
           >
             <button className="absolute top-4 right-4" onClick={closeEditModal}>
               <X className="w-5 h-5" />
             </button>
             <h3 className="text-2xl font-semibold mb-4">Update forum</h3>
-            <form className="space-y-4" onSubmit={handleUpdate}>
+            <form className="space-y-2" onSubmit={handleUpdate}>
               <div>
                 <label className="block text-sm font-medium mb-2">Title</label>
                 <input
                   type="text"
-                  className={`w-full rounded-xl border px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
+                  className={`w-full rounded-xl border px-4 h-10 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"
                     }`}
                   value={editModal.title}
                   onChange={(event) => setEditModal((prev) => ({ ...prev, title: event.target.value }))}
@@ -875,22 +879,69 @@ const ForumListPage: React.FC = () => {
                   onChange={(next) => setEditModal((prev) => ({ ...prev, description: next }))}
                   placeholder="Share context, add bullet lists, or embed resources using Markdown shortcuts."
                   darkMode={darkMode}
-                  attachment={editModal.file}
-                  onAttachmentChange={(file) => setEditModal((prev) => ({ ...prev, file }))}
+                  attachment={null}
+                  onAttachmentChange={(file) => {
+                    if (file) {
+                      setEditModal((prev) => ({
+                        ...prev,
+                        newFiles: [...prev.newFiles, file],
+                      }));
+                    }
+                  }}
                   attachmentAccept={attachmentAcceptTypes}
                 />
-                {editModal.file && (
-                  <div className="mt-3">
-                    <AttachmentPreview
-                      files={[URL.createObjectURL(editModal.file)]}
-                      size="sm"
-                      onImageClick={handleAttachmentPreview}
-                      caption={editModal.file.name}
-                    />
+                {(editModal.existingFiles.length > 0 || editModal.newFiles.length > 0) && (
+                  <div className="mt-3 space-y-2">
+                    {/* Existing files */}
+                    {editModal.existingFiles.length > 0 && (
+                      <div>
+                        <p className="text-xs mb-2" style={{ color: darkMode ? "#94a3b8" : "#64748b" }}>
+                          Existing files:
+                        </p>
+                        <AttachmentPreview
+                          files={editModal.existingFiles}
+                          size='xs'
+                          onImageClick={handleAttachmentPreview}
+                        />
+                      </div>
+                    )}
+                    {/* New files */}
+                    {editModal.newFiles.length > 0 && (
+                      <div>
+                        <p className="text-xs mb-2" style={{ color: darkMode ? "#94a3b8" : "#64748b" }}>
+                          New files to add:
+                        </p>
+                        <div className="space-y-2">
+                          {editModal.newFiles.map((file, index) => (
+                            <div key={index} className="relative">
+                              <AttachmentPreview
+                                files={[URL.createObjectURL(file)]}
+                                size="sm"
+                                onImageClick={handleAttachmentPreview}
+                                caption={file.name}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditModal((prev) => ({
+                                    ...prev,
+                                    newFiles: prev.newFiles.filter((_, i) => i !== index),
+                                  }));
+                                }}
+                                className="absolute top-1 right-1 p-1 rounded-full bg-red-500/80 text-white hover:bg-red-600 transition-colors"
+                                style={{ zIndex: 10 }}
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="flex items-center gap-3 flex-wrap">
                 {(["discussion", "announcement"] as ForumType[]).map((type) => {
                   const isActive = editModal.forumType === type;
                   return (
@@ -898,7 +949,7 @@ const ForumListPage: React.FC = () => {
                       type="button"
                       key={type}
                       onClick={() => setEditModal((prev) => ({ ...prev, forumType: type }))}
-                      className={`text-left p-4 rounded-xl border transition-all ${
+                      className={`text-left px-3 py-2 rounded-lg border transition-all text-sm ${
                         isActive
                           ? darkMode
                             ? "border-indigo-400 bg-indigo-500/20 text-white"
@@ -908,20 +959,20 @@ const ForumListPage: React.FC = () => {
                           : "border-slate-200 hover:border-slate-300 text-slate-700"
                       }`}
                     >
-                      <p className="font-semibold">{forumTypeLabels[type]}</p>
+                      <span className="font-medium">{forumTypeLabels[type]}</span>
                     </button>
                   );
                 })}
+                <label className="flex items-center gap-2 ml-auto">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    checked={editModal.isActive}
+                    onChange={(event) => setEditModal((prev) => ({ ...prev, isActive: event.target.checked }))}
+                  />
+                  <span className="text-sm">Active</span>
+                </label>
               </div>
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                  checked={editModal.isActive}
-                  onChange={(event) => setEditModal((prev) => ({ ...prev, isActive: event.target.checked }))}
-                />
-                <span className="text-sm">Active (visible to everyone in the course)</span>
-              </label>
               {/* Error message now shown via react-hot-toast */}
               <div className="flex justify-end gap-3">
                 <button
