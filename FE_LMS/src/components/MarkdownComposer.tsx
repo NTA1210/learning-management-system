@@ -120,7 +120,7 @@ const MarkdownComposer: React.FC<MarkdownComposerProps> = ({
     return `${formatted} ${units[exponent]}`;
   };
 
-  const editorClasses = `w-full rounded-2xl border px-4 py-3 resize-y min-h-[160px] focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
+  const editorClasses = `w-full rounded-2xl border px-4 py-3 resize-y min-h-[100px] focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
     darkMode ? "bg-slate-900 border-slate-700 text-slate-100" : "bg-white border-slate-200 text-slate-900"
   }`;
 
@@ -138,7 +138,7 @@ const MarkdownComposer: React.FC<MarkdownComposerProps> = ({
 
   return (
     <div className={`rounded-2xl border ${darkMode ? "border-slate-800 bg-slate-950/40" : "border-slate-200 bg-white"}`}>
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-4 py-2 text-xs font-semibold dark:border-slate-800">
+      <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-2 text-xs font-semibold dark:border-slate-800">
         {toolbarButtons.map((button) => (
           <button
             key={button.action}
@@ -156,7 +156,7 @@ const MarkdownComposer: React.FC<MarkdownComposerProps> = ({
         ))}
         {onAttachmentChange && (
           <>
-            <span className="mx-1 h-4 w-px bg-slate-200 dark:bg-slate-700" aria-hidden />
+            <span className="mx-1 h-4 w-px bg-slate-400 dark:bg-slate-700" aria-hidden />
             <button
               type="button"
               onClick={triggerAttachmentPicker}
@@ -166,7 +166,6 @@ const MarkdownComposer: React.FC<MarkdownComposerProps> = ({
               }`}
             >
               <Paperclip className="w-3.5 h-3.5" />
-              Add attachment
             </button>
             <input
               ref={fileInputRef}
