@@ -236,7 +236,7 @@ const CourseManagement: React.FC = () => {
         { courseId, role: "student" },
         { withCredentials: true }
       );
-      await showToastSuccess("Enroll thành công");
+      await showToastSuccess("Enroll to course successfully");
     } catch (e: any) {
       const status = e?.response?.status;
       if (status === 409) {
@@ -695,7 +695,7 @@ const CourseManagement: React.FC = () => {
                       onClick={() => navigate("/admin/courses/approved")}
                       className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105 w-full sm:w-auto"
                       style={{
-                        backgroundColor: darkMode ? "#111827" : "#1eb1cbff",
+                        backgroundColor: darkMode ? "#059669" : "#10b981",
                         border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
                       }}
                     >
