@@ -949,13 +949,7 @@ export default function TakeQuizPage() {
           <div className="max-w-4xl mx-auto">
             {/* Header */}
             <div className="mb-6">
-              <button
-                onClick={() => navigate(-1)}
-                className="flex items-center gap-2 text-sm mb-4 hover:underline"
-                style={{ color: "var(--muted-text)" }}
-              >
-                ← Back to Quizzes
-              </button>
+
               <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--heading-text)" }}>
                 {quiz.title}
               </h1>
