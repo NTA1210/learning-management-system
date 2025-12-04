@@ -146,10 +146,16 @@ httpClient.interceptors.response.use(
       originalRequest?.url?.includes("/auth/register") ||
       originalRequest?.url?.includes("/auth/refresh");
 
+    // Skip token refresh and redirect for chat-room related endpoints
+    const isChatRoomEndpoint =
+      originalRequest?.url?.includes("/chat-room") ||
+      originalRequest?.url?.includes("/chatroom");
+
     const shouldRenewToken =
       error.response?.status === 401 &&
       !originalRequest._retry &&
-      !isAuthEndpoint;
+      !isAuthEndpoint &&
+      !isChatRoomEndpoint;
 
     console.log("shouldRenewToken:", shouldRenewToken, "url:", originalRequest?.url);
 
