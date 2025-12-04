@@ -64,6 +64,22 @@ function AppRoutes() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
 
+        {/* Auth routes */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/email-verify" element={<EmailVerifyPage />} />
+        <Route
+          path="/auth/verify-email/:code"
+          element={<EmailVerificationPage />}
+        />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:code" element={<ResetPasswordPage />} />
+
+        <Route path="/blogs" element={<BlogPage />} />
+        <Route path="/blogs/:slug" element={<BlogDetailPage />} />
+        {/* Not found */}
+        <Route path="*" element={<NotFoundPage />} />
+
         {/* Onboarding */}
         <Route
           path="/onboarding"
@@ -130,17 +146,6 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-
-        {/* Auth routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/email-verify" element={<EmailVerifyPage />} />
-        <Route
-          path="/auth/verify-email/:code"
-          element={<EmailVerificationPage />}
-        />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password/:code" element={<ResetPasswordPage />} />
 
         <Route
           path="/my-courses"
@@ -494,12 +499,8 @@ function AppRoutes() {
             </ProtectedRoute>
           }
         />
-        <Route path="/blogs" element={<BlogPage />} />
-        <Route path="/blogs/:slug" element={<BlogDetailPage />} />
-        {/* Not found */}
-        <Route path="*" element={<NotFoundPage />} />
       </Routes>
-      
+
       {/* Floating Chat Windows - inside Router for useNavigate */}
       <FloatingChatContainer />
     </Router>

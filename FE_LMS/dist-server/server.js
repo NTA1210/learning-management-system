@@ -6,8 +6,8 @@ import dotenv from "dotenv";
 import prerender from "prerender-node";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, ".env.local") });
-dotenv.config({ path: path.resolve(__dirname, ".env.production") });
+const rootDir = path.resolve(__dirname, ".."); // parent folder
+dotenv.config({ path: path.join(rootDir, ".env") });
 const app = express();
 // Serve robots & sitemap trước khi prerender
 app.use("/robots.txt", express.static(path.join(__dirname, "public", "robots.txt")));
