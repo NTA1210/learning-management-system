@@ -198,5 +198,3 @@ _(Chi tiết đầy đủ có thể tham khảo qua Postman Collection hoặc Sw
 - Phát triển Mobile App (React Native).
 
 ---
-
-_Dự án được xây dựng bởi Nguyễn Tuấn Anh (NTA1210)._
