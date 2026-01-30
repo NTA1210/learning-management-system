@@ -188,8 +188,6 @@ Các endpoint chính của hệ thống backend:
 - **Courses**: `/api/v1/courses` (CRUD courses, lessons)
 - **Upload**: `/api/v1/upload` (Upload file to MinIO)
 
-_(Chi tiết đầy đủ có thể tham khảo qua Postman Collection hoặc Swagger nếu được tích hợp sau này)_
-
 ## 🔮 Hướng phát triển trong tương lai
 
 - Tích hợp thanh toán online (Stripe/PayPal).
