@@ -2,7 +2,7 @@
 
 Dự án **Fullstack Learning Management System (LMS)** là một nền tảng quản lý học tập trực tuyến hiện đại, được xây dựng với mục tiêu cung cấp giải pháp toàn diện cho việc giảng dạy và học tập.
 
-Hệ thống cung cấp trải nghiệm học tập phong phú với giao diện người dùng tương tác cao, hỗ trợ quản lý khóa học, bài giảng đa phương tiện (bao gồm hình ảnh, video, và nội dung 3D), cũng như các công cụ quản lý dành cho giảng viên và admin.
+Hệ thống cung cấp trải nghiệm học tập phong phú với giao diện người dùng tương tác cao, hỗ trợ quản lý khóa học, bài giảng đa phương tiện (bao gồm hình ảnh, video...), cũng như các công cụ quản lý dành cho giảng viên và admin.
 
 ## 🚀 Tính năng chính
 
