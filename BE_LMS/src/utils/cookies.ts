@@ -5,22 +5,21 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 export const REFRESH_PATH = '/auth/refresh';
 
-const defaults: CookieOptions = {
-  sameSite: isProduction ? 'none' : 'lax',
-  secure: isProduction,
+const baseCookieOptions: CookieOptions = {
   httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? 'none' : 'lax',
+  path: '/',
 };
 
 export const getAccessTokenCookieOptions = (): CookieOptions => ({
-  ...defaults,
+  ...baseCookieOptions,
   expires: fifteenMinutesFromNow(),
-  path: '/',
 });
 
 export const getRefreshTokenCookieOptions = (): CookieOptions => ({
-  ...defaults,
+  ...baseCookieOptions,
   expires: thirtyDaysFromNow(),
-  path: '/',
 });
 
 type Params = {
@@ -37,6 +36,6 @@ export const setAuthCookies = ({ res, accessToken, refreshToken }: Params) => {
 
 export const clearAuthCookies = (res: Response) => {
   return res
-    .clearCookie('accessToken', { path: '/' })
-    .clearCookie('refreshToken', { path: '/' });
+    .clearCookie('accessToken', baseCookieOptions)
+    .clearCookie('refreshToken', baseCookieOptions);
 };
