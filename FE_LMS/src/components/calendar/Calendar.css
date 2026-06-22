@@ -1170,5 +1170,193 @@
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
 }
 
+/* ===== Unified LMS schedule board polish ===== */
+.calendar-page {
+  background:
+    linear-gradient(180deg, rgba(79, 70, 229, 0.05), transparent 300px),
+    var(--app-bg);
+  padding-top: 5.5rem;
+  padding-left: 0;
+}
+
+@media (min-width: 768px) {
+  .calendar-page {
+    padding-left: 5.75rem;
+  }
+}
+
+.calendar-page-header {
+  max-width: 1280px;
+  margin: 0 auto 24px;
+  padding: 28px 20px;
+  background: transparent;
+  color: var(--page-text);
+}
+
+.calendar-page.dark .calendar-page-header {
+  background: transparent;
+}
+
+.header-content {
+  text-align: left;
+  margin-bottom: 20px;
+}
+
+.header-content h1 {
+  color: var(--heading-text);
+  text-shadow: none;
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+}
+
+.header-content p {
+  color: var(--muted-text);
+  opacity: 1;
+}
+
+.header-stats {
+  justify-content: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.stat-card,
+.calendar-section,
+.events-section,
+.sidebar-section {
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  box-shadow: var(--app-shadow-sm);
+}
+
+.stat-card {
+  min-width: 150px;
+  border-radius: var(--app-radius);
+  padding: 16px 18px;
+  text-align: left;
+}
+
+.stat-number {
+  color: var(--heading-text);
+}
+
+.stat-label {
+  color: var(--muted-text);
+  opacity: 1;
+  letter-spacing: 0;
+}
+
+.calendar-page-tabs {
+  max-width: 1280px;
+  margin: 0 auto 20px;
+  justify-content: flex-start;
+  padding: 0 20px;
+}
+
+.tab-button {
+  border-radius: 999px;
+  border-width: 1px;
+  box-shadow: none;
+}
+
+.tab-button:hover {
+  transform: translateY(-1px);
+}
+
+.calendar-page-content {
+  max-width: 1280px;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  padding: 0 20px 56px;
+}
+
+.calendar-content,
+.calendar-section,
+.events-section,
+.sidebar-section {
+  border-radius: var(--app-radius);
+}
+
+.calendar-container {
+  color: var(--page-text);
+}
+
+.week-schedule-item-compact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 48px;
+  height: auto;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--app-surface-soft);
+  border: 1px solid var(--app-border);
+  box-shadow: none;
+}
+
+.calendar-page:not(.dark) .week-schedule-item-compact {
+  background: #ffffff;
+  border-color: var(--app-border);
+  box-shadow: var(--app-shadow-sm);
+}
+
+.week-schedule-item-compact .room-info {
+  display: block !important;
+  grid-column: 1 / -1;
+}
+
+.subject-code,
+.time-range,
+.room-info,
+.week-day-name,
+.week-day-number {
+  text-shadow: none;
+  letter-spacing: 0;
+}
+
+.calendar-page:not(.dark) .subject-code {
+  color: #0f172a;
+}
+
+.day-schedule-item {
+  border-radius: 12px;
+  background: var(--app-surface-soft);
+  border: 1px solid var(--app-border);
+  border-left: 4px solid var(--app-primary);
+  box-shadow: none;
+}
+
+.quick-action-btn,
+.event-item {
+  border-radius: 12px;
+}
+
+@media (max-width: 1024px) {
+  .calendar-page-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .calendar-page {
+    padding-top: 7.25rem;
+  }
+
+  .calendar-page-header,
+  .calendar-page-content,
+  .calendar-page-tabs {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .header-stats {
+    gap: 10px;
+  }
+
+  .stat-card {
+    width: calc(50% - 5px);
+    min-width: 0;
+  }
+}
 
 

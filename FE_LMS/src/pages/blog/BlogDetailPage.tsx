@@ -154,7 +154,7 @@ const BlogDetailPage: React.FC = () => {
                         darkMode ? "text-slate-300" : "text-slate-700"
                       }`}
                     >
-                      {new Date(blog.createdAt).toLocaleDateString("vi-VN", {
+                      {new Date(blog.createdAt).toLocaleDateString("en-US", {
                         year: "numeric",
                         month: "long",
                         day: "numeric",

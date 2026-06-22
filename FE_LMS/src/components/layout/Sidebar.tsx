@@ -284,25 +284,6 @@ const getMenuItems = (
         label: "Questions Bank",
       },
       {
-        href: "/grading",
-        icon: (
-          <svg
-            className="w-5 h-5 min-w-[1.25rem]"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
-            ></path>
-          </svg>
-        ),
-        label: "Grading",
-      },
-      {
         href: "/my-courses",
         icon: (
           <svg
@@ -378,25 +359,6 @@ const getMenuItems = (
         ),
         label: "Weekly Timetable",
       },
-      {
-        href: "/students",
-        icon: (
-          <svg
-            className="w-5 h-5 min-w-[1.25rem]"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-            ></path>
-          </svg>
-        ),
-        label: "Students",
-      },
     ];
   }
 
@@ -421,25 +383,6 @@ const getMenuItems = (
           </svg>
         ),
         label: "My Enrollments",
-      },
-      {
-        href: "/grades",
-        icon: (
-          <svg
-            className="w-5 h-5 min-w-[1.25rem]"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"
-            ></path>
-          </svg>
-        ),
-        label: "Grades",
       },
       {
         href: "/my-courses",
@@ -472,8 +415,6 @@ export default function Sidebar({
   userInfo,
   variant = "desktop",
   onClose,
-  forceExpanded,
-  mobileView,
 }: SidebarProps) {
   const { darkMode } = useTheme();
   const { isSidebarOpen, toggleSidebar } = useSidebar();
@@ -1218,7 +1159,7 @@ export default function Sidebar({
                       <span className="whitespace-nowrap">Profile</span>
                     </Link>
                     <Link
-                      to="/account"
+                      to="/profile"
                       className="flex items-center w-full px-3 py-2 text-sm rounded-md hover:bg-gray-100/20"
                       style={{ color: darkMode ? "#9ca3af" : "#374151" }}
                     >
@@ -1239,7 +1180,7 @@ export default function Sidebar({
                       <span className="whitespace-nowrap">Account</span>
                     </Link>
                     <Link
-                      to="/theme"
+                      to="/profile"
                       className="flex items-center w-full px-3 py-2 text-sm rounded-md hover:bg-gray-100/20"
                       style={{ color: darkMode ? "#9ca3af" : "#374151" }}
                     >

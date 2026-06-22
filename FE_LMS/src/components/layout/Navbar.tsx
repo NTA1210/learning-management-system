@@ -150,15 +150,18 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
 
   return (
     <nav
-      className="shadow-lg py-3 px-4 sm:px-6 fixed top-0 left-0 right-0 z-[95] backdrop-blur-md transition-colors duration-300"
+      className="py-3 px-4 sm:px-6 fixed top-0 left-0 right-0 z-[95] backdrop-blur-md transition-colors duration-300"
       style={{
         backgroundColor: darkMode
-          ? "rgba(26, 32, 44, 0.95)"
-          : "rgba(255, 255, 255, 0.95)",
+          ? "rgba(15, 23, 42, 0.92)"
+          : "rgba(255, 255, 255, 0.92)",
         borderBottom: darkMode
-          ? "1px solid rgba(148, 163, 184, 0.1)"
-          : "1px solid rgba(148, 163, 184, 0.1)",
+          ? "1px solid rgba(148, 163, 184, 0.16)"
+          : "1px solid rgba(226, 232, 240, 0.9)",
         color: darkMode ? "#ffffff" : "#1e293b",
+        boxShadow: darkMode
+          ? "0 10px 30px rgba(0,0,0,0.18)"
+          : "0 10px 30px rgba(15,23,42,0.05)",
       }}
     >
       <div className="flex flex-col gap-3 mx-auto max-w-7xl">
@@ -213,7 +216,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
               <input
                 type="text"
                 placeholder="Search..."
-                className="w-full py-3 pl-10 pr-4 transition-all duration-200 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full py-2.5 pl-10 pr-4 transition-all duration-200 border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
                 style={{
                   borderColor: darkMode
                     ? "rgba(148, 163, 184, 0.2)"
@@ -248,7 +251,7 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
           </div>
           <div className="flex items-center gap-3 md:gap-4">
             <NotificationDropdown isDarkMode={darkMode} />
-            <ChatButton darkMode={darkMode} />
+            <ChatButton />
             {user && (
               <div className="relative" ref={dropdownRef}>
                 <button

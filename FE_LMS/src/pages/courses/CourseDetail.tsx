@@ -428,9 +428,9 @@ export default function CourseDetail() {
 
   return (
     <div
-      className="min-h-screen transition-colors duration-300"
+      className="app-page min-h-screen transition-colors duration-300"
       style={{
-        backgroundColor: isDarkMode ? "#0f172a" : "#f8fafc",
+        backgroundColor: "var(--app-bg)",
         color: isDarkMode ? "#ffffff" : "#0f172a",
       }}
     >
@@ -439,7 +439,8 @@ export default function CourseDetail() {
         role={(user?.role as "admin" | "teacher" | "student") || "student"}
       />
 
-      <div className="max-w-[1200px] mx-auto px-4 py-10 mt-16 sm:pl-24 md:pl-28">
+      <div className="app-shell-main">
+        <div className="app-content">
         {loading ? (
           <div className="animate-pulse">
             <div className="h-8 w-48 bg-gray-300 dark:bg-gray-700 rounded mb-6" />
@@ -521,36 +522,44 @@ export default function CourseDetail() {
 
             {/* Hero */}
             <div
-              className="relative rounded-2xl overflow-visible mb-8 shadow-xl"
+              className="ui-panel relative overflow-visible mb-8"
               style={{
-                background:
-                  "linear-gradient(135deg, rgba(82,95,225,0.15), rgba(255,207,89,0.15))",
-                border: "1px solid rgba(255,255,255,0.12)",
+                background: isDarkMode
+                  ? "linear-gradient(135deg, rgba(30,41,59,0.98), rgba(15,23,42,0.92))"
+                  : "linear-gradient(135deg, rgba(255,255,255,0.98), rgba(238,242,255,0.78))",
               }}
             >
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
                 <div
-                  className="p-6 flex items-center justify-center"
+                  className="p-5 sm:p-6 flex items-center justify-center"
                   style={{
-                    backgroundColor: isDarkMode ? "#0b132b" : "#ffffff",
+                    backgroundColor: isDarkMode ? "rgba(15,23,42,0.55)" : "rgba(255,255,255,0.72)",
                   }}
                 >
                   {logoUrl ? (
                     <img
                       src={logoUrl}
                       alt={course.title ?? "Course Logo"}
-                      className="rounded-xl w-full h-[260px] object-cover"
+                      className="rounded-xl w-full h-[260px] object-cover shadow-sm"
                     />
                   ) : (
-                    <div className="w-full h-[260px] rounded-xl bg-gradient-to-br from-indigo-200 via-purple-200 to-pink-200 dark:from-indigo-900 dark:via-purple-900 dark:to-pink-900 flex items-center justify-center">
+                    <div className="w-full h-[260px] rounded-xl flex items-center justify-center"
+                      style={{
+                        background: isDarkMode
+                          ? "linear-gradient(135deg, rgba(79,70,229,0.28), rgba(14,165,233,0.16))"
+                          : "linear-gradient(135deg, #eef2ff, #ecfeff)",
+                        border: "1px solid var(--app-border)",
+                      }}
+                    >
                       <span className="text-lg opacity-80">No Cover</span>
                     </div>
                   )}
                 </div>
-                <div className="lg:col-span-2 p-8">
+                <div className="lg:col-span-2 p-6 sm:p-8">
                   <div className="flex items-center gap-2 mb-3">
+                    <p className="section-eyebrow mr-1">Course Detail</p>
                     <h1
-                      className="text-4xl font-bold"
+                      className="text-3xl sm:text-4xl font-bold"
                       style={{ color: isDarkMode ? "#ffffff" : "#111827" }}
                     >
                       {course.title}
@@ -1343,6 +1352,7 @@ export default function CourseDetail() {
           courseStatus={course?.status}
         />
       )}
+      </div>
     </div>
   );
 }

@@ -5,6 +5,10 @@ import { authService, courseService, enrollmentService, subjectService, speciali
 import { userService } from "../../services/userService";
 import type { Course } from "../../types/course";
 import type { CourseFilters } from "../../services/courseService";
+import type {
+  EnrollmentItem,
+  EnrollmentUser,
+} from "../../services/enrollmentService";
 import Navbar from "../../components/layout/Navbar.tsx";
 import Sidebar from "../../components/layout/Sidebar.tsx";
 import CreateCourseForm from "../../components/courses/CreateCourseForm.tsx";
@@ -27,15 +31,15 @@ const CourseManagement: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
-  const [availableCategories, setAvailableCategories] = useState<
+  const [, setAvailableCategories] = useState<
     { _id: string; name: string }[]
   >([]);
   const [availableTeachers, setAvailableTeachers] = useState<
     { _id: string; username: string; email: string }[]
   >([]);
   const [selectedTeachers, setSelectedTeachers] = useState<string[]>([]);
-  const [categorySearchTerm, setCategorySearchTerm] = useState("");
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [, setCategorySearchTerm] = useState("");
+  const [, setShowCategoryDropdown] = useState(false);
   const [currentTeacherId, setCurrentTeacherId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: "",
@@ -70,30 +74,13 @@ const CourseManagement: React.FC = () => {
   const [selectedTeacherId, setSelectedTeacherId] = useState(searchParams.get("teacherId") ?? "");
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailCourse, setDetailCourse] = useState<Course | null>(null);
-  const [enrollments, setEnrollments] = useState<
-    {
-      _id: string;
-      userId: {
-        _id: string;
-        username: string;
-        email: string;
-        fullname?: string;
-      };
-      courseId: string;
-      status: string;
-      role: string;
-      enrolledAt: string;
-    }[]
-  >([]);
+  const [enrollments, setEnrollments] = useState<EnrollmentItem[]>([]);
   const [enrollPage, setEnrollPage] = useState(1);
   const [enrollLimit, setEnrollLimit] = useState(10);
   const [enrollTotal, setEnrollTotal] = useState(0);
   const [enrollLoading, setEnrollLoading] = useState(false);
   const [modalAnim, setModalAnim] = useState<"enter" | "leave" | "none">(
     "none"
-  );
-  const [contentPaddingLeft, setContentPaddingLeft] = useState(
-    window.innerWidth >= 640 ? 93 : 0
   );
   const [currentPage, setCurrentPage] = useState(Number(searchParams.get("page") ?? "1"));
   const [pageLimit, setPageLimit] = useState(Number(searchParams.get("limit") ?? "25"));
@@ -227,6 +214,10 @@ const CourseManagement: React.FC = () => {
       });
     } catch {}
   };
+
+  const getEnrollmentUser = (
+    enrollment: EnrollmentItem
+  ): EnrollmentUser | undefined => enrollment.studentId || enrollment.userId;
 
   const handleEnroll = async (courseId: string) => {
     try {
@@ -537,14 +528,6 @@ const CourseManagement: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    function handleResize() {
-      setContentPaddingLeft(window.innerWidth >= 640 ? 93 : 0);
-    }
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
   // Fetch courses on param change
   useEffect(() => {
     fetchCourses();
@@ -638,9 +621,9 @@ const CourseManagement: React.FC = () => {
         `}
       </style>
       <div
-        className="flex h-screen overflow-hidden relative"
+        className="app-page flex h-screen overflow-hidden relative"
         style={{
-          backgroundColor: darkMode ? "#1a202c" : "#f8fafc",
+          backgroundColor: "var(--app-bg)",
           color: darkMode ? "#ffffff" : "#1e293b",
         }}
       >
@@ -656,15 +639,16 @@ const CourseManagement: React.FC = () => {
         <div
           className="flex flex-col flex-1 w-0 overflow-hidden"
           style={{
-            paddingLeft: contentPaddingLeft,
-            backgroundColor: darkMode ? "#1f2937" : "#f0f0f0",
+            paddingLeft: 0,
+            backgroundColor: "transparent",
           }}
         >
-          <main className="flex-1 relative overflow-y-auto focus:outline-none p-4 sm:mt-16 mt-36">
-            <div className="max-w-7xl mx-auto">
+          <main className="app-shell-main flex-1 relative overflow-y-auto focus:outline-none">
+            <div className="app-content">
               {/* Header */}
-              <div className="flex justify-between items-center mb-6 gap-4 flex-col sm:flex-row">
+              <div className="ui-panel p-5 sm:p-6 flex justify-between items-start mb-6 gap-4 flex-col sm:flex-row">
                 <div>
+                  <p className="section-eyebrow mb-2">Courses</p>
                   <h1
                     className="text-3xl font-bold mb-2"
                     style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
@@ -681,10 +665,9 @@ const CourseManagement: React.FC = () => {
                   {isAdmin && (
                     <button
                       onClick={() => navigate("/admin/courses/deleted")}
-                      className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105 w-full sm:w-auto"
+                      className="ui-button-secondary w-full sm:w-auto"
                       style={{
-                        backgroundColor: darkMode ? "#111827" : "#DC2627",
-                        border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
+                        color: darkMode ? "#fecaca" : "#b91c1c",
                       }}
                     >
                       List Deleted
@@ -693,10 +676,9 @@ const CourseManagement: React.FC = () => {
                     {isAdmin && (
                     <button
                       onClick={() => navigate("/admin/courses/approved")}
-                      className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105 w-full sm:w-auto"
+                      className="ui-button-secondary w-full sm:w-auto"
                       style={{
-                        backgroundColor: darkMode ? "#111827" : "#1eb1cbff",
-                        border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
+                        color: darkMode ? "#a5f3fc" : "#0e7490",
                       }}
                     >
                       Approve Courses
@@ -712,17 +694,17 @@ const CourseManagement: React.FC = () => {
                           setSelectedTeachers([]);
                         }
                       }}
-                      className="px-6 py-2 rounded-lg text-white transition-all duration-200 hover:shadow-lg hover:opacity-90 hover:scale-105 w-full sm:w-auto"
+                      className="ui-button-primary w-full sm:w-auto"
                       style={{
-                        backgroundColor: darkMode ? "#059669" : "#10b981",
+                        backgroundColor: "var(--app-success)",
                       }}
                     >
                       + Create Course
                     </button>
                   )}
                   <button
-                    className="px-4 py-2 rounded-lg text-white flex items-center transition-all duration-200 hover:opacity-90 hover:scale-105 w-full justify-center sm:w-auto"
-                    style={{ backgroundColor: darkMode ? "#4c1d95" : "#4f46e5" }}
+                    className="ui-button-secondary w-full justify-center sm:w-auto"
+                    style={{ color: darkMode ? "#c7d2fe" : "#4f46e5" }}
                     onClick={fetchCourses}
                   >
                     <svg
@@ -754,22 +736,20 @@ const CourseManagement: React.FC = () => {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-                    className="w-full px-4 py-2 rounded-lg border transition-colors duration-300"
+                    className="ui-input w-full px-4 py-2 transition-colors duration-300"
                     style={{
                       backgroundColor: darkMode
                         ? "rgba(55, 65, 81, 0.8)"
                         : "#ffffff",
-                      borderColor: darkMode
-                        ? "rgba(75, 85, 99, 0.3)"
-                        : "#e5e7eb",
+                      borderColor: "var(--app-border)",
                       color: darkMode ? "#ffffff" : "#000000",
                     }}
                   />
                 </div>
                 <button
                   onClick={handleSearch}
-                  className="p-2 rounded-lg text-white transition-all duration-200 flex items-center justify-center hover:opacity-90 hover:scale-105"
-                  style={{ backgroundColor: darkMode ? "#4c1d95" : "#4f46e5" }}
+                  className="ui-button-primary flex items-center justify-center"
+                  style={{ minWidth: 44 }}
                 >
                   <Search size={20} />
                 </button>
@@ -1084,12 +1064,11 @@ const CourseManagement: React.FC = () => {
                   {courses.map((course, index) => (
                     <div
                       key={course._id}
-                      className="rounded-xl p-6 transition-all duration-300 hover:scale-[1.02] neu-surface"
+                      className="ui-card ui-card-hover p-5 sm:p-6 transition-all duration-300"
                       style={{
                         backgroundColor: darkMode
                           ? "rgba(55, 65, 81, 0.8)"
                           : "#ffffff",
-                        border: "none",
                         animationDelay: `${index * 100}ms`,
                         animation: "fadeInUp 0.6s ease-out forwards",
                       }}
@@ -2393,90 +2372,98 @@ const CourseManagement: React.FC = () => {
                           gap: "1rem",
                         }}
                       >
-                        {enrollments.map((item) => (
-                          <div
-                            key={item._id}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              borderRadius: "1.2rem",
-                              backgroundColor: darkMode ? "#0f766e" : "#ecfeff",
-                              color: darkMode ? "#99f6e4" : "#0f766e",
-                              border: darkMode
-                                ? "1.5px solid #2dd4bf"
-                                : "1.5px solid #99f6e4",
-                              minWidth: "100%",
-                              padding: "0.55rem 1.1rem",
-                              boxShadow: darkMode
-                                ? "0 3px 7px #181F2A"
-                                : "0 1px 5px #cffafe",
-                              fontSize: "0.93em",
-                              gap: 12,
-                            }}
-                          >
-                            <img
-                              src={
-                                "https://admin.toandz.id.vn/placeholder/img/3.jpg"
-                              }
-                              alt="avatar"
-                              width={48}
-                              height={48}
-                              style={{
-                                borderRadius: "50%",
-                                aspectRatio: "1 / 1",
-                                objectFit: "cover",
-                                marginRight: 8,
-                                border: darkMode
-                                  ? "2px solid #2dd4bf"
-                                  : "2px solid #99f6e4",
-                                background: darkMode ? "#232946" : "#fff",
-                              }}
-                            />
+                        {enrollments.map((item) => {
+                          const enrollmentUser = getEnrollmentUser(item);
+                          const displayName =
+                            enrollmentUser?.username ||
+                            enrollmentUser?.email ||
+                            "Unknown student";
+
+                          return (
                             <div
+                              key={item._id}
                               style={{
                                 display: "flex",
-                                flexDirection: "column",
-                                minWidth: 0,
-                                width: "100%",
+                                alignItems: "center",
+                                borderRadius: "1.2rem",
+                                backgroundColor: darkMode ? "#0f766e" : "#ecfeff",
+                                color: darkMode ? "#99f6e4" : "#0f766e",
+                                border: darkMode
+                                  ? "1.5px solid #2dd4bf"
+                                  : "1.5px solid #99f6e4",
+                                minWidth: "100%",
+                                padding: "0.55rem 1.1rem",
+                                boxShadow: darkMode
+                                  ? "0 3px 7px #181F2A"
+                                  : "0 1px 5px #cffafe",
+                                fontSize: "0.93em",
+                                gap: 12,
                               }}
                             >
-                              <span
+                              <img
+                                src={
+                                  "https://admin.toandz.id.vn/placeholder/img/3.jpg"
+                                }
+                                alt="avatar"
+                                width={48}
+                                height={48}
                                 style={{
-                                  fontWeight: 600,
-                                  whiteSpace: "nowrap",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
+                                  borderRadius: "50%",
+                                  aspectRatio: "1 / 1",
+                                  objectFit: "cover",
+                                  marginRight: 8,
+                                  border: darkMode
+                                    ? "2px solid #2dd4bf"
+                                    : "2px solid #99f6e4",
+                                  background: darkMode ? "#232946" : "#fff",
+                                }}
+                              />
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  minWidth: 0,
+                                  width: "100%",
                                 }}
                               >
-                                {item.userId.username}
-                              </span>
-                              {item.userId.fullname && (
                                 <span
                                   style={{
-                                    fontSize: "11px",
-                                    color: darkMode ? "#a7f3d0" : "#0f766e",
+                                    fontWeight: 600,
                                     whiteSpace: "nowrap",
                                     overflow: "hidden",
                                     textOverflow: "ellipsis",
                                   }}
                                 >
-                                  {item.userId.fullname}
+                                  {displayName}
                                 </span>
-                              )}
-                              <span
-                                style={{
-                                  fontSize: "11px",
-                                  color: darkMode ? "#99f6e4" : "#0ea5e9",
-                                  whiteSpace: "nowrap",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                }}
-                              >
-                                {item.userId.email}
-                              </span>
+                                {enrollmentUser?.fullname && (
+                                  <span
+                                    style={{
+                                      fontSize: "11px",
+                                      color: darkMode ? "#a7f3d0" : "#0f766e",
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                    }}
+                                  >
+                                    {enrollmentUser.fullname}
+                                  </span>
+                                )}
+                                <span
+                                  style={{
+                                    fontSize: "11px",
+                                    color: darkMode ? "#99f6e4" : "#0ea5e9",
+                                    whiteSpace: "nowrap",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                  }}
+                                >
+                                  {enrollmentUser?.email || "No email available"}
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

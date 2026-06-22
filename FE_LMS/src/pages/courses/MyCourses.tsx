@@ -111,21 +111,28 @@ const MyCoursesPage: React.FC = () => {
 
     return (
         <div
-            className="min-h-screen transition-colors duration-300"
+            className="app-page min-h-screen transition-colors duration-300"
             style={{
-                backgroundColor: darkMode ? "#0f172a" : "#f8fafc",
+                backgroundColor: "var(--app-bg)",
                 color: darkMode ? "#ffffff" : "#0f172a",
             }}
         >
             <Navbar />
                   <Sidebar role={user?.role as 'admin' | 'teacher' | 'student'} />
-            <div className="max-w-[1200px] mt-[100px] mx-auto px-4 sm:pl-[93px] py-6">
-                <h1
-                    className="text-2xl font-semibold mb-6"
-                    style={{ color: darkMode ? "#ffffff" : "#111827" }}
-                >
-                    My Courses
-                </h1>
+            <div className="app-shell-main">
+              <div className="app-content">
+                <div className="ui-panel p-5 sm:p-6 mb-6">
+                    <p className="section-eyebrow mb-2">Learning</p>
+                    <h1
+                        className="text-3xl font-bold mb-2"
+                        style={{ color: darkMode ? "#ffffff" : "#111827" }}
+                    >
+                        My Courses
+                    </h1>
+                    <p style={{ color: darkMode ? "#9ca3af" : "#64748b" }}>
+                        Track your enrolled courses, subjects, semesters, and teachers in one place.
+                    </p>
+                </div>
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                     <div className="flex flex-wrap items-center gap-3">
@@ -135,7 +142,7 @@ const MyCoursesPage: React.FC = () => {
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 placeholder="Search courses by title or description"
-                                className="pl-9 pr-3 py-2 rounded-lg outline-none shadow-sm w-full sm:w-64"
+                                className="ui-input pl-9 pr-3 py-2 outline-none shadow-sm w-full sm:w-64"
                                 style={{
                                     backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                                     color: darkMode ? "#ffffff" : "#111827",
@@ -146,7 +153,7 @@ const MyCoursesPage: React.FC = () => {
                         <select
                             value={sortOption}
                             onChange={(e) => setSortOption(e.target.value as 'name_asc' | 'name_desc' | 'date_asc' | 'date_desc')}
-                            className="px-3 py-2 rounded-lg w-full sm:w-auto"
+                            className="ui-input px-3 py-2 w-full sm:w-auto"
                             style={{
                                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                                 color: darkMode ? "#ffffff" : "#111827",
@@ -161,7 +168,7 @@ const MyCoursesPage: React.FC = () => {
                         <select
                             value={selectedSubjectId}
                             onChange={(e) => { setSelectedSubjectId(e.target.value); setCurrentPage(1); }}
-                            className="px-3 py-2 rounded-lg w-full sm:w-auto"
+                            className="ui-input px-3 py-2 w-full sm:w-auto"
                             style={{
                                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                                 color: darkMode ? "#ffffff" : "#111827",
@@ -176,7 +183,7 @@ const MyCoursesPage: React.FC = () => {
                         <select
                             value={selectedSemesterId}
                             onChange={(e) => { setSelectedSemesterId(e.target.value); setCurrentPage(1); }}
-                            className="px-3 py-2 rounded-lg w-full sm:w-auto"
+                            className="ui-input px-3 py-2 w-full sm:w-auto"
                             style={{
                                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                                 color: darkMode ? "#ffffff" : "#111827",
@@ -191,7 +198,7 @@ const MyCoursesPage: React.FC = () => {
                         <select
                             value={selectedTeacherId}
                             onChange={(e) => { setSelectedTeacherId(e.target.value); setCurrentPage(1); }}
-                            className="px-3 py-2 rounded-lg w-full sm:w-auto"
+                            className="ui-input px-3 py-2 w-full sm:w-auto"
                             style={{
                                 backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                                 color: darkMode ? "#ffffff" : "#111827",
@@ -211,7 +218,7 @@ const MyCoursesPage: React.FC = () => {
                             setCurrentPage(1);
                             setPageLimit(Number(e.target.value));
                         }}
-                        className="px-3 py-2 rounded-lg w-full sm:w-auto"
+                        className="ui-input px-3 py-2 w-full sm:w-auto"
                         style={{
                             backgroundColor: darkMode ? "#1f2937" : "#ffffff",
                             color: darkMode ? "#ffffff" : "#111827",
@@ -255,10 +262,9 @@ const MyCoursesPage: React.FC = () => {
                                         {courses.map((course) => (
                                             <div
                                                 key={course._id}
-                                                className="rounded-xl p-6 neu-surface transition-all duration-300 hover:scale-[1.02] hover:shadow-xl flex flex-col"
+                                                className="ui-card ui-card-hover p-5 sm:p-6 transition-all duration-300 flex flex-col"
                                                 style={{
-                                                    backgroundColor: darkMode ? 'rgba(31, 41, 55, 0.85)' : '#f7f7fb',
-                                                    border: 'none',
+                                                    backgroundColor: darkMode ? 'rgba(31, 41, 55, 0.85)' : '#ffffff',
                                                     minHeight: '320px',
                                                 }}
                                             >
@@ -387,6 +393,7 @@ const MyCoursesPage: React.FC = () => {
                     </>
                     
                 )}
+              </div>
             </div>
         </div>
     );

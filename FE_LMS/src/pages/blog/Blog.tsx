@@ -28,7 +28,7 @@ function BlogCard({
   onDelete: (id: string) => void;
 }) {
   const { darkMode } = useTheme();
-  const date = new Date(post.createdAt).toLocaleDateString("vi-VN", {
+  const date = new Date(post.createdAt).toLocaleDateString("en-US", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -143,7 +143,7 @@ function BlogCard({
                 : "text-indigo-600 hover:text-indigo-700"
             }`}
           >
-            Xem thêm
+            Read more
             <span className="transition-transform group-hover/btn:translate-x-1">
               →
             </span>
@@ -189,7 +189,7 @@ function Pagination({
         aria-disabled={!hasPrev}
         onClick={(e) => !hasPrev && e.preventDefault()}
       >
-        ← Trước
+        ← Previous
       </Link>
 
       <span
@@ -197,7 +197,7 @@ function Pagination({
           darkMode ? "text-slate-400" : "text-slate-600"
         }`}
       >
-        Trang {pageNumber} / {totalPages}
+        Page {pageNumber} / {totalPages}
       </span>
 
       <Link
@@ -214,7 +214,7 @@ function Pagination({
         aria-disabled={!hasNext}
         onClick={(e) => !hasNext && e.preventDefault()}
       >
-        Sau →
+        Next →
       </Link>
     </div>
   );
@@ -357,7 +357,7 @@ const BlogPage: React.FC = () => {
                 <div className="relative group">
                   <input
                     type="search"
-                    placeholder="Tìm kiếm bài viết..."
+                    placeholder="Search posts..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className={`w-full rounded-2xl border px-6 py-4 pl-12 text-base shadow-sm outline-none ring-0 transition-all focus:ring-2 focus:-translate-y-0.5 focus:shadow-lg ${
@@ -404,7 +404,7 @@ const BlogPage: React.FC = () => {
                 }`}
               >
                 <i className="block mb-3 text-2xl bi bi-journal-text"></i>
-                Hiện chưa có bài viết nào.
+                No posts are available yet.
               </div>
             ) : (
               <>

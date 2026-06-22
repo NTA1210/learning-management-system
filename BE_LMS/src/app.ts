@@ -55,23 +55,39 @@ import blogRoutes from './routes/blogRoutes.route';
 
 export const createApp = async () => {
   const app = express();
+  const allowedOrigins = [
+    APP_ORIGIN,
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+  ];
+  const corsOptions = {
+    origin: (
+      origin: string | undefined,
+      callback: (error: Error | null, allow?: boolean) => void
+    ) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    },
+    credentials: true,
+  };
 
   app.use(customResponse);
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
-  app.use(
-    cors({
-      origin: APP_ORIGIN,
-      credentials: true,
-    })
-  );
+  app.use(cors(corsOptions));
   app.use(cookieParser());
 
   const httpServer = http.createServer(app);
 
   const io = new Server(httpServer, {
     cors: {
-      origin: APP_ORIGIN,
+      origin: allowedOrigins,
       credentials: true,
       methods: ['GET', 'POST'],
     },
