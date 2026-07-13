@@ -11,7 +11,7 @@ import upload from './config/multer';
 
 //constants
 import { OK } from './constants/http';
-import { APP_ORIGIN } from './constants/env';
+import { APP_ORIGIN, FRONTEND_URL } from './constants/env';
 
 //middleware
 
@@ -20,7 +20,7 @@ import { authenticate, authorize, customResponse, errorHandler } from './middlew
 //routes
 import {
   announcementRoutes,
-  assignmentRoutes, 
+  assignmentRoutes,
   attendanceRoutes,
   authRoutes,
   courseInviteRoutes,
@@ -56,6 +56,7 @@ import blogRoutes from './routes/blogRoutes.route';
 export const createApp = async () => {
   const app = express();
   const allowedOrigins = [
+    FRONTEND_URL,
     APP_ORIGIN,
     'http://localhost:5173',
     'http://127.0.0.1:5173',

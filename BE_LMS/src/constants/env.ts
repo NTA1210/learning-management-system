@@ -34,3 +34,8 @@ export const MINIO_USE_SSL =
   getEnv("MINIO_USE_SSL", "true") === "true" ? true : false;
 export const MINIO_ACCESS_KEY = getEnv("MINIO_ACCESS_KEY");
 export const MINIO_SECRET_KEY = getEnv("MINIO_SECRET_KEY");
+
+export const FRONTEND_URL = getEnv(
+  "FRONTEND_URL",
+  "http://localhost:5173"
+);
