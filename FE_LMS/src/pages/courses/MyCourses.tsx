@@ -8,7 +8,7 @@ import http from "../../utils/http";
 import useDebounce from "../../hooks/useDebounce";
 import type { Course } from "../../types/course";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { userService } from "../../services/userService";
 
 const MyCoursesPage: React.FC = () => {
@@ -134,103 +134,159 @@ const MyCoursesPage: React.FC = () => {
                     </p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }} />
+                <div
+                    className="p-5 rounded-2xl mb-8 border flex flex-col gap-5 transition-all duration-300"
+                    style={{
+                        backgroundColor: darkMode ? "rgba(15, 23, 42, 0.45)" : "#ffffff",
+                        borderColor: darkMode ? "rgba(255, 255, 255, 0.06)" : "rgba(226, 232, 240, 0.8)",
+                        boxShadow: darkMode
+                            ? "0 4px 20px -2px rgba(0, 0, 0, 0.2)"
+                            : "0 4px 20px -2px rgba(0, 0, 0, 0.03)",
+                    }}
+                >
+                    {/* Row 1: Search and Limit */}
+                    <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
+                        {/* Search Input with nested icon */}
+                        <div className="relative flex-1 max-w-xl">
+                            <Search
+                                size={18}
+                                className="absolute left-3.5 top-1/2 -translate-y-1/2"
+                                style={{ color: darkMode ? "#64748b" : "#94a3b8" }}
+                            />
                             <input
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search courses by title or description"
-                                className="ui-input pl-9 pr-3 py-2 outline-none shadow-sm w-full sm:w-64"
+                                placeholder="Search courses by title or description..."
+                                className="w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                                 style={{
-                                    backgroundColor: darkMode ? "#1f2937" : "#ffffff",
-                                    color: darkMode ? "#ffffff" : "#111827",
-                                    border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
+                                    backgroundColor: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                                    borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                                    color: darkMode ? "#ffffff" : "#1f2937",
                                 }}
                             />
                         </div>
-                        <select
-                            value={sortOption}
-                            onChange={(e) => setSortOption(e.target.value as 'name_asc' | 'name_desc' | 'date_asc' | 'date_desc')}
-                            className="ui-input px-3 py-2 w-full sm:w-auto"
-                            style={{
-                                backgroundColor: darkMode ? "#1f2937" : "#ffffff",
-                                color: darkMode ? "#ffffff" : "#111827",
-                                border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
-                            }}
-                        >
-                            <option value="date_desc">Newest</option>
-                            <option value="date_asc">Oldest</option>
-                            <option value="name_asc">Title A-Z</option>
-                            <option value="name_desc">Title Z-A</option>
-                        </select>
-                        <select
-                            value={selectedSubjectId}
-                            onChange={(e) => { setSelectedSubjectId(e.target.value); setCurrentPage(1); }}
-                            className="ui-input px-3 py-2 w-full sm:w-auto"
-                            style={{
-                                backgroundColor: darkMode ? "#1f2937" : "#ffffff",
-                                color: darkMode ? "#ffffff" : "#111827",
-                                border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
-                            }}
-                        >
-                            <option value="">All My Subjects</option>
-                            {mySubjects.map((s) => (
-                                <option key={s._id} value={s._id}>{s.name}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={selectedSemesterId}
-                            onChange={(e) => { setSelectedSemesterId(e.target.value); setCurrentPage(1); }}
-                            className="ui-input px-3 py-2 w-full sm:w-auto"
-                            style={{
-                                backgroundColor: darkMode ? "#1f2937" : "#ffffff",
-                                color: darkMode ? "#ffffff" : "#111827",
-                                border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
-                            }}
-                        >
-                            <option value="">All Semesters</option>
-                            {semesters.map((s) => (
-                                <option key={s._id} value={s._id}>{s.name}</option>
-                            ))}
-                        </select>
-                        <select
-                            value={selectedTeacherId}
-                            onChange={(e) => { setSelectedTeacherId(e.target.value); setCurrentPage(1); }}
-                            className="ui-input px-3 py-2 w-full sm:w-auto"
-                            style={{
-                                backgroundColor: darkMode ? "#1f2937" : "#ffffff",
-                                color: darkMode ? "#ffffff" : "#111827",
-                                border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
-                            }}
-                        >
-                            <option value="">All Teachers</option>
-                            {teachers.map((t) => (
-                                <option key={t._id} value={t._id}>{t.fullname || t.username}</option>
-                            ))}
-                        </select>
+
+                        {/* Page Limit Select */}
+                        <div className="flex items-center gap-3">
+                            <div className="relative">
+                                <select
+                                    value={pageLimit}
+                                    onChange={(e) => {
+                                        setCurrentPage(1);
+                                        setPageLimit(Number(e.target.value));
+                                    }}
+                                    className="appearance-none rounded-xl px-4 py-2 pr-10 border text-xs font-semibold focus:outline-none focus:ring-2 transition-all duration-200 cursor-pointer"
+                                    style={{
+                                        width: 120,
+                                        background: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                                        color: darkMode ? "#cbd5e1" : "#475569",
+                                        borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                                    }}
+                                >
+                                    {[10, 20, 25, 50].map((n) => (
+                                        <option key={n} value={n}>{n} / page</option>
+                                    ))}
+                                </select>
+                                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                                    <ChevronDown size={14} style={{ color: darkMode ? "#64748b" : "#94a3b8" }} />
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2">
-<select
-                        value={pageLimit}
-                        onChange={(e) => {
-                            setCurrentPage(1);
-                            setPageLimit(Number(e.target.value));
-                        }}
-                        className="ui-input px-3 py-2 w-full sm:w-auto"
-                        style={{
-                            backgroundColor: darkMode ? "#1f2937" : "#ffffff",
-                            color: darkMode ? "#ffffff" : "#111827",
-                            border: darkMode ? "1px solid rgba(255,255,255,0.08)" : "1px solid #e5e7eb",
-                        }}
+
+                    {/* Row 2: Filters Grid */}
+                    <div
+                        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-4 border-t"
+                        style={{ borderColor: darkMode ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.05)" }}
                     >
-                        {[10, 20, 25, 50].map((n) => (
-                            <option key={n} value={n}>{n}/page</option>
-                        ))}
-                    </select>
+                        {/* Sort Select */}
+                        <div className="relative">
+                            <select
+                                value={sortOption}
+                                onChange={(e) => setSortOption(e.target.value as 'name_asc' | 'name_desc' | 'date_asc' | 'date_desc')}
+                                className="w-full appearance-none rounded-xl px-4 py-2 pr-10 border text-xs font-semibold focus:outline-none focus:ring-2 transition-all duration-200 cursor-pointer"
+                                style={{
+                                    background: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                                    color: darkMode ? "#cbd5e1" : "#475569",
+                                    borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                                }}
+                            >
+                                <option value="date_desc">Sort: Newest</option>
+                                <option value="date_asc">Sort: Oldest</option>
+                                <option value="name_asc">Sort: Title A-Z</option>
+                                <option value="name_desc">Sort: Title Z-A</option>
+                            </select>
+                            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                                <ChevronDown size={14} style={{ color: darkMode ? "#64748b" : "#94a3b8" }} />
+                            </span>
+                        </div>
+
+                        {/* Subject Select */}
+                        <div className="relative">
+                            <select
+                                value={selectedSubjectId}
+                                onChange={(e) => { setSelectedSubjectId(e.target.value); setCurrentPage(1); }}
+                                className="w-full appearance-none rounded-xl px-4 py-2 pr-10 border text-xs font-semibold focus:outline-none focus:ring-2 transition-all duration-200 cursor-pointer"
+                                style={{
+                                    background: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                                    color: darkMode ? "#cbd5e1" : "#475569",
+                                    borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                                }}
+                            >
+                                <option value="">All My Subjects</option>
+                                {mySubjects.map((s) => (
+                                    <option key={s._id} value={s._id}>{s.name}</option>
+                                ))}
+                            </select>
+                            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                                <ChevronDown size={14} style={{ color: darkMode ? "#64748b" : "#94a3b8" }} />
+                            </span>
+                        </div>
+
+                        {/* Semester Select */}
+                        <div className="relative">
+                            <select
+                                value={selectedSemesterId}
+                                onChange={(e) => { setSelectedSemesterId(e.target.value); setCurrentPage(1); }}
+                                className="w-full appearance-none rounded-xl px-4 py-2 pr-10 border text-xs font-semibold focus:outline-none focus:ring-2 transition-all duration-200 cursor-pointer"
+                                style={{
+                                    background: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                                    color: darkMode ? "#cbd5e1" : "#475569",
+                                    borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                                }}
+                            >
+                                <option value="">All Semesters</option>
+                                {semesters.map((s) => (
+                                    <option key={s._id} value={s._id}>{s.name}</option>
+                                ))}
+                            </select>
+                            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                                <ChevronDown size={14} style={{ color: darkMode ? "#64748b" : "#94a3b8" }} />
+                            </span>
+                        </div>
+
+                        {/* Teacher Select */}
+                        <div className="relative">
+                            <select
+                                value={selectedTeacherId}
+                                onChange={(e) => { setSelectedTeacherId(e.target.value); setCurrentPage(1); }}
+                                className="w-full appearance-none rounded-xl px-4 py-2 pr-10 border text-xs font-semibold focus:outline-none focus:ring-2 transition-all duration-200 cursor-pointer"
+                                style={{
+                                    background: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                                    color: darkMode ? "#cbd5e1" : "#475569",
+                                    borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                                }}
+                            >
+                                <option value="">All Teachers</option>
+                                {teachers.map((t) => (
+                                    <option key={t._id} value={t._id}>{t.fullname || t.username}</option>
+                                ))}
+                            </select>
+                            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                                <ChevronDown size={14} style={{ color: darkMode ? "#64748b" : "#94a3b8" }} />
+                            </span>
+                        </div>
                     </div>
-                    
                 </div>
 
                 {loading ? (
@@ -262,21 +318,32 @@ const MyCoursesPage: React.FC = () => {
                                         {courses.map((course) => (
                                             <div
                                                 key={course._id}
-                                                className="ui-card ui-card-hover p-5 sm:p-6 transition-all duration-300 flex flex-col"
+                                                className="ui-card ui-card-hover p-5 sm:p-6 transition-all duration-300 flex flex-col h-full"
                                                 style={{
-                                                    backgroundColor: darkMode ? 'rgba(31, 41, 55, 0.85)' : '#ffffff',
-                                                    minHeight: '320px',
+                                                    backgroundColor: darkMode
+                                                        ? "rgba(30, 41, 59, 0.75)"
+                                                        : "#ffffff",
+                                                    borderColor: darkMode
+                                                        ? "rgba(255, 255, 255, 0.06)"
+                                                        : "rgba(226, 232, 240, 0.8)",
+                                                    backdropFilter: "blur(8px)",
+                                                    boxShadow: darkMode
+                                                        ? "0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3)"
+                                                        : "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
+                                                    minHeight: '340px',
                                                 }}
                                             >
+                                                {/* Course Header */}
                                                 <div className="flex items-start justify-between mb-4">
                                                     <div className="flex-1">
-                                                        <div className="flex items-center space-x-2 mb-2">
+                                                        <div className="flex flex-wrap gap-1.5 items-center mb-3">
                                                             {course.code && (
                                                                 <span
-                                                                    className="px-2 py-1 rounded text-xs font-semibold"
+                                                                    className="px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide shadow-sm"
                                                                     style={{
-                                                                        backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff',
-                                                                        color: darkMode ? '#a5b4fc' : '#4f46e5'
+                                                                        backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.15)' : '#eef2ff',
+                                                                        color: darkMode ? '#cbd5e1' : '#4f46e5',
+                                                                        border: darkMode ? '1px solid rgba(99, 102, 241, 0.25)' : '1px solid rgba(99, 102, 241, 0.4)'
                                                                     }}
                                                                 >
                                                                     {course.code}
@@ -284,64 +351,183 @@ const MyCoursesPage: React.FC = () => {
                                                             )}
                                                             {course.isPublished ? (
                                                                 <span
-                                                                    className="px-2 py-1 rounded text-xs font-semibold"
+                                                                    className="px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide shadow-sm"
                                                                     style={{
-                                                                        backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.2)' : '#d1fae5',
-                                                                        color: darkMode ? '#6ee7b7' : '#059669'
+                                                                        backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.15)' : '#e6fffa',
+                                                                        color: darkMode ? '#34d399' : '#047857',
+                                                                        border: darkMode ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid rgba(16, 185, 129, 0.4)'
                                                                     }}
                                                                 >
                                                                     Published
                                                                 </span>
                                                             ) : (
                                                                 <span
-                                                                    className="px-2 py-1 rounded text-xs font-semibold"
+                                                                    className="px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide shadow-sm"
                                                                     style={{
-                                                                        backgroundColor: darkMode ? 'rgba(156, 163, 175, 0.2)' : '#f3f4f6',
-                                                                        color: darkMode ? '#9ca3af' : '#6b7280'
+                                                                        backgroundColor: darkMode ? 'rgba(156, 163, 175, 0.15)' : '#f3f4f6',
+                                                                        color: darkMode ? '#cbd5e1' : '#6b7280',
+                                                                        border: darkMode ? '1px solid rgba(156, 163, 175, 0.25)' : '1px solid rgba(156, 163, 175, 0.4)'
                                                                     }}
                                                                 >
                                                                     Draft
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <h3 className="text-xl font-bold mb-2" style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>
+                                                        <h3 className="text-xl font-bold tracking-tight mb-2 line-clamp-2" style={{ color: darkMode ? '#ffffff' : '#1f2937' }}>
                                                             {course.title}
                                                         </h3>
                                                     </div>
                                                 </div>
 
-                                                <p className="text-sm mb-4 line-clamp-2" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                                                    {course.description}
-                                                </p>
+                                                {/* Course Body (grows to push buttons to the bottom) */}
+                                                <div className="flex-1 flex flex-col justify-between mb-5">
+                                                    <div className="space-y-4">
+                                                        {/* Course Description */}
+                                                        <p className="text-sm line-clamp-2" style={{ color: darkMode ? '#94a3b8' : '#64748b' }}>
+                                                            {course.description}
+                                                        </p>
 
-                                                <div className="space-y-2 mb-4">
-                                                    <div className="flex items-center text-sm">
-                                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: darkMode ? '#6b7280' : '#9ca3af' }}>
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                                        </svg>
-                                                        <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                                                            {(() => {
-                                                                const sem: any = (course as any).semesterId;
-                                                                return typeof sem === 'object' && sem ? (sem.name || 'No Semester') : 'No Semester';
-                                                            })()}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex items-center text-sm">
-                                                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: darkMode ? '#6b7280' : '#9ca3af' }}>
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                                        </svg>
-                                                        <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                                                            Capacity: {course.capacity} students
-                                                        </span>
+                                                        {/* Course Details (Semester & Capacity) */}
+                                                        <div
+                                                            className="space-y-2.5 py-3 border-t border-b"
+                                                            style={{
+                                                                borderColor: darkMode
+                                                                    ? "rgba(255, 255, 255, 0.06)"
+                                                                    : "rgba(0, 0, 0, 0.05)"
+                                                            }}
+                                                        >
+                                                            <div className="flex items-center text-sm">
+                                                                <div
+                                                                    className="w-7 h-7 rounded-lg flex items-center justify-center mr-2.5"
+                                                                    style={{
+                                                                        backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.1)' : '#eef2ff'
+                                                                    }}
+                                                                >
+                                                                    <svg
+                                                                        className="w-4 h-4"
+                                                                        fill="none"
+                                                                        stroke="currentColor"
+                                                                        viewBox="0 0 24 24"
+                                                                        style={{ color: darkMode ? '#818cf8' : '#4f46e5' }}
+                                                                    >
+                                                                        <path
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            strokeWidth="2"
+                                                                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                                                        />
+                                                                    </svg>
+                                                                </div>
+                                                                <span style={{ color: darkMode ? '#cbd5e1' : '#475569' }}>
+                                                                    {(() => {
+                                                                        const sem: any = (course as any).semesterId;
+                                                                        return typeof sem === 'object' && sem ? (sem.name || 'No Semester') : 'No Semester';
+                                                                    })()}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center text-sm">
+                                                                <div
+                                                                    className="w-7 h-7 rounded-lg flex items-center justify-center mr-2.5"
+                                                                    style={{
+                                                                        backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.1)' : '#ecfdf5'
+                                                                    }}
+                                                                >
+                                                                    <svg
+                                                                        className="w-4 h-4"
+                                                                        fill="none"
+                                                                        stroke="currentColor"
+                                                                        viewBox="0 0 24 24"
+                                                                        style={{ color: darkMode ? '#34d399' : '#059669' }}
+                                                                    >
+                                                                        <path
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                            strokeWidth="2"
+                                                                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                                                                        />
+                                                                    </svg>
+                                                                </div>
+                                                                <span style={{ color: darkMode ? '#cbd5e1' : '#475569' }}>
+                                                                    Capacity: <span className="font-semibold" style={{ color: darkMode ? '#f3f4f6' : '#1f2937' }}>{course.capacity}</span> students
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Instructors list */}
+                                                        {(() => {
+                                                            const list = Array.isArray((course as any).teacherIds)
+                                                                ? (course as any).teacherIds
+                                                                : Array.isArray(course.teachers)
+                                                                    ? course.teachers
+                                                                    : [];
+                                                            return list.length > 0 ? (
+                                                                <div>
+                                                                    <div
+                                                                        className="text-[10px] uppercase tracking-wider font-bold mb-1.5"
+                                                                        style={{ color: darkMode ? "#64748b" : "#94a3b8" }}
+                                                                    >
+                                                                        Instructors
+                                                                    </div>
+                                                                    <div className="flex flex-wrap gap-1.5">
+                                                                        {list.map((teacher: any) => (
+                                                                            <span
+                                                                                key={
+                                                                                    typeof teacher === "string"
+                                                                                        ? teacher
+                                                                                        : teacher?._id
+                                                                                }
+                                                                                className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium"
+                                                                                style={{
+                                                                                    backgroundColor: darkMode
+                                                                                        ? "rgba(100, 116, 139, 0.15)"
+                                                                                        : "#f1f5f9",
+                                                                                    color: darkMode ? "#cbd5e1" : "#475569",
+                                                                                    border: darkMode
+                                                                                        ? "1px solid rgba(255, 255, 255, 0.04)"
+                                                                                        : "1px solid #e2e8f0"
+                                                                                }}
+                                                                            >
+                                                                                <svg
+                                                                                    className="w-3 h-3 mr-1"
+                                                                                    fill="currentColor"
+                                                                                    viewBox="0 0 20 20"
+                                                                                    style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+                                                                                >
+                                                                                    <path
+                                                                                        fillRule="evenodd"
+                                                                                        d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                                                                                        clipRule="evenodd"
+                                                                                    />
+                                                                                </svg>
+                                                                                {typeof teacher === "object" && teacher !== null
+                                                                                    ? teacher.fullname || teacher.username || "Teacher"
+                                                                                    : "Teacher"}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            ) : null;
+                                                        })()}
                                                     </div>
                                                 </div>
 
-                                                <div className="mt-auto pt-4 border-t" style={{ borderColor: darkMode ? 'rgba(75, 85, 99, 0.3)' : '#e5e7eb' }}>
+                                                {/* Action Buttons */}
+                                                <div
+                                                    className="mt-auto pt-4 border-t"
+                                                    style={{
+                                                        borderColor: darkMode
+                                                            ? "rgba(255, 255, 255, 0.08)"
+                                                            : "rgba(226, 232, 240, 0.8)",
+                                                    }}
+                                                >
                                                     <button
-                                                        className="w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-all hover:opacity-90"
+                                                        className="w-full px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 hover:opacity-90 active:scale-95 flex items-center justify-center"
                                                         style={{
-                                                            backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.2)' : '#eef2ff',
-                                                            color: darkMode ? '#a5b4fc' : '#4f46e5'
+                                                            backgroundColor: darkMode ? 'rgba(99, 102, 241, 0.15)' : '#eef2ff',
+                                                            color: darkMode ? '#c7d2fe' : '#4f46e5',
+                                                            border: darkMode
+                                                                ? "1px solid rgba(99, 102, 241, 0.25)"
+                                                                : "1px solid #e2e8f0",
                                                         }}
                                                         onClick={() => navigate(`/courses/${course._id}`)}
                                                     >

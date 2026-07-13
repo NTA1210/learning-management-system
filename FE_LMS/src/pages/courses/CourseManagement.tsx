@@ -12,7 +12,7 @@ import type {
 import Navbar from "../../components/layout/Navbar.tsx";
 import Sidebar from "../../components/layout/Sidebar.tsx";
 import CreateCourseForm from "../../components/courses/CreateCourseForm.tsx";
-import { Search, Trash } from "lucide-react";
+import { Search, Trash, Plus, RefreshCw, Archive, CheckCircle, SlidersHorizontal, ChevronDown } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import http, { httpClient } from "../../utils/http";
 import useDebounce from "../../hooks/useDebounce";
@@ -646,41 +646,48 @@ const CourseManagement: React.FC = () => {
           <main className="app-shell-main flex-1 relative overflow-y-auto focus:outline-none">
             <div className="app-content">
               {/* Header */}
-              <div className="ui-panel p-5 sm:p-6 flex justify-between items-start mb-6 gap-4 flex-col sm:flex-row">
+              {/* Header */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                 <div>
-                  <p className="section-eyebrow mb-2">Courses</p>
+                  <p className="section-eyebrow mb-1">Courses</p>
                   <h1
-                    className="text-3xl font-bold mb-2"
+                    className="text-3xl font-bold tracking-tight mb-1"
                     style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
                   >
                     {isStudent ? "Available Courses" : "Course Management"}
                   </h1>
-                  <p style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}>
+                  <p className="text-sm" style={{ color: darkMode ? "#94a3b8" : "#64748b" }}>
                     {isStudent
                       ? "Browse and enroll in available courses"
                       : "View and manage all courses in the system"}
                   </p>
                 </div>
-                <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto">
+                <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
                   {isAdmin && (
                     <button
                       onClick={() => navigate("/admin/courses/deleted")}
-                      className="ui-button-secondary w-full sm:w-auto"
+                      className="px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 hover:opacity-90 active:scale-95 flex items-center gap-2 cursor-pointer"
                       style={{
-                        color: darkMode ? "#fecaca" : "#b91c1c",
+                        backgroundColor: darkMode ? "rgba(239, 68, 68, 0.1)" : "#fef2f2",
+                        color: darkMode ? "#fca5a5" : "#b91c1c",
+                        border: darkMode ? "1px solid rgba(239, 68, 68, 0.2)" : "1px solid #fecaca"
                       }}
                     >
+                      <Trash size={15} />
                       List Deleted
                     </button>
                   )}
-                    {isAdmin && (
+                  {isAdmin && (
                     <button
                       onClick={() => navigate("/admin/courses/approved")}
-                      className="ui-button-secondary w-full sm:w-auto"
+                      className="px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 hover:opacity-90 active:scale-95 flex items-center gap-2 cursor-pointer"
                       style={{
-                        color: darkMode ? "#a5f3fc" : "#0e7490",
+                        backgroundColor: darkMode ? "rgba(6, 182, 212, 0.1)" : "#ecfeff",
+                        color: darkMode ? "#67e8f9" : "#0891b2",
+                        border: darkMode ? "1px solid rgba(6, 182, 212, 0.2)" : "1px solid #cffafe"
                       }}
                     >
+                      <CheckCircle size={15} />
                       Approve Courses
                     </button>
                   )}
@@ -694,332 +701,295 @@ const CourseManagement: React.FC = () => {
                           setSelectedTeachers([]);
                         }
                       }}
-                      className="ui-button-primary w-full sm:w-auto"
+                      className="px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 hover:opacity-90 active:scale-95 flex items-center gap-2 cursor-pointer text-white shadow-sm"
                       style={{
-                        backgroundColor: "var(--app-success)",
+                        backgroundColor: "#10b981",
+                        boxShadow: "0 4px 10px rgba(16, 185, 129, 0.15)"
                       }}
                     >
-                      + Create Course
+                      <Plus size={15} />
+                      Create Course
                     </button>
                   )}
                   <button
-                    className="ui-button-secondary w-full justify-center sm:w-auto"
-                    style={{ color: darkMode ? "#c7d2fe" : "#4f46e5" }}
                     onClick={fetchCourses}
+                    className="px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 hover:opacity-90 active:scale-95 flex items-center gap-2 cursor-pointer"
+                    style={{
+                      backgroundColor: darkMode ? "rgba(79, 70, 229, 0.1)" : "#f5f3ff",
+                      color: darkMode ? "#c7d2fe" : "#4f46e5",
+                      border: darkMode ? "1px solid rgba(79, 70, 229, 0.2)" : "1px solid #ddd6fe"
+                    }}
                   >
-                    <svg
-                      className="w-4 h-4 mr-2"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                      ></path>
-                    </svg>
+                    <RefreshCw size={14} />
                     Refresh
                   </button>
                 </div>
-             
               </div>
 
-              {/* Search and Filter Controls */}
-              <div className="mb-6 flex flex-col flex-wrap md:flex-row gap-4">
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    placeholder="Search courses..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-                    className="ui-input w-full px-4 py-2 transition-colors duration-300"
-                    style={{
-                      backgroundColor: darkMode
-                        ? "rgba(55, 65, 81, 0.8)"
-                        : "#ffffff",
-                      borderColor: "var(--app-border)",
-                      color: darkMode ? "#ffffff" : "#000000",
-                    }}
-                  />
-                </div>
-                <button
-                  onClick={handleSearch}
-                  className="ui-button-primary flex items-center justify-center"
-                  style={{ minWidth: 44 }}
-                >
-                  <Search size={20} />
-                </button>
-                <div className="relative flex items-center">
-                  {isAdmin ? null :(
-                  <button
-                    onClick={() => {
-
-                      if (localSpecId) {
-                        if (selectedSpecialistId === localSpecId) {
-                          setSelectedSpecialistId("");
-                        } else {
-                          setSelectedSpecialistId(localSpecId);
-                        }
-                        setCurrentPage(1);
-                      } else {
-                        showToastInfo("No specialist found in local storage");
-                      }
-                    }}
-                    className={`px-4 py-2 rounded-lg border transition-colors duration-200 shadow-sm font-semibold text-sm ${selectedSpecialistId && selectedSpecialistId === localSpecId
-                        ? "bg-indigo-600 text-white border-indigo-600"
-                        : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                      }`}
-                    style={
-                      !(selectedSpecialistId && selectedSpecialistId === localSpecId)
-                        ? {
-                          background: darkMode ? "#152632" : "#ffffff",
-                          color: darkMode ? "#ffffff" : "#111827",
-                          borderColor: darkMode ? "#334155" : "#e5e7eb",
-                        }
-                        : {}
-                    }
-                  >
-                    My Specialist
-                  </button>
-              )}
-             
-                </div>
-                <div className="relative">
-                  <select
-                    value={selectedSpecialistId}
-                    onChange={(e) => { setSelectedSpecialistId(e.target.value); setCurrentPage(1); }}
-                    className="appearance-none rounded-lg px-4 py-2 pr-10 border focus:outline-none focus:ring-2 transition-colors duration-200 shadow-sm"
-                    style={{
-                      width: 150,
-                      fontWeight: 600,
-                      background: darkMode ? "#152632" : "#ffffff",
-                      color: darkMode ? "#ffffff" : "#111827",
-                      borderColor: darkMode ? "#334155" : "#e5e7eb",
-                      boxShadow: darkMode ? "0 1px 2px rgba(0,0,0,0.25)" : "0 1px 2px rgba(0,0,0,0.06)",
-                    }}
-                  >
-                    <option value="">All Specialists</option>
-                    {specialists.map((s) => (
-                      <option key={s._id} value={s._id}>{s.name}</option>
-                    ))}
-                  </select>
-                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }} aria-hidden="true">
-                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.062l-4.24 4.24a.75.75 0 01-1.06 0L5.25 8.29a.75.75 0 01-.02-1.08z" clipRule="evenodd" />
-                    </svg>
-                  </span>
-                </div>
-                <div className="relative">
-                  <select
-                    value={selectedSubjectId}
-                    onChange={(e) => { setSelectedSubjectId(e.target.value); setCurrentPage(1); }}
-                    className="appearance-none rounded-lg px-4 py-2 pr-10 border focus:outline-none focus:ring-2 transition-colors duration-200 shadow-sm"
-                    style={{
-                      width: 150,
-                      fontWeight: 600,
-                      background: darkMode ? "#152632" : "#ffffff",
-                      color: darkMode ? "#ffffff" : "#111827",
-                      borderColor: darkMode ? "#334155" : "#e5e7eb",
-                      boxShadow: darkMode ? "0 1px 2px rgba(0,0,0,0.25)" : "0 1px 2px rgba(0,0,0,0.06)",
-                    }}
-                  >
-                    <option value="">All Subjects</option>
-                    {subjects.map((s) => (
-                      <option key={s._id} value={s._id}>{s.name}</option>
-                    ))}
-                  </select>
-                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }} aria-hidden="true">
-                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.062l-4.24 4.24a.75.75 0 01-1.06 0L5.25 8.29a.75.75 0 01-.02-1.08z" clipRule="evenodd" />
-                    </svg>
-                  </span>
-                </div>
-
-                <div className="relative">
-                  <select
-                    value={selectedSemesterId}
-                    onChange={(e) => { setSelectedSemesterId(e.target.value); setCurrentPage(1); }}
-                    className="appearance-none rounded-lg px-4 py-2 pr-10 border focus:outline-none focus:ring-2 transition-colors duration-200 shadow-sm"
-                    style={{
-                      width: 170,
-                      fontWeight: 600,
-                      background: darkMode ? "#152632" : "#ffffff",
-                      color: darkMode ? "#ffffff" : "#111827",
-                      borderColor: darkMode ? "#334155" : "#e5e7eb",
-                      boxShadow: darkMode ? "0 1px 2px rgba(0,0,0,0.25)" : "0 1px 2px rgba(0,0,0,0.06)",
-                    }}
-                  >
-                    <option value="">All Semesters</option>
-                    {semesters.map((s) => (
-                      <option key={s._id} value={s._id}>{s.name}</option>
-                    ))}
-                  </select>
-                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }} aria-hidden="true">
-                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.062l-4.24 4.24a.75.75 0 01-1.06 0L5.25 8.29a.75.75 0 01-.02-1.08z" clipRule="evenodd" />
-                    </svg>
-                  </span>
-                </div>
-                <div className="relative">
-                  <select
-                    value={selectedTeacherId}
-                    onChange={(e) => { setSelectedTeacherId(e.target.value); setCurrentPage(1); }}
-                    className="appearance-none rounded-lg px-4 py-2 pr-10 border focus:outline-none focus:ring-2 transition-colors duration-200 shadow-sm"
-                    style={{
-                      width: 150,
-                      fontWeight: 600,
-                      background: darkMode ? "#152632" : "#ffffff",
-                      color: darkMode ? "#ffffff" : "#111827",
-                      borderColor: darkMode ? "#334155" : "#e5e7eb",
-                      boxShadow: darkMode ? "0 1px 2px rgba(0,0,0,0.25)" : "0 1px 2px rgba(0,0,0,0.06)",
-                    }}
-                  >
-                    <option value="">All Teachers</option>
-                    {availableTeachers.map((t) => (
-                      <option key={t._id} value={t._id}>{t.username}</option>
-                    ))}
-                  </select>
-                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                    <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style={{ color: darkMode ? "#9ca3af" : "#6b7280" }} aria-hidden="true">
-                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.062l-4.24 4.24a.75.75 0 01-1.06 0L5.25 8.29a.75.75 0 01-.02-1.08z" clipRule="evenodd" />
-                    </svg>
-                  </span>
-                </div>
-              
-                {/* Sort options: a-z, z-a, old->new, new->old */}
-                <div className="relative">
-                  <select
-                    value={sortOption}
-                    onChange={(e) =>
-                      setSortOption(
-                        e.target.value as
-                          | "name_asc"
-                          | "name_desc"
-                          | "date_asc"
-                          | "date_desc"
-                      )
-                    }
-                    className="appearance-none rounded-lg px-4 py-2 pr-10 border focus:outline-none focus:ring-2 transition-colors duration-200 shadow-sm"
-                    style={{
-                      width: 120,
-                      fontWeight: 600,
-                      background: darkMode ? "#152632" : "#ffffff",
-                      color: darkMode ? "#ffffff" : "#111827",
-                      borderColor: darkMode ? "#334155" : "#e5e7eb",
-                      boxShadow: darkMode
-                        ? "0 1px 2px rgba(0,0,0,0.25)"
-                        : "0 1px 2px rgba(0,0,0,0.06)",
-                    }}
-                  >
-                    <option value="name_asc">A-Z</option>
-                    <option value="name_desc">Z-A</option>
-                    <option value="date_asc">Oldest</option>
-                    <option value="date_desc">Newest</option>
-                  </select>
-                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                    <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
-                      aria-hidden="true"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.062l-4.24 4.24a.75.75 0 01-1.06 0L5.25 8.29a.75.75 0 01-.02-1.08z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </span>
-                </div>
-
-                {/* Pagination Controls */}
-                <div className="flex items-center gap-3 mr-3 flex-wrap">
-                  <div className="relative">
-                    <select
-                      value={pageLimit}
-                      onChange={(e) => changePageLimit(Number(e.target.value))}
-                      className="appearance-none rounded-lg px-4 py-2 pr-10 border focus:outline-none focus:ring-2 transition-colors duration-200 shadow-sm"
+              {/* Search and Filter Control Center */}
+              <div
+                className="p-5 rounded-2xl mb-8 border flex flex-col gap-5 transition-all duration-300"
+                style={{
+                  backgroundColor: darkMode ? "rgba(15, 23, 42, 0.45)" : "#ffffff",
+                  borderColor: darkMode ? "rgba(255, 255, 255, 0.06)" : "rgba(226, 232, 240, 0.8)",
+                  boxShadow: darkMode
+                    ? "0 4px 20px -2px rgba(0, 0, 0, 0.2)"
+                    : "0 4px 20px -2px rgba(0, 0, 0, 0.03)",
+                }}
+              >
+                {/* Row 1: Search and Pagination */}
+                <div className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
+                  {/* Search Input with nested icon */}
+                  <div className="relative flex-1 max-w-xl">
+                    <Search
+                      size={18}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2"
+                      style={{ color: darkMode ? "#64748b" : "#94a3b8" }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Search courses by name..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onKeyPress={(e) => e.key === "Enter" && handleSearch()}
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                       style={{
-                        width: 135,
-                        fontWeight: 600,
-                        background: darkMode ? "#152632" : "#ffffff",
-                        color: darkMode ? "#ffffff" : "#111827",
-                        borderColor: darkMode ? "#334155" : "#e5e7eb",
-                        boxShadow: darkMode
-                          ? "0 1px 2px rgba(0,0,0,0.25)"
-                          : "0 1px 2px rgba(0,0,0,0.06)",
+                        backgroundColor: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                        borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                        color: darkMode ? "#ffffff" : "#1f2937",
+                      }}
+                    />
+                  </div>
+
+                  {/* Pagination Controls */}
+                  <div className="flex items-center gap-3 flex-wrap justify-end">
+                    <div className="relative">
+                      <select
+                        value={pageLimit}
+                        onChange={(e) => changePageLimit(Number(e.target.value))}
+                        className="appearance-none rounded-xl px-4 py-2 pr-10 border text-xs font-semibold focus:outline-none focus:ring-2 transition-all duration-200 cursor-pointer"
+                        style={{
+                          width: 120,
+                          background: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                          color: darkMode ? "#cbd5e1" : "#475569",
+                          borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                        }}
+                      >
+                        {[5, 25, 50, 75, 100].map((l) => (
+                          <option key={l} value={l}>
+                            {l} / page
+                          </option>
+                        ))}
+                      </select>
+                      <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                        <ChevronDown size={14} style={{ color: darkMode ? "#64748b" : "#94a3b8" }} />
+                      </span>
+                    </div>
+
+                    <span
+                      className="text-xs font-semibold"
+                      style={{
+                        color: darkMode ? "#94a3b8" : "#64748b",
+                        fontVariantNumeric: "tabular-nums",
                       }}
                     >
-                      {[5, 25, 50, 75, 100].map((l) => (
-                        <option key={l} value={l}>
-                          {l} / page
-                        </option>
+                      {`${pageLimit * (currentPage - 1) + 1} – ${Math.min(
+                        pageLimit * currentPage,
+                        totalCourses
+                      )} of ${totalCourses}`}
+                    </span>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        className="p-2 rounded-lg border disabled:opacity-40 hover:bg-slate-800/40 transition-colors cursor-pointer"
+                        onClick={() => goToPage(currentPage - 1)}
+                        disabled={currentPage <= 1}
+                        title="Previous page"
+                        style={{
+                          background: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                          color: darkMode ? "#fff" : "#475569",
+                          borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                        }}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                      <button
+                        className="p-2 rounded-lg border disabled:opacity-40 hover:bg-slate-800/40 transition-colors cursor-pointer"
+                        onClick={() => goToPage(currentPage + 1)}
+                        disabled={pageLimit * currentPage >= totalCourses}
+                        title="Next page"
+                        style={{
+                          background: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                          color: darkMode ? "#fff" : "#475569",
+                          borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                        }}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Row 2: Filters Grid */}
+                <div
+                  className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 pt-4 border-t"
+                  style={{ borderColor: darkMode ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.05)" }}
+                >
+                  {/* My Specialist Toggle / Specialist selector */}
+                  {!isAdmin && (
+                    <button
+                      onClick={() => {
+                        if (localSpecId) {
+                          if (selectedSpecialistId === localSpecId) {
+                            setSelectedSpecialistId("");
+                          } else {
+                            setSelectedSpecialistId(localSpecId);
+                          }
+                          setCurrentPage(1);
+                        } else {
+                          showToastInfo("No specialist found in local storage");
+                        }
+                      }}
+                      className="px-4 py-2 rounded-xl border text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
+                      style={{
+                        backgroundColor: selectedSpecialistId && selectedSpecialistId === localSpecId
+                          ? "rgba(79, 70, 229, 0.15)"
+                          : darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                        color: selectedSpecialistId && selectedSpecialistId === localSpecId
+                          ? (darkMode ? "#a5b4fc" : "#4f46e5")
+                          : (darkMode ? "#94a3b8" : "#475569"),
+                        borderColor: selectedSpecialistId && selectedSpecialistId === localSpecId
+                          ? "#4f46e5"
+                          : (darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0"),
+                      }}
+                    >
+                      <SlidersHorizontal size={14} />
+                      {selectedSpecialistId && selectedSpecialistId === localSpecId ? "My Specialist On" : "Filter My Specialist"}
+                    </button>
+                  )}
+
+                  {/* Specialist Select */}
+                  <div className="relative">
+                    <select
+                      value={selectedSpecialistId}
+                      onChange={(e) => { setSelectedSpecialistId(e.target.value); setCurrentPage(1); }}
+                      className="w-full appearance-none rounded-xl px-4 py-2 pr-10 border text-xs font-semibold focus:outline-none focus:ring-2 transition-all duration-200 cursor-pointer"
+                      style={{
+                        background: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                        color: darkMode ? "#cbd5e1" : "#475569",
+                        borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                      }}
+                    >
+                      <option value="">All Specialists</option>
+                      {specialists.map((s) => (
+                        <option key={s._id} value={s._id}>{s.name}</option>
                       ))}
                     </select>
                     <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                      <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                        style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
-                        aria-hidden="true"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.062l-4.24 4.24a.75.75 0 01-1.06 0L5.25 8.29a.75.75 0 01-.02-1.08z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
+                      <ChevronDown size={14} style={{ color: darkMode ? "#64748b" : "#94a3b8" }} />
                     </span>
                   </div>
-                  <span
-                    style={{
-                      minWidth: 100,
-                      fontVariantNumeric: "tabular-nums",
-                      color: darkMode ? "#e5e7eb" : "#223344",
-                    }}
-                  >
-                    {`${pageLimit * (currentPage - 1) + 1} – ${Math.min(
-                      pageLimit * currentPage,
-                      totalCourses
-                    )} of ${totalCourses}`}
-                  </span>
-                  <button
-                    className="px-4 py-1 rounded border mx-1 disabled:opacity-40"
-                    onClick={() => goToPage(currentPage - 1)}
-                    disabled={currentPage <= 1}
-                    title="Previous page"
-                    style={{
-                      background: darkMode ? "#223344" : "#ffffff",
-                      color: darkMode ? "#fff" : "#223344",
-                      borderColor: darkMode ? "#334155" : "#e5e7eb",
-                    }}
-                  >
-                    &#x2039;
-                  </button>
-                  <button
-                    className="px-4 py-1 rounded border mx-1 disabled:opacity-40"
-                    onClick={() => goToPage(currentPage + 1)}
-                    disabled={pageLimit * currentPage >= totalCourses}
-                    title="Next page"
-                    style={{
-                      background: darkMode ? "#223344" : "#ffffff",
-                      color: darkMode ? "#fff" : "#223344",
-                      borderColor: darkMode ? "#334155" : "#e5e7eb",
-                    }}
-                  >
-                    &#x203A;
-                  </button>
-                </div>
 
-              
+                  {/* Subject Select */}
+                  <div className="relative">
+                    <select
+                      value={selectedSubjectId}
+                      onChange={(e) => { setSelectedSubjectId(e.target.value); setCurrentPage(1); }}
+                      className="w-full appearance-none rounded-xl px-4 py-2 pr-10 border text-xs font-semibold focus:outline-none focus:ring-2 transition-all duration-200 cursor-pointer"
+                      style={{
+                        background: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                        color: darkMode ? "#cbd5e1" : "#475569",
+                        borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                      }}
+                    >
+                      <option value="">All Subjects</option>
+                      {subjects.map((s) => (
+                        <option key={s._id} value={s._id}>{s.name}</option>
+                      ))}
+                    </select>
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                      <ChevronDown size={14} style={{ color: darkMode ? "#64748b" : "#94a3b8" }} />
+                    </span>
+                  </div>
+
+                  {/* Semester Select */}
+                  <div className="relative">
+                    <select
+                      value={selectedSemesterId}
+                      onChange={(e) => { setSelectedSemesterId(e.target.value); setCurrentPage(1); }}
+                      className="w-full appearance-none rounded-xl px-4 py-2 pr-10 border text-xs font-semibold focus:outline-none focus:ring-2 transition-all duration-200 cursor-pointer"
+                      style={{
+                        background: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                        color: darkMode ? "#cbd5e1" : "#475569",
+                        borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                      }}
+                    >
+                      <option value="">All Semesters</option>
+                      {semesters.map((s) => (
+                        <option key={s._id} value={s._id}>{s.name}</option>
+                      ))}
+                    </select>
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                      <ChevronDown size={14} style={{ color: darkMode ? "#64748b" : "#94a3b8" }} />
+                    </span>
+                  </div>
+
+                  {/* Teacher Select */}
+                  <div className="relative">
+                    <select
+                      value={selectedTeacherId}
+                      onChange={(e) => { setSelectedTeacherId(e.target.value); setCurrentPage(1); }}
+                      className="w-full appearance-none rounded-xl px-4 py-2 pr-10 border text-xs font-semibold focus:outline-none focus:ring-2 transition-all duration-200 cursor-pointer"
+                      style={{
+                        background: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                        color: darkMode ? "#cbd5e1" : "#475569",
+                        borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                      }}
+                    >
+                      <option value="">All Teachers</option>
+                      {availableTeachers.map((t) => (
+                        <option key={t._id} value={t._id}>{t.username}</option>
+                      ))}
+                    </select>
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                      <ChevronDown size={14} style={{ color: darkMode ? "#64748b" : "#94a3b8" }} />
+                    </span>
+                  </div>
+
+                  {/* Sort Select */}
+                  <div className="relative">
+                    <select
+                      value={sortOption}
+                      onChange={(e) =>
+                        setSortOption(
+                          e.target.value as
+                            | "name_asc"
+                            | "name_desc"
+                            | "date_asc"
+                            | "date_desc"
+                        )
+                      }
+                      className="w-full appearance-none rounded-xl px-4 py-2 pr-10 border text-xs font-semibold focus:outline-none focus:ring-2 transition-all duration-200 cursor-pointer"
+                      style={{
+                        background: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
+                        color: darkMode ? "#cbd5e1" : "#475569",
+                        borderColor: darkMode ? "rgba(255, 255, 255, 0.08)" : "#e2e8f0",
+                      }}
+                    >
+                      <option value="name_asc">Sort: A-Z</option>
+                      <option value="name_desc">Sort: Z-A</option>
+                      <option value="date_asc">Sort: Oldest</option>
+                      <option value="date_desc">Sort: Newest</option>
+                    </select>
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                      <ChevronDown size={14} style={{ color: darkMode ? "#64748b" : "#94a3b8" }} />
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* Loading State */}
@@ -1064,11 +1034,18 @@ const CourseManagement: React.FC = () => {
                   {courses.map((course, index) => (
                     <div
                       key={course._id}
-                      className="ui-card ui-card-hover p-5 sm:p-6 transition-all duration-300"
+                      className="ui-card ui-card-hover p-5 sm:p-6 transition-all duration-300 flex flex-col h-full"
                       style={{
                         backgroundColor: darkMode
-                          ? "rgba(55, 65, 81, 0.8)"
+                          ? "rgba(30, 41, 59, 0.75)"
                           : "#ffffff",
+                        borderColor: darkMode
+                          ? "rgba(255, 255, 255, 0.06)"
+                          : "rgba(226, 232, 240, 0.8)",
+                        backdropFilter: "blur(8px)",
+                        boxShadow: darkMode
+                          ? "0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3)"
+                          : "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
                         animationDelay: `${index * 100}ms`,
                         animation: "fadeInUp 0.6s ease-out forwards",
                       }}
@@ -1076,38 +1053,45 @@ const CourseManagement: React.FC = () => {
                       {/* Course Header */}
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-2">
+                          <div className="flex flex-wrap gap-1.5 items-center mb-3">
                             <span
-                              className="px-2 py-1 rounded text-xs font-semibold"
+                              className="px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide shadow-sm"
                               style={{
-                                backgroundColor: darkMode
-                                  ? "rgba(99, 102, 241, 0.2)"
-                                  : "#eef2ff",
-                                color: darkMode ? "#a5b4fc" : "#4f46e5",
+                                backgroundColor: course.status === "completed"
+                                  ? (darkMode ? "rgba(16, 185, 129, 0.15)" : "#e6fffa")
+                                  : (darkMode ? "rgba(99, 102, 241, 0.15)" : "#eef2ff"),
+                                color: course.status === "completed"
+                                  ? (darkMode ? "#34d399" : "#047857")
+                                  : (darkMode ? "#a5b4fc" : "#4f46e5"),
+                                border: `1px solid ${course.status === "completed"
+                                  ? (darkMode ? "rgba(16, 185, 129, 0.25)" : "rgba(16, 185, 129, 0.4)")
+                                  : (darkMode ? "rgba(99, 102, 241, 0.25)" : "rgba(99, 102, 241, 0.4)")}`
                               }}
                             >
                               {course.status}
                             </span>
                             {course.isPublished ? (
                               <span
-                                className="px-2 py-1 rounded text-xs font-semibold"
+                                className="px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide shadow-sm"
                                 style={{
                                   backgroundColor: darkMode
-                                    ? "rgba(16, 185, 129, 0.2)"
-                                    : "#d1fae5",
-                                  color: darkMode ? "#6ee7b7" : "#059669",
+                                    ? "rgba(16, 185, 129, 0.15)"
+                                    : "#e6fffa",
+                                  color: darkMode ? "#34d399" : "#047857",
+                                  border: `1px solid ${darkMode ? "rgba(16, 185, 129, 0.25)" : "rgba(16, 185, 129, 0.4)"}`
                                 }}
                               >
                                 Published
                               </span>
                             ) : (
                               <span
-                                className="px-2 py-1 rounded text-xs font-semibold"
+                                className="px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide shadow-sm"
                                 style={{
                                   backgroundColor: darkMode
-                                    ? "rgba(156, 163, 175, 0.2)"
+                                    ? "rgba(156, 163, 175, 0.15)"
                                     : "#f3f4f6",
-                                  color: darkMode ? "#9ca3af" : "#6b7280",
+                                  color: darkMode ? "#cbd5e1" : "#4b5563",
+                                  border: `1px solid ${darkMode ? "rgba(156, 163, 175, 0.25)" : "rgba(156, 163, 175, 0.4)"}`
                                 }}
                               >
                                 Draft
@@ -1115,12 +1099,13 @@ const CourseManagement: React.FC = () => {
                             )}
                             {isTeacher && canTeacherEditCourse(course) && (
                               <span
-                                className="px-2 py-1 rounded text-xs font-semibold"
+                                className="px-2.5 py-0.5 rounded-full text-xs font-semibold tracking-wide shadow-sm"
                                 style={{
                                   backgroundColor: darkMode
-                                    ? "rgba(245, 158, 11, 0.2)"
-                                    : "#fef3c7",
-                                  color: darkMode ? "#fbbf24" : "#d97706",
+                                    ? "rgba(245, 158, 11, 0.15)"
+                                    : "#fffbeb",
+                                  color: darkMode ? "#fbbf24" : "#b45309",
+                                  border: `1px solid ${darkMode ? "rgba(245, 158, 11, 0.25)" : "rgba(245, 158, 11, 0.4)"}`
                                 }}
                               >
                                 Your Course
@@ -1128,7 +1113,7 @@ const CourseManagement: React.FC = () => {
                             )}
                           </div>
                           <h3
-                            className="text-xl font-bold mb-2"
+                            className="text-xl font-bold tracking-tight mb-2 line-clamp-2"
                             style={{ color: darkMode ? "#ffffff" : "#1f2937" }}
                           >
                             {course.title}
@@ -1136,141 +1121,188 @@ const CourseManagement: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Course Description */}
-                      <p
-                        className="text-sm mb-4 line-clamp-2"
-                        style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
-                      >
-                        {course.description}
-                      </p>
+                      {/* Course Body (grows to push buttons to the bottom) */}
+                      <div className="flex-1 flex flex-col justify-between mb-5">
+                        <div className="space-y-4">
+                          {/* Course Description */}
+                          <p
+                            className="text-sm line-clamp-2"
+                            style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+                          >
+                            {course.description}
+                          </p>
 
-                      {/* Course Details */}
-                      <div className="space-y-2 mb-4">
-                        <div className="flex items-center text-sm">
-                          <svg
-                            className="w-4 h-4 mr-2"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            style={{ color: darkMode ? "#6b7280" : "#9ca3af" }}
+                          {/* Course Details (Semester & Capacity) */}
+                          <div
+                            className="space-y-2.5 py-3 border-t border-b"
+                            style={{
+                              borderColor: darkMode
+                                ? "rgba(255, 255, 255, 0.06)"
+                                : "rgba(0, 0, 0, 0.05)"
+                            }}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-                            />
-                          </svg>
-                          <span
-                            style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
-                          >
-                            {(() => {
-                              const sem: any = (course as any).semesterId;
-                              return typeof sem === "object" && sem
-                                ? sem.name || "No Semester"
-                                : "No Semester";
-                            })()}
-                          </span>
-                        </div>
-                        <div className="flex items-center text-sm">
-                          <svg
-                            className="w-4 h-4 mr-2"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            style={{ color: darkMode ? "#6b7280" : "#9ca3af" }}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth="2"
-                              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                            />
-                          </svg>
-                          <span
-                            style={{ color: darkMode ? "#9ca3af" : "#6b7280" }}
-                          >
-                            Capacity: {course.capacity} students
-                          </span>
-                        </div>
-                        {/* <div className="flex items-center text-sm">
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: darkMode ? '#6b7280' : '#9ca3af' }}>
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                        </svg>
-                        <span style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
-                          
-                        </span>
-                      </div> */}
-                      </div>
-
-                      {/* Teachers List */}
-                      {(() => {
-                        const list = Array.isArray((course as any).teacherIds)
-                          ? (course as any).teacherIds
-                          : Array.isArray(course.teachers)
-                          ? course.teachers
-                          : [];
-                        return list.length > 0 ? (
-                          <div className="mb-4">
-                            <div className="flex flex-wrap gap-2">
-                              {list.map((teacher: any) => (
-                                <span
-                                  key={
-                                    typeof teacher === "string"
-                                      ? teacher
-                                      : teacher?._id
-                                  }
-                                  className="px-2 py-1 rounded text-xs"
-                                  style={{
-                                    backgroundColor: darkMode
-                                      ? "rgba(75, 85, 99, 0.3)"
-                                      : "#f3f4f6",
-                                    color: darkMode ? "#d1d5db" : "#4b5563",
-                                  }}
+                            <div className="flex items-center text-sm">
+                              <div
+                                className="w-7 h-7 rounded-lg flex items-center justify-center mr-2.5"
+                                style={{
+                                  backgroundColor: darkMode
+                                    ? "rgba(99, 102, 241, 0.1)"
+                                    : "#eef2ff"
+                                }}
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                  style={{ color: darkMode ? "#818cf8" : "#4f46e5" }}
                                 >
-                                  {typeof teacher === "object" &&
-                                  teacher !== null
-                                    ? teacher.fullname ||
-                                      teacher.username ||
-                                      "Teacher"
-                                    : "Teacher"}
-                                </span>
-                              ))}
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                  />
+                                </svg>
+                              </div>
+                              <span
+                                className="font-medium"
+                                style={{ color: darkMode ? "#cbd5e1" : "#475569" }}
+                              >
+                                {(() => {
+                                  const sem: any = (course as any).semesterId;
+                                  return typeof sem === "object" && sem
+                                    ? sem.name || "No Semester"
+                                    : "No Semester";
+                                })()}
+                              </span>
+                            </div>
+                            <div className="flex items-center text-sm">
+                              <div
+                                className="w-7 h-7 rounded-lg flex items-center justify-center mr-2.5"
+                                style={{
+                                  backgroundColor: darkMode
+                                    ? "rgba(16, 185, 129, 0.1)"
+                                    : "#ecfdf5"
+                                }}
+                              >
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                  style={{ color: darkMode ? "#34d399" : "#059669" }}
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                                  />
+                                </svg>
+                              </div>
+                              <span
+                                className="font-medium"
+                                style={{ color: darkMode ? "#cbd5e1" : "#475569" }}
+                              >
+                                Capacity: <span className="font-semibold" style={{ color: darkMode ? "#f3f4f6" : "#1f2937" }}>{course.capacity}</span> students
+                              </span>
                             </div>
                           </div>
-                        ) : null;
-                      })()}
+
+                          {/* Teachers List */}
+                          {(() => {
+                            const list = Array.isArray((course as any).teacherIds)
+                              ? (course as any).teacherIds
+                              : Array.isArray(course.teachers)
+                              ? course.teachers
+                              : [];
+                            return list.length > 0 ? (
+                              <div>
+                                <div
+                                  className="text-[10px] uppercase tracking-wider font-bold mb-1.5"
+                                  style={{ color: darkMode ? "#64748b" : "#94a3b8" }}
+                                >
+                                  Instructors
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {list.map((teacher: any) => (
+                                    <span
+                                      key={
+                                        typeof teacher === "string"
+                                          ? teacher
+                                          : teacher?._id
+                                      }
+                                      className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium"
+                                      style={{
+                                        backgroundColor: darkMode
+                                          ? "rgba(100, 116, 139, 0.15)"
+                                          : "#f1f5f9",
+                                        color: darkMode ? "#cbd5e1" : "#475569",
+                                        border: darkMode
+                                          ? "1px solid rgba(255, 255, 255, 0.04)"
+                                          : "1px solid #e2e8f0"
+                                      }}
+                                    >
+                                      <svg
+                                        className="w-3 h-3 mr-1"
+                                        fill="currentColor"
+                                        viewBox="0 0 20 20"
+                                        style={{ color: darkMode ? "#94a3b8" : "#64748b" }}
+                                      >
+                                        <path
+                                          fillRule="evenodd"
+                                          d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
+                                          clipRule="evenodd"
+                                        />
+                                      </svg>
+                                      {typeof teacher === "object" && teacher !== null
+                                        ? teacher.fullname || teacher.username || "Teacher"
+                                        : "Teacher"}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null;
+                          })()}
+                        </div>
+                      </div>
 
                       {/* Action Buttons */}
                       <div
-                        className="flex space-x-2 pt-4 border-t"
+                        className="flex space-x-2 pt-4 border-t mt-auto"
                         style={{
                           borderColor: darkMode
-                            ? "rgba(75, 85, 99, 0.3)"
-                            : "#e5e7eb",
+                            ? "rgba(255, 255, 255, 0.08)"
+                            : "rgba(226, 232, 240, 0.8)",
                         }}
                       >
                         <button
-                          className="flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md"
+                          className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 hover:opacity-90 active:scale-95 flex items-center justify-center"
                           style={{
                             backgroundColor: darkMode
-                              ? "rgba(99, 102, 241, 0.2)"
+                              ? "rgba(99, 102, 241, 0.15)"
                               : "#eef2ff",
-                            color: darkMode ? "#a5b4fc" : "#4f46e5",
+                            color: darkMode ? "#c7d2fe" : "#4f46e5",
+                            border: darkMode
+                              ? "1px solid rgba(99, 102, 241, 0.25)"
+                              : "1px solid #e2e8f0",
                           }}
                           onClick={() => navigate(`/courses/${course._id}`)}
                         >
-                          {/* Điều hướng đến page chi tiết bằng _id */}
                           {isStudent ? "View Course" : "View Details"}
                         </button>
                         {canTeacherEditCourse(course) && (
                           <button
-                            className="flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md"
+                            className="flex-1 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 hover:opacity-90 active:scale-95 flex items-center justify-center"
                             style={{
                               backgroundColor: darkMode
-                                ? "rgba(99, 102, 241, 0.2)"
-                                : "#eef2ff",
-                              color: darkMode ? "#a5b4fc" : "#4f46e5",
+                                ? "rgba(245, 158, 11, 0.1)"
+                                : "#fef3c7",
+                              color: darkMode ? "#fde047" : "#d97706",
+                              border: darkMode
+                                ? "1px solid rgba(245, 158, 11, 0.2)"
+                                : "1px solid #fef08a",
                             }}
                             onClick={() => handleEdit(course)}
                           >
@@ -1279,28 +1311,34 @@ const CourseManagement: React.FC = () => {
                         )}
                         {canTeacherDeleteCourse(course) && (
                           <button
-                            className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md flex items-center gap-2"
+                            className="px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-200 hover:opacity-90 active:scale-95 flex items-center justify-center"
                             style={{
                               backgroundColor: darkMode
-                                ? "rgba(239, 68, 68, 0.2)"
+                                ? "rgba(239, 68, 68, 0.15)"
                                 : "#fee2e2",
                               color: darkMode ? "#fca5a5" : "#dc2626",
+                              border: darkMode
+                                ? "1px solid rgba(239, 68, 68, 0.25)"
+                                : "1px solid #fecaca",
                             }}
                             onClick={() => openDeleteModal(course._id)}
                           >
-                            <Trash size={16} />
+                            <Trash size={15} />
                           </button>
                         )}
                         {isStudent && (
                           <button
                             onClick={() => handleEnroll(course._id)}
                             disabled={!!enrolling[course._id]}
-                            className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 hover:scale-105 hover:shadow-md disabled:opacity-50"
+                            className="px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 hover:opacity-90 disabled:opacity-50 active:scale-95 flex items-center justify-center"
                             style={{
                               backgroundColor: darkMode
-                                ? "rgba(16, 185, 129, 0.2)"
+                                ? "rgba(16, 185, 129, 0.15)"
                                 : "#d1fae5",
                               color: darkMode ? "#6ee7b7" : "#059669",
+                              border: darkMode
+                                ? "1px solid rgba(16, 185, 129, 0.25)"
+                                : "1px solid #a7f3d0",
                             }}
                           >
                             {enrolling[course._id] ? "Enrolling..." : "Enroll"}
