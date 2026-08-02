@@ -22,6 +22,11 @@ export interface GradeItem {
   };
   status: string;
   fileUrl?: string;
+  // The student-grade endpoint returns a compact record with maxScore at the
+  // top level, while submission detail endpoints keep it under assignmentId.
+  maxScore?: number;
+  assignmentTitle?: string;
+  courseName?: string;
 }
 
 export interface GradesResponse {
@@ -97,11 +102,16 @@ export interface CourseReport {
 export const submissionService = {
   // Get all grades for the current student
   getMyGrades: async (): Promise<GradesResponse> => {
-    const response = await http.get<GradesResponse>("/submissions/my/grades");
+    const response = await http.get<any>("/submissions/my/grades");
+    const gradePayload = response?.data ?? response;
     return {
-      data: Array.isArray(response.data) ? response.data : [],
-      pagination: response.pagination,
-      summary: response.summary,
+      data: Array.isArray(gradePayload)
+        ? gradePayload
+        : Array.isArray(gradePayload?.grades)
+          ? gradePayload.grades
+          : [],
+      pagination: gradePayload?.pagination,
+      summary: gradePayload?.summary,
     };
   },
 

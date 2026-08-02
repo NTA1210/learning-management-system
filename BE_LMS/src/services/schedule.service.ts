@@ -23,6 +23,9 @@ export interface CreateScheduleInput {
     effectiveTo?: Date;
     location?: string;
     requestNote?: string;
+    requestedBy?: mongoose.Types.ObjectId;
+    initialStatus?: ScheduleStatus;
+    approvedBy?: mongoose.Types.ObjectId;
 }
 
 export interface CreateExceptionInput {
@@ -53,12 +56,22 @@ export const createScheduleRequest = async (input: CreateScheduleInput) => {
 
     // Check for conflicts for all requested slots
     // Include PENDING to prevent duplicate requests, and APPROVED/ACTIVE for actual conflicts
+    // Recurring slots clash only if their effective date ranges overlap.
+    // A completed semester must not block a later semester.
+    const requestedEffectiveTo = input.effectiveTo ?? new Date("9999-12-31T23:59:59.999Z");
+
     const conflictChecks = input.slots.map(async (slot) => {
         const conflict = await ScheduleModel.findOne({
             teacherId: input.teacherId,
             dayOfWeek: slot.dayOfWeek,
             timeSlotId: slot.timeSlotId,
             status: {$in: [ScheduleStatus.PENDING, ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
+            effectiveFrom: {$lte: requestedEffectiveTo},
+            $or: [
+                {effectiveTo: {$exists: false}},
+                {effectiveTo: null},
+                {effectiveTo: {$gte: input.effectiveFrom}},
+            ],
         });
 
         if (conflict) {
@@ -92,6 +105,8 @@ export const createScheduleRequest = async (input: CreateScheduleInput) => {
 
     try {
         // Create all schedule documents in the session
+        const initialStatus = input.initialStatus ?? ScheduleStatus.PENDING;
+        const requestedBy = input.requestedBy ?? input.teacherId;
         const scheduleDocs = input.slots.map((slot) => ({
             courseId: input.courseId,
             teacherId: input.teacherId,
@@ -101,9 +116,12 @@ export const createScheduleRequest = async (input: CreateScheduleInput) => {
             effectiveTo: input.effectiveTo,
             location: input.location,
             requestNote: input.requestNote,
-            status: ScheduleStatus.PENDING,
-            requestedBy: input.teacherId,
+            status: initialStatus,
+            requestedBy,
             requestedAt: new Date(),
+            ...(initialStatus === ScheduleStatus.APPROVED && input.approvedBy
+                ? {approvedBy: input.approvedBy, approvedAt: new Date()}
+                : {}),
         }));
 
         // Use insertMany instead of multiple create calls to avoid transaction number mismatch
@@ -202,12 +220,21 @@ export const approveScheduleRequest = async (
 
     // If approving, check for conflicts again (in case another schedule was approved meanwhile)
     if (approved) {
+        // Use the same date-overlap rule as schedule creation. A completed
+        // semester occupying the same recurring slot must not block approval.
+        const scheduleEffectiveTo = schedule.effectiveTo ?? new Date("9999-12-31T23:59:59.999Z");
         const conflict = await ScheduleModel.findOne({
             _id: {$ne: scheduleId},
             teacherId: schedule.teacherId,
             dayOfWeek: schedule.dayOfWeek,
             timeSlotId: schedule.timeSlotId,
             status: {$in: [ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
+            effectiveFrom: {$lte: scheduleEffectiveTo},
+            $or: [
+                {effectiveTo: {$exists: false}},
+                {effectiveTo: null},
+                {effectiveTo: {$gte: schedule.effectiveFrom}},
+            ],
         });
 
         appAssert(

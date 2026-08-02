@@ -492,6 +492,12 @@ export const getSubmissionStats = async ({
    const averageGrade = graded.length > 0 ? Math.round((graded.reduce((sum, s) => sum + (s.grade ?? 0), 0) / graded.length) *100) / 100 : null;
    return {
           totalStudents,
+          // These counts are used by the teacher dashboard and are scoped to
+          // students who are still approved in the course (the same scope as
+          // every other statistic returned by this endpoint).
+          totalSubmissions: submissions.length,
+          gradedSubmissions: graded.length,
+          pendingSubmissions: submissions.length - graded.length,
           submissionRate: `${totalStudents ? ((submittedCount / totalStudents) * 100).toFixed(2) : 0}%`,
           onTimeRate: `${submissions.length ? ((onTime / submissions.length) * 100).toFixed(2) : 0}%`,
           averageGrade,

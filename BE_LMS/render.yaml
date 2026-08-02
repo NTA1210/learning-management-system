@@ -29,8 +29,10 @@ services:
         sync: false
       - key: MINIO_SECRET_KEY
         sync: false
-      - key: MINIO_BUCKET_NAME
+      - key: BUCKET_NAME
         value: lms-files
+      - key: PUBLIC_FILE_BASE_URL
+        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: FRONTEND_URL

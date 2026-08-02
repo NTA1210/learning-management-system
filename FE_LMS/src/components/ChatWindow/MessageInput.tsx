@@ -5,6 +5,9 @@ import { useSocketContext } from "../../context/SocketContext";
 import AttachMenu from "./components/AttachMenu";
 import { useTheme } from "../../hooks/useTheme";
 import VoiceRecorder from "./VoiceRecorder";
+import { toast } from "react-hot-toast";
+
+const MAX_CHAT_FILE_SIZE = 100 * 1024 * 1024;
 
 // Type for staged files with preview
 interface StagedFile {
@@ -243,6 +246,11 @@ const MessageInput: React.FC = () => {
 
   // Stage a file for sending (with preview for images)
   const stageFile = (file: File) => {
+    if (file.size > MAX_CHAT_FILE_SIZE) {
+      toast.error(`\"${file.name}\" exceeds the 100 MB chat attachment limit.`);
+      return;
+    }
+
     const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const isImage = file.type.startsWith("image/");
     const preview = isImage ? URL.createObjectURL(file) : undefined;

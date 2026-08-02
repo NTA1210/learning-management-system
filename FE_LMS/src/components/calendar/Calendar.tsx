@@ -229,6 +229,7 @@ const Calendar: React.FC = () => {
   // Create schedule form state - supports multiple slots
   const [createForm, setCreateForm] = useState<{
     courseId: string;
+    teacherId: string;
     slots: Array<{ dayOfWeek: DayOfWeek; timeSlotId: string }>;
     effectiveFrom: string;
     effectiveTo: string;
@@ -236,12 +237,30 @@ const Calendar: React.FC = () => {
     requestNote: string;
   }>({
     courseId: "",
+    teacherId: "",
     slots: [],
     effectiveFrom: format(new Date(), "yyyy-MM-dd"),
     effectiveTo: "",
     location: "",
     requestNote: "",
   });
+
+  const selectedCourseForSchedule = useMemo(
+    () => courses.find((course) => course._id === createForm.courseId),
+    [courses, createForm.courseId]
+  );
+
+  const assignedTeachersForSelectedCourse = useMemo(() => {
+    if (!selectedCourseForSchedule?.teacherIds) return [];
+
+    const assignedTeacherIds = new Set(
+      selectedCourseForSchedule.teacherIds.map((teacher) =>
+        typeof teacher === "string" ? teacher : teacher._id
+      )
+    );
+
+    return teachers.filter((teacher) => assignedTeacherIds.has(teacher._id));
+  }, [selectedCourseForSchedule, teachers]);
 
   // Fetch time slots
   useEffect(() => {
@@ -473,6 +492,11 @@ const Calendar: React.FC = () => {
       return;
     }
 
+    if (isAdmin && !createForm.teacherId) {
+      setActionError("Please select a teacher assigned to this course");
+      return;
+    }
+
     // Validate all slots have timeSlotId
     const invalidSlots = createForm.slots.filter((s) => !s.timeSlotId);
     if (invalidSlots.length > 0) {
@@ -486,6 +510,7 @@ const Calendar: React.FC = () => {
     try {
       const request: CreateScheduleRequest = {
         courseId: createForm.courseId,
+        ...(isAdmin ? { teacherId: createForm.teacherId } : {}),
         slots: createForm.slots,
         effectiveFrom: createForm.effectiveFrom,
         effectiveTo: createForm.effectiveTo || undefined,
@@ -497,6 +522,7 @@ const Calendar: React.FC = () => {
       setShowCreateModal(false);
       setCreateForm({
         courseId: "",
+        teacherId: "",
         slots: [],
         effectiveFrom: format(new Date(), "yyyy-MM-dd"),
         effectiveTo: "",
@@ -2791,6 +2817,12 @@ const Calendar: React.FC = () => {
                     setCreateForm({
                       ...createForm,
                       courseId: selectedCourseId,
+                      teacherId:
+                        isAdmin && selectedCourse?.teacherIds?.length === 1
+                          ? typeof selectedCourse.teacherIds[0] === "string"
+                            ? selectedCourse.teacherIds[0]
+                            : selectedCourse.teacherIds[0]._id
+                          : "",
                       effectiveFrom,
                       effectiveTo,
                     });
@@ -2808,6 +2840,35 @@ const Calendar: React.FC = () => {
                   ))}
                 </select>
               </div>
+
+              {isAdmin && (
+                <div className="form-group">
+                  <label>Assigned Teacher *</label>
+                  <select
+                    value={createForm.teacherId}
+                    disabled={!createForm.courseId}
+                    onChange={(e) =>
+                      setCreateForm({ ...createForm, teacherId: e.target.value })
+                    }
+                  >
+                    <option value="">
+                      {createForm.courseId
+                        ? "Select an assigned teacher"
+                        : "Select a course first"}
+                    </option>
+                    {assignedTeachersForSelectedCourse.map((teacher) => (
+                      <option key={teacher._id} value={teacher._id}>
+                        {teacher.fullname || teacher.username} ({teacher.email})
+                      </option>
+                    ))}
+                  </select>
+                  {createForm.courseId && assignedTeachersForSelectedCourse.length === 0 && (
+                    <small className="form-hint">
+                      This course has no assigned teacher. Assign a teacher in Course Management first.
+                    </small>
+                  )}
+                </div>
+              )}
 
               {/* Multiple Day/Time Slot Selection */}
               <div className="form-group">
@@ -3063,7 +3124,13 @@ const Calendar: React.FC = () => {
                     onClick={handleCreateSchedule}
                     disabled={actionLoading}
                   >
-                    {actionLoading ? "Creating..." : "Create Schedule"}
+                    {actionLoading
+                      ? isAdmin
+                        ? "Creating..."
+                        : "Requesting..."
+                      : isAdmin
+                      ? "Create Schedule"
+                      : "Request Schedule"}
                   </button>
                 </div>
               </div>

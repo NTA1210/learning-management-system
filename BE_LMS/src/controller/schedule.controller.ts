@@ -1,5 +1,8 @@
 import {catchErrors} from "../utils/asyncHandler";
-import {CREATED, OK} from "../constants/http";
+import {BAD_REQUEST, CREATED, OK} from "../constants/http";
+import {Role, ScheduleStatus} from "../types";
+import mongoose from "mongoose";
+import appAssert from "../utils/appAssert";
 import {
     approveExceptionSchema,
     approveScheduleSchema,
@@ -59,12 +62,28 @@ export const createScheduleRequestHandler = catchErrors(async (req, res) => {
     // Validate request body
     const data = createScheduleSchema.parse(req.body);
 
-    const teacherId = req.userId!;
+    const {teacherId: selectedTeacherId, ...scheduleData} = data;
+    const isAdmin = req.role === Role.ADMIN;
+
+    // Teachers can request schedules only for themselves. Administrators select
+    // one of the teachers assigned to the selected course.
+    appAssert(
+        !isAdmin || selectedTeacherId,
+        BAD_REQUEST,
+        "Please select an assigned teacher for this course"
+    );
+
+    const teacherId = isAdmin
+        ? new mongoose.Types.ObjectId(selectedTeacherId!)
+        : req.userId!;
 
     // Call service - returns array of created schedules
     const schedules = await createScheduleRequest({
-        ...data,
+        ...scheduleData,
         teacherId,
+        requestedBy: req.userId!,
+        initialStatus: isAdmin ? ScheduleStatus.APPROVED : ScheduleStatus.PENDING,
+        approvedBy: isAdmin ? req.userId! : undefined,
     });
 
     return res.success(CREATED, {
@@ -262,4 +281,3 @@ export const checkSlotAvailabilityHandler = catchErrors(async (req, res) => {
         data: {available: isAvailable},
     });
 });
-

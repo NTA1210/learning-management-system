@@ -1266,8 +1266,8 @@ export const getMyCourses = async ({
     // Student: Find enrolled courses
     const enrollments = await EnrollmentModel.find({
       studentId: userId,
-      // Optional: Filter by enrollment status if needed (e.g., only APPROVED)
-      status: EnrollmentStatus.APPROVED,
+      // A completed course remains visible to its student for review.
+      status: { $in: [EnrollmentStatus.APPROVED, EnrollmentStatus.COMPLETED] },
     }).select('courseId');
 
     const courseIds = enrollments.map((e) => e.courseId);
@@ -1567,7 +1567,21 @@ export const completeCourse = async (
               },
             },
           },
-          { $match: { status: AttemptStatus.SUBMITTED } },
+          // Keep every valid submission state. A graded submission must be
+          // included in the final score instead of being discarded after the
+          // teacher changes its status from "submitted" to "graded".
+          {
+            $match: {
+              status: {
+                $in: [
+                  SubmissionStatus.SUBMITTED,
+                  SubmissionStatus.RESUBMITTED,
+                  SubmissionStatus.OVERDUE,
+                  SubmissionStatus.GRADED,
+                ],
+              },
+            },
+          },
         ],
         as: 'quizAttemptsRaw',
       },
@@ -1683,7 +1697,20 @@ export const completeCourse = async (
               },
             },
           },
-          { $match: { status: AttemptStatus.SUBMITTED } },
+          // Include graded work in the final calculation. Submission status
+          // changes after grading, but its earned score must remain counted.
+          {
+            $match: {
+              status: {
+                $in: [
+                  SubmissionStatus.SUBMITTED,
+                  SubmissionStatus.RESUBMITTED,
+                  SubmissionStatus.OVERDUE,
+                  SubmissionStatus.GRADED,
+                ],
+              },
+            },
+          },
         ],
         as: 'assignmentSubmissionsRaw',
       },
@@ -1750,6 +1777,15 @@ export const completeCourse = async (
           total: { $size: '$assignments' },
           submitted: { $size: '$assignmentSubmissionsRaw' },
           totalGrade: { $sum: '$assignmentSubmissionsRaw.grade' },
+          totalMaxScore: {
+            $sum: {
+              $map: {
+                input: '$assignments',
+                as: 'assignment',
+                in: { $ifNull: ['$$assignment.maxScore', 10] },
+              },
+            },
+          },
           details: '$assignmentDetails',
         },
       },
@@ -1836,29 +1872,34 @@ export const completeCourse = async (
       updatedAt: new Date(),
     };
 
-    // averages (0..1)
+    // Component scores are normalized to the 0..10 scale. Missing or
+    // ungraded assignments contribute 0 while their maxScore remains in the
+    // denominator, so the final score is not inflated.
     const quizAvg =
       progress.totalQuizzes > 0 ? progress.totalQuizScores / progress.totalQuizzes : 0;
     const assignmentAvg =
-      progress.totalAssignments > 0
-        ? progress.totalAssignmentScores / progress.totalAssignments
+      s.assignment.totalMaxScore > 0
+        ? (progress.totalAssignmentScores / s.assignment.totalMaxScore) * 10
         : 0;
     const attendanceAvg =
-      progress.totalAttendances > 0 ? progress.completedAttendances / progress.totalAttendances : 0;
+      progress.totalAttendances > 0
+        ? (progress.completedAttendances / progress.totalAttendances) * 10
+        : 0;
 
-    // final grade scale 0..10 (weights from course.weight if exists, otherwise default)
-    const weight = course.weight ?? { quiz: 0.4, assignment: 0.4, attendance: 0.2 };
+    // Course final grade: 30% quiz + 50% assignment + 20% attendance,
+    // consistently expressed on a 0..10 scale.
+    const weight = { quiz: 0.3, assignment: 0.5, attendance: 0.2 };
     const rawFinal =
-      (quizAvg * (weight.quiz ?? 0.3) +
-        assignmentAvg * (weight.assignment ?? 0.5) +
-        attendanceAvg * (weight.attendance ?? 0.2)) *
-      10;
+      quizAvg * weight.quiz +
+      assignmentAvg * weight.assignment +
+      attendanceAvg * weight.attendance;
     const finalGrade = Math.round(rawFinal * 100) / 100; // 2 decimals
 
-    const absent = progress.totalAttendances - progress.completedAttendances;
-    const absentPercent = (absent / progress.totalAttendances) * 100;
-    const isDropped = absentPercent > 20 || finalGrade < 5;
-    const status = isDropped ? EnrollmentStatus.DROPPED : EnrollmentStatus.APPROVED;
+    const attendanceRate = progress.totalAttendances > 0
+      ? progress.completedAttendances / progress.totalAttendances
+      : 0;
+    const isDropped = attendanceRate < 0.8 || finalGrade < 5;
+    const status = isDropped ? EnrollmentStatus.DROPPED : EnrollmentStatus.COMPLETED;
 
     // bulk update: set progress, finalGrade, status, and droppedAt/completedAt appropriately
     const updateObj: any = {
@@ -1917,6 +1958,11 @@ export const completeCourse = async (
           present: progress.completedAttendances,
           absent: progress.totalAttendances - progress.completedAttendances,
         },
+      },
+      scores: {
+        quiz: quizAvg,
+        assignment: assignmentAvg,
+        attendance: attendanceAvg,
       },
       finalGrade,
       status,
@@ -2009,13 +2055,13 @@ export const completeCourse = async (
     : 0;
   const averageQuizScore = totalStudents
     ? Math.round(
-      (studentsOut.reduce((acc, x) => acc + (x.progress.quizzes.score || 0), 0) / totalStudents) *
+      (studentsOut.reduce((acc, x) => acc + (x.scores.quiz || 0), 0) / totalStudents) *
       100
     ) / 100
     : 0;
   const averageAssignmentScore = totalStudents
     ? Math.round(
-      (studentsOut.reduce((acc, x) => acc + (x.progress.assignments.score || 0), 0) /
+      (studentsOut.reduce((acc, x) => acc + (x.scores.assignment || 0), 0) /
         totalStudents) *
       100
     ) / 100

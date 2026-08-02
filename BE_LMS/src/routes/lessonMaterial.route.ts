@@ -10,8 +10,7 @@ import {
   uploadLessonMaterialController,
   deleteLessonMaterialFile,
 } from "../controller/lessonMaterial.controller";
-import authenticate from "@/middleware/authenticate";
-import authorize from "@/middleware/authorize";
+import { authenticate, authorize } from "@/middleware";
 import { Role } from "../types";
 import upload from "@/config/multer";
 

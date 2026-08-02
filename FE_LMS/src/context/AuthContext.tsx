@@ -187,6 +187,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(resolvedUser);
       localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('userData', JSON.stringify(resolvedUser));
+      // Keep the synchronous client identity in step with the new auth cookie.
+      // This prevents providers that initialize from lms:user from reusing the
+      // previously selected account during a quick switch.
+      localStorage.setItem('lms:user', JSON.stringify(resolvedUser));
       try {
         await saveCurrentUserFromApi();
       } catch {
@@ -220,11 +224,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const updateCurrentUser = (nextUser: User) => {
+    setUser(nextUser);
+    localStorage.setItem('userData', JSON.stringify(nextUser));
+    localStorage.setItem('lms:user', JSON.stringify(nextUser));
+  };
+
   const value: AuthContextType = {
     user,
     loading,
     login,
     logout,
+    updateCurrentUser,
     isAuthenticated: !!user,
     savedAccounts: savedAccountRecords.map(({ encodedPassword, ...rest }) => rest),
     saveAccountForQuickSwitch,

@@ -1,10 +1,11 @@
 import { listAllUsersSchema, updateUserProfileSchema } from '@/validators/user.schemas';
-import { NOT_FOUND, OK } from '../constants/http';
+import { FORBIDDEN, NOT_FOUND, OK } from '../constants/http';
 import UserModel from '../models/user.model';
 import appAssert from '../utils/appAssert';
 import { catchErrors } from '../utils/asyncHandler';
 import { getAllUsers, updateUserProfile } from '@/services/user.service';
 import { parseFormData } from '@/utils/parseFormData';
+import { Role } from '@/types';
 
 // GET /users/:courseId - Get all users for a specific course
 export const getUserForCourseHandler = catchErrors(async (req, res) => {
@@ -29,6 +30,12 @@ export const getUserHandler = catchErrors(async (req, res) => {
 
 // PUT /users/:userId - Update user profile
 export const updateUserProfileHandler = catchErrors(async (req, res) => {
+  appAssert(
+    req.role === Role.ADMIN || req.userId?.toString() === req.params.userId,
+    FORBIDDEN,
+    'You can only update your own profile'
+  );
+
   const avatar = req.file;
   const input = updateUserProfileSchema.parse(
     parseFormData({

@@ -75,11 +75,17 @@ export default function Navbar({ onToggleSidebar }: NavbarProps) {
     try {
       const switchedUser = await switchToAccount(accountId, passwordOverride);
       if (switchedUser) {
-        navigate(navigateByRole(switchedUser.role));
         if (passwordOverride) {
           setManualPasswords((prev) => ({ ...prev, [accountId]: "" }));
         }
         setPasswordPromptAccount(null);
+        setIsDropdownOpen(false);
+
+        // Switching identity must start a clean client session. A full reload
+        // closes the old Socket.IO connection and clears in-memory query/chat
+        // caches before mounting the selected role.
+        window.location.replace(navigateByRole(switchedUser.role));
+        return;
       }
       setIsDropdownOpen(false);
     } catch (error) {

@@ -25,6 +25,7 @@ export interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateCurrentUser: (user: User) => void;
   isAuthenticated: boolean;
   savedAccounts: SavedAccountSummary[];
   saveAccountForQuickSwitch: (payload: SaveAccountPayload) => void;

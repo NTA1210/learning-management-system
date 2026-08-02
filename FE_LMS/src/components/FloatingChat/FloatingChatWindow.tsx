@@ -9,6 +9,9 @@ import MessageItem from "../ChatWindow/MessageItem";
 import FileMessageItem from "../ChatWindow/FileMessageItem";
 import VoiceMessageItem from "../ChatWindow/VoiceMessageItem";
 import VoiceRecorder from "../ChatWindow/VoiceRecorder";
+import { toast } from "react-hot-toast";
+
+const MAX_CHAT_FILE_SIZE = 100 * 1024 * 1024;
 
 interface FloatingChatWindowProps {
   chat: FloatingChat;
@@ -254,6 +257,11 @@ const FloatingChatWindow: React.FC<FloatingChatWindowProps> = ({ chat, index }) 
 
   // File handling
   const stageFile = (file: File) => {
+    if (file.size > MAX_CHAT_FILE_SIZE) {
+      toast.error(`\"${file.name}\" exceeds the 100 MB chat attachment limit.`);
+      return;
+    }
+
     const id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const isImage = file.type.startsWith("image/");
     const preview = isImage ? URL.createObjectURL(file) : undefined;

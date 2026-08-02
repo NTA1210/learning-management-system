@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { useTheme } from "../../hooks/useTheme";
 import Navbar from "../../components/layout/Navbar.tsx";
 import Sidebar from "../../components/layout/Sidebar.tsx";
+import { userService } from "../../services/userService";
 
 type UserLike = {
   _id?: string;
@@ -12,6 +13,7 @@ type UserLike = {
   fullname?: string; // our types/auth uses fullnamex
   email?: string;
   phoneNumber?: string;
+  phone_number?: string;
   profileImageUrl?: string;
   avatar_url?: string;
   role?: string;
@@ -22,6 +24,7 @@ type UserLike = {
   gender?: string;
   dateOfBirth?: string;
   organization?: string;
+  bio?: string;
 };
 
 type ClassLike = {
@@ -36,7 +39,7 @@ type ClassLike = {
 const API_BASE = (import.meta.env.VITE_BASE_API as string | undefined)?.replace(/\/$/, "") || "";
 
 const Profile: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateCurrentUser } = useAuth();
   const { darkMode } = useTheme();
   const navigate = useNavigate();
 
@@ -54,11 +57,15 @@ const Profile: React.FC = () => {
     gender: "",
     dateOfBirth: "",
     organization: "",
+    bio: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [studentImageUrl, setStudentImageUrl] = useState("");
+  const [selectedAvatar, setSelectedAvatar] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   // original image url not needed currently
   const [userClasses, setUserClasses] = useState<ClassLike[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(false);
@@ -99,11 +106,19 @@ const Profile: React.FC = () => {
   }, [safeUser]);
 
   useEffect(() => {
+    return () => {
+      if (avatarPreview.startsWith("blob:")) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+    };
+  }, [avatarPreview]);
+
+  useEffect(() => {
     if (safeUser) {
       setProfileData({
         fullName: safeUser.fullName || safeUser.fullname || "",
         email: safeUser.email || "",
-        phoneNumber: safeUser.phoneNumber || "",
+        phoneNumber: safeUser.phoneNumber || safeUser.phone_number || "",
         profileImageUrl: safeUser.profileImageUrl || safeUser.avatar_url || "",
         department: safeUser.department || "",
         specializations: safeUser.specializations || "",
@@ -111,13 +126,53 @@ const Profile: React.FC = () => {
         gender: safeUser.gender || "",
         dateOfBirth: safeUser.dateOfBirth || "",
         organization: safeUser.organization || "",
+        bio: safeUser.bio || "",
       });
     }
   }, [safeUser]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setProfileData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (!["image/jpeg", "image/png"].includes(file.type)) {
+      setError("Avatar must be a PNG or JPG image.");
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      setError("Avatar image must be 20 MB or smaller.");
+      return;
+    }
+
+    setError("");
+    setSelectedAvatar(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
+
+  const cancelEditing = () => {
+    setEditing(false);
+    setSelectedAvatar(null);
+    setAvatarPreview("");
+    setError("");
+    setProfileData({
+      fullName: safeUser?.fullName || safeUser?.fullname || "",
+      email: safeUser?.email || "",
+      phoneNumber: safeUser?.phoneNumber || safeUser?.phone_number || "",
+      profileImageUrl: safeUser?.profileImageUrl || safeUser?.avatar_url || "",
+      department: "",
+      specializations: "",
+      academicMajor: "",
+      gender: "",
+      dateOfBirth: "",
+      organization: "",
+      bio: safeUser?.bio || "",
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -128,50 +183,34 @@ const Profile: React.FC = () => {
 
     try {
       const userId = safeUser?.id || safeUser?._id || "";
-      const payload: Record<string, unknown> = {
-        userId,
-        fullName: profileData.fullName,
-        phoneNumber: profileData.phoneNumber,
-        profileImageUrl: profileData.profileImageUrl,
-      };
+      if (!userId) throw new Error("Unable to identify the current user");
 
-      const role = safeUser?.role;
-      if (role === "lecturer") {
-        payload.department = profileData.department;
-        payload.specializations = profileData.specializations;
-      } else if (role === "student") {
-        payload.academicMajor = profileData.academicMajor;
-        payload.gender = profileData.gender;
-        payload.dateOfBirth = profileData.dateOfBirth;
-      } else if (role === "outsrc_student") {
-        payload.organization = profileData.organization;
-        payload.dateOfBirth = profileData.dateOfBirth;
-      }
-
-      const response = await fetch(`${API_BASE}/update-profile`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        credentials: "include",
+      const originalAvatarUrl = safeUser?.profileImageUrl || safeUser?.avatar_url || "";
+      const requestedAvatarUrl = profileData.profileImageUrl.trim();
+      const updatedUser = await userService.updateProfile(userId, {
+        fullname: profileData.fullName.trim(),
+        phone_number: profileData.phoneNumber.trim() || undefined,
+        bio: profileData.bio.trim() || undefined,
+        avatar_url:
+          !selectedAvatar && requestedAvatarUrl && requestedAvatarUrl !== originalAvatarUrl
+            ? requestedAvatarUrl
+            : undefined,
+        avatar: selectedAvatar || undefined,
       });
-
-      if (!response.ok) {
-        let message = "Failed to update profile";
-        try {
-          const errJson = await response.json();
-          message = errJson?.message || message;
-        } catch { /* noop */ }
-        throw new Error(message);
-      }
-
-      const updatedUser = await response.json();
       const newUserData = { ...(safeUser || {}), ...updatedUser };
-      localStorage.setItem("user", JSON.stringify(newUserData));
+      updateCurrentUser(newUserData as NonNullable<typeof user>);
+
+      const updatedAvatarUrl = updatedUser.avatar_url || requestedAvatarUrl || originalAvatarUrl;
+      setStudentImageUrl(updatedAvatarUrl);
+      setProfileData((current) => ({ ...current, profileImageUrl: updatedAvatarUrl }));
+      setSelectedAvatar(null);
+      setAvatarPreview("");
 
       setSuccess("Profile updated successfully");
       setEditing(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred while updating your profile");
+      const apiMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(apiMessage || (err instanceof Error ? err.message : "An error occurred while updating your profile"));
     } finally {
       setLoading(false);
     }
@@ -188,8 +227,8 @@ const Profile: React.FC = () => {
     const role = safeUser?.role;
     if (!role) return "User";
     switch (role) {
-      case "lecturer":
-        return "Lecturer";
+      case "teacher":
+        return "Teacher";
       case "student":
         return "Student";
       case "outsrc_student":
@@ -299,9 +338,31 @@ const Profile: React.FC = () => {
                   >
                     <div className="flex flex-col items-center text-center">
                       <div className="relative">
-                        <img src={studentImageUrl || "https://media.tenor.com/AN83u7YyqwUAAAAM/maxwell-the-cat.gif"} alt="avatar" className="h-28 w-28 rounded-full object-cover border-2"
+                        <img src={avatarPreview || studentImageUrl || "https://media.tenor.com/AN83u7YyqwUAAAAM/maxwell-the-cat.gif"} alt="avatar" className="h-28 w-28 rounded-full object-cover border-2"
                           style={{ borderColor: darkMode ? '#4f46e5' : '#6366f1' }} />
                       </div>
+                      {editing && (
+                        <>
+                          <input
+                            ref={avatarInputRef}
+                            type="file"
+                            accept="image/png,image/jpeg"
+                            className="hidden"
+                            onChange={handleAvatarChange}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => avatarInputRef.current?.click()}
+                            className="mt-3 rounded-lg px-3 py-2 text-sm font-medium text-white"
+                            style={{ backgroundColor: darkMode ? '#4f46e5' : '#6366f1' }}
+                          >
+                            Choose image from device
+                          </button>
+                          <p className="mt-1 text-xs" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>
+                            PNG or JPG, maximum 20 MB{selectedAvatar ? ` · ${selectedAvatar.name}` : ''}
+                          </p>
+                        </>
+                      )}
                       <h2 className="mt-4 text-xl font-semibold">{profileData.fullName || 'User Name'}</h2>
                       <p className="text-sm" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>{getUserTitle()}</p>
                       <p className="mt-1 text-xs" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>@{getUserHandle()}</p>
@@ -364,7 +425,7 @@ const Profile: React.FC = () => {
                           </div>
                         ) : (
                           <button
-                            onClick={() => setEditing(false)}
+                            onClick={cancelEditing}
                             className="px-4 py-2 text-white rounded"
                             style={{ backgroundColor: darkMode ? '#6b7280' : '#9ca3af' }}
                             onMouseEnter={(e) => {
@@ -404,100 +465,24 @@ const Profile: React.FC = () => {
                         </div>
                         {editing && (
                           <div>
-                            <label className="block text-sm font-medium" style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Profile Image URL</label>
-                            <input type="text" name="profileImageUrl" value={profileData.profileImageUrl} onChange={handleInputChange} className="mt-1 p-2 w-full border rounded-md" placeholder="Image URL" />
+                            <label className="block text-sm font-medium" style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Profile Image URL (optional)</label>
+                            <input type="url" name="profileImageUrl" value={profileData.profileImageUrl} onChange={handleInputChange} className="mt-1 p-2 w-full border rounded-md" placeholder="https://example.com/avatar.png" />
+                            <p className="mt-1 text-xs" style={{ color: darkMode ? '#9ca3af' : '#6b7280' }}>Choose an image from your device above, or provide a public image URL.</p>
                           </div>
                         )}
                         <div>
                           <label className="block text-sm font-medium" style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Role</label>
                           <p className="mt-1 capitalize">{safeUser?.role}</p>
                         </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium" style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Bio</label>
+                          {editing ? (
+                            <textarea name="bio" value={profileData.bio} onChange={handleInputChange} rows={3} maxLength={500} className="mt-1 p-2 w-full border rounded-md" placeholder="Tell others a little about yourself" />
+                          ) : (
+                            <p className="mt-1 whitespace-pre-wrap">{profileData.bio || "Not provided"}</p>
+                          )}
+                        </div>
 
-                        {safeUser?.role === "lecturer" && (
-                          <>
-                            <div>
-                              <label className="block text-sm font-medium" style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Department</label>
-                              {editing ? (
-                                <input type="text" name="department" value={profileData.department} onChange={handleInputChange} className="mt-1 p-2 w-full border rounded-md" />
-                              ) : (
-                                <p className="mt-1">{profileData.department || "Not provided"}</p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium" style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Specializations</label>
-                              {editing ? (
-                                <input type="text" name="specializations" value={profileData.specializations} onChange={handleInputChange} className="mt-1 p-2 w-full border rounded-md" />
-                              ) : (
-                                <p className="mt-1">{profileData.specializations || "Not provided"}</p>
-                              )}
-                            </div>
-                          </>
-                        )}
-
-                        {safeUser?.role === "student" && (
-                          <>
-                            <div>
-                              <label className="block text-sm font-medium" style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Academic Major</label>
-                              {editing ? (
-                                <input type="text" name="academicMajor" value={profileData.academicMajor} onChange={handleInputChange} className="mt-1 p-2 w-full border rounded-md" />
-                              ) : (
-                                <p className="mt-1">{profileData.academicMajor || "Not provided"}</p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium" style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Gender</label>
-                              {editing ? (
-                                <select name="gender" value={profileData.gender} onChange={handleInputChange} className="mt-1 p-2 w-full border rounded-md">
-                                  <option value="">Select Gender</option>
-                                  <option value="Male">Male</option>
-                                  <option value="Female">Female</option>
-                                  <option value="Other">Other</option>
-                                </select>
-                              ) : (
-                                <p className="mt-1">{profileData.gender || "Not provided"}</p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium" style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Date of Birth</label>
-                              {editing ? (
-                                <input type="date" name="dateOfBirth" value={profileData.dateOfBirth} onChange={handleInputChange} className="mt-1 p-2 w-full border rounded-md" />
-                              ) : (
-                                <p className="mt-1">{profileData.dateOfBirth || "Not provided"}</p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium" style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Classes</label>
-                              <div className="mt-1 space-y-1">
-                                {userClasses.map((classObj) => (
-                                  <div key={classObj.classId}>
-                                    <p>{classObj.className}</p>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </>
-                        )}
-
-                        {safeUser?.role === "outsrc_student" && (
-                          <>
-                            <div>
-                              <label className="block text-sm font-medium" style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Organization</label>
-                              {editing ? (
-                                <input type="text" name="organization" value={profileData.organization} onChange={handleInputChange} className="mt-1 p-2 w-full border rounded-md" />
-                              ) : (
-                                <p className="mt-1">{profileData.organization || "Not provided"}</p>
-                              )}
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium" style={{ color: darkMode ? '#d1d5db' : '#374151' }}>Date of Birth</label>
-                              {editing ? (
-                                <input type="date" name="dateOfBirth" value={profileData.dateOfBirth} onChange={handleInputChange} className="mt-1 p-2 w-full border rounded-md" />
-                              ) : (
-                                <p className="mt-1">{profileData.dateOfBirth || "Not provided"}</p>
-                              )}
-                            </div>
-                          </>
-                        )}
                       </div>
 
                       {editing && (
@@ -557,4 +542,3 @@ const Profile: React.FC = () => {
 };
 
 export default Profile;
-

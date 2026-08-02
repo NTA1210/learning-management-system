@@ -41,6 +41,9 @@
   --app-warning: #f59e0b;
   --app-success: #10b981;
   --app-danger: #dc2626;
+  --select-option-bg: #ffffff;
+  --select-option-text: #0f172a;
+  --select-option-selected-bg: #e0e7ff;
 }
 
 :root[data-theme="dark"] {
@@ -79,10 +82,32 @@
   --app-primary: #818cf8;
   --app-primary-hover: #a5b4fc;
   --app-primary-soft: rgba(129, 140, 248, 0.16);
+  --select-option-bg: #111827;
+  --select-option-text: #e2e8f0;
+  --select-option-selected-bg: #312e81;
 }
 
 /* Ensure dark mode works with Tailwind */
 .dark {
+  color-scheme: dark;
+}
+
+/* Keep every native select popup aligned with the active application theme. */
+select {
+  color-scheme: light;
+}
+
+select option,
+select optgroup {
+  background-color: var(--select-option-bg);
+  color: var(--select-option-text);
+}
+
+select option:checked {
+  background-color: var(--select-option-selected-bg);
+}
+
+:root[data-theme="dark"] select {
   color-scheme: dark;
 }
 

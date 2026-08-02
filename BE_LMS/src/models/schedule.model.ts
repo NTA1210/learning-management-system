@@ -90,15 +90,13 @@ ScheduleSchema.index({teacherId: 1, status: 1});
 // Find schedules by day and time slot
 ScheduleSchema.index({dayOfWeek: 1, timeSlotId: 1, status: 1});
 
-// Prevent double-booking: One teacher cannot teach 2 classes in the same slot
-// This unique index ensures no conflicts
+// Lookup index for schedule conflict checks. This must not be unique because
+// the same teacher may use the same recurring slot in different semesters.
+// Date-range overlap is enforced by schedule.service.ts.
 ScheduleSchema.index(
-    {teacherId: 1, dayOfWeek: 1, timeSlotId: 1, status: 1},
+    {teacherId: 1, dayOfWeek: 1, timeSlotId: 1, status: 1, effectiveFrom: 1, effectiveTo: 1},
     {
-        unique: true,
-        partialFilterExpression: {
-            status: {$in: [ScheduleStatus.APPROVED, ScheduleStatus.ACTIVE]},
-        },
+        name: "teacher_slot_status_effective_range",
     }
 );
 
@@ -122,4 +120,3 @@ const ScheduleModel = mongoose.model<ISchedule>(
 );
 
 export default ScheduleModel;
-

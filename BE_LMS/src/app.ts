@@ -92,6 +92,9 @@ export const createApp = async () => {
       credentials: true,
       methods: ['GET', 'POST'],
     },
+    // Chat attachments are sent as Socket.IO binary packets. Reserve a small
+    // amount for packet metadata so a file up to 100 MiB is accepted.
+    maxHttpBufferSize: 101 * 1024 * 1024,
     pingInterval: 25000,
     pingTimeout: 60000,
   });

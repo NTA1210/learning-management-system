@@ -217,10 +217,37 @@ describe("📅 Schedule Controller Unit Tests", () => {
             expect(scheduleService.createScheduleRequest).toHaveBeenCalledWith({
                 ...scheduleData,
                 teacherId,
+                requestedBy: teacherId,
+                initialStatus: ScheduleStatus.PENDING,
+                approvedBy: undefined,
             });
             expect(mockRes.success).toHaveBeenCalledWith(201, {
                 message: "Schedule request created successfully with 1 slot",
                 data: mockCreatedSchedules,
+            });
+        });
+
+        it("should create an approved schedule for the selected teacher when requested by admin", async () => {
+            const scheduleData = {
+                courseId,
+                teacherId: teacherId.toString(),
+                slots: [{dayOfWeek: DayOfWeek.MONDAY, timeSlotId}],
+            };
+            mockReq.body = scheduleData;
+            mockReq.userId = adminId;
+            mockReq.role = Role.ADMIN;
+            (scheduleSchemas.createScheduleSchema.parse as jest.Mock).mockReturnValue(scheduleData);
+            (scheduleService.createScheduleRequest as jest.Mock).mockResolvedValue([schedule]);
+
+            await createScheduleRequestHandler(mockReq as Request, mockRes as Response, mockNext);
+
+            expect(scheduleService.createScheduleRequest).toHaveBeenCalledWith({
+                courseId,
+                slots: scheduleData.slots,
+                teacherId,
+                requestedBy: adminId,
+                initialStatus: ScheduleStatus.APPROVED,
+                approvedBy: adminId,
             });
         });
 
@@ -779,4 +806,3 @@ describe("📅 Schedule Controller Unit Tests", () => {
         });
     });
 });
-

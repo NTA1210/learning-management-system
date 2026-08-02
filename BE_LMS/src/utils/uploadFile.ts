@@ -1,4 +1,4 @@
-import { BUCKET_NAME, MINIO_ENDPOINT } from '@/constants/env';
+import { BUCKET_NAME, MINIO_ENDPOINT, PUBLIC_FILE_BASE_URL } from '@/constants/env';
 import { minioClient } from '../config/minio';
 import { v4 } from 'uuid';
 import mime from 'mime-types';
@@ -15,6 +15,19 @@ import slugify from 'slugify';
  * @returns Tên file đã slugify, giữ extension
  */
 const decodeOriginalName = (name: string) => Buffer.from(name, 'latin1').toString('utf8');
+
+const trimTrailingSlashes = (value: string) => value.replace(/\/+$/, '');
+
+/**
+ * The S3 API endpoint and the browser URL are intentionally different for R2.
+ * When no public base is configured, preserve the existing MinIO/S3 URL shape.
+ */
+const getLegacyObjectBaseUrl = () => `https://${MINIO_ENDPOINT}/${BUCKET_NAME}`;
+const getPublicObjectBaseUrl = () =>
+  trimTrailingSlashes(PUBLIC_FILE_BASE_URL) || getLegacyObjectBaseUrl();
+
+export const getPublicUrl = (key: string) =>
+  `${getPublicObjectBaseUrl()}/${key.replace(/^\/+/, '')}`;
 
 export const slugifyFileName = (originalNameRaw: string) => {
   const originalName = decodeOriginalName(originalNameRaw);
@@ -51,8 +64,7 @@ export const uploadFile = async (file: Express.Multer.File, prefix: string) => {
       'Content-Type': mime.lookup(file.originalname) || 'application/octet-stream',
     });
 
-    // URL public
-    const publicUrl = `https://${MINIO_ENDPOINT}/${BUCKET_NAME}/${key}`;
+    const publicUrl = getPublicUrl(key);
 
     return {
       publicUrl,
@@ -99,18 +111,22 @@ export const getFile = async (key: string) => {
 
 /**
  *
- * @param key
- * @returns
- */
-export const getPublicUrl = (key: string) => `https://${MINIO_ENDPOINT}/${BUCKET_NAME}/${key}`;
-
-/**
- *
  * @param publicUrl
  * @returns
  */
-export const getKeyFromPublicUrl = (publicUrl: string) =>
-  publicUrl.replace(`https://${MINIO_ENDPOINT}/${BUCKET_NAME}/`, '');
+export const getKeyFromPublicUrl = (publicUrl: string) => {
+  const objectBases = [getPublicObjectBaseUrl(), getLegacyObjectBaseUrl()];
+
+  for (const baseUrl of objectBases) {
+    const prefix = `${trimTrailingSlashes(baseUrl)}/`;
+    if (publicUrl.startsWith(prefix)) {
+      return publicUrl.slice(prefix.length);
+    }
+  }
+
+  // Preserve the old behaviour for externally-hosted URLs.
+  return publicUrl;
+};
 
 /**
  * method to get signed url

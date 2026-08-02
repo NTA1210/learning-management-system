@@ -34,6 +34,14 @@ export const MINIO_USE_SSL =
   getEnv("MINIO_USE_SSL", "true") === "true" ? true : false;
 export const MINIO_ACCESS_KEY = getEnv("MINIO_ACCESS_KEY");
 export const MINIO_SECRET_KEY = getEnv("MINIO_SECRET_KEY");
+/**
+ * Browser-facing base URL for objects stored in MinIO/R2.
+ *
+ * Keep this separate from MINIO_ENDPOINT: Cloudflare R2's S3 endpoint accepts
+ * authenticated API requests but is not a public object host. Include the
+ * bucket in this URL only when the public host requires it.
+ */
+export const PUBLIC_FILE_BASE_URL = getEnv("PUBLIC_FILE_BASE_URL", "");
 
 export const FRONTEND_URL = getEnv(
   "FRONTEND_URL",

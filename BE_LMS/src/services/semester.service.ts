@@ -183,7 +183,7 @@ export const getSemesterStatistics = async (
   const totalGrades = completedEnrollments.reduce((sum: number, e: any) => sum + (e.finalGrade || 0), 0);
   const averageFinalGrade = completedEnrollments.length > 0 ? totalGrades / completedEnrollments.length : 0;
 
-  const passedCount = completedEnrollments.filter((e: any) => e.finalGrade >= 50).length;
+  const passedCount = completedEnrollments.filter((e: any) => e.finalGrade >= 5).length;
   const passRate = enrollments.length > 0 ? (passedCount / enrollments.length) * 100 : 0;
   const dropRate = enrollments.length > 0 ? (droppedEnrollments.length / enrollments.length) * 100 : 0;
 

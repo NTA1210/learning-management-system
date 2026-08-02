@@ -47,7 +47,9 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 MINIO_ENDPOINT=your_minio_or_s3_endpoint
 MINIO_ACCESS_KEY=your_access_key
 MINIO_SECRET_KEY=your_secret_key
-MINIO_BUCKET_NAME=lms-files
+BUCKET_NAME=lms-files
+# Cloudflare R2: use an enabled r2.dev URL or custom domain, not MINIO_ENDPOINT.
+PUBLIC_FILE_BASE_URL=https://media.example.com
 
 # Resend Email
 RESEND_API_KEY=your_resend_api_key

@@ -116,6 +116,7 @@ export const updateUserProfile = async (
     fullname,
     phone_number,
     avatar,
+    avatar_url,
     bio,
     status,
     isVerified,
@@ -145,6 +146,12 @@ export const updateUserProfile = async (
     }
     user.avatar_url = publicUrl;
     user.key = key;
+  } else if (avatar_url !== undefined) {
+    if (user.key) {
+      await removeFile(user.key);
+    }
+    user.avatar_url = avatar_url;
+    user.key = undefined;
   }
 
   if (userRole === Role.ADMIN) {

@@ -35,7 +35,7 @@ export const updateUserProfileSchema = z.object({
   userId: userIdSchema,
   username: z.string().optional(),
   email: z.string().regex(EMAIL_REGEX, 'Invalid email format').optional(),
-  fullname: z.string().optional(),
+  fullname: z.string().trim().min(1, 'Full name is required').max(100).optional(),
   phone_number: z
     .string()
     .regex(VIETNAM_PHONE_REGEX || INTERNATIONAL_PHONE_REGEX, {
@@ -43,6 +43,7 @@ export const updateUserProfileSchema = z.object({
     })
     .optional(),
   avatar: z.any().optional(),
+  avatar_url: z.string().url('Invalid avatar URL').optional(),
   bio: z.string().optional(),
   status: z.enum(UserStatus).optional(),
   specialistIds: z.array(z.string()).optional(),

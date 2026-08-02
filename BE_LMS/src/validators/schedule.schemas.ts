@@ -15,6 +15,9 @@ export const scheduleSlotSchema = z.object({
 // Schema for creating a schedule request (now supports multiple slots)
 export const createScheduleSchema = z.object({
     courseId: z.string().min(1, "Course ID is required"),
+    // Administrators select the teacher assigned to the course.
+    // Teachers are always scoped to their own account by the controller.
+    teacherId: z.string().length(24, "Invalid teacher ID").optional(),
     slots: z.array(scheduleSlotSchema)
         .min(1, "At least one schedule slot is required")
         .refine(

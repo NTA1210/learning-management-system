@@ -50,6 +50,14 @@ export interface UserDetail extends User {
   key?: string;
 }
 
+export interface UpdateProfilePayload {
+  fullname: string;
+  phone_number?: string;
+  bio?: string;
+  avatar_url?: string;
+  avatar?: File;
+}
+
 export const userService = {
   getUsers: async (params?: UserListParams): Promise<UserListResult> => {
     const queryParams = new URLSearchParams();
@@ -112,6 +120,21 @@ export const userService = {
     if (data.specialistIds !== undefined)
       payload.specialistIds = data.specialistIds;
     const response = await http.put(`/users/${userId}`, payload);
+    return response.data as UserDetail;
+  },
+
+  updateProfile: async (
+    userId: string,
+    data: UpdateProfilePayload
+  ): Promise<UserDetail> => {
+    const formData = new FormData();
+    formData.append("fullname", data.fullname);
+    if (data.phone_number) formData.append("phone_number", data.phone_number);
+    if (data.bio) formData.append("bio", data.bio);
+    if (data.avatar_url) formData.append("avatar_url", data.avatar_url);
+    if (data.avatar) formData.append("avatar", data.avatar);
+
+    const response = await http.put(`/users/${userId}`, formData);
     return response.data as UserDetail;
   },
 };

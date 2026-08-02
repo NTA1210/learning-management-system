@@ -441,6 +441,8 @@ export default function Sidebar({
     email?: string;
     role?: string;
     avatar?: string;
+    avatar_url?: string;
+    avatarUrl?: string;
   }>(null);
 
   useEffect(() => {
@@ -513,7 +515,11 @@ export default function Sidebar({
   const user = userInfo || {
     name: storedUser?.fullname || storedUser?.username || defaultUserInfo.name,
     email: storedUser?.email || defaultUserInfo.email,
-    avatar: storedUser?.avatar || defaultUserInfo.avatar,
+    avatar:
+      storedUser?.avatar ||
+      storedUser?.avatar_url ||
+      storedUser?.avatarUrl ||
+      defaultUserInfo.avatar,
   };
   const roleColors = {
     admin: "rgba(168, 85, 247, 0.7)",

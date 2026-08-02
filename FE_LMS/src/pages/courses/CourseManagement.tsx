@@ -67,7 +67,7 @@ const CourseManagement: React.FC = () => {
      
                     
   const [specialists, setSpecialists] = useState<Array<{ _id: string; name: string }>>([]);
-  const [subjects, setSubjects] = useState<Array<{ _id: string; name: string; specialistIds?: string[] }>>([]);
+  const [subjects, setSubjects] = useState<Array<{ _id: string; name: string; code?: string; specialistIds?: string[] }>>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState(searchParams.get("subjectId") ?? "");
   const [selectedSpecialistId, setSelectedSpecialistId] = useState(searchParams.get("specialistId") ?? "");
   const [selectedSemesterId, setSelectedSemesterId] = useState(searchParams.get("semesterId") ?? "");
@@ -261,14 +261,34 @@ const CourseManagement: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       try {
-        const res = await subjectService.getAllSubjects({ limit: 200,  sortOrder: "asc" });
+        // A Subject is selectable only when it belongs to the selected Specialist.
+        // This keeps the filter hierarchy consistent: Specialist -> Subject -> Course.
+        const res = await subjectService.getAllSubjects({
+          limit: 200,
+          // The current Subject API allows sorting by name, not code.
+          sortBy: "name",
+          sortOrder: "asc",
+          isActive: true,
+          ...(selectedSpecialistId ? { specialistId: selectedSpecialistId } : {}),
+        });
+        if (cancelled) return;
+
         const list = Array.isArray(res?.data) ? res.data : [];
         setSubjects(list as any);
-      } catch {}
+        setSelectedSubjectId((current) =>
+          current && list.some((subject: any) => subject._id === current) ? current : ""
+        );
+      } catch {
+        if (!cancelled) setSubjects([]);
+      }
     })();
-  }, []);
+
+    return () => { cancelled = true; };
+  }, [selectedSpecialistId]);
 
   useEffect(() => {
     (async () => {
@@ -343,7 +363,10 @@ const CourseManagement: React.FC = () => {
       const filters: CourseFilters = {
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
         ...(selectedSubjectId && { subjectId: selectedSubjectId }),
-        ...(selectedSpecialistId && { specialistId: selectedSpecialistId }),
+        // The selected Subject is already constrained by the Specialist
+        // dropdown. Send one of these filters so the existing backend does
+        // not broaden a Subject selection back to every course in a Specialist.
+        ...(!selectedSubjectId && selectedSpecialistId && { specialistId: selectedSpecialistId }),
         ...(selectedSemesterId && { semesterId: selectedSemesterId }),
         ...(selectedTeacherId && { teacherId: selectedTeacherId }),
         page: currentPage,
@@ -539,7 +562,7 @@ const CourseManagement: React.FC = () => {
     if (debouncedSearchTerm) params.search = debouncedSearchTerm;
     if (sortOption) params.sort = sortOption;
     if (selectedSubjectId) params.subjectId = selectedSubjectId;
-    if (selectedSpecialistId) params.specialistId = selectedSpecialistId;
+    if (!selectedSubjectId && selectedSpecialistId) params.specialistId = selectedSpecialistId;
     if (selectedSemesterId) params.semesterId = selectedSemesterId;
     if (selectedTeacherId) params.teacherId = selectedTeacherId;
     params.page = String(currentPage);
@@ -876,7 +899,11 @@ const CourseManagement: React.FC = () => {
                   <div className="relative">
                     <select
                       value={selectedSpecialistId}
-                      onChange={(e) => { setSelectedSpecialistId(e.target.value); setCurrentPage(1); }}
+                      onChange={(e) => {
+                        setSelectedSpecialistId(e.target.value);
+                        setSelectedSubjectId("");
+                        setCurrentPage(1);
+                      }}
                       className="w-full appearance-none rounded-xl px-4 py-2 pr-10 border text-xs font-semibold focus:outline-none focus:ring-2 transition-all duration-200 cursor-pointer"
                       style={{
                         background: darkMode ? "rgba(30, 41, 59, 0.5)" : "#ffffff",
@@ -908,7 +935,7 @@ const CourseManagement: React.FC = () => {
                     >
                       <option value="">All Subjects</option>
                       {subjects.map((s) => (
-                        <option key={s._id} value={s._id}>{s.name}</option>
+                        <option key={s._id} value={s._id}>{s.code ? `${s.code} - ${s.name}` : s.name}</option>
                       ))}
                     </select>
                     <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">

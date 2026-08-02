@@ -210,6 +210,16 @@ describe("Schedule Service Unit Tests", () => {
             expect(result).toBeDefined();
             expect(result).toHaveLength(2);
             expect(CourseModel.findById).toHaveBeenCalledWith(courseId.toString());
+            expect(ScheduleModel.findOne).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    effectiveFrom: {$lte: createScheduleInput.effectiveTo},
+                    $or: [
+                        {effectiveTo: {$exists: false}},
+                        {effectiveTo: null},
+                        {effectiveTo: {$gte: createScheduleInput.effectiveFrom}},
+                    ],
+                })
+            );
             expect(mockSession.startTransaction).toHaveBeenCalled();
             expect(mockSession.commitTransaction).toHaveBeenCalled();
             expect(mockSession.endSession).toHaveBeenCalled();
@@ -329,6 +339,16 @@ describe("Schedule Service Unit Tests", () => {
             expect(result).toBeDefined();
             expect(schedule.status).toBe(ScheduleStatus.APPROVED);
             expect(schedule.approvedBy).toBe(adminId);
+            expect(ScheduleModel.findOne).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    effectiveFrom: {$lte: schedule.effectiveTo},
+                    $or: [
+                        {effectiveTo: {$exists: false}},
+                        {effectiveTo: null},
+                        {effectiveTo: {$gte: schedule.effectiveFrom}},
+                    ],
+                })
+            );
             expect(schedule.save).toHaveBeenCalled();
             expect(schedule.populate).toHaveBeenCalled();
         });
@@ -514,4 +534,3 @@ describe("Schedule Service Unit Tests", () => {
         });
     });
 });
-

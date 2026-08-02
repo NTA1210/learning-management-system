@@ -667,7 +667,7 @@ export default function Dashboard() {
                         : "1px solid rgba(148, 163, 184, 0.1)",
                       backdropFilter: "blur(10px)",
                     }}
-                    onClick={() => setActiveTab("Enrollments")}
+                    onClick={() => navigate("/enrollments-list")}
                     onMouseEnter={() => handleMouseEnter("enrollments")}
                     onMouseLeave={handleMouseLeave}
                   >
@@ -746,7 +746,7 @@ export default function Dashboard() {
                           : "1px solid rgba(148, 163, 184, 0.1)",
                       backdropFilter: "blur(10px)",
                     }}
-                    onClick={() => setActiveTab("Enrollments")}
+                    onClick={() => navigate("/enrollments-list")}
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div
@@ -885,9 +885,9 @@ export default function Dashboard() {
                     </p>
                   </div>
 
-                  {/* Current Semester */}
+                  {/* Current Semester - Clickable */}
                   <div
-                    className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                    className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
                     style={{
                       backgroundColor: darkMode
                         ? "rgba(26, 32, 44, 0.8)"
@@ -897,6 +897,7 @@ export default function Dashboard() {
                         : "1px solid rgba(148, 163, 184, 0.1)",
                       backdropFilter: "blur(10px)",
                     }}
+                    onClick={() => navigate("/semesters")}
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div
@@ -921,6 +922,17 @@ export default function Dashboard() {
                             d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                           ></path>
                         </svg>
+                      </div>
+                      <div
+                        className="text-xs px-2 py-1 rounded-full"
+                        style={{
+                          backgroundColor: darkMode
+                            ? "rgba(16, 185, 129, 0.1)"
+                            : "rgba(16, 185, 129, 0.1)",
+                          color: darkMode ? "#10b981" : "#059669",
+                        }}
+                      >
+                        Click to manage
                       </div>
                     </div>
                     <p

@@ -194,6 +194,7 @@ export interface ScheduleSlotItem {
 // Create schedule request - uses slots array for multiple day/time combinations
 export interface CreateScheduleRequest {
     courseId: string;
+    teacherId?: string;
     slots: ScheduleSlotItem[];
     effectiveFrom: string; // YYYY-MM-DD
     effectiveTo?: string;

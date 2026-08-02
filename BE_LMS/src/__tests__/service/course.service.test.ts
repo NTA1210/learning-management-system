@@ -2603,7 +2603,7 @@ describe('📚 Course Service Unit Tests', () => {
               status: EnrollmentStatus.APPROVED,
               lesson: { total: 10, completed: 10 },
               quiz: { total: 5, completed: 5, totalScore: 40, details: [] },
-              assignment: { total: 5, submitted: 5, totalGrade: 40, details: [] },
+              assignment: { total: 5, submitted: 5, totalGrade: 40, totalMaxScore: 50, details: [] },
               attendance: { total: 10, present: 10 },
             },
           ];
@@ -2614,7 +2614,7 @@ describe('📚 Course Service Unit Tests', () => {
           await completeCourse(course._id.toString(), adminUser._id, Role.ADMIN);
 
           const bulkOps = (EnrollmentModel.bulkWrite as jest.Mock).mock.calls[0][0];
-          expect(bulkOps[0].updateOne.update.$set.status).toBe(EnrollmentStatus.APPROVED);
+          expect(bulkOps[0].updateOne.update.$set.status).toBe(EnrollmentStatus.COMPLETED);
           expect(bulkOps[0].updateOne.update.$set.completedAt).toBeDefined();
         });
       });

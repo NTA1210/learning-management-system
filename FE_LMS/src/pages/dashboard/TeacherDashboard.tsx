@@ -124,6 +124,7 @@ export default function TeacherDashboard() {
   const [hasMoreCourses, setHasMoreCourses] = useState(false);
   const [totalCourses, setTotalCourses] = useState(0);
   const COURSES_PER_PAGE = 5;
+  const QUIZ_COURSE_FETCH_LIMIT = 100;
   const VISIBLE_COURSES = 3;
 
   // Stats
@@ -215,7 +216,8 @@ export default function TeacherDashboard() {
         try {
           const assignmentsResponse = await assignmentService.listAssignments({
             page: 1,
-            limit: 20,
+            // Count the full grading queue, not only the first dashboard page.
+            limit: 100,
             sortOrder: 'desc'
           });
           assignmentsData = assignmentsResponse.data || [];
@@ -224,11 +226,22 @@ export default function TeacherDashboard() {
           console.log('Could not fetch assignments:', err);
         }
 
-        // 3. Fetch Quizzes for teaching courses
+        // 3. Fetch quizzes from all teaching courses. The course carousel only
+        // loads five records, which must not determine the dashboard quiz list.
         let allQuizzes: Quiz[] = [];
         try {
-          if (coursesData.length > 0) {
-            const quizPromises = coursesData.slice(0, 5).map((course: any) =>
+          const quizCoursesResponse = await courseService.getMyCourses({
+            page: 1,
+            limit: QUIZ_COURSE_FETCH_LIMIT,
+            sortOrder: 'desc'
+          });
+          const quizCourses = quizCoursesResponse.data || coursesData;
+
+          if (quizCourses.length > 0) {
+            const courseById = new Map(
+              quizCourses.map((course: any) => [course._id, course])
+            );
+            const quizPromises = quizCourses.map((course: any) =>
               quizService.getQuizzesByCourseId(course._id, {
                 page: 1,
                 limit: 5
@@ -236,7 +249,20 @@ export default function TeacherDashboard() {
             );
 
             const quizResults = await Promise.all(quizPromises);
-            allQuizzes = quizResults.flatMap(result => result.data || []);
+            allQuizzes = quizResults
+              .flatMap(result => result.data || [])
+              .map((quiz) => {
+                const courseId = typeof quiz.courseId === 'string'
+                  ? quiz.courseId
+                  : quiz.courseId._id;
+                const course = courseById.get(courseId);
+                return course
+                  ? { ...quiz, courseId: { _id: course._id, title: course.title } }
+                  : quiz;
+              })
+              .sort((a, b) =>
+                new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+              );
           }
           setQuizzes(allQuizzes);
         } catch (err) {
@@ -274,13 +300,13 @@ export default function TeacherDashboard() {
         let pendingGradingCount = 0;
         if (assignmentsData.length > 0) {
           try {
-            const statsPromises = assignmentsData.slice(0, 5).map((assignment: any) =>
+            const statsPromises = assignmentsData.map((assignment: any) =>
               submissionService.getSubmissionStats(assignment._id).catch(() => null)
             );
             const statsResults = await Promise.all(statsPromises);
             pendingGradingCount = statsResults.reduce((sum, stat) => {
               if (stat) {
-                return sum + (stat.totalSubmissions || 0) - (stat.gradedSubmissions || 0);
+                return sum + (stat.pendingSubmissions || 0);
               }
               return sum;
             }, 0);
@@ -470,14 +496,15 @@ export default function TeacherDashboard() {
                     )}
                   </div>
 
-                  {/* Total Students (Estimated) */}
+                  {/* Total Students (Estimated) - View through each course roster */}
                   <div
-                    className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                    className="p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 cursor-pointer"
                     style={{
                       backgroundColor: darkMode ? 'rgba(26, 32, 44, 0.8)' : 'rgba(255, 255, 255, 0.9)',
                       border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                       backdropFilter: 'blur(10px)'
                     }}
+                    onClick={() => navigate('/my-courses')}
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div
@@ -487,6 +514,15 @@ export default function TeacherDashboard() {
                         <svg className="w-6 h-6" style={{ color: darkMode ? '#86efac' : '#16a34a' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
                         </svg>
+                      </div>
+                      <div
+                        className="text-xs px-2 py-1 rounded-full"
+                        style={{
+                          backgroundColor: darkMode ? 'rgba(16, 185, 129, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                          color: darkMode ? '#10b981' : '#059669'
+                        }}
+                      >
+                        View rosters
                       </div>
                     </div>
                     <p
@@ -526,6 +562,15 @@ export default function TeacherDashboard() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
                         </svg>
                       </div>
+                      <div
+                        className="text-xs px-2 py-1 rounded-full"
+                        style={{
+                          backgroundColor: darkMode ? 'rgba(245, 158, 11, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                          color: darkMode ? '#fcd34d' : '#d97706'
+                        }}
+                      >
+                        Review submissions
+                      </div>
                     </div>
                     <p
                       className="text-sm font-medium mb-1"
@@ -552,7 +597,7 @@ export default function TeacherDashboard() {
                       border: darkMode ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.1)',
                       backdropFilter: 'blur(10px)'
                     }}
-                    onClick={() => navigate('/quizzes')}
+                    onClick={() => navigate('/my-courses')}
                     onMouseEnter={() => handleMouseEnter('quizzes')}
                     onMouseLeave={handleMouseLeave}
                   >

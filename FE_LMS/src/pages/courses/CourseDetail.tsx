@@ -425,6 +425,8 @@ export default function CourseDetail() {
   const subject = course?.subjectId;
   const startDate = course?.startDate ? new Date(course.startDate) : null;
   const endDate = course?.endDate ? new Date(course.endDate) : null;
+  const backPath = user?.role === "admin" ? "/courses" : "/my-courses";
+  const backLabel = user?.role === "admin" ? "Back to Courses" : "Back to My Courses";
 
   return (
     <div
@@ -494,7 +496,7 @@ export default function CourseDetail() {
             {/* Back Button */}
             <div className="mb-4">
               <button
-                onClick={() => navigate("/my-courses")}
+                onClick={() => navigate(backPath)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors"
                 style={{
                   backgroundColor: isDarkMode
@@ -516,7 +518,7 @@ export default function CourseDetail() {
                     d="M10 19l-7-7m0 0l7-7m-7 7h18"
                   />
                 </svg>
-                <span>Back to My Courses</span>
+                <span>{backLabel}</span>
               </button>
             </div>
 
