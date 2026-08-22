@@ -1,7 +1,7 @@
 ## 2.2.2 Descriptions
-This part describes the use cases of the Learning Management System (LMS). The use cases are categorized by business modules, with actor roles meticulously aligned to the Use Case Diagrams.
+This section describes the use cases of the Learning Management System (LMS). The use cases are categorized by business modules, with actor roles meticulously aligned to the Use Case Diagrams.
 
-### 1. Hệ thống Xác thực & Quản lý Tài khoản (Authentication & Users)
+### 1. Authentication & User Management
 | ID | Use Case | Actors | Use Case Description |
 | :--- | :--- | :--- | :--- |
 | **01** | Register Account | Student | Register an account with email and password |
@@ -11,7 +11,7 @@ This part describes the use cases of the Learning Management System (LMS). The u
 | **05** | Update Profile | Student, Teacher, Admin | Update user profile details and avatar |
 | **06** | User Management | Admin | Console user management and list users for courses |
 
-### 2. Quản lý Khóa học & Lớp học (Course & Class Management)
+### 2. Course & Class Management
 | ID | Use Case | Actors | Use Case Description |
 | :--- | :--- | :--- | :--- |
 | **07** | Create and Edit Courses | Teacher | Create and edit courses |
@@ -19,7 +19,7 @@ This part describes the use cases of the Learning Management System (LMS). The u
 | **09** | Divide Class Sections | Teacher, Admin | Divide students/teachers into small classes (Sections) |
 | **10** | View Course Statistics | Teacher, Admin | Create and view course statistics |
 
-### 3. Đăng ký Môn học & Thư mời (Enrollment & Course Invites)
+### 3. Enrollment & Course Invites
 | ID | Use Case | Actors | Use Case Description |
 | :--- | :--- | :--- | :--- |
 | **11** | Enroll/Unenroll Course | Student | Enroll or unenroll (cancel) from courses |
@@ -29,7 +29,7 @@ This part describes the use cases of the Learning Management System (LMS). The u
 | **15** | Join via Invite Link | Student | Join course via invite link token without manual approval |
 | **16** | Manage Invite Links | Teacher, Admin | Manage (view, enable/disable, delete) course invite links |
 
-### 4. Quản lý Môn học & Điều kiện tiên quyết (Subjects & Prerequisites)
+### 4. Subjects & Prerequisites Management
 | ID | Use Case | Actors | Use Case Description |
 | :--- | :--- | :--- | :--- |
 | **17** | Manage Subjects | Admin | Manage subjects for courses |
@@ -39,7 +39,7 @@ This part describes the use cases of the Learning Management System (LMS). The u
 | **21** | Update/Delete Subject | Admin | Update/activate/deactivate/delete subjects |
 | **22** | Manage Prerequisites | Admin | Manage prerequisite subject dependencies |
 
-### 5. Quản lý Bài học & Tiến độ (Lessons & Learning Progress)
+### 5. Lessons & Learning Progress
 | ID | Use Case | Actors | Use Case Description |
 | :--- | :--- | :--- | :--- |
 | **23** | View Lessons | Student | View lessons and download learning materials (PDF, Video...) |
@@ -50,7 +50,7 @@ This part describes the use cases of the Learning Management System (LMS). The u
 | **28** | Review Progress | Teacher, Admin | Review student's course-level lesson progress |
 | **29** | Log Access Timestamps | System | Include last access timestamps in lesson progress data |
 
-### 6. Ngân hàng Câu hỏi & Đề thi (Quiz & Questions Bank)
+### 6. Question Banks & Quizzes
 | ID | Use Case | Actors | Use Case Description |
 | :--- | :--- | :--- | :--- |
 | **30** | Import Questions | Teacher, Admin | Import XML questions file to create questions bank |
@@ -68,7 +68,7 @@ This part describes the use cases of the Learning Management System (LMS). The u
 | **42** | View Score Statistics | Teacher, Admin | View quiz overall score statistics |
 | **43** | Auto-save Answers | Student | Auto-save / remember answers when doing quiz to prevent data loss |
 
-### 7. Bài tập lớn & Chấm điểm (Assignments & Submissions Grading)
+### 7. Assignments & Submissions Grading
 | ID | Use Case | Actors | Use Case Description |
 | :--- | :--- | :--- | :--- |
 | **44** | Create Assignments | Teacher, Admin | Create assignments with deadlines |
@@ -79,7 +79,7 @@ This part describes the use cases of the Learning Management System (LMS). The u
 | **49** | View Grade Statistics | Teacher, Admin | View grade statistics and reports of assignments/courses |
 | **50** | View Study Result Statistics | Teacher, Admin | View study result statistics of students in a course |
 
-### 8. Lịch học & Điểm danh (Attendance & Schedules)
+### 8. Timetables & Attendance Tracking
 | ID | Use Case | Actors | Use Case Description |
 | :--- | :--- | :--- | :--- |
 | **51** | Manage Weekly Schedules | Admin | Global schedules weekly with customizable daily time slots |
@@ -94,13 +94,13 @@ This part describes the use cases of the Learning Management System (LMS). The u
 | **60** | View Student Attendance Stats | Teacher, Admin | View individual student statistics in a course |
 | **61** | Send Absence Notification | System Cron | Send absence notification emails to students |
 
-### 9. Kênh thảo luận & Trò chuyện thời gian thực (Forums, Blogs & Live Chat)
+### 9. Forums, Blogs & Live Real-Time Chat
 | ID | Use Case | Actors | Use Case Description |
 | :--- | :--- | :--- | :--- |
 | **62** | Post & Reply in Forum | Student, Teacher, Admin | Post and reply to discussions in each course forum |
 | **63** | Real-time Chat & Video Calls | Student, Teacher, Admin | Real-time chat & video calls with attachments |
 
-### 10. Hệ thống Phản hồi & Đánh giá (Feedback System)
+### 10. Feedback & Quality Review System
 | ID | Use Case | Actors | Use Case Description |
 | :--- | :--- | :--- | :--- |
 | **64** | Send Feedback | Student | Send feedback about course/teacher with rating & file upload |
@@ -112,7 +112,7 @@ This part describes the use cases of the Learning Management System (LMS). The u
 | **70** | Delete Own Feedback | Student, Admin | Delete own feedback |
 | **71** | Delete Inappropriate Feedback | Student, Admin | Delete any inappropriate feedback |
 
-### 11. Quản lý Thông báo & Tin tức (Announcements & Notifications)
+### 11. Announcements & System Notifications
 | ID | Use Case | Actors | Use Case Description |
 | :--- | :--- | :--- | :--- |
 | **72** | Create Announcements | Teacher, Admin | Create Announcements (course-wide or system-wide) |

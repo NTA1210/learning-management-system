@@ -1,69 +1,43 @@
-# React + TypeScript + Vite
+# LMS Frontend (FE_LMS)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Modern, responsive Single Page Application (SPA) for the Learning Management System (LMS), built with **React 19**, **Vite**, and **TypeScript**.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 🛠️ Tech Stack & Libraries
 
-## Expanding the ESLint configuration
+- **Core**: React 19, TypeScript, Vite
+- **Styling**: Tailwind CSS v4, Lucide React, Bootstrap Icons
+- **State Management**: Zustand, Jotai
+- **Server State & Data Fetching**: TanStack React Query v5, Axios
+- **Real-Time Communication**: Socket.io Client
+- **Interactive & Analytics**: Three.js, React Three Fiber, Recharts
+- **Content & Markdown**: React Markdown, Remark GFM, DOMPurify
+- **OAuth**: `@react-oauth/google`
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+---
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 🚀 Quick Start
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 1. Install Dependencies
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. Configure Environment Variables
+Create a `.env` file in `FE_LMS/` (or copy `.env.development`):
+```ini
+VITE_BASE_API=http://localhost:4004
+VITE_GOOGLE_CLIENT_ID=your_google_client_id.apps.googleusercontent.com
+```
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### 3. Run Development Server
+```bash
+npm run dev
+```
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 4. Build for Production
+```bash
+npm run build
+npm run preview
 ```

@@ -1,103 +1,103 @@
-# Sơ đồ ngữ cảnh (Context Diagram) - Learning Management System (LMS)
+# Context Diagram - Learning Management System (LMS)
 
-Tài liệu này cung cấp sơ đồ ngữ cảnh (Context Diagram - DFD Level 0) và phân tích các luồng dữ liệu của hệ thống quản lý học tập (Learning Management System - LMS) dựa trên mã nguồn thực tế của dự án.
-
----
-
-## 1. Các thành phần trong hệ thống ngữ cảnh
-
-Hệ thống LMS trung tâm tương tác với **3 Đối tác bên ngoài (External Actors)** và **3 Hệ thống hỗ trợ (External Systems)**:
-
-### Tác nhân bên ngoài (External Actors)
-*   **Học sinh/Sinh viên (Student):** Người dùng học tập, làm bài kiểm tra (quizzes), nộp bài tập (assignments), xem thời khóa biểu (schedule), điểm danh (attendance), trao đổi trên diễn đàn (forum), viết blog, chat và gọi video call (chatRoom).
-*   **Giáo viên/Giảng viên (Teacher):** Người quản lý khóa học (courses), bài học (lessons), đăng tải tài liệu học tập (lesson materials), soạn đề kiểm tra (quizzes), chấm điểm bài tập (submissions), điểm danh học viên (attendance), tạo lịch học/phân ca (schedules/sessions), và phản hồi đánh giá của học viên.
-*   **Quản trị viên (Admin):** Người quản lý tổng thể hệ thống bao gồm: Quản lý ngành học (majors), chuyên ngành (specialists), học kỳ (semesters), các môn học (subjects), tài khoản người dùng (users - Admin/Teacher/Student), các ca học chuẩn (time slots), và giám sát hoạt động hệ thống.
-
-### Hệ thống tích hợp ngoài (External Systems)
-*   **Hệ thống cơ sở dữ liệu (MongoDB & Mongoose):** Lưu trữ toàn bộ dữ liệu nghiệp vụ của hệ thống (User, Course, Enrollment, Lesson, Quiz, Assignment, Submission, Forum, Attendance, ChatRoom,...).
-*   **Dịch vụ lưu trữ tệp (MinIO / S3 Object Storage):** Lưu trữ và phân phối các tệp tin tải lên như: tài liệu bài học (lesson materials), tệp tin bài tập nộp (submissions), ảnh đại diện (avatar_url), v.v.
-*   **Dịch vụ gửi Email (Resend Mailer):** Gửi mã OTP xác thực (Verification Codes), thư mời tham gia khóa học (Course Invitation), và các thông báo quan trọng.
-*   **Hệ thống thời gian thực (Socket.io Engine):** Xử lý tín hiệu gọi video (Video Call Signaling), tin nhắn tức thời (Chat Message), và thông báo thời gian thực (Real-time Notifications).
+This document provides the Context Diagram (DFD Level 0) and analyzes data flows for the **Learning Management System (LMS)** based on the actual project codebase.
 
 ---
 
-## 2. Sơ đồ ngữ cảnh hệ thống (Mermaid Diagram)
+## 1. Components in the Context System
 
-Dưới đây là sơ đồ ngữ cảnh biểu diễn dòng thông tin giữa các tác nhân và hệ thống LMS:
+The central LMS application interacts with **3 External Actors** and **4 External Systems**:
+
+### External Actors
+*   **Student:** Enrolled learners who access lessons, download study materials, complete quizzes, submit assignments, track schedules, view personal attendance, participate in forum discussions, write blog posts, live chat, and make 1-on-1 video calls.
+*   **Teacher:** Instructors who manage courses and syllabus lessons, upload learning materials (slides, videos, docs), create quizzes, grade assignment submissions, conduct student attendance, configure teaching schedules/sessions, and view student feedback.
+*   **Administrator (Admin):** System administrators responsible for overall system configuration: managing academic majors, specializations, semesters, subject prerequisite maps, user accounts (Admin/Teacher/Student), standardized time slots, course approvals, and system-wide monitoring.
+
+### External Systems
+*   **Database System (MongoDB & Mongoose):** Persistent storage for all application domain entities (`User`, `Course`, `Enrollment`, `Lesson`, `Quiz`, `Assignment`, `Submission`, `Forum`, `Attendance`, `ChatRoom`, etc.).
+*   **File Storage Service (MinIO / S3 Object Storage):** Stores and securely serves binary uploaded assets such as lesson materials, student submission files, user avatars, and feedback attachments.
+*   **Email Delivery Service (Resend Mailer API):** Handles transactional emails including 6-digit OTP verification codes, course invitation links, password reset emails, and automated absence threshold warnings.
+*   **Real-time Engine (Socket.io Gateway):** Orchestrates real-time bidirectional communication, including instant chat messaging, read receipts, real-time alerts, and WebRTC peer-to-peer video call signaling (SDP offer/answer/ICE candidate exchange).
+
+---
+
+## 2. System Context Diagram (Mermaid UML)
+
+The diagram below illustrates the information flows between external actors, external integration systems, and the central LMS:
 
 ```mermaid
 graph TD
-    %% Định nghĩa các Style
+    %% Style Definitions
     classDef actor fill:#e1f5fe,stroke:#0288d1,stroke-width:2px;
     classDef system fill:#efebe9,stroke:#5d4037,stroke-width:2px;
     classDef lmsCore fill:#e8f5e9,stroke:#2e7d32,stroke-width:3px,stroke-dasharray:5 5;
 
-    %% Định nghĩa các nút
-    STUDENT((Học sinh / Student)):::actor
-    TEACHER((Giáo viên / Teacher)):::actor
-    ADMIN((Quản trị viên / Admin)):::actor
+    %% Node Definitions
+    STUDENT((Student)):::actor
+    TEACHER((Teacher)):::actor
+    ADMIN((Admin)):::actor
 
-    LMS["Hệ thống trung tâm LMS<br/>(BE ExpressJS + FE Vite/React)"]:::lmsCore
+    LMS["Central LMS Application<br/>(ExpressJS Backend + React/Vite Frontend)"]:::lmsCore
 
     DB[(MongoDB Database)]:::system
-    STORAGE[(MinIO Storage)]:::system
-    EMAIL[(Resend Mail Service)]:::system
-    SOCKET[(Socket.io Engine)]:::system
+    STORAGE[(MinIO / S3 Storage)]:::system
+    EMAIL[(Resend Email Service)]:::system
+    SOCKET[(Socket.io Gateway)]:::system
 
-    %% Dòng dữ liệu từ Học sinh (Student)
-    STUDENT -- "1. Đăng ký/Đăng nhập, Thông tin cá nhân" --> LMS
-    STUDENT -- "2. Xem bài học, tải tài liệu học tập" --> LMS
-    STUDENT -- "3. Làm bài kiểm tra (Quiz), nộp bài tập" --> LMS
-    STUDENT -- "4. Điểm danh, xem lịch học, gửi feedback" --> LMS
-    STUDENT -- "5. Gửi tin nhắn chat, post bài thảo luận forum, blog" --> LMS
-    LMS -- "Phản hồi kết quả học tập, bài làm, điểm số, lịch học, thông báo" --> STUDENT
+    %% Data Flow from Student
+    STUDENT -- "1. Register/Login, Profile Management" --> LMS
+    STUDENT -- "2. View Lessons, Download Materials" --> LMS
+    STUDENT -- "3. Take Quizzes (Auto-save), Submit Assignments" --> LMS
+    STUDENT -- "4. View Attendance, Schedules, Submit Feedback" --> LMS
+    STUDENT -- "5. Chat, Forum Discussions, Blog Posts" --> LMS
+    LMS -- "Learning results, grades, schedules, notifications" --> STUDENT
 
-    %% Dòng dữ liệu từ Giáo viên (Teacher)
-    TEACHER -- "1. Quản lý khóa học, bài học, tài liệu" --> LMS
-    TEACHER -- "2. Soạn đề kiểm tra (Quiz), đăng bài tập" --> LMS
-    TEACHER -- "3. Chấm điểm bài tập nộp, xem danh sách bài thi" --> LMS
-    TEACHER -- "4. Quản lý lịch học, ca học, điểm danh" --> LMS
-    TEACHER -- "5. Viết thông báo khóa học, phản hồi học sinh" --> LMS
-    LMS -- "Danh sách bài nộp, thống kê điểm số, tiến độ học viên" --> TEACHER
+    %% Data Flow from Teacher
+    TEACHER -- "1. Manage Courses, Lessons, Materials" --> LMS
+    TEACHER -- "2. Create Quizzes, Post Assignments" --> LMS
+    TEACHER -- "3. Grade Submissions, Review Quiz Attempts" --> LMS
+    TEACHER -- "4. Manage Schedules, Conduct Attendance" --> LMS
+    TEACHER -- "5. Course Announcements, Student Reviews" --> LMS
+    LMS -- "Submission lists, grade analytics, student progress" --> TEACHER
 
-    %% Dòng dữ liệu từ Quản trị viên (Admin)
-    ADMIN -- "1. Quản trị Tài khoản (Users)" --> LMS
-    ADMIN -- "2. Quản lý Môn học, Học kỳ, Ngành học" --> LMS
-    ADMIN -- "3. Thiết lập ca học, Chuyên ngành" --> LMS
-    LMS -- "Thống kê hệ thống, Nhật ký hoạt động" --> ADMIN
+    %% Data Flow from Admin
+    ADMIN -- "1. User Account Administration" --> LMS
+    ADMIN -- "2. Subjects, Semesters, Majors & Prerequisites" --> LMS
+    ADMIN -- "3. Teaching Approvals, Time Slots, Feedbacks" --> LMS
+    LMS -- "System analytics, audit logs, reports" --> ADMIN
 
-    %% Dòng dữ liệu với hệ thống ngoài
-    LMS <--> "Lưu/Truy xuất dữ liệu nghiệp vụ" DB
-    LMS <--> "Tải lên/Tải về tài liệu, bài nộp, avatar" STORAGE
-    LMS -- "Gửi mã OTP, Thư mời khóa học" --> EMAIL
-    LMS <--> "Truyền tín hiệu video, chat, thông báo realtime" SOCKET
+    %% External Systems Data Flow
+    LMS <--> "Query/Store domain data" DB
+    LMS <--> "Upload/Stream materials, submissions, avatars" STORAGE
+    LMS -- "Send OTPs, invites, absence warnings" --> EMAIL
+    LMS <--> "Video signaling, real-time chat, instant notifications" SOCKET
 
-    %% Kết nối từ hệ thống ngoài đến người dùng qua cổng trung gian
-    SOCKET -.-> |"Thông báo realtime & video call"| STUDENT
-    SOCKET -.-> |"Thông báo realtime & video call"| TEACHER
-    EMAIL -.-> |"Thư mời & OTP"| STUDENT
-    EMAIL -.-> |"Thư mời & OTP"| TEACHER
+    %% Direct notifications to users
+    SOCKET -.-> |"Real-time notifications & video calls"| STUDENT
+    SOCKET -.-> |"Real-time notifications & video calls"| TEACHER
+    EMAIL -.-> |"Invitation & OTP emails"| STUDENT
+    EMAIL -.-> |"Invitation & OTP emails"| TEACHER
 ```
 
 ---
 
-## 3. Bản đồ Luồng Dữ liệu Chi tiết (Data Flow Matrix)
+## 3. Detailed Data Flow Matrix
 
-Dưới đây là chi tiết về các thông tin trao đổi qua lại giữa hệ thống trung tâm LMS và các tác nhân/hệ thống liên kết:
+The matrix below provides details regarding the data exchanged between the central LMS application and external entities:
 
-### 3.1. Các Tác Nhân (Actors)
+### 3.1. External Actors
 
-| Tác nhân gửi | Dữ liệu Đầu vào (Input to LMS) | Tác nhân nhận | Dữ liệu Đầu ra (Output from LMS) |
+| Sending Actor | Input Data to LMS | Receiving Actor | Output Data from LMS |
 | :--- | :--- | :--- | :--- |
-| **Student** | • Thông tin đăng nhập, đăng ký<br/>• Yêu cầu vào học khóa học/bài học<br/>• Bài thi trắc nghiệm (Quiz Attempts)<br/>• Tệp tin bài tập lớn (Submissions)<br/>• Phản hồi/Đánh giá môn học (Feedback)<br/>• Bài đăng forum, bình luận, bài blog<br/>• Tin nhắn chat cá nhân/nhóm | **Student** | • Trạng thái đăng nhập & Token xác thực<br/>• Tài liệu học tập (Lesson Materials)<br/>• Kết quả kiểm tra trắc nghiệm tức thời<br/>• Điểm số & nhận xét từ giáo viên<br/>• Lịch học & trạng thái điểm danh cá nhân<br/>• Luồng chat, luồng video call realtime |
-| **Teacher** | • Thông tin khóa học, bài học mới<br/>• Tài liệu đính kèm (Slide, PDF, Video)<br/>• Ngân hàng câu hỏi & Đề kiểm tra (Quiz)<br/>• Điểm số & nhận xét bài tập học viên<br/>• Lịch dạy học & Điểm danh học viên lớp học<br/>• Thông báo khóa học (Announcements) | **Teacher** | • Báo cáo tiến độ học tập của từng học viên<br/>• Danh sách học viên nộp bài & tệp đính kèm<br/>• Danh sách và lịch sử điểm danh của lớp<br/>• Ý kiến đánh giá môn học (Feedback) từ sinh viên |
-| **Admin** | • Danh sách tài khoản tạo mới (Admin/Teacher/Student)<br/>• Danh sách Môn học (Subjects), Ngành (Majors)<br/>• Cấu hình chuyên ngành (Specialists), Học kỳ (Semesters)<br/>• Cấu hình ca học mẫu (Time Slots) | **Admin** | • Danh sách người dùng hệ thống kèm trạng thái<br/>• Thống kê lượng truy cập, học tập toàn hệ thống<br/>• Báo cáo hệ thống và log lỗi (nếu có) |
+| **Student** | • Credentials & Registration info<br/>• Course enrollment & lesson access requests<br/>• Quiz responses (with auto-save)<br/>• Homework submission files<br/>• Course/Instructor feedback ratings<br/>• Forum posts, replies & blog articles<br/>• Real-time chat messages & WebRTC signals | **Student** | • Auth tokens (JWT in HTTP-Only Cookies)<br/>• Lesson content & streaming materials<br/>• Instant quiz results & score feedback<br/>• Assignment grades & instructor remarks<br/>• Personal timetable & attendance status<br/>• Real-time chat & video streams |
+| **Teacher** | • Course syllabus, chapter & lesson data<br/>• Lecture files (PDF, MP4, MP3, slides)<br/>• Question bank items & Quiz definitions<br/>• Assignment grades & evaluation remarks<br/>• Teaching availability & attendance records<br/>• Course-level announcements | **Teacher** | • Student progress tracking reports<br/>• Submitted assignments & file downloads<br/>• Class attendance summary & alerts<br/>• Aggregated student feedback ratings |
+| **Admin** | • User accounts creation & role updates<br/>• Majors, Specialists, Semesters, Subjects<br/>• Prerequisite dependency graph<br/>• Time slots & course approval status | **Admin** | • Global user directory & status logs<br/>• Academic analytics & enrollment metrics<br/>• System logs & reported feedback moderation |
 
-### 3.2. Các Hệ Thống Tích Hợp (Systems)
+### 3.2. External Integrated Systems
 
-| Tác nhân liên kết | Hướng tương tác | Luồng dữ liệu trao đổi |
+| Integrated System | Direction | Exchanged Data Flow |
 | :--- | :---: | :--- |
-| **MongoDB Database** | Hai chiều | • **Gửi từ LMS:** Truy vấn CRUD (Create, Read, Update, Delete) cho các collection: `users`, `courses`, `lessons`, `quizzes`, `submissions`, `schedules`, `chats`,...<br/>• **Nhận về LMS:** Kết quả truy vấn dữ liệu dạng JSON Documents thông qua Mongoose ORM. |
-| **MinIO Object Storage** | Hai chiều | • **Gửi từ LMS:** Tải lên luồng nhị phân (Buffer) các file đính kèm với mã hash định danh duy nhất (UUID) vào các prefix phù hợp.<br/>• **Nhận về LMS:** Trả về Public URL dạng `https://[Minio_Endpoint]/[Bucket]/[Key]` hoặc Link ký nhận tải về có thời hạn (Presigned URL) cho client. |
-| **Resend Mail Service** | Một chiều | • **Gửi từ LMS:** Gửi API Payload chứa thông tin: địa chỉ email nhận (`to`), tiêu đề (`subject`), nội dung text/HTML (`html` được render từ template mẫu của hệ thống). Dịch vụ Resend sẽ thực thi gửi email thực tế đến người dùng. |
-| **Socket.io Engine** | Hai chiều | • **Tương tác:** Tạo kênh kết nối song song WebSockets. LMS gửi các gói tin sự kiện như gửi tin nhắn chat, yêu cầu kết nối Video Call (SDP offer/answer), hoặc kích hoạt thông báo realtime để hệ thống Socket.io phân phối ngay lập tức tới máy trạm của các User tương ứng đang online. |
+| **MongoDB Database** | Bidirectional | • **Outbound from LMS:** CRUD operations across domain collections: `users`, `courses`, `lessons`, `quizzes`, `submissions`, `schedules`, `chats`, `attendances`, etc.<br/>• **Inbound to LMS:** Query results and hydrated JSON documents via Mongoose ORM. |
+| **MinIO / S3 Storage** | Bidirectional | • **Outbound from LMS:** Binary upload streams with unique UUID hashes and structured bucket prefixes.<br/>• **Inbound to LMS:** Public file URLs and secure time-limited Presigned URLs for client download/streaming. |
+| **Resend Email Service** | Unidirectional | • **Outbound from LMS:** API payloads containing recipient (`to`), subject line, and rendered HTML/text templates for OTP codes, password resets, course invites, and attendance warnings. |
+| **Socket.io Gateway** | Bidirectional | • **Interaction:** Persistent WebSocket tunnels for instant messaging, room broadcasting, seen receipts, live notifications, and WebRTC peer connection signaling (SDP offer/answer, ICE candidates). |

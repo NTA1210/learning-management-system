@@ -1,39 +1,39 @@
-# 1. Code Packages - Phân rã cấu trúc Gói mã nguồn
+# 1. Code Packages - Source Code Structure Breakdown
 
-Tài liệu này trình bày sơ đồ gói (Package Diagram), giải thích chi tiết mối quan hệ phụ thuộc giữa các gói, quy tắc đặt tên, và bảng mô tả vai trò của từng package trong dự án **LMS (Backend ExpressJS + TypeScript)**.
+This document presents the Package Diagram, explains package dependencies, naming conventions, and provides a detailed breakdown of each package in the **LMS Backend (ExpressJS + TypeScript)**.
 
 ---
 
-## 1.1 Sơ đồ Gói tổng thể (Overall Package Diagram)
+## 1.1 Overall Package Diagram
 
-Dưới đây là sơ đồ UML mô tả các package trong dự án và mối quan hệ sử dụng (`<<use>>`) giữa chúng:
+Below is the UML diagram depicting the codebase packages and their dependency (`<<use>>`) relationships:
 
 ```mermaid
 graph TD
-    %% Định nghĩa các Package chính
-    subgraph Client-Facing Layer [Tầng Giao Tiếp Ngoại Vi]
-        ROUTES["📁 routes<br/>(Định tuyến API & URL)"]
+    %% Package Definitions
+    subgraph Client-Facing Layer [Client-Facing Layer]
+        ROUTES["📁 routes<br/>(API Endpoints & URL Routing)"]
         SOCKET["📁 socket<br/>(Realtime Socket.io Engines)"]
     end
 
-    subgraph Business Logic Layer [Tầng Xử Lý Nghiệp Vụ]
-        CONTROLLER["📁 controller<br/>(Điều phối HTTP Request/Response)"]
-        SERVICES["📁 services<br/>(Lõi nghiệp vụ & Transaction)"]
+    subgraph Business Logic Layer [Business Logic Layer]
+        CONTROLLER["📁 controller<br/>(HTTP Request/Response Orchestrator)"]
+        SERVICES["📁 services<br/>(Core Business Logic & Transactions)"]
     end
 
-    subgraph Data Access Layer [Tầng Truy Cập Dữ Liệu]
+    subgraph Data Access Layer [Data Access Layer]
         MODELS["📁 models<br/>(Mongoose Schemas & MongoDB Models)"]
     end
 
-    subgraph Cross-Cutting Layer [Tầng Tiện Ích Chung]
-        MIDDLEWARE["📁 middleware<br/>(Xác thực, Phân quyền, Bắt lỗi)"]
-        VALIDATORS["📁 validators<br/>(Lớp kiểm tra dữ liệu - Zod/Schemas)"]
-        UTILS["📁 utils<br/>(Gửi Mail, MinIO S3, Asserts)"]
-        CONFIG["📁 config<br/>(Kết nối DB, Cấu hình Multer, Env)"]
+    subgraph Cross-Cutting Layer [Cross-Cutting Layer]
+        MIDDLEWARE["📁 middleware<br/>(Auth, RBAC, Error Handlers)"]
+        VALIDATORS["📁 validators<br/>(Validation Schemas - Zod)"]
+        UTILS["📁 utils<br/>(Mailer, MinIO S3, Asserts)"]
+        CONFIG["📁 config<br/>(DB Connection, Multer, Env)"]
         TYPES["📁 types<br/>(TypeScript Interfaces & Enums)"]
     end
 
-    %% Mối quan hệ sử dụng <<use>>
+    %% Dependency Relationships <<use>>
     ROUTES -. "<<use>>" .-> CONTROLLER
     ROUTES -. "<<use>>" .-> MIDDLEWARE
     
@@ -52,7 +52,7 @@ graph TD
     MIDDLEWARE -. "<<use>>" .-> TYPES
     VALIDATORS -. "<<use>>" .-> TYPES
 
-    %% Định nghĩa Style
+    %% Style Definitions
     classDef client fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
     classDef logic fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
     classDef data fill:#fff3e0,stroke:#e65100,stroke-width:2px;
@@ -66,51 +66,51 @@ graph TD
 
 ---
 
-## 1.2 Giải thích quan hệ phụ thuộc giữa các Gói (Explanation)
+## 1.2 Package Dependencies & Architecture Rationale
 
-Kiến trúc hệ thống được xây dựng theo mô hình **layered architecture (kiến trúc phân tầng)** hướng đối tượng giúp mã nguồn tách biệt trách nhiệm (Separation of Concerns) và dễ dàng bảo trì:
+The system architecture follows a clean **Layered Architecture** with strict Separation of Concerns (SoC) for maintainability and scalability:
 
-1.  **Tầng Giao Tiếp Ngoại Vi (Client-Facing Layer):**
-    *   `routes` nhận trực tiếp các yêu cầu HTTP từ người dùng (Frontend Vite/React). Nó sử dụng các `middleware` để xác thực quyền truy cập trước khi chuyển tiếp yêu cầu đến `controller`.
-    *   `socket` quản lý các luồng dữ liệu thời gian thực hai chiều (tin nhắn chat, video calling) thông qua công cụ Socket.io.
-2.  **Tầng Xử Lý Nghiệp Vụ (Business Logic Layer):**
-    *   `controller` đóng vai trò nhạc trưởng điều phối. Nó sử dụng `validators` để đảm bảo dữ liệu gửi lên đúng định dạng, sau đó chuyển giao cho `services` để xử lý và đóng gói kết quả phản hồi HTTP.
-    *   `services` là trái tim của ứng dụng. Đây là nơi duy nhất chứa các quy tắc nghiệp vụ, tính toán logic và giao tiếp với tầng `models` để thực thi truy vấn cơ sở dữ liệu.
-3.  **Tầng Truy Cập Dữ Liệu (Data Access Layer):**
-    *   `models` định nghĩa các thực thể và cấu trúc lược đồ Mongoose để lưu trữ và truy vấn trong MongoDB.
-4.  **Tầng Tiện Ích Chung (Cross-Cutting Layer):**
-    *   `middleware`, `validators`, `utils`, `config` và `types` là các gói chức năng bổ trợ, được import và tái sử dụng xuyên suốt bởi tất cả các tầng nghiệp vụ phía trên.
-
----
-
-## 1.3 Quy tắc đặt tên Gói và Tệp nguồn (Naming Conventions)
-
-Để duy trì tính nhất quán trên toàn bộ dự án, các quy tắc đặt tên sau đây được áp dụng nghiêm ngặt:
-
-*   **Tên gói (Package/Folder names):** Luôn viết thường hoàn toàn, sử dụng danh từ số nhiều hoặc số ít đơn giản (Ví dụ: `routes`, `controller`, `services`, `models`).
-*   **Tên tệp Router:** Đặt theo cấu trúc `camelCase` kết thúc bằng đuôi `.route.ts` (Ví dụ: `auth.route.ts`, `attendance.route.ts`).
-*   **Tên tệp Controller:** Đặt theo cấu trúc `camelCase` kết thúc bằng đuôi `.controller.ts` (Ví dụ: `auth.controller.ts`, `assignment.controller.ts`).
-*   **Tên tệp Service:** Đặt theo cấu trúc `camelCase` kết thúc bằng đuôi `.service.ts` (Ví dụ: `auth.service.ts`, `enrollment.service.ts`).
-*   **Tên tệp Model:** Đặt theo cấu trúc `camelCase` kết thúc bằng đuôi `.model.ts` (Ví dụ: `user.model.ts`, `course.model.ts`).
-*   **Tên tệp Middleware:** Đặt theo cấu trúc `camelCase` viết thường (Ví dụ: `authenticate.ts`, `authorize.ts`).
-*   **Tên tệp Validator Schemas:** Đặt theo cấu trúc `camelCase` kết thúc bằng đuôi `.schemas.ts` (Ví dụ: `course.schemas.ts`).
+1.  **Client-Facing Layer:**
+    *   `routes`: Receives incoming HTTP requests from the frontend client (React + Vite). Binds route paths with security middleware (authentication, RBAC) and dispatches calls to target controllers.
+    *   `socket`: Handles persistent bidirectional WebSockets connections (instant chat messaging, read receipts, and WebRTC video call signaling) using Socket.io.
+2.  **Business Logic Layer:**
+    *   `controller`: Orchestrates HTTP inputs and outputs. Validates payload formats using `validators` and delegates processing to `services`, returning standardized HTTP responses.
+    *   `services`: Houses domain business logic (e.g., prerequisite verification algorithms, anti-spam enrollment cooldown, quiz auto-grading, and attendance stats). Directly interacts with `models` to persist and retrieve domain data.
+3.  **Data Access Layer:**
+    *   `models`: Defines Mongoose schemas, domain constraints, database indexes, hooks (pre-save), and provides strong typing for MongoDB collections.
+4.  **Cross-Cutting Layer:**
+    *   `middleware`, `validators`, `utils`, `config`, and `types` provide reusable helper modules and configurations shared across all upper layers.
 
 ---
 
-## 1.4 Bảng Mô tả Gói (Package Descriptions Table)
+## 1.3 Naming Conventions
 
-Dưới đây là bảng phân rã chi tiết 11 gói mã nguồn chính trong thư mục `/src` của dự án `BE_LMS`:
+To maintain consistency across the codebase, the following naming conventions are enforced:
+
+*   **Package / Directory Names:** Lowercase words or singular/plural nouns (e.g., `routes`, `controller`, `services`, `models`, `middleware`, `validators`, `utils`).
+*   **Router Files:** `camelCase` with `.route.ts` suffix (e.g., `auth.route.ts`, `attendance.route.ts`).
+*   **Controller Files:** `camelCase` with `.controller.ts` suffix (e.g., `auth.controller.ts`, `assignment.controller.ts`).
+*   **Service Files:** `camelCase` with `.service.ts` suffix (e.g., `auth.service.ts`, `enrollment.service.ts`).
+*   **Model Files:** `camelCase` with `.model.ts` suffix (e.g., `user.model.ts`, `course.model.ts`).
+*   **Middleware Files:** `camelCase` (e.g., `authenticate.ts`, `authorize.ts`, `errorHandler.ts`).
+*   **Validator Files:** `camelCase` with `.schemas.ts` suffix (e.g., `course.schemas.ts`, `enrollment.schemas.ts`).
+
+---
+
+## 1.4 Package Descriptions Table
+
+Detailed breakdown of the 11 core packages under `/src` in `BE_LMS`:
 
 | No | Package | Description |
 | :--- | :--- | :--- |
-| **01** | **routes** | Đăng ký và phân phối tất cả các API endpoints của hệ thống (như `/auth`, `/courses`, `/attendances`). Liên kết các Route với Middleware bảo mật và định hướng luồng yêu cầu đến đúng tệp Controller tương ứng. |
-| **02** | **controller** | Đóng vai trò cầu nối tiếp nhận dữ liệu đầu vào từ HTTP Request. Gọi validator để kiểm tra tính hợp lệ của dữ liệu, gọi Service để thực thi nghiệp vụ cốt lõi, và phản hồi kết quả về phía Client bằng mã HTTP tương ứng. |
-| **03** | **services** | Chứa toàn bộ các xử lý nghiệp vụ thực tế của hệ thống (ví dụ: thuật toán kiểm tra môn tiên quyết, thời gian cooldown đăng ký lớp học, hay thống kê trung bình điểm số). Giao tiếp trực tiếp với cơ sở dữ liệu thông qua các Model. |
-| **04** | **models** | Định nghĩa lược đồ thực thể (Mongoose Schemas), các chỉ mục tìm kiếm tối ưu (Indexes), các bộ lắng nghe sự kiện (Pre-save Hooks), và cung cấp giao diện tương tác dữ liệu (MongoDB Collection Models) cho tầng Service. |
-| **05** | **middleware** | Tập hợp các hàm trung gian xử lý các tác vụ xuyên suốt hệ thống như kiểm tra trạng thái đăng nhập (Authentication), phân quyền theo vai trò (Role-based Authorization), giới hạn tần suất yêu cầu và bắt lỗi tập trung (Global Error Handler). |
-| **06** | **validators** | Định nghĩa các bộ lọc và cấu trúc schema xác thực dữ liệu (sử dụng Zod/Joi) cho từng API để ngăn chặn lỗi dữ liệu rác hoặc tấn công tiêm mã độc vào DB trước khi chuyển sang tầng nghiệp vụ. |
-| **07** | **socket** | Thiết lập và quản lý toàn bộ các sự kiện thời gian thực (WebSockets) qua Socket.io bao gồm kết nối, phát tín hiệu video call (video call signaling) và truyền nhận tin nhắn tức thời trong phòng chat. |
-| **08** | **config** | Cấu hình toàn bộ môi trường và thư viện thứ ba bao gồm kết nối cơ sở dữ liệu MongoDB, tích hợp bộ nhớ lưu trữ file MinIO (Multer/S3), cấu hình cổng email Resend và quản lý biến môi trường. |
-| **09** | **utils** | Thư viện các hàm tiện ích dùng chung được đóng gói sẵn để tái sử dụng như: hàm gửi thư `sendMail`, hàm upload tệp MinIO `uploadFile`, và cấu trúc xác định lỗi ứng dụng tùy biến `appAssert`. |
-| **10** | **types** | Khai báo toàn bộ các kiểu dữ liệu, các giao diện (Interfaces), kiểu định danh (Type aliases) và các tập hợp hằng số (Enums) của TypeScript dùng chung cho toàn bộ dự án. |
-| **11** | **constants** | Lưu trữ các giá trị hằng số cố định xuyên suốt vòng đời ứng dụng bao gồm mã trạng thái HTTP (HTTP status codes), đường dẫn hệ thống mặc định và các cấu hình tĩnh. |
+| **01** | **routes** | Registers and routes all application REST API endpoints (such as `/auth`, `/courses`, `/attendances`). Pairs routes with authentication/authorization middleware and directs execution flow to controllers. |
+| **02** | **controller** | Serves as the HTTP presentation layer. Validates client payloads, calls service functions for business execution, and returns standardized JSON responses with proper HTTP status codes. |
+| **03** | **services** | Implements core application business logic (e.g., prerequisite checks, registration cooldown, quiz attempts evaluation, attendance stats aggregation). Communicates with MongoDB via Mongoose models. |
+| **04** | **models** | Defines domain entity schemas, indexes, hooks, and TypeScript types for Mongoose/MongoDB collections. |
+| **05** | **middleware** | Intercepts HTTP requests for cross-cutting tasks including JWT token verification, role-based authorization (RBAC), rate limiting, and centralized error handling (`errorHandler`). |
+| **06** | **validators** | Defines input validation schemas using Zod to sanitize and validate incoming request bodies, queries, and parameters before reaching service layers. |
+| **07** | **socket** | Configures and manages WebSocket events via Socket.io, including chat rooms, live messaging, presence states, and WebRTC peer-to-peer video signaling. |
+| **08** | **config** | Centralizes configuration modules: MongoDB connection initialization, Multer file upload settings, MinIO client configuration, and environment variable loaders. |
+| **09** | **utils** | Reusable utility functions, such as email dispatching (`sendMail` via Resend), MinIO file uploads (`uploadFile`), app assertions (`appAssert`), and token helpers. |
+| **10** | **types** | Declares global TypeScript interfaces, type definitions, and Enums used throughout the backend codebase. |
+| **11** | **constants** | Houses global application constants including HTTP status codes, error message codes, and static configuration flags. |
