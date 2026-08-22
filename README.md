@@ -346,43 +346,58 @@ cd learning-management-system
 
 ---
 
-### Step 2: Backend Setup (`BE_LMS`)
+---
+
+### Step 2: Install All Dependencies (Monorepo Workspace)
+Install dependencies across all workspaces (`BE_LMS`, `FE_LMS`, and `prerender-server`) with a single command from root:
 ```bash
-cd BE_LMS
-
-# Install dependencies
 npm install
-
-# Configure environment variables
-cp .env.example .env
-
-# (Optional) Seed initial demo data
-npx ts-node src/scripts/initData.ts
-
-# Start development server (Port 4004)
-npm run dev
 ```
 
 ---
 
-### Step 3: Frontend Setup (`FE_LMS`)
+### Step 3: Configure Environment Files
 ```bash
-# Open a new terminal
-cd FE_LMS
+# Backend environment
+cp BE_LMS/.env.example BE_LMS/.env
 
-# Install dependencies
-npm install
-
-# Configure environment variables
-cp .env.development .env
-
-# Start Vite development server (Port 5173)
-npm run dev
+# Frontend environment
+cp FE_LMS/.env.example FE_LMS/.env
 ```
 
 ---
 
-### Step 4: Access Application
+### Step 4: Run Unified Workspace Scripts
+From the **root directory**, you can manage both services concurrently:
+
+```bash
+# 🚀 Run both Backend (Port 4004) & Frontend (Port 5173) simultaneously:
+npm run dev
+
+# 🔨 Run specific workspaces individually:
+npm run dev:be        # Start Backend dev server
+npm run dev:fe        # Start Frontend dev server
+npm run dev:prerender # Start Prerender service
+
+# 📦 Build all workspaces for production:
+npm run build
+npm run build:be      # Build Backend
+npm run build:fe      # Build Frontend
+
+# 🧪 Run automated test suites:
+npm test              # Run Jest tests in Backend
+```
+
+---
+
+### Step 5: (Optional) Seed Initial Demo Data
+```bash
+cd BE_LMS && npx ts-node src/scripts/initData.ts
+```
+
+---
+
+### Step 6: Access Application
 - **Frontend App**: `http://localhost:5173`
 - **Backend API**: `http://localhost:4004`
 - **Default Seed Accounts** (if `initData.ts` was executed):

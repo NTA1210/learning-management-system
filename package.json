@@ -1,0 +1,34 @@
+{
+  "name": "learning-management-system",
+  "version": "1.0.0",
+  "description": "Enterprise-grade Learning Management System (LMS) Monorepo Workspace",
+  "private": true,
+  "workspaces": [
+    "BE_LMS",
+    "FE_LMS",
+    "prerender-server/prerender-server"
+  ],
+  "scripts": {
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"cyan.bold,magenta.bold\" \"npm run dev -w BE_LMS\" \"npm run dev -w FE_LMS\"",
+    "dev:all": "concurrently -n \"BE,FE,PRERENDER\" -c \"cyan.bold,magenta.bold,yellow.bold\" \"npm run dev -w BE_LMS\" \"npm run dev -w FE_LMS\" \"npm run dev -w prerender-server/prerender-server\"",
+    "dev:be": "npm run dev -w BE_LMS",
+    "dev:fe": "npm run dev -w FE_LMS",
+    "dev:prerender": "npm run dev -w prerender-server/prerender-server",
+    "build": "npm run build --workspaces --if-present",
+    "build:be": "npm run build -w BE_LMS",
+    "build:fe": "npm run build -w FE_LMS",
+    "build:prerender": "npm run build -w prerender-server/prerender-server",
+    "start": "concurrently -n \"BACKEND,FRONTEND\" -c \"cyan.bold,magenta.bold\" \"npm run start -w BE_LMS\" \"npm run preview -w FE_LMS\"",
+    "test": "npm run test -w BE_LMS",
+    "test:coverage": "npm test -w BE_LMS -- --coverage",
+    "lint": "npm run lint --workspaces --if-present",
+    "clean": "rm -rf BE_LMS/dist FE_LMS/dist prerender-server/prerender-server/dist"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}
